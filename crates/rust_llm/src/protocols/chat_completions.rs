@@ -500,7 +500,7 @@ fn fill_usage(provider: Provider, message: &mut Message, usage: &Value) {
     message.tokens.input = input_tokens(usage);
     message.tokens.output = output_tokens(usage);
     message.tokens.cache_read = cache_read_tokens(usage);
-    message.tokens.cache_write = if usage.is_object() && !usage.as_object().unwrap().is_empty() { cache_write_tokens(usage) } else { None };
+    message.tokens.cache_write = if usage.is_object() && !usage.as_object().unwrap().is_empty() { cache_write_tokens(usage) } else { None }; // is_object() checked first
     message.tokens.thinking = thinking_tokens(usage);
     message.tokens.server_tool_use = usage
         .get("server_tool_use")

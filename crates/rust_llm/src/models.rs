@@ -35,7 +35,7 @@ pub struct Models {
 
 /// `RubyLLM.models`.
 pub fn models() -> Arc<Models> {
-    REGISTRY.read().unwrap().clone()
+    REGISTRY.read().unwrap().clone() // poisoned lock only
 }
 
 impl Models {
@@ -49,7 +49,7 @@ impl Models {
 
     /// Replaces the process-wide registry, e.g. after refreshing from providers.
     pub fn install(models: Vec<Model>) {
-        *REGISTRY.write().unwrap() = Arc::new(Models::new(models));
+        *REGISTRY.write().unwrap() = Arc::new(Models::new(models)); // poisoned lock only
     }
 
     /// Listed models (`Models#all`).

@@ -32,6 +32,7 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["process", "io-util"] }
 tracing.workspace = true
 uuid.workspace = true
+unicode-normalization.workspace = true
 
 [dev-dependencies]
 futures.workspace = true

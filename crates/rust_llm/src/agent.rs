@@ -9,7 +9,16 @@
 //! WeatherAssistant.new.ask "What's the weather in Berlin?"
 //! ```
 //!
-//! ```ignore
+//! ```no_run
+//! # use std::sync::Arc;
+//! # use rust_llm::{Agent, SharedTool, Tool, ToolCall, ToolError, ToolResult};
+//! # struct Weather;
+//! # #[async_trait::async_trait]
+//! # impl Tool for Weather {
+//! #     fn description(&self) -> String { "Gets the weather".into() }
+//! #     async fn execute(&self, _: serde_json::Map<String, serde_json::Value>, _: &ToolCall) -> Result<ToolResult, ToolError> { Ok("15C".into()) }
+//! # }
+//! # async fn run() -> rust_llm::Result<()> {
 //! struct WeatherAssistant;
 //! impl Agent for WeatherAssistant {
 //!     fn model(&self) -> Option<&str> { Some("gpt-5.6-luna") }
@@ -17,6 +26,7 @@
 //!     fn tools(&self) -> Vec<SharedTool> { vec![Arc::new(Weather)] }
 //! }
 //! WeatherAssistant.chat()?.ask("What's the weather in Berlin?").await?;
+//! # Ok(()) }
 //! ```
 
 use serde_json::Value;

@@ -1,5 +1,6 @@
 //! SeaORM entities for the tables `migrations` creates: `RubyLLM::ActiveRecord::Model`,
-//! `ToolCall`, `Usage`, and the app's `Chat`/`Message` (`acts_as_chat`/`acts_as_message`).
+//! `ToolCall`, `Usage`, and the app's `Chat`/`Message` (`acts_as_chat`/`acts_as_message`), plus
+//! `rust_llm_attachments`, which stands in for Active Storage.
 
 pub mod chats {
     use sea_orm::entity::prelude::*;
@@ -170,6 +171,32 @@ pub mod rust_llm_usages {
         pub total_cost: Option<f64>,
         pub created_at: DateTimeWithTimeZone,
         pub updated_at: DateTimeWithTimeZone,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod rust_llm_attachments {
+    use sea_orm::entity::prelude::*;
+
+    /// A message's file: the bytes and the Active Storage blob attributes RubyLLM reads back.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "rust_llm_attachments")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub id: i32,
+        pub message_type: String,
+        pub message_id: i64,
+        pub filename: String,
+        pub content_type: String,
+        pub byte_size: i64,
+        /// `{ "resolution": "high" }`, like the blob metadata RubyLLM writes.
+        pub metadata: Option<Json>,
+        pub data: Vec<u8>,
+        pub created_at: DateTimeWithTimeZone,
     }
 
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

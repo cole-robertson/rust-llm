@@ -614,7 +614,7 @@ fn track(state: &mut StreamBlocks, data: &Value, delta_type: Option<&str>) {
                     if !block.get("citations").is_some_and(Value::is_array) {
                         block["citations"] = json!([]);
                     }
-                    block["citations"].as_array_mut().unwrap().push(delta["citation"].clone());
+                    block["citations"].as_array_mut().unwrap().push(delta["citation"].clone()); // made an array just above
                 }
                 _ => {}
             }

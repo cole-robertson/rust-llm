@@ -109,7 +109,7 @@ pub struct EmbedOptions<'a> {
 
 fn vectors_from(rows: Vec<Vec<f64>>, single: bool) -> Vectors {
     if single && rows.len() == 1 {
-        Vectors::Single(rows.into_iter().next().unwrap())
+        Vectors::Single(rows.into_iter().next().unwrap()) // len() == 1 checked above
     } else {
         Vectors::Batch(rows)
     }

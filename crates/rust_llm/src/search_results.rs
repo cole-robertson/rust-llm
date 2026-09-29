@@ -6,8 +6,12 @@
 //! RubyLLM::SearchResults.new(title: 'Q4 Report', url: report_url, text: report_text)
 //! ```
 //!
-//! ```ignore
+//! ```no_run
+//! # use rust_llm::{SearchResults, ToolError, ToolResult};
+//! # use serde_json::json;
+//! # fn execute(report_url: &str, report_text: &str) -> Result<ToolResult, ToolError> {
 //! Ok(SearchResults::new(vec![json!({ "title": "Q4 Report", "url": report_url, "text": report_text })])?.into())
+//! # }
 //! ```
 
 use serde_json::{Map, Value, json};

@@ -19,6 +19,14 @@ The same tables and columns RubyLLM creates, with the `rust_llm_` prefix:
 | `rust_llm_models` | registry entries used by chats, created on first use |
 | `rust_llm_tool_calls` | each tool call, its arguments, approval decision, and the tool-result message it links to |
 | `rust_llm_usages` | one row per provider attempt: operation, provider, model, status, token buckets, and cost components |
+| `rust_llm_attachments` | message files: bytes, filename, content type, byte size, and `{ "resolution": ... }` metadata |
+
+RubyLLM stores message files with Active Storage (`has_many_attached :attachments`). Loco has no
+Active Storage, so `rust_llm_attachments` holds the bytes in the database, one row per file,
+pointing at its message the same polymorphic way `rust_llm_tool_calls` does. `ask_with` stores the
+files with the user message, and `to_llm` gives them back as `Attachment`s with the same bytes,
+name, and type. Keep large files in object storage and attach them by URL if the database should
+stay small: a URL attachment is fetched once when it is stored.
 
 Add the migrations to your Loco migrator:
 
@@ -83,12 +91,29 @@ database. Reapply them after `to_llm`, or keep them in an [Agent](agents.md) and
 | `ChatRecord::create(db, model, provider)` | `Chat.create!(model:, provider:)` |
 | `ChatRecord::find(db, id)` | `Chat.find(id)` |
 | `to_llm(db)` / `to_llm_with(db, config)` | `chat.to_llm` (with `context:`) |
-| `ask(db, &mut chat, text)` | `chat.ask(text)` |
+| `create_with(db, model, provider, true)`, `assume_model_exists` | `Chat.create!(..., assume_model_exists: true)` |
+| `reload(db, &mut chat)` | `chat.reload` (keeps tools, callbacks, runtime instructions) |
+| `with_model(db, chat, model, provider)` | `chat.with_model(model, provider:)` |
+| `ask(db, &mut chat, text)` / `ask_with(..., attachments)` | `chat.ask(text)` / `chat.ask(text, with: [...])` |
+| `ask_later(db, &mut chat, text)` / `ask_later_with` | `chat.ask_later(text)` (persisted) |
 | `complete(db, &mut chat)` | `chat.complete` |
-| `with_instructions(db, &mut chat, text)` | `chat.with_instructions(text)` (persisted, replaces earlier ones) |
+| `add_message(db, &mut chat, message)` | `chat.add_message(message)` |
+| `with_instructions(db, &mut chat, text)` | `chat.with_instructions(text)` |
+| `set_instructions(db, &mut chat, text, append, persist, cache_until_here)` | `chat.with_instructions(text, append:, persist:, cache_until_here:)` |
+| `cache_until_here(db, &mut chat)` | `chat.cache_until_here` |
 | `approve` / `deny(db, &mut chat, tool_call_id)` | `chat.approve` / `chat.deny` (persisted) |
+| `is_awaiting_approval(db, &mut chat)`, `pending_approvals(db, &mut chat)` | `chat.awaiting_approval?`, `chat.pending_approvals` (tool-call rows) |
+| `answer` / `decline(db, &mut chat, request, ...)` | `chat.answer` / `chat.decline` (persisted) |
+| `cancel(db)`, `is_cancelled(db)` | `chat.cancel`, `chat.cancelled?` |
+| `create_for_agent(db, &agent)` / `find_for_agent(db, id, &agent)` | `Agent.create!` / `Agent.find(id)` with `chat_model Chat` |
 | `messages(db)`, `usages(db)`, `model(db)` | `chat.messages`, the usage rows, `chat.model` |
 | `tokens(db)`, `cost(db)`, `total_cost(db)` | `chat.tokens`, `chat.cost`, `chat.cost.total` |
+
+Instructions work as in RubyLLM. Persisted instructions replace the chat's system rows; a single
+existing row is updated in place so it stays ahead of the conversation. `append: true` adds another.
+With `persist: false` they apply only to chats this `ChatRecord` builds or reloads and are never
+written. `create_for_agent` persists the agent's instructions; `find_for_agent` applies them
+without rewriting history.
 
 `complete` advances one `step` at a time and writes after every step, so a crash loses at most the
 step in flight. If a round fails, the incomplete tool round is rolled back (usage rows stay, linked
@@ -123,6 +148,11 @@ record.complete(db, &mut chat).await?;
 # Ok(()) }
 ```
 
+`complete` rereads the decisions and paused MCP input requests on the tool-call rows before each
+step (RubyLLM's `approval_checker` and `input_checker`), so an approval or answer recorded by
+another process reaches a chat that is already running. A tool call paused on an MCP input request
+stores its state in `pending_input` and resumes from rows after `answer` or `decline`.
+
 Make approval-gated tools safe to run twice: a worker can die after the side effect but before the
 result row is written.
 
@@ -139,6 +169,13 @@ let total = record.total_cost(db).await?; // None when any attempt could not be 
 # Ok(()) }
 ```
 
+## Cancellation
+
+`record.cancel(db)` sets `chats.cancelled`. A `complete` running anywhere, in a job for example,
+polls the column every second (`CANCELLATION_POLL_INTERVAL`), clears it, and stops with
+`rust_llm::Error::Cancelled`. The billed attempt stays in the ledger, unlinked, and the chat stays
+usable.
+
 ## Errors
 
 `rust_llm_loco::Error` wraps `Db(sea_orm::DbErr)`, `Llm(rust_llm::Error)`, and `NotFound`.
@@ -146,10 +183,9 @@ let total = record.total_cost(db).await?; // None when any attempt could not be 
 ## Not ported
 
 - Streaming through a persisted chat (`chat.ask { |chunk| }` on a record) and Turbo broadcasting.
-- Persisted cancellation: the `chats.cancelled` column exists but is not read or written.
-- Persisted MCP input requests: the `pending_input` column exists, but `ChatRecord` does not
-  save or restore `tool_call_inputs`, so a chat paused on an MCP input request cannot resume from
-  rows.
-- `add_message` on a record, custom or namespaced chat/message classes, a separate user-visible
-  transcript, the `ruby_llm_batches` table, and Active Storage attachments on messages.
+- Custom or namespaced chat/message classes, a separate user-visible transcript, Action Text
+  content, the `ruby_llm_batches` and `ruby_llm_mcp_credentials` tables, and `compact`/`generate`
+  on a record.
+- Copying the whole registry into an empty `rust_llm_models` table on first use: RustLLM's
+  registry never reads that table, so only the rows chats use are written.
 - Registry refresh into `rust_llm_models` (`RubyLLM.models.refresh`, `ruby_llm:load_models`).

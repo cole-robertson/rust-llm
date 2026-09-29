@@ -5,9 +5,18 @@
 //! chat.ask "What's the weather in Berlin?"
 //! ```
 //!
-//! ```ignore
-//! let mut chat = rust_llm::chat().with_model("claude-haiku-4-5")?.with_tool(Weather);
+//! ```no_run
+//! # use rust_llm::{Tool, ToolCall, ToolError, ToolResult};
+//! # struct Weather;
+//! # #[async_trait::async_trait]
+//! # impl Tool for Weather {
+//! #     fn description(&self) -> String { "Gets the weather".into() }
+//! #     async fn execute(&self, _: serde_json::Map<String, serde_json::Value>, _: &ToolCall) -> Result<ToolResult, ToolError> { Ok("15C".into()) }
+//! # }
+//! # async fn run() -> rust_llm::Result<()> {
+//! let mut chat = rust_llm::chat_with("claude-haiku-4-5")?.with_tool(Weather);
 //! chat.ask("What's the weather in Berlin?").await?;
+//! # Ok(()) }
 //! ```
 
 use std::collections::HashMap;
@@ -57,11 +66,19 @@ impl From<&str> for Fallback {
 pub struct FallbackAttempt {
     pub attempt: usize,
     pub error: String,
+    /// The class of `error` (`fallback.error.is_a?(ServerError)`).
+    pub error_kind: ErrorKind,
     pub from: String,
     pub to: String,
+    /// `fallback.to.provider`.
+    pub to_provider: String,
     pub streaming: bool,
     pub chunks_yielded: bool,
     pub succeeded: Option<bool>,
+    /// `fallback.response`: what the fallback model answered, once it did.
+    pub response: Option<Message>,
+    /// `fallback.fallback_error`: why the fallback attempt itself failed (`failed?`).
+    pub fallback_error: Option<(ErrorKind, String)>,
 }
 
 #[derive(Default)]
@@ -120,12 +137,18 @@ pub struct Chat {
 
 impl std::fmt::Debug for Chat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Chat")
-            .field("model", &self.model.id)
+        let mut f = f.debug_struct("Chat");
+        f.field("model", &self.model.id)
             .field("provider", &self.provider.slug())
             .field("messages", &self.messages.len())
-            .field("tools", &self.tools.iter().map(|t| t.name()).collect::<Vec<_>>())
-            .finish()
+            .field("tools", &self.tools.iter().map(|t| t.name()).collect::<Vec<_>>());
+        // `inspect_attributes` `awaiting_approval:`, omitted when empty like `Inspectable`.
+        let mut awaiting: Vec<String> = self.pending_approvals().into_iter().map(|c| c.name).collect();
+        awaiting.dedup();
+        if !awaiting.is_empty() {
+            f.field("awaiting_approval", &awaiting);
+        }
+        f.finish()
     }
 }
 
@@ -562,6 +585,16 @@ impl Chat {
         self
     }
 
+    /// `fallbacks`.
+    pub fn fallbacks(&self) -> &[Fallback] {
+        &self.fallbacks
+    }
+
+    /// `fallback_errors`.
+    pub fn fallback_errors(&self) -> &[ErrorKind] {
+        &self.fallback_errors
+    }
+
     // ---- callbacks -------------------------------------------------------------------------
 
     pub fn before_message(mut self, f: impl FnMut() + Send + Sync + 'static) -> Self {
@@ -613,7 +646,7 @@ impl Chat {
     /// `add_message`: append without calling the model.
     pub fn add_message(&mut self, message: Message) -> &Message {
         self.messages.push(message);
-        self.messages.last().unwrap()
+        self.messages.last().unwrap() // pushed just above
     }
 
     /// `add_completion(response, record_usage:)`: append an answer produced outside `complete`
@@ -640,7 +673,7 @@ impl Chat {
             cb();
         }
         self.messages.push(message);
-        let message = self.messages.last().unwrap();
+        let message = self.messages.last().unwrap(); // pushed just above
         for cb in &mut self.callbacks.after_message {
             cb(message);
         }
@@ -787,6 +820,10 @@ impl Chat {
             let result = self.generate_once(on_chunk.as_mut().map(|f| &mut **f as &mut (dyn FnMut(&Message) + Send)), &mut chunks_yielded).await;
             if let Some(mut a) = active.take() {
                 a.succeeded = Some(result.is_ok());
+                match &result {
+                    Ok(message) => a.response = Some(message.clone()),
+                    Err(e) => a.fallback_error = Some((e.kind(), e.to_string())),
+                }
                 for cb in &mut self.callbacks.after_fallback {
                     cb(&a);
                 }
@@ -815,11 +852,15 @@ impl Chat {
                     let a = FallbackAttempt {
                         attempt,
                         error: e.to_string(),
+                        error_kind: e.kind(),
                         from,
                         to: self.model.id.clone(),
+                        to_provider: self.provider.slug().into(),
                         streaming,
                         chunks_yielded,
                         succeeded: None,
+                        response: None,
+                        fallback_error: None,
                     };
                     for cb in &mut self.callbacks.before_fallback {
                         cb(&a);
@@ -1032,7 +1073,8 @@ impl Chat {
                 acc.add(&chunk);
                 *chunks_yielded = true;
                 on_chunk(&chunk);
-                if cancelled.load(Ordering::SeqCst) {
+                // `raise_if_cancelled!` inside the streaming block: one-shot, so it clears the flag.
+                if cancelled.swap(false, Ordering::SeqCst) {
                     return Err(Error::Cancelled);
                 }
                 Ok(())
@@ -1071,7 +1113,6 @@ impl Chat {
                 return Err(e);
             }
         };
-        self.raise_if_cancelled()?;
         let billed_model = message
             .model
             .as_deref()
@@ -1079,6 +1120,9 @@ impl Chat {
             .unwrap_or_else(|| self.model.clone());
         let entry = self.entry(UsageStatus::Succeeded, message.tokens.clone(), Some(&billed_model));
         self.record_usage(entry.clone());
+        // `record_generated_message`: the tracker has already billed the attempt, so a cancel
+        // during the request keeps the usage but adds no message.
+        self.raise_if_cancelled()?;
         call_entries.push(entry);
         message.usage_entries = call_entries.clone();
         message.model_info = Some(billed_model.clone());
@@ -1235,7 +1279,15 @@ impl Chat {
             return !self.tool_call_decisions.contains_key(&call.id);
         }
         let Some(tool) = self.find_tool(&call.name) else { return false };
-        tool.requires_approval() && !self.tool_call_decisions.contains_key(&call.id)
+        tool.requires_approval() && self.tool_call_approval(&*tool, call).is_none()
+    }
+
+    /// `tool_call_approval`: the tool's own resolver, else the recorded decision.
+    fn tool_call_approval(&self, tool: &dyn Tool, call: &ToolCall) -> Option<bool> {
+        match tool.approval(call) {
+            Some(decision) => decision,
+            None => self.tool_call_decisions.get(&call.id).copied(),
+        }
     }
 
     /// Execute the pending tool calls of the latest response (`run_tools`).
@@ -1262,7 +1314,7 @@ impl Chat {
             }
             let tool = self.find_tool(&call.name);
             let decision = match &tool {
-                Some(t) if t.requires_approval() => self.tool_call_decisions.get(&call.id).copied(),
+                Some(t) if t.requires_approval() => self.tool_call_approval(&**t, &call),
                 _ => Some(self.tool_call_decisions.get(&call.id).copied() != Some(false)),
             };
             match decision {

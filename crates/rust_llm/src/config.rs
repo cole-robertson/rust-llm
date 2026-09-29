@@ -101,7 +101,8 @@ impl Config {
     }
 
     pub fn get(&self, option: &str) -> Option<&str> {
-        self.values.get(option).map(String::as_str).filter(|v| !v.is_empty())
+        // `normalize_blank`: a whitespace-only value is unset, like `value.strip.empty?`.
+        self.values.get(option).map(String::as_str).filter(|v| !v.trim().is_empty())
     }
 
     pub fn set(&mut self, option: impl Into<String>, value: impl Into<String>) -> &mut Self {
@@ -133,7 +134,7 @@ static CONFIG: LazyLock<RwLock<Arc<Config>>> = LazyLock::new(|| RwLock::new(Arc:
 
 /// `RubyLLM.configure { |config| ... }`.
 pub fn configure(f: impl FnOnce(&mut Config)) {
-    let mut guard = CONFIG.write().unwrap();
+    let mut guard = CONFIG.write().unwrap(); // poisoned lock only
     let mut config = (**guard).clone();
     f(&mut config);
     *guard = Arc::new(config);
@@ -141,5 +142,5 @@ pub fn configure(f: impl FnOnce(&mut Config)) {
 
 /// `RubyLLM.config`.
 pub fn config() -> Arc<Config> {
-    CONFIG.read().unwrap().clone()
+    CONFIG.read().unwrap().clone() // poisoned lock only
 }

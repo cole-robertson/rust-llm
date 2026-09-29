@@ -178,7 +178,7 @@ pub const DEFAULT_FALLBACK_ERRORS: &[ErrorKind] = &[
 ];
 
 fn patterns(list: &[&str]) -> Vec<Regex> {
-    list.iter().map(|p| Regex::new(&format!("(?i){p}")).unwrap()).collect()
+    list.iter().map(|p| Regex::new(&format!("(?i){p}")).unwrap()).collect() // patterns are constants in this file
 }
 
 static CONTEXT_LENGTH_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {

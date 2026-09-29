@@ -112,13 +112,21 @@ impl Connection {
         Ok(format!("{}/{}", base.trim_end_matches('/'), path.trim_start_matches('/')))
     }
 
+    /// `additional_headers.merge(req.headers)`: request headers (a chat's `with_headers`, betas)
+    /// are added, but the provider's own headers (auth, API version) win on a name clash, which
+    /// is case-insensitive like Faraday's header hash.
+    fn merged_headers(&self, extra: &[(String, String)]) -> Vec<(String, String)> {
+        let provider = self.provider.headers(&self.config);
+        let mut headers: Vec<(String, String)> =
+            extra.iter().filter(|(k, _)| !provider.iter().any(|(p, _)| p.eq_ignore_ascii_case(k))).cloned().collect();
+        headers.extend(provider);
+        headers
+    }
+
     fn request(&self, url: &str, payload: &Value, extra: &[(String, String)]) -> reqwest::RequestBuilder {
         let mut req = self.client.post(url).json(payload);
-        for (k, v) in self.provider.headers(&self.config) {
+        for (k, v) in self.merged_headers(extra) {
             req = req.header(k, v);
-        }
-        for (k, v) in extra {
-            req = req.header(k.as_str(), v.as_str());
         }
         req
     }
@@ -272,11 +280,8 @@ impl Connection {
         let url = self.url(path)?;
         let build = || {
             let mut req = self.client.request(method.clone(), &url);
-            for (k, v) in self.provider.headers(&self.config) {
+            for (k, v) in self.merged_headers(extra) {
                 req = req.header(k, v);
-            }
-            for (k, v) in extra {
-                req = req.header(k.as_str(), v.as_str());
             }
             body(req)
         };

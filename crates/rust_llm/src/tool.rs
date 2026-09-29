@@ -121,6 +121,14 @@ pub trait Tool: Send + Sync {
         false
     }
 
+    /// `requires_approval { |tool_call| ... }`: decide a call yourself instead of using the
+    /// recorded `approve`/`deny`. `Some(true)` executes, `Some(false)` denies, `None` keeps it
+    /// pending. Only consulted when `requires_approval()` is true, and possibly several times per
+    /// call, so make it an idempotent read. The default defers to the recorded decision.
+    fn approval(&self, _tool_call: &ToolCall) -> Option<Option<bool>> {
+        None
+    }
+
     /// `Tool.provider_options`: deep-merged into this tool's provider definition.
     fn provider_options(&self) -> Map<String, Value> {
         Map::new()
@@ -140,9 +148,16 @@ pub trait Tool: Send + Sync {
 pub fn tool_name_from_type(type_name: &str) -> String {
     let base = type_name.rsplit("::").next().unwrap_or(type_name);
     let base = base.split('<').next().unwrap_or(base);
-    let ascii: String =
-        base.chars().map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '-' }).collect();
-    underscore(&ascii).trim_end_matches("_tool").to_string()
+    // `unicode_normalize(:nfkd).encode('ASCII', replace: '')`: accents decompose and drop, other
+    // non-ASCII characters drop, then anything outside `[a-zA-Z0-9_-]` becomes `-`.
+    use unicode_normalization::UnicodeNormalization;
+    let ascii: String = base
+        .nfkd()
+        .filter(char::is_ascii)
+        .map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '-' })
+        .collect();
+    let name = underscore(&ascii);
+    name.strip_suffix("_tool").unwrap_or(&name).to_string()
 }
 
 /// Acronym-aware underscoring: `HTTPProxyTool` -> `http_proxy_tool`.
@@ -261,8 +276,10 @@ fn close_objects(node: &mut Value) {
 
 /// Rejects arguments `execute(**kwargs)` would: missing required keys and unknown keys.
 pub(crate) fn validate_arguments(tool: &dyn Tool, arguments: &Map<String, Value>) -> Option<String> {
+    // A tool with no declared parameters renders the empty object schema, like Ruby's `execute`
+    // without keywords, so any argument is unknown there too.
     let params = tool.parameters();
-    if params.is_empty() || tool.parameters_schema().is_some() {
+    if tool.parameters_schema().is_some() {
         return None;
     }
     if let Some(missing) = params.iter().find(|p| p.required && !arguments.contains_key(&p.name)) {

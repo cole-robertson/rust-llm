@@ -141,7 +141,9 @@ impl Attachment {
     /// `Attachment.new(source)`: a local path or an http(s) URL.
     pub fn new(source: impl AsRef<str>) -> Attachment {
         let source = source.as_ref();
-        if source.starts_with("http://") || source.starts_with("https://") {
+        // `url?`: `\Ahttps?://` case-insensitively.
+        let scheme = source.get(..8).unwrap_or(source).to_ascii_lowercase();
+        if scheme.starts_with("http://") || scheme.starts_with("https://") {
             let path = source.split(['?', '#']).next().unwrap_or(source);
             let filename = path.rsplit('/').next().map(str::to_string);
             let mime = mime_for_name(filename.as_deref().unwrap_or(""));
@@ -300,6 +302,15 @@ impl Attachment {
         self.content.get().map(Vec::as_slice).ok_or_else(|| {
             Error::Argument(format!("attachment {:?} was not loaded before rendering", self.filename))
         })
+    }
+
+    /// `Attachment#content`: the raw bytes, reading or fetching the source on the first call.
+    /// Fails for a provider-managed file, which has no local content.
+    pub async fn content(&mut self) -> Result<Vec<u8>> {
+        if !self.is_provider_file() {
+            self.load(&reqwest::Client::new()).await?;
+        }
+        self.bytes().map(<[u8]>::to_vec)
     }
 
     pub fn content_text(&self) -> Result<String> {

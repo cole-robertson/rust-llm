@@ -8,10 +8,15 @@
 //! chat.with_provider_tools({ type: "web_search_20260318", name: "web_search" })
 //! ```
 //!
-//! ```ignore
-//! chat.with_provider_tools(["web_search".into()]);
-//! chat.with_provider_tools([ProviderTool::with_options("mcp", json!({ "name": "docs", "url": "..." }))]);
-//! chat.with_provider_tools([ProviderTool::raw(json!({ "type": "web_search_20260318", "name": "web_search" }))]);
+//! ```no_run
+//! # use rust_llm::ProviderTool;
+//! # use serde_json::json;
+//! # fn run() -> rust_llm::Result<()> {
+//! # let chat = rust_llm::chat()?;
+//! let chat = chat.with_provider_tools(["web_search".into()]);
+//! let chat = chat.with_provider_tools([ProviderTool::with_options("mcp", json!({ "name": "docs", "url": "..." }))]);
+//! let chat = chat.with_provider_tools([ProviderTool::raw(json!({ "type": "web_search_20260318", "name": "web_search" }))]);
+//! # let _ = chat; Ok(()) }
 //! ```
 
 use serde_json::{Map, Value, json};

@@ -6,7 +6,7 @@ use sea_orm_migration::schema::*;
 
 /// All RubyLLM migrations, in order.
 pub fn all() -> Vec<Box<dyn MigrationTrait>> {
-    vec![Box::new(CreateRustLlmRecords), Box::new(CreateChats), Box::new(CreateMessages)]
+    vec![Box::new(CreateRustLlmRecords), Box::new(CreateChats), Box::new(CreateMessages), Box::new(CreateRustLlmAttachments)]
 }
 
 /// `create_rust_llm_records_migration.rb.tt`: models, tool calls, usages.
@@ -192,5 +192,43 @@ impl MigrationTrait for CreateMessages {
 
     async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
         m.drop_table(Table::drop().table("messages").if_exists().to_owned()).await
+    }
+}
+
+/// Attachment storage for messages. RubyLLM keeps message files in Active Storage
+/// (`has_many_attached :attachments`, installed by `active_storage:install`); Loco has no
+/// equivalent, so the bytes live in this table instead, one row per file, with the Active Storage
+/// blob's filename, content type, byte size, and `metadata: { resolution: }`. Rows reference their
+/// message polymorphically, like `rust_llm_tool_calls`.
+#[derive(DeriveMigrationName)]
+pub struct CreateRustLlmAttachments;
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateRustLlmAttachments {
+    async fn up(&self, m: &SchemaManager) -> Result<(), DbErr> {
+        m.create_table(
+            Table::create()
+                .table("rust_llm_attachments")
+                .if_not_exists()
+                .col(pk_auto("id"))
+                .col(string("message_type"))
+                .col(big_integer("message_id"))
+                .col(string("filename"))
+                .col(string("content_type"))
+                .col(big_integer("byte_size"))
+                .col(json_null("metadata"))
+                .col(blob("data"))
+                .col(timestamp_with_time_zone("created_at").default(Expr::current_timestamp()))
+                .to_owned(),
+        )
+        .await?;
+        m.create_index(
+            Index::create().name("idx-rust_llm_attachments-message").table("rust_llm_attachments").col("message_type").col("message_id").to_owned(),
+        )
+        .await
+    }
+
+    async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
+        m.drop_table(Table::drop().table("rust_llm_attachments").if_exists().to_owned()).await
     }
 }

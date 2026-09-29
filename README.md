@@ -110,6 +110,10 @@ record.complete(&ctx.db, &mut chat).await?;
 `bin/fw cargo test --workspace` builds and tests on the `framework` box; `bin/convert-cassettes`
 turns more upstream cassettes into test fixtures.
 
+[`docs/PARITY.md`](docs/PARITY.md) lists every example in RubyLLM's spec suite with its status
+here: ported (the Rust test that cites it), replayed from its own cassette, not applicable (and
+why), or missing. `bin/parity` regenerates it.
+
 ## Generators
 
 `cargo install --path crates/rust_llm_cli`, then from a Loco app:
@@ -130,6 +134,8 @@ The chat UI polls for new messages while a reply is pending; it doesn't stream t
 
 These are listed so nothing is silently missing:
 - Bedrock, Vertex AI, Azure (cloud auth); Cohere; ElevenLabs; Deepgram.
-- `animate`, `speak`, `transcribe`, `ocr`, `rerank`, `moderate`.
+- Gemini's Interactions protocol for chat (only its transcription is ported); Mistral's
+  Conversations API (so Mistral can't `paint`); WebSocket transcription streaming (xAI, Gemini Live).
+- `research` / `research_later` (Perplexity agents, Vertex research); `CachedContent`.
 - MCP OAuth; Gemini embedding batches; multipart image edits for non-gpt-image models (dall-e-2).
-- `with_compaction`, `count_tokens`, `with_citations` as a request option; instrumentation events.
+- Prompt templates (`RubyLLM::Prompt`, `app/prompts`); `workflow` and instrumentation events.

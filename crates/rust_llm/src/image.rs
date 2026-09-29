@@ -525,8 +525,8 @@ fn gemini_image_model(model: &str) -> bool {
 }
 
 const GEMINI_IMAGE_SIZES: &[&str] = &["512", "512P", "512PX", "1K", "2K", "4K"];
-static ASPECT_RATIO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\A\d+:\d+\z").unwrap());
-static PIXEL_DIMENSIONS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\A(\d+)\s*[x×]\s*(\d+)\z").unwrap());
+static ASPECT_RATIO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\A\d+:\d+\z").unwrap()); // constant regex
+static PIXEL_DIMENSIONS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\A(\d+)\s*[x×]\s*(\d+)\z").unwrap()); // constant regex
 
 /// `Gemini::Images#build_image_config`: Gemini sizes by aspect ratio and resolution tier, so
 /// `WxH` becomes the ratio it reduces to.

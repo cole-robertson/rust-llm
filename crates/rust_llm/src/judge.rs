@@ -9,9 +9,12 @@
 //! Urgency.judge("Please refund the duplicate charge today.").urgent.probability
 //! ```
 //!
-//! ```ignore
-//! let urgency = Judge::new().probability("urgent", "Does this need attention today?");
+//! ```no_run
+//! # use rust_llm::Judge;
+//! # async fn run() -> rust_llm::Result<()> {
+//! let urgency = Judge::new().probability("urgent", "Does this need attention today?")?;
 //! urgency.judge("Please refund the duplicate charge today.").await?.probability("urgent");
+//! # Ok(()) }
 //! ```
 //!
 //! A judgment is one request: every question is answered about the same input. Nothing is

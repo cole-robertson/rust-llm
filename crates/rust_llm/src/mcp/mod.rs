@@ -13,11 +13,15 @@
 //! Here the class DSL is a builder, and settings Ruby evaluates on the instance (blocks reading
 //! declared `inputs`) are closures that capture what they need:
 //!
-//! ```ignore
+//! ```no_run
+//! # use rust_llm::Mcp;
+//! # async fn run() -> rust_llm::Result<()> {
+//! # let chat = rust_llm::chat()?;
 //! let files = Mcp::command(["npx", "-y", "@modelcontextprotocol/server-filesystem", "."])
 //!     .requires_approval_if(&[] as &[&str], |tool| tool.is_destructive())
 //!     .build()?;
 //! chat.with_mcp(files).ask("What's in the README?").await?;
+//! # Ok(()) }
 //! ```
 //!
 //! A `url` connects over Streamable HTTP ([`Http`]), a `command` starts a local server that speaks

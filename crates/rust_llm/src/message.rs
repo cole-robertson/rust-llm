@@ -569,7 +569,7 @@ impl Message {
         }
         if let Some(calls) = &self.tool_calls {
             let calls: Map<String, Value> =
-                calls.iter().map(|(k, v)| (k.clone(), serde_json::to_value(v).unwrap())).collect();
+                calls.iter().map(|(k, v)| (k.clone(), serde_json::to_value(v).unwrap())).collect(); // ToolCall always serializes
             h.insert("tool_calls".into(), calls.into());
         }
         if let Some(id) = &self.tool_call_id {
@@ -584,7 +584,7 @@ impl Message {
             }
         }
         if !self.citations.is_empty() {
-            h.insert("citations".into(), serde_json::to_value(&self.citations).unwrap());
+            h.insert("citations".into(), serde_json::to_value(&self.citations).unwrap()); // Citation always serializes
         }
         if let Some(r) = &self.finish_reason {
             h.insert("finish_reason".into(), r.as_str().into());

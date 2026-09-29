@@ -2,7 +2,9 @@
 //!
 //! Upstream's only upgrade is 2.0 -> 2.1 (`upgrade_ruby_llm_to_2_1.rb.tt`: an MCP credentials
 //! table and `ruby_llm_tool_calls.pending_input`). This port is 2.0.0, its install migration
-//! already creates `pending_input`, and MCP is not ported, so there is nothing to write.
+//! already creates `pending_input`, and the credentials table only backs MCP OAuth, which is not
+//! ported (MCP itself is: `rust_llm::mcp` over stdio and Streamable HTTP, `Chat::with_mcp`), so
+//! there is nothing to write.
 
 use crate::Generator;
 
