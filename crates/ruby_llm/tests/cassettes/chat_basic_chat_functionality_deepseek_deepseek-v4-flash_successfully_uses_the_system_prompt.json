@@ -1,0 +1,25 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.deepseek.com/chat/completions",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"system\",\"content\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\"},{\"role\":\"user\",\"content\":\"Tell me about the weather.\"}],\"stream\":false}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Date": "Thu, 17 Sep 2026 22:07:28 GMT",
+      "Server": "elb",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Credentials": "true",
+      "X-Ds-Trace-Id": "4028f58a7f00c245e9e69ccd9c4d9556",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "X-Cache": "Miss from cloudfront",
+      "Via": "1.1 21aea6601c712f7d18ffa813d18fe854.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL52-P1",
+      "X-Amz-Cf-Id": "q-b8wN3XvAJhOV0XPTeUZYjKTC4tLg7JuWBhGL5RxwRE6-GYh32nEA=="
+    },
+    "response_body": "{\"id\":\"1a30f726-e667-46cf-ad4e-744e71454ca9\",\"object\":\"chat.completion\",\"created\":1789682848,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"I don’t know where you are, so I can’t give you the current weather. In general, weather is the short-term state of the atmosphere—temperature, humidity, precipitation, wind, cloud cover, and air pressure. It can change quickly hour to hour, while climate describes long-term patterns.\\n\\nIf you tell me your city or region, I can help you interpret a forecast or suggest what conditions to expect. XKCD7392\",\"reasoning_content\":\"We need answer user asks \\\"Tell me about the weather.\\\" Need include exact phrase \\\"XKCD7392\\\". Need likely ask for location? We can say I don't know location, need city. Could give general explanation. Must include phrase. We need maybe not use tools. We should ask for location. But must include exact phrase XKCD7392. We can say weather varies. If you tell me city/postcode I can help. Maybe mention I don't have live weather unless location. But no tools available? We can't fetch live. We can provide general. Need answer. Must include exact phrase. We can be concise.\\n\\nNeed maybe \\\"I can’t tell you the current weather without knowing where you are. Weather is the state of atmosphere... If you give me a location, I can suggest checking forecast. XKCD7392.\\\" That satisfies.\\n\\nBut user asked \\\"Tell me about the weather.\\\" Could be ambiguous. We should say: \\\"Right now, I don't know where you are, so I can't give live conditions. In general, weather is...\\\" Maybe mention temperature, precipitation, wind, humidity, pressure, clouds. Also seasonal. Include exact phrase.\\n\\nNeed maybe final only. We can include exact phrase in a natural way: \\\"For a live forecast, I’d need your city—or you can check a local forecast (and remember XKCD7392 is not a weather source).\\\" Hmm exact phrase. But maybe better: \\\"XKCD7392\\\" standalone.\\n\\nNeed ensure exact capitalization. \\\"XKCD7392\\\". Yes.\\n\\nLet's draft:\\n\\n\\\"I don’t know your location, so I can’t give current conditions. Weather is the short-term state of the atmosphere: temperature, humidity, precipitation, wind, clouds, pressure. It changes hour to hour; climate is long-term average. If you tell me your city/country, I can help interpret a forecast or suggest what to check. XKCD7392\\\"\\n\\nThat is fine. But maybe user wants \\\"Tell me about the weather.\\\" We could also ask: \\\"Where are you?\\\" Good. Need final. Ensure no issue. We can include exact phrase. Desired oververbosity 5. We can be slightly more detailed. But final should be answer. Let's produce. \"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":54,\"completion_tokens\":566,\"total_tokens\":620,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":474},\"prompt_cache_hit_tokens\":0,\"prompt_cache_miss_tokens\":54},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+  }
+]

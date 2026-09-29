@@ -1,0 +1,257 @@
+//! Port of `lib/ruby_llm/attachment.rb` and `files/mime_type.rb`.
+
+use std::path::{Path, PathBuf};
+
+use base64::Engine;
+
+use crate::error::{Error, Result};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttachmentType {
+    Image,
+    Video,
+    Audio,
+    Pdf,
+    Text,
+    Document,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Resolution {
+    Low,
+    Medium,
+    High,
+    UltraHigh,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Source {
+    Path(PathBuf),
+    Url(String),
+    Bytes(Vec<u8>),
+}
+
+/// A file sent to (or returned by) a model. Local paths are read when the request is rendered;
+/// URLs are passed through to providers that accept them and fetched otherwise.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Attachment {
+    pub source: Source,
+    pub filename: Option<String>,
+    pub mime_type: String,
+    pub resolution: Option<Resolution>,
+    content: Option<Vec<u8>>,
+}
+
+const DOCUMENT_EXTENSIONS: &[&str] = &[
+    "doc", "docx", "dot", "key", "numbers", "odp", "ods", "odt", "pages", "pot", "pps", "ppt", "pptx", "rtf",
+    "xls", "xlsx",
+];
+const TEXT_SUFFIXES: &[&str] = &["+json", "+xml", "+html", "+yaml", "+csv", "+plain", "+javascript", "+svg"];
+const TEXT_MIME_TYPES: &[&str] = &[
+    "application/json", "application/xml", "application/javascript", "application/ecmascript",
+    "application/rtf", "application/sql", "application/x-sh", "application/x-csh", "application/x-httpd-php",
+    "application/sdp", "application/sparql-query", "application/graphql", "application/yang", "application/mbox",
+    "application/x-tex", "application/x-latex", "application/x-perl", "application/x-python", "application/x-tcl",
+    "application/pgp-signature", "application/pgp-keys", "application/vnd.coffeescript", "application/vnd.dart",
+    "application/vnd.oai.openapi", "application/vnd.zul", "application/x-yaml", "application/yaml",
+    "application/toml",
+];
+const DOCUMENT_MIME_TYPES: &[&str] = &[
+    "application/msword", "application/rtf", "application/vnd.apple.keynote", "application/vnd.apple.numbers",
+    "application/vnd.apple.pages", "application/vnd.google-apps.document",
+];
+const DOCUMENT_MIME_PREFIXES: &[&str] =
+    &["application/vnd.openxmlformats-officedocument.", "application/vnd.oasis.opendocument."];
+
+/// Text formats `mime_guess` maps to octet-stream but Marcel knows as text.
+const TEXT_EXTENSIONS: &[&str] = &["rb", "rs", "py", "go", "ts", "tsx", "jsx", "md", "yml", "yaml", "toml", "sh"];
+
+fn mime_for_name(name: &str) -> String {
+    let ext = Path::new(name).extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    if TEXT_EXTENSIONS.contains(&ext.as_str()) {
+        return "text/plain".into();
+    }
+    match mime_guess::from_path(name).first() {
+        Some(m) if m.essence_str() == "audio/x-wav" => "audio/wav".into(),
+        Some(m) => m.essence_str().to_string(),
+        None => "application/octet-stream".into(),
+    }
+}
+
+impl Attachment {
+    /// `Attachment.new(source)`: a local path or an http(s) URL.
+    pub fn new(source: impl AsRef<str>) -> Attachment {
+        let source = source.as_ref();
+        if source.starts_with("http://") || source.starts_with("https://") {
+            let path = source.split(['?', '#']).next().unwrap_or(source);
+            let filename = path.rsplit('/').next().map(str::to_string);
+            let mime = mime_for_name(filename.as_deref().unwrap_or(""));
+            Attachment { source: Source::Url(source.to_string()), filename, mime_type: mime, resolution: None, content: None }
+        } else {
+            let path = PathBuf::from(source);
+            let filename = path.file_name().map(|f| f.to_string_lossy().into_owned());
+            let mime = mime_for_name(source);
+            Attachment { source: Source::Path(path), filename, mime_type: mime, resolution: None, content: None }
+        }
+    }
+
+    pub fn from_bytes(bytes: Vec<u8>, filename: impl Into<String>, mime_type: Option<&str>) -> Attachment {
+        let filename = filename.into();
+        let mime = mime_type.map(str::to_string).unwrap_or_else(|| mime_for_name(&filename));
+        Attachment {
+            source: Source::Bytes(bytes.clone()),
+            filename: Some(filename),
+            mime_type: mime,
+            resolution: None,
+            content: Some(bytes),
+        }
+    }
+
+    pub fn with_resolution(mut self, resolution: Resolution) -> Attachment {
+        self.resolution = Some(resolution);
+        self
+    }
+
+    pub fn is_url(&self) -> bool {
+        matches!(self.source, Source::Url(_))
+    }
+
+    pub fn url(&self) -> Option<&str> {
+        match &self.source {
+            Source::Url(u) => Some(u),
+            _ => None,
+        }
+    }
+
+    /// Reads the bytes now, so rendering a request never blocks on the network.
+    pub(crate) async fn load(&mut self, client: &reqwest::Client) -> Result<()> {
+        if self.content.is_some() {
+            return Ok(());
+        }
+        let bytes = match &self.source {
+            Source::Path(p) => tokio::fs::read(p).await?,
+            Source::Bytes(b) => b.clone(),
+            Source::Url(u) => client
+                .get(u)
+                .send()
+                .await
+                .and_then(|r| r.error_for_status())
+                .map_err(|e| Error::ConnectionFailed(e.to_string()))?
+                .bytes()
+                .await
+                .map_err(|e| Error::ConnectionFailed(e.to_string()))?
+                .to_vec(),
+        };
+        self.content = Some(bytes);
+        Ok(())
+    }
+
+    fn bytes(&self) -> Result<&[u8]> {
+        self.content.as_deref().ok_or_else(|| {
+            Error::Argument(format!("attachment {:?} was not loaded before rendering", self.filename))
+        })
+    }
+
+    pub fn content_text(&self) -> Result<String> {
+        Ok(String::from_utf8_lossy(self.bytes()?).into_owned())
+    }
+
+    pub fn encoded(&self) -> Result<String> {
+        Ok(base64::engine::general_purpose::STANDARD.encode(self.bytes()?))
+    }
+
+    pub fn data_uri(&self) -> Result<String> {
+        Ok(format!("data:{};base64,{}", self.mime_type, self.encoded()?))
+    }
+
+    pub fn url_or_data_uri(&self) -> Result<String> {
+        match &self.source {
+            Source::Url(u) => Ok(u.clone()),
+            _ => self.data_uri(),
+        }
+    }
+
+    /// `Attachment#for_llm`: text files are wrapped in a `<file>` tag, everything else is a data URI.
+    pub fn for_llm(&self) -> Result<String> {
+        match self.kind() {
+            AttachmentType::Text => Ok(format!(
+                "<file name='{}' mime_type='{}'>{}</file>",
+                self.filename.as_deref().unwrap_or(""),
+                self.mime_type,
+                self.content_text()?
+            )),
+            _ => self.data_uri(),
+        }
+    }
+
+    pub fn kind(&self) -> AttachmentType {
+        let m = self.mime_type.as_str();
+        if m.starts_with("image/") {
+            AttachmentType::Image
+        } else if m.starts_with("video/") {
+            AttachmentType::Video
+        } else if m.starts_with("audio/") {
+            AttachmentType::Audio
+        } else if m == "application/pdf" {
+            AttachmentType::Pdf
+        } else if self.is_text() {
+            AttachmentType::Text
+        } else if self.is_document() {
+            AttachmentType::Document
+        } else {
+            AttachmentType::Unknown
+        }
+    }
+
+    fn is_text(&self) -> bool {
+        let m = self.mime_type.as_str();
+        m.starts_with("text/") || TEXT_SUFFIXES.iter().any(|s| m.ends_with(s)) || TEXT_MIME_TYPES.contains(&m)
+    }
+
+    fn is_document(&self) -> bool {
+        let m = self.mime_type.as_str();
+        if m == "application/pdf" || self.is_text() {
+            return false;
+        }
+        let ext = self
+            .filename
+            .as_deref()
+            .and_then(|f| Path::new(f).extension())
+            .and_then(|e| e.to_str())
+            .map(str::to_lowercase);
+        DOCUMENT_MIME_TYPES.contains(&m)
+            || DOCUMENT_MIME_PREFIXES.iter().any(|p| m.starts_with(p))
+            || ext.is_some_and(|e| DOCUMENT_EXTENSIONS.contains(&e.as_str()))
+    }
+
+    /// `Attachment#format`: the short audio format name providers expect.
+    pub fn format(&self) -> String {
+        match self.mime_type.as_str() {
+            "audio/mpeg" => "mp3".into(),
+            "audio/wav" | "audio/wave" | "audio/x-wav" => "wav".into(),
+            m => m.rsplit('/').next().unwrap_or(m).to_string(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn classifies_by_mime_type() {
+        assert_eq!(Attachment::new("ruby.png").kind(), AttachmentType::Image);
+        assert_eq!(Attachment::new("contract.pdf").kind(), AttachmentType::Pdf);
+        assert_eq!(Attachment::new("app.rb").kind(), AttachmentType::Text);
+        assert_eq!(Attachment::new("meeting.wav").kind(), AttachmentType::Audio);
+        assert_eq!(Attachment::new("meeting.wav").format(), "wav");
+        assert_eq!(Attachment::new("deck.pptx").kind(), AttachmentType::Document);
+    }
+
+    #[test]
+    fn text_files_are_wrapped_for_the_model() {
+        let a = Attachment::from_bytes(b"puts 1".to_vec(), "app.rb", None);
+        assert_eq!(a.for_llm().unwrap(), "<file name='app.rb' mime_type='text/plain'>puts 1</file>");
+    }
+}

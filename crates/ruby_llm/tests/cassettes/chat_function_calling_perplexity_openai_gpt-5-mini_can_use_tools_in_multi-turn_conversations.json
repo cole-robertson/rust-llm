@@ -1,0 +1,102 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.perplexity.ai/v1/agent",
+    "request_body": "{\"model\":\"openai/gpt-5-mini\",\"input\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin? (52.5200, 13.4050)\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"tools\":[{\"type\":\"function\",\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true},\"strict\":false}]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Fri, 25 Sep 2026 08:38:08 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Server": "cloudflare",
+      "X-Ratelimit-Limit": "1",
+      "X-Ratelimit-Remaining": "0",
+      "X-Ratelimit-Reset": "1790325489",
+      "X-Ratelimit-Used": "1",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Access-Control-Allow-Origin": "*",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Set-Cookie": "<COOKIE>",
+      "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\"background\":false,\"completed_at\":1790325486,\"created_at\":1790325486,\"error\":null,\"frequency_penalty\":0,\"id\":\"resp_1452aaa5-93c4-4680-b0fe-c6c8fcd48f6a\",\"incomplete_details\":null,\"instructions\":null,\"max_output_tokens\":null,\"max_tool_calls\":null,\"metadata\":{},\"model\":\"openai/gpt-5-mini\",\"object\":\"response\",\"output\":[{\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\",\"call_id\":\"call_88A2aLH1rQHjkHUbHaRxYzeB\",\"id\":\"fc_79409421-f253-40c4-8fa0-571292fe1915\",\"name\":\"weather\",\"status\":\"completed\",\"type\":\"function_call\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"reasoning\":null,\"safety_identifier\":null,\"service_tier\":\"default\",\"status\":\"completed\",\"store\":false,\"temperature\":1,\"text\":{\"format\":{\"type\":\"text\"}},\"tool_choice\":\"auto\",\"tools\":[{\"type\":\"function\",\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"latitude\":{\"description\":\"Latitude (e.g., 52.5200)\",\"type\":\"string\"},\"longitude\":{\"description\":\"Longitude (e.g., 13.4050)\",\"type\":\"string\"}},\"required\":[\"latitude\",\"longitude\"],\"strict\":true,\"type\":\"object\"},\"strict\":false}],\"top_logprobs\":0,\"top_p\":1,\"truncation\":\"\",\"usage\":{\"cost\":{\"currency\":\"USD\",\"input_cost\":0.00003,\"output_cost\":0.00024,\"total_cost\":0.00027},\"input_tokens\":109,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":120,\"output_tokens_details\":{\"reasoning_tokens\":64},\"total_tokens\":229},\"user\":null}\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://api.perplexity.ai/v1/agent",
+    "request_body": "{\"model\":\"openai/gpt-5-mini\",\"input\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin? (52.5200, 13.4050)\"},{\"type\":\"function_call\",\"call_id\":\"call_88A2aLH1rQHjkHUbHaRxYzeB\",\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_88A2aLH1rQHjkHUbHaRxYzeB\",\"output\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"tools\":[{\"type\":\"function\",\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true},\"strict\":false}]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Fri, 25 Sep 2026 08:38:13 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Server": "cloudflare",
+      "X-Ratelimit-Limit": "1",
+      "X-Ratelimit-Remaining": "0",
+      "X-Ratelimit-Reset": "1790325494",
+      "X-Ratelimit-Used": "1",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Access-Control-Allow-Origin": "*",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Set-Cookie": "<COOKIE>",
+      "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\"background\":false,\"completed_at\":1790325488,\"created_at\":1790325488,\"error\":null,\"frequency_penalty\":0,\"id\":\"resp_37a430d6-5c75-4975-b914-7dc3abaf27ec\",\"incomplete_details\":null,\"instructions\":null,\"max_output_tokens\":null,\"max_tool_calls\":null,\"metadata\":{},\"model\":\"openai/gpt-5-mini\",\"object\":\"response\",\"output\":[{\"content\":[{\"annotations\":[],\"text\":\"Current weather for Berlin (52.5200, 13.4050): 15°C (≈59°F), wind 10 km/h (≈6.2 mph).\\n\\nWould you like a short-term forecast, precipitation chance, or additional details (humidity, pressure)?\",\"type\":\"output_text\"}],\"id\":\"msg_a747d989-2a57-456c-936a-c590cb5de032\",\"role\":\"assistant\",\"status\":\"completed\",\"type\":\"message\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"reasoning\":null,\"safety_identifier\":null,\"service_tier\":\"default\",\"status\":\"completed\",\"store\":false,\"temperature\":1,\"text\":{\"format\":{\"type\":\"text\"}},\"tool_choice\":\"auto\",\"tools\":[{\"type\":\"function\",\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"latitude\":{\"description\":\"Latitude (e.g., 52.5200)\",\"type\":\"string\"},\"longitude\":{\"description\":\"Longitude (e.g., 13.4050)\",\"type\":\"string\"}},\"required\":[\"latitude\",\"longitude\"],\"strict\":true,\"type\":\"object\"},\"strict\":false}],\"top_logprobs\":0,\"top_p\":1,\"truncation\":\"\",\"usage\":{\"cost\":{\"currency\":\"USD\",\"input_cost\":0.00004,\"output_cost\":0.00041,\"total_cost\":0.00045},\"input_tokens\":168,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":203,\"output_tokens_details\":{\"reasoning_tokens\":128},\"total_tokens\":371},\"user\":null}\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://api.perplexity.ai/v1/agent",
+    "request_body": "{\"model\":\"openai/gpt-5-mini\",\"input\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin? (52.5200, 13.4050)\"},{\"type\":\"function_call\",\"call_id\":\"call_88A2aLH1rQHjkHUbHaRxYzeB\",\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_88A2aLH1rQHjkHUbHaRxYzeB\",\"output\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"Current weather for Berlin (52.5200, 13.4050): 15°C (≈59°F), wind 10 km/h (≈6.2 mph).\\n\\nWould you like a short-term forecast, precipitation chance, or additional details (humidity, pressure)?\"}]},{\"role\":\"user\",\"content\":\"What's the weather in Paris? (48.8575, 2.3514)\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"tools\":[{\"type\":\"function\",\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true},\"strict\":false}]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Fri, 25 Sep 2026 08:38:15 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Server": "cloudflare",
+      "X-Ratelimit-Limit": "1",
+      "X-Ratelimit-Remaining": "0",
+      "X-Ratelimit-Reset": "1790325496",
+      "X-Ratelimit-Used": "1",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Access-Control-Allow-Origin": "*",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Set-Cookie": "<COOKIE>",
+      "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\"background\":false,\"completed_at\":1790325493,\"created_at\":1790325493,\"error\":null,\"frequency_penalty\":0,\"id\":\"resp_4ae71214-35f5-48ff-9413-9165c539d036\",\"incomplete_details\":null,\"instructions\":null,\"max_output_tokens\":null,\"max_tool_calls\":null,\"metadata\":{},\"model\":\"openai/gpt-5-mini\",\"object\":\"response\",\"output\":[{\"arguments\":\"{\\\"latitude\\\":\\\"48.8575\\\",\\\"longitude\\\":\\\"2.3514\\\"}\",\"call_id\":\"call_MyMd8eh5lvcSkNkcKxoTvZwa\",\"id\":\"fc_aa2c4007-4f2f-4cdd-8055-bcdb7c1e6f12\",\"name\":\"weather\",\"status\":\"completed\",\"type\":\"function_call\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"reasoning\":null,\"safety_identifier\":null,\"service_tier\":\"default\",\"status\":\"completed\",\"store\":false,\"temperature\":1,\"text\":{\"format\":{\"type\":\"text\"}},\"tool_choice\":\"auto\",\"tools\":[{\"type\":\"function\",\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"latitude\":{\"description\":\"Latitude (e.g., 52.5200)\",\"type\":\"string\"},\"longitude\":{\"description\":\"Longitude (e.g., 13.4050)\",\"type\":\"string\"}},\"required\":[\"latitude\",\"longitude\"],\"strict\":true,\"type\":\"object\"},\"strict\":false}],\"top_logprobs\":0,\"top_p\":1,\"truncation\":\"\",\"usage\":{\"cost\":{\"currency\":\"USD\",\"input_cost\":0.00006,\"output_cost\":0.00019,\"total_cost\":0.00025},\"input_tokens\":251,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":96,\"output_tokens_details\":{\"reasoning_tokens\":64},\"total_tokens\":347},\"user\":null}\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://api.perplexity.ai/v1/agent",
+    "request_body": "{\"model\":\"openai/gpt-5-mini\",\"input\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin? (52.5200, 13.4050)\"},{\"type\":\"function_call\",\"call_id\":\"call_88A2aLH1rQHjkHUbHaRxYzeB\",\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_88A2aLH1rQHjkHUbHaRxYzeB\",\"output\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"Current weather for Berlin (52.5200, 13.4050): 15°C (≈59°F), wind 10 km/h (≈6.2 mph).\\n\\nWould you like a short-term forecast, precipitation chance, or additional details (humidity, pressure)?\"}]},{\"role\":\"user\",\"content\":\"What's the weather in Paris? (48.8575, 2.3514)\"},{\"type\":\"function_call\",\"call_id\":\"call_MyMd8eh5lvcSkNkcKxoTvZwa\",\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"48.8575\\\",\\\"longitude\\\":\\\"2.3514\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_MyMd8eh5lvcSkNkcKxoTvZwa\",\"output\":\"Current weather at 48.8575, 2.3514: 15°C, Wind: 10 km/h\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"tools\":[{\"type\":\"function\",\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true},\"strict\":false}]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Fri, 25 Sep 2026 08:38:16 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Server": "cloudflare",
+      "X-Ratelimit-Limit": "1",
+      "X-Ratelimit-Remaining": "0",
+      "X-Ratelimit-Reset": "1790325497",
+      "X-Ratelimit-Used": "1",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Access-Control-Allow-Origin": "*",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Set-Cookie": "<COOKIE>",
+      "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\"background\":false,\"completed_at\":1790325495,\"created_at\":1790325495,\"error\":null,\"frequency_penalty\":0,\"id\":\"resp_e253c5ff-c3d1-445b-8a6c-2b7c9b734846\",\"incomplete_details\":null,\"instructions\":null,\"max_output_tokens\":null,\"max_tool_calls\":null,\"metadata\":{},\"model\":\"openai/gpt-5-mini\",\"object\":\"response\",\"output\":[{\"content\":[{\"annotations\":[],\"text\":\"Current weather for Paris (48.8575, 2.3514): 15°C (≈59°F), wind 10 km/h (≈6.2 mph).\\n\\nWould you like a short-term forecast, precipitation chance, or additional details (humidity, pressure)?\",\"type\":\"output_text\"}],\"id\":\"msg_178bd276-acef-4ff2-853c-11c3329671ab\",\"role\":\"assistant\",\"status\":\"completed\",\"type\":\"message\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"reasoning\":null,\"safety_identifier\":null,\"service_tier\":\"default\",\"status\":\"completed\",\"store\":false,\"temperature\":1,\"text\":{\"format\":{\"type\":\"text\"}},\"tool_choice\":\"auto\",\"tools\":[{\"type\":\"function\",\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"latitude\":{\"description\":\"Latitude (e.g., 52.5200)\",\"type\":\"string\"},\"longitude\":{\"description\":\"Longitude (e.g., 13.4050)\",\"type\":\"string\"}},\"required\":[\"latitude\",\"longitude\"],\"strict\":true,\"type\":\"object\"},\"strict\":false}],\"top_logprobs\":0,\"top_p\":1,\"truncation\":\"\",\"usage\":{\"cost\":{\"currency\":\"USD\",\"input_cost\":0.00008,\"output_cost\":0.00012,\"total_cost\":0.0002},\"input_tokens\":310,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":59,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":369},\"user\":null}\n"
+  }
+]

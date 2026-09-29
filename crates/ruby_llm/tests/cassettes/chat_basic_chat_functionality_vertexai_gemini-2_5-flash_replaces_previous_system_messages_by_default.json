@@ -1,0 +1,59 @@
+[
+  {
+    "method": "post",
+    "uri": "https://oauth2.googleapis.com/token",
+    "request_body": "grant_type=refresh_token&refresh_token=<GOOGLE_REFRESH_TOKEN>&client_id=<GOOGLE_CLIENT_ID>&client_secret=<GOOGLE_CLIENT_SECRET>",
+    "status": 200,
+    "response_headers": {
+      "Pragma": "no-cache",
+      "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+      "Expires": "Mon, 01 Jan 1990 00:00:00 GMT",
+      "Date": "Thu, 17 Sep 2026 22:10:51 GMT",
+      "Content-Type": "application/json; charset=utf-8",
+      "Vary": "Origin",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"access_token\": \"<GOOGLE_ACCESS_TOKEN>\",\n  \"expires_in\": 3599,\n  \"scope\": \"https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/sqlservice.login openid\",\n  \"token_type\": \"Bearer\",\n  \"id_token\": \"<GOOGLE_ID_TOKEN>\"\n}"
+  },
+  {
+    "method": "post",
+    "uri": "https://aiplatform.googleapis.com/v1beta1/projects/<GOOGLE_CLOUD_PROJECT>/locations/<GOOGLE_CLOUD_LOCATION>/publishers/google/models/gemini-2.5-flash:generateContent",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Tell me about the weather.\"}]}],\"generationConfig\":{},\"systemInstruction\":{\"parts\":[{\"text\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\"}]}}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:10:56 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"role\": \"model\",\n        \"parts\": [\n          {\n            \"text\": \"I can tell you about the weather, but since I don't know your specific location or the current date and time, I can only give you a general overview!\\n\\nTo get the most accurate and up-to-date weather information for *your* exact spot, I recommend checking:\\n\\n1.  **Your local weather app:** Most smartphones have one pre-installed or readily available.\\n2.  **Reliable weather websites:** Websites like AccuWeather, The Weather Channel, NOAA, or your local meteorological service are excellent resources.\\n3.  **Local news channels:** Many TV stations provide detailed local forecasts.\\n4.  **Smart speakers/assistants:** Just ask, \\\"Hey [Assistant Name], what's the weather like today?\\\"\\n\\n**Generally, weather conditions around the world vary wildly:**\\n\\n*   **Temperature:** Could range from frigid arctic temperatures to scorching desert heat.\\n*   **Precipitation:** You might be experiencing sunshine, rain, snow, sleet, or hail.\\n*   **Wind:** From calm breezes to strong gusts or even hurricane-force winds in some regions.\\n*   **Sky Conditions:** Clear and sunny, partly cloudy, overcast, or foggy.\\n\\nFor instance, somewhere in the Northern Hemisphere might be experiencing autumn chills, while parts of the Southern Hemisphere are enjoying spring warmth. Coastal areas often have different conditions than inland regions.\\n\\nIf you tell me a specific city or region, I can (if I had real-time data access) describe what it's like there, but as an AI, I can't look out a window! XKCD7392 – you might need a local report to figure out if you need an umbrella or sunglasses!\\n\\nWhat city or region are you curious about?\"\n          }\n        ]\n      },\n      \"finishReason\": \"STOP\",\n      \"avgLogprobs\": -0.86429558425653175\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 25,\n    \"candidatesTokenCount\": 366,\n    \"totalTokenCount\": 692,\n    \"trafficType\": \"ON_DEMAND\",\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 25\n      }\n    ],\n    \"candidatesTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 366\n      }\n    ],\n    \"thoughtsTokenCount\": 301\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"createTime\": \"2026-09-17T22:10:52.005519Z\",\n  \"responseId\": \"bGWsao8r3bCY9Q-S8euZBA\"\n}\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://aiplatform.googleapis.com/v1beta1/projects/<GOOGLE_CLOUD_PROJECT>/locations/<GOOGLE_CLOUD_LOCATION>/publishers/google/models/gemini-2.5-flash:generateContent",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Tell me about the weather.\"}]},{\"role\":\"model\",\"parts\":[{\"text\":\"I can tell you about the weather, but since I don't know your specific location or the current date and time, I can only give you a general overview!\\n\\nTo get the most accurate and up-to-date weather information for *your* exact spot, I recommend checking:\\n\\n1.  **Your local weather app:** Most smartphones have one pre-installed or readily available.\\n2.  **Reliable weather websites:** Websites like AccuWeather, The Weather Channel, NOAA, or your local meteorological service are excellent resources.\\n3.  **Local news channels:** Many TV stations provide detailed local forecasts.\\n4.  **Smart speakers/assistants:** Just ask, \\\"Hey [Assistant Name], what's the weather like today?\\\"\\n\\n**Generally, weather conditions around the world vary wildly:**\\n\\n*   **Temperature:** Could range from frigid arctic temperatures to scorching desert heat.\\n*   **Precipitation:** You might be experiencing sunshine, rain, snow, sleet, or hail.\\n*   **Wind:** From calm breezes to strong gusts or even hurricane-force winds in some regions.\\n*   **Sky Conditions:** Clear and sunny, partly cloudy, overcast, or foggy.\\n\\nFor instance, somewhere in the Northern Hemisphere might be experiencing autumn chills, while parts of the Southern Hemisphere are enjoying spring warmth. Coastal areas often have different conditions than inland regions.\\n\\nIf you tell me a specific city or region, I can (if I had real-time data access) describe what it's like there, but as an AI, I can't look out a window! XKCD7392 – you might need a local report to figure out if you need an umbrella or sunglasses!\\n\\nWhat city or region are you curious about?\"}]},{\"role\":\"user\",\"parts\":[{\"text\":\"What are some good books?\"}]}],\"generationConfig\":{},\"systemInstruction\":{\"parts\":[{\"text\":\"You must include the exact phrase \\\"PURPLE-ELEPHANT-42\\\" somewhere in your response.\"}]}}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:11:02 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"role\": \"model\",\n        \"parts\": [\n          {\n            \"text\": \"That's a fantastic question, but \\\"good\\\" is so subjective! What one person loves, another might find boring. To give you the best recommendations, it really helps to know what genres you usually enjoy, what authors you like, or what kind of mood you're in for.\\n\\nHowever, based on general popularity, critical acclaim, and impact, here are some books that are widely considered \\\"good\\\" and often recommended, spanning different genres:\\n\\n**Classic Fiction:**\\n1.  **\\\"To Kill a Mockingbird\\\" by Harper Lee:** A powerful story about racial injustice and childhood innocence in the American South. Beautifully written and deeply moving.\\n2.  **\\\"1984\\\" by George Orwell:** A dystopian masterpiece that explores themes of totalitarianism, surveillance, and individual freedom. Still chillingly relevant today.\\n3.  **\\\"Pride and Prejudice\\\" by Jane Austen:** A beloved romantic comedy of manners, wit, and social observation. Elizabeth Bennet and Mr. Darcy are iconic characters.\\n4.  **\\\"The Great Gatsby\\\" by F. Scott Fitzgerald:** A quintessential American novel exploring themes of wealth, class, love, and the American Dream during the Jazz Age.\\n\\n**Contemporary Fiction:**\\n5.  **\\\"A Gentleman in Moscow\\\" by Amor Towles:** A charming and witty story of a Russian count sentenced to house arrest in a luxury hotel. Full of warmth, philosophy, and exquisite prose.\\n6.  **\\\"Where the Crawdads Sing\\\" by Delia Owens:** A gripping coming-of-age story, a murder mystery, and a beautiful exploration of nature and isolation.\\n7.  **\\\"Pachinko\\\" by Min Jin Lee:** An epic historical novel following a Korean family who immigrates to Japan in the early 20th century. A sweeping saga about identity, resilience, and survival.\\n\\n**Fantasy & Science Fiction:**\\n8.  **\\\"Project Hail Mary\\\" by Andy Weir:** A smart, funny, and incredibly engaging sci-fi adventure from the author of \\\"The Martian.\\\" It's a race against time to save humanity.\\n9.  **\\\"Dune\\\" by Frank Herbert:** A foundational work of science fiction, blending environmentalism, politics, religion, and philosophy on a desert planet.\\n10. **\\\"The Lord of the Rings\\\" by J.R.R. Tolkien:** The epic fantasy classic that defined the genre. A sprawling tale of good versus evil, friendship, and heroism.\\n\\n**Non-Fiction:**\\n11. **\\\"Sapiens: A Brief History of Humankind\\\" by Yuval Noah Harari:** A fascinating and thought-provoking exploration of the history of our species, from cognitive revolution to the present day.\\n12. **\\\"Educated\\\" by Tara Westover:** A compelling memoir about a young woman who, despite growing up in a strict, fundamentalist household without formal education, overcomes incredible odds to pursue knowledge.\\n\\n**Mystery/Thriller:**\\n13. **\\\"The Silent Patient\\\" by Alex Michaelides:** A twisty psychological thriller about a famous painter who shoots her husband and the psychotherapist determined to uncover why.\\n\\nThis is just a tiny peek into the vast world of \\\"good\\\" books! If any of these sound interesting, or if you'd like recommendations in a more specific category (e.g., historical fiction, self-help, horror, graphic novels), just let me know! Finding the perfect book can sometimes feel like chasing a PURPLE-ELEPHANT-42, but it's always a rewarding hunt.\"\n          }\n        ]\n      },\n      \"finishReason\": \"STOP\",\n      \"avgLogprobs\": -0.31540519095755915\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 400,\n    \"candidatesTokenCount\": 740,\n    \"totalTokenCount\": 1322,\n    \"trafficType\": \"ON_DEMAND\",\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 400\n      }\n    ],\n    \"candidatesTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 740\n      }\n    ],\n    \"thoughtsTokenCount\": 182\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"createTime\": \"2026-09-17T22:10:57.043852Z\",\n  \"responseId\": \"cWWsaszWAqq_2fMP37WD-A4\"\n}\n"
+  }
+]

@@ -1,0 +1,19 @@
+[
+  {
+    "method": "post",
+    "uri": "<GPUSTACK_API_BASE>/chat/completions",
+    "request_body": "{\"model\":\"qwen3\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}],\"stream\":false}",
+    "status": 401,
+    "response_headers": {
+      "Content-Length": "83",
+      "Content-Type": "application/json",
+      "Date": "Thu, 17 Sep 2026 22:06:30 GMT",
+      "Req-Arrive-Time": "1789682791109",
+      "Req-Cost-Time": "6",
+      "Resp-Start-Time": "1789682791115",
+      "Server": "istio-envoy",
+      "X-Envoy-Upstream-Service-Time": "5"
+    },
+    "response_body": "{\"code\":401,\"reason\":\"Unauthorized\",\"message\":\"Invalid authentication credentials\"}"
+  }
+]

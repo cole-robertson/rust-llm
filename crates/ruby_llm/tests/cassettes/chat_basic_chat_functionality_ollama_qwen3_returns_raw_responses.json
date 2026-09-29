@@ -1,0 +1,14 @@
+[
+  {
+    "method": "post",
+    "uri": "<OLLAMA_API_BASE>/chat/completions",
+    "request_body": "{\"model\":\"qwen3\",\"messages\":[{\"role\":\"user\",\"content\":\"What is the capital of France?\"}],\"stream\":false}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Date": "Thu, 17 Sep 2026 22:08:37 GMT",
+      "Content-Length": "1052"
+    },
+    "response_body": "{\"id\":\"chatcmpl-207\",\"object\":\"chat.completion\",\"created\":1789682917,\"model\":\"qwen3\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The capital of France is **Paris**. It is the most populous city in France and serves as the political, economic, and cultural hub of the country.\",\"reasoning\":\"Okay, the user is asking for the capital of France. Let me think about this.\\n\\nFirst, I know that France is a country in Europe. The capital is a city where the government is based. I remember that Paris is the capital of France. But wait, I should make sure. Sometimes people get confused with other cities like Lyon or Marseille, but those are major cities, not capitals. Let me confirm. Yes, Paris is the capital. It's also the most populous city in France. The government, including the President and the government, is located there. So the answer is Paris.\\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":17,\"prompt_tokens_details\":{\"cached_tokens\":4},\"completion_tokens\":158,\"total_tokens\":175}}\n"
+  }
+]

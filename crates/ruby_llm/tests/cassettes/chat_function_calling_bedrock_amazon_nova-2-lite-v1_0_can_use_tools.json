@@ -1,0 +1,30 @@
+[
+  {
+    "method": "post",
+    "uri": "https://bedrock-runtime.<AWS_REGION>.amazonaws.com/model/us.amazon.nova-2-lite-v1:0/converse",
+    "request_body": "{\"messages\":[{\"role\":\"user\",\"content\":[{\"text\":\"What's the weather in Berlin? (52.5200, 13.4050)\"}]}],\"inferenceConfig\":{},\"toolConfig\":{\"tools\":[{\"toolSpec\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"inputSchema\":{\"json\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}}]}}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:06:17 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "322",
+      "Connection": "keep-alive",
+      "X-Amzn-Requestid": "12cd13ec-0a36-4787-98e4-94bd3fa1e13d"
+    },
+    "response_body": "{\"metrics\":{\"latencyMs\":522},\"output\":{\"message\":{\"content\":[{\"toolUse\":{\"input\":{\"latitude\":\"52.5200\",\"longitude\":\"13.4050\"},\"name\":\"weather\",\"toolUseId\":\"tooluse_6xcCowhyRwCABj0RHz2uil\"}}],\"role\":\"assistant\"}},\"stopReason\":\"tool_use\",\"usage\":{\"inputTokens\":986,\"outputTokens\":42,\"serverToolUsage\":{},\"totalTokens\":1028}}"
+  },
+  {
+    "method": "post",
+    "uri": "https://bedrock-runtime.<AWS_REGION>.amazonaws.com/model/us.amazon.nova-2-lite-v1:0/converse",
+    "request_body": "{\"messages\":[{\"role\":\"user\",\"content\":[{\"text\":\"What's the weather in Berlin? (52.5200, 13.4050)\"}]},{\"role\":\"assistant\",\"content\":[{\"toolUse\":{\"toolUseId\":\"tooluse_6xcCowhyRwCABj0RHz2uil\",\"name\":\"weather\",\"input\":{\"latitude\":\"52.5200\",\"longitude\":\"13.4050\"}}}]},{\"role\":\"user\",\"content\":[{\"toolResult\":{\"toolUseId\":\"tooluse_6xcCowhyRwCABj0RHz2uil\",\"content\":[{\"text\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\"}]}}]}],\"inferenceConfig\":{},\"toolConfig\":{\"tools\":[{\"toolSpec\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"inputSchema\":{\"json\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}}]}}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:06:18 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "293",
+      "Connection": "keep-alive",
+      "X-Amzn-Requestid": "bad6303e-9713-4b13-b782-93bc5b8f65c8"
+    },
+    "response_body": "{\"metrics\":{\"latencyMs\":512},\"output\":{\"message\":{\"content\":[{\"text\":\"The current weather in Berlin (52.5200, 13.4050) is **15°C** with wind at **10 km/h**.\"}],\"role\":\"assistant\"}},\"stopReason\":\"end_turn\",\"usage\":{\"inputTokens\":1078,\"outputTokens\":31,\"serverToolUsage\":{},\"totalTokens\":1109}}"
+  }
+]

@@ -1,0 +1,30 @@
+[
+  {
+    "method": "post",
+    "uri": "https://bedrock-runtime.<AWS_REGION>.amazonaws.com/model/us.amazon.nova-2-lite-v1:0/converse-stream",
+    "request_body": "{\"messages\":[{\"role\":\"user\",\"content\":[{\"text\":\"Reply with exactly: 1, 2, 3\"}]}],\"inferenceConfig\":{\"temperature\":0.0}}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:06:30 GMT",
+      "Content-Type": "application/vnd.amazon.eventstream",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "X-Amzn-Requestid": "0f7c2245-6473-4a60-9974-030b61c9d1a9"
+    },
+    "response_body": "\u0000\u0000\u0000�\u0000\u0000\u0000RF���\u000b:event-type\u0007\u0000\fmessageStart\r:content-type\u0007\u0000\u0010application/json\r:message-type\u0007\u0000\u0005event{\"p\":\"abcdefghijklmnopqrstuvwxyzABCD\",\"role\":\"assistant\"}��t�\u0000\u0000\u0000�\u0000\u0000\u0000W���x\u000b:event-type\u0007\u0000\u0011contentBlockDelta\r:content-type\u0007\u0000\u0010application/json\r:message-type\u0007\u0000\u0005event{\"contentBlockIndex\":0,\"delta\":{\"text\":\"1\"},\"p\":\"abcdefghi\"}�B�]\u0000\u0000\u0000�\u0000\u0000\u0000W��:�\u000b:event-type\u0007\u0000\u0011contentBlockDelta\r:content-type\u0007\u0000\u0010application/json\r:message-type\u0007\u0000\u0005event{\"contentBlockIndex\":0,\"delta\":{\"text\":\", 2\"},\"p\":\"abcdefghijklmnopqrstu\"}\\78�\u0000\u0000\u0000�\u0000\u0000\u0000W\u0019�dg\u000b:event-type\u0007\u0000\u0011contentBlockDelta\r:content-type\u0007\u0000\u0010application/json\r:message-type\u0007\u0000\u0005event{\"contentBlockIndex\":0,\"delta\":{\"text\":\", 3\"},\"p\":\"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"}�\u0004�.\u0000\u0000\u0000�\u0000\u0000\u0000V(=\n_\u000b:event-type\u0007\u0000\u0010contentBlockStop\r:content-type\u0007\u0000\u0010application/json\r:message-type\u0007\u0000\u0005event{\"contentBlockIndex\":0,\"p\":\"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP\"}���:\u0000\u0000\u0000�\u0000\u0000\u0000Q�(��\u000b:event-type\u0007\u0000\u000bmessageStop\r:content-type\u0007\u0000\u0010application/json\r:message-type\u0007\u0000\u0005event{\"p\":\"abcdefghijklmnop\",\"stopReason\":\"end_turn\"}__�.\u0000\u0000\u0000�\u0000\u0000\u0000Nϓ\u0010�\u000b:event-type\u0007\u0000\bmetadata\r:content-type\u0007\u0000\u0010application/json\r:message-type\u0007\u0000\u0005event{\"metrics\":{\"latencyMs\":961},\"p\":\"ab\",\"usage\":{\"inputTokens\":58,\"outputTokens\":10,\"serverToolUsage\":{},\"totalTokens\":68}}V�cb"
+  },
+  {
+    "method": "post",
+    "uri": "https://bedrock-runtime.<AWS_REGION>.amazonaws.com/model/us.amazon.nova-2-lite-v1:0/converse",
+    "request_body": "{\"messages\":[{\"role\":\"user\",\"content\":[{\"text\":\"Reply with exactly: 1, 2, 3\"}]}],\"inferenceConfig\":{\"temperature\":0.0}}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:06:31 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "209",
+      "Connection": "keep-alive",
+      "X-Amzn-Requestid": "24c6c8b5-f6fd-4f23-8a2e-b7194414abcb"
+    },
+    "response_body": "{\"metrics\":{\"latencyMs\":501},\"output\":{\"message\":{\"content\":[{\"text\":\"1, 2, 3\"}],\"role\":\"assistant\"}},\"stopReason\":\"end_turn\",\"usage\":{\"inputTokens\":58,\"outputTokens\":10,\"serverToolUsage\":{},\"totalTokens\":68}}"
+  }
+]

@@ -1,0 +1,23 @@
+[
+  {
+    "method": "post",
+    "uri": "https://openrouter.ai/api/v1/chat/completions",
+    "request_body": "{\"model\":\"anthropic/claude-haiku-4.5\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}],\"stream\":false}",
+    "status": 401,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:06:31 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Expose-Headers": "X-Generation-Id,X-Provider-Name,request-id,cf-ray",
+      "Set-Cookie": "<COOKIE>",
+      "Permissions-Policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "Referrer-Policy": "no-referrer, strict-origin-when-cross-origin",
+      "X-Content-Type-Options": "nosniff",
+      "Server": "cloudflare",
+      "Cf-Ray": "<CF_RAY>"
+    },
+    "response_body": "{\"error\":{\"message\":\"Missing Authentication header\",\"code\":401}}"
+  }
+]

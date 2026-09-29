@@ -1,0 +1,94 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.deepseek.com/chat/completions",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin? (52.5200, 13.4050)\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Date": "Thu, 17 Sep 2026 22:18:30 GMT",
+      "Server": "elb",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Credentials": "true",
+      "X-Ds-Trace-Id": "28ee519328e9ef585b66868746529697",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "X-Cache": "Miss from cloudfront",
+      "Via": "1.1 365a977b864574759e83e211b333db7e.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL50-P5",
+      "X-Amz-Cf-Id": "y11g24AX61dGUHvDmh8GC6WS3I48SyL5cKwnfVnr1ylYJM2Evw8aCw=="
+    },
+    "response_body": "{\"id\":\"51b6b749-3e57-4bcf-8c1c-4f621af11c8e\",\"object\":\"chat.completion\",\"created\":1789683510,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"I'll check the current weather in Berlin for you.\",\"reasoning_content\":\"The user wants the weather in Berlin. I'll call the weather tool with the given coordinates.\",\"tool_calls\":[{\"index\":0,\"id\":\"call_00_yccdPtoHV4bpIDuafxKV2085\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\": \\\"52.5200\\\", \\\"longitude\\\": \\\"13.4050\\\"}\"}}]},\"logprobs\":null,\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":364,\"completion_tokens\":89,\"total_tokens\":453,\"prompt_tokens_details\":{\"cached_tokens\":128},\"completion_tokens_details\":{\"reasoning_tokens\":19},\"prompt_cache_hit_tokens\":128,\"prompt_cache_miss_tokens\":236},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+  },
+  {
+    "method": "post",
+    "uri": "https://api.deepseek.com/chat/completions",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin? (52.5200, 13.4050)\"},{\"role\":\"assistant\",\"content\":\"I'll check the current weather in Berlin for you.\",\"tool_calls\":[{\"id\":\"call_00_yccdPtoHV4bpIDuafxKV2085\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}],\"reasoning_content\":\"The user wants the weather in Berlin. I'll call the weather tool with the given coordinates.\",\"reasoning\":\"The user wants the weather in Berlin. I'll call the weather tool with the given coordinates.\"},{\"role\":\"tool\",\"content\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_00_yccdPtoHV4bpIDuafxKV2085\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Date": "Thu, 17 Sep 2026 22:18:30 GMT",
+      "Server": "elb",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Credentials": "true",
+      "X-Ds-Trace-Id": "0c9cb8ff8f86354346f5e826f801c15d",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "X-Cache": "Miss from cloudfront",
+      "Via": "1.1 f1db5e6f1988a99f7e893e57b76aecb8.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL52-P2",
+      "X-Amz-Cf-Id": "DppIqF3zPDtsG5vAS9rqKz8H0WNhWxlhUG8S3onuMhgCLyeGu5YvVg=="
+    },
+    "response_body": "{\"id\":\"17e1e710-8086-42e2-9a9d-ca68a485f625\",\"object\":\"chat.completion\",\"created\":1789683510,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Here's the current weather in Berlin:\\n\\n- **Temperature:** 15°C\\n- **Wind:** 10 km/h\\n\\nIt's a fairly mild day in Berlin with light winds. Let me know if you'd like me to check anywhere else!\",\"reasoning_content\":\"\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":491,\"completion_tokens\":52,\"total_tokens\":543,\"prompt_tokens_details\":{\"cached_tokens\":256},\"completion_tokens_details\":{\"reasoning_tokens\":0},\"prompt_cache_hit_tokens\":256,\"prompt_cache_miss_tokens\":235},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+  },
+  {
+    "method": "post",
+    "uri": "https://api.deepseek.com/chat/completions",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin? (52.5200, 13.4050)\"},{\"role\":\"assistant\",\"content\":\"I'll check the current weather in Berlin for you.\",\"tool_calls\":[{\"id\":\"call_00_yccdPtoHV4bpIDuafxKV2085\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}],\"reasoning_content\":\"The user wants the weather in Berlin. I'll call the weather tool with the given coordinates.\",\"reasoning\":\"The user wants the weather in Berlin. I'll call the weather tool with the given coordinates.\"},{\"role\":\"tool\",\"content\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_00_yccdPtoHV4bpIDuafxKV2085\"},{\"role\":\"assistant\",\"content\":\"Here's the current weather in Berlin:\\n\\n- **Temperature:** 15°C\\n- **Wind:** 10 km/h\\n\\nIt's a fairly mild day in Berlin with light winds. Let me know if you'd like me to check anywhere else!\",\"reasoning_content\":\"\"},{\"role\":\"user\",\"content\":\"What's the weather in Paris? (48.8575, 2.3514)\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Date": "Thu, 17 Sep 2026 22:18:32 GMT",
+      "Server": "elb",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Credentials": "true",
+      "X-Ds-Trace-Id": "6bdb62e7db46486f3119bbd3fe4caa87",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "X-Cache": "Miss from cloudfront",
+      "Via": "1.1 4e44ab675e04b2d505f10321504a5be2.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL50-P5",
+      "X-Amz-Cf-Id": "nShj31FA2qEgZi3ThCwEa50j9P4xhV2MTOhidWp2AE7JZl83mBeI-g=="
+    },
+    "response_body": "{\"id\":\"4b1c4c60-63ef-47f8-b16d-fe04680e9773\",\"object\":\"chat.completion\",\"created\":1789683512,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"I'll check the current weather in Paris for you.\",\"reasoning_content\":\"The user wants the weather in Paris. Let me call the weather tool.\",\"tool_calls\":[{\"index\":0,\"id\":\"call_00_3E5rT9ibeExOKsB34L6k5703\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\": \\\"48.8575\\\", \\\"longitude\\\": \\\"2.3514\\\"}\"}}]},\"logprobs\":null,\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":566,\"completion_tokens\":85,\"total_tokens\":651,\"prompt_tokens_details\":{\"cached_tokens\":384},\"completion_tokens_details\":{\"reasoning_tokens\":15},\"prompt_cache_hit_tokens\":384,\"prompt_cache_miss_tokens\":182},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+  },
+  {
+    "method": "post",
+    "uri": "https://api.deepseek.com/chat/completions",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin? (52.5200, 13.4050)\"},{\"role\":\"assistant\",\"content\":\"I'll check the current weather in Berlin for you.\",\"tool_calls\":[{\"id\":\"call_00_yccdPtoHV4bpIDuafxKV2085\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}],\"reasoning_content\":\"The user wants the weather in Berlin. I'll call the weather tool with the given coordinates.\",\"reasoning\":\"The user wants the weather in Berlin. I'll call the weather tool with the given coordinates.\"},{\"role\":\"tool\",\"content\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_00_yccdPtoHV4bpIDuafxKV2085\"},{\"role\":\"assistant\",\"content\":\"Here's the current weather in Berlin:\\n\\n- **Temperature:** 15°C\\n- **Wind:** 10 km/h\\n\\nIt's a fairly mild day in Berlin with light winds. Let me know if you'd like me to check anywhere else!\",\"reasoning_content\":\"\"},{\"role\":\"user\",\"content\":\"What's the weather in Paris? (48.8575, 2.3514)\"},{\"role\":\"assistant\",\"content\":\"I'll check the current weather in Paris for you.\",\"tool_calls\":[{\"id\":\"call_00_3E5rT9ibeExOKsB34L6k5703\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"48.8575\\\",\\\"longitude\\\":\\\"2.3514\\\"}\"}}],\"reasoning_content\":\"The user wants the weather in Paris. Let me call the weather tool.\",\"reasoning\":\"The user wants the weather in Paris. Let me call the weather tool.\"},{\"role\":\"tool\",\"content\":\"Current weather at 48.8575, 2.3514: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_00_3E5rT9ibeExOKsB34L6k5703\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Date": "Thu, 17 Sep 2026 22:18:33 GMT",
+      "Server": "elb",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Credentials": "true",
+      "X-Ds-Trace-Id": "29012d3dd82bde7493c3d30b381af8cd",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "X-Cache": "Miss from cloudfront",
+      "Via": "1.1 6822dfa8db680b7a0bf038c5e3b66404.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL52-P3",
+      "X-Amz-Cf-Id": "KTvJc_mp62xlKtdDJfRoxOfx5gPYqH1oE5jY0AJ_Yx3V0g7iBbXHKw=="
+    },
+    "response_body": "{\"id\":\"77b40d81-f015-4c0b-88b5-729be4d005f4\",\"object\":\"chat.completion\",\"created\":1789683513,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Here's the current weather in Paris:\\n\\n- **Temperature:** 15°C\\n- **Wind:** 10 km/h\\n\\nInterestingly, it's the same as Berlin right now — 15°C with 10 km/h winds. Let me know if you'd like the weather for any other location!\",\"reasoning_content\":\"\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":689,\"completion_tokens\":63,\"total_tokens\":752,\"prompt_tokens_details\":{\"cached_tokens\":512},\"completion_tokens_details\":{\"reasoning_tokens\":0},\"prompt_cache_hit_tokens\":512,\"prompt_cache_miss_tokens\":177},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+  }
+]

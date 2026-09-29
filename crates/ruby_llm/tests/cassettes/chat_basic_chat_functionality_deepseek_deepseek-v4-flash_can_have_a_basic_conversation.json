@@ -1,0 +1,25 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.deepseek.com/chat/completions",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"What's 2 + 2?\"}],\"stream\":false}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Date": "Thu, 17 Sep 2026 22:07:23 GMT",
+      "Server": "elb",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Credentials": "true",
+      "X-Ds-Trace-Id": "821d5c600ff259396b44df1020f8e900",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "X-Cache": "Miss from cloudfront",
+      "Via": "1.1 7df3557c3d03c1259c580428921b9dbe.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL52-P2",
+      "X-Amz-Cf-Id": "tNeiK5bNK3bNlinHsGkVE1sH5zlFY24i3RTlWKZQ8bYADCfor8mT8Q=="
+    },
+    "response_body": "{\"id\":\"96c1573f-c047-4888-a90d-9fc88a417bb0\",\"object\":\"chat.completion\",\"created\":1789682843,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"4\",\"reasoning_content\":\"We need answer simple. Need comply. \\\"4\\\". But maybe user asks trick? Just answer.\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":38,\"completion_tokens\":22,\"total_tokens\":60,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":20},\"prompt_cache_hit_tokens\":0,\"prompt_cache_miss_tokens\":38},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+  }
+]

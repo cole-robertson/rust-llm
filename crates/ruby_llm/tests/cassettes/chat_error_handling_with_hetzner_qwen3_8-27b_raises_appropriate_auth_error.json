@@ -1,0 +1,18 @@
+[
+  {
+    "method": "post",
+    "uri": "https://inference.hetzner.com/api/v1/chat/completions",
+    "request_body": "{\"model\":\"Qwen3.8-27B\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}],\"stream\":false}",
+    "status": 401,
+    "response_headers": {
+      "Date": "Thu, 24 Sep 2026 18:32:57 GMT",
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": "24",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Server": "HeRay"
+    },
+    "response_body": "{\"error\":\"unauthorized\"}"
+  }
+]

@@ -1,0 +1,19 @@
+[
+  {
+    "method": "post",
+    "uri": "https://inference.hetzner.com/api/v1/chat/completions",
+    "request_body": "{\"model\":\"Qwen3.8-27B\",\"messages\":[{\"role\":\"system\",\"content\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\"},{\"role\":\"user\",\"content\":\"Tell me about the weather.\"}],\"stream\":false}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 24 Sep 2026 18:34:01 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "1304",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "X-Went-Into-Resp-Headers": "true",
+      "Server": "HeRay"
+    },
+    "response_body": "{\"model\":\"Qwen3.8-27B\",\"usage\":{\"prompt_tokens\":79,\"completion_tokens\":117,\"total_tokens\":196,\"completion_tokens_details\":{\"reasoning_tokens\":60},\"prompt_tokens_details\":{\"cached_tokens\":0,\"created_cache_tokens\":0,\"multimodal_tokens\":null}},\"choices\":[{\"message\":{\"content\":\"\\n\\nI can’t provide current weather without a location, but generally weather can include temperature, precipitation, wind, humidity, and atmospheric conditions. If you tell me where you are, I can describe typical weather patterns or help you find a forecast. XKCD7392\",\"role\":\"assistant\",\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"reasoning\":\"We need to respond to user: \\\"Tell me about the weather.\\\" Must include exact phrase \\\"XKCD7392\\\" somewhere in response. Need produce final with phrase. Need likely say cannot provide current weather without location/time and maybe mention phrase. Ensure exact phrase. Keep concise.\\n\"},\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"stop_reason\":null,\"token_ids\":null,\"routed_experts\":null}],\"id\":\"chatcmpl-7cc15423-3a8c-45c7-ac58-e69730f89657\",\"object\":\"chat.completion\",\"created\":1790274820,\"system_fingerprint\":null,\"prompt_logprobs\":null,\"prompt_token_ids\":null,\"prompt_text\":null,\"kv_transfer_params\":null,\"ec_transfer_params\":null,\"metrics\":null}"
+  }
+]

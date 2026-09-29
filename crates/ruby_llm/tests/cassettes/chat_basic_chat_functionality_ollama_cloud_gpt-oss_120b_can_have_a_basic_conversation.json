@@ -1,0 +1,24 @@
+[
+  {
+    "method": "post",
+    "uri": "https://ollama.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"What's 2 + 2?\"}],\"stream\":false}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Set-Cookie": "<COOKIE>",
+      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
+      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Frame-Options": "DENY",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Content-Length": "419",
+      "Date": "Thu, 17 Sep 2026 22:08:56 GMT",
+      "Server": "Google Frontend",
+      "X-Cloud-Trace-Context": "66ab812edcbbf4204d75b73510b35709/4425217697956323479",
+      "Traceparent": "00-66ab812edcbbf4204d75b73510b35709-3d69880cec756097-00",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000"
+    },
+    "response_body": "{\"id\":\"chatcmpl-738\",\"object\":\"chat.completion\",\"created\":1789682936,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"2 + 2 = 4.\",\"reasoning\":\"User asks a simple arithmetic: 2+2=4. Provide answer.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":74,\"prompt_tokens_details\":{\"cached_tokens\":48},\"completion_tokens\":36,\"total_tokens\":110}}\n"
+  }
+]

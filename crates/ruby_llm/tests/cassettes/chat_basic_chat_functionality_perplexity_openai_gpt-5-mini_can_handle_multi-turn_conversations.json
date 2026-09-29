@@ -1,0 +1,52 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.perplexity.ai/v1/agent",
+    "request_body": "{\"model\":\"openai/gpt-5-mini\",\"input\":[{\"role\":\"user\",\"content\":\"Who is the creator of the programming language Ruby?\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Fri, 25 Sep 2026 08:37:00 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Server": "cloudflare",
+      "X-Ratelimit-Limit": "1",
+      "X-Ratelimit-Remaining": "0",
+      "X-Ratelimit-Reset": "1790325421",
+      "X-Ratelimit-Used": "1",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Access-Control-Allow-Origin": "*",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Set-Cookie": "<COOKIE>",
+      "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\"background\":false,\"completed_at\":1790325416,\"created_at\":1790325416,\"error\":null,\"frequency_penalty\":0,\"id\":\"resp_acbbb18e-26cf-4323-b3ea-8efb68e12879\",\"incomplete_details\":null,\"instructions\":null,\"max_output_tokens\":null,\"max_tool_calls\":null,\"metadata\":{},\"model\":\"openai/gpt-5-mini\",\"object\":\"response\",\"output\":[{\"content\":[{\"annotations\":[],\"text\":\"Ruby was created by Yukihiro \\\"Matz\\\" Matsumoto (松本行弘). He began developing Ruby in 1993 and released the first public version in 1995.\",\"type\":\"output_text\"}],\"id\":\"msg_30821227-67e9-499b-9d54-fc5bb58c56d3\",\"role\":\"assistant\",\"status\":\"completed\",\"type\":\"message\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"reasoning\":null,\"safety_identifier\":null,\"service_tier\":\"default\",\"status\":\"completed\",\"store\":false,\"temperature\":1,\"text\":{\"format\":{\"type\":\"text\"}},\"tool_choice\":\"auto\",\"tools\":[],\"top_logprobs\":0,\"top_p\":1,\"truncation\":\"\",\"usage\":{\"cost\":{\"currency\":\"USD\",\"input_cost\":0.00001,\"output_cost\":0.00047,\"total_cost\":0.00048},\"input_tokens\":35,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":237,\"output_tokens_details\":{\"reasoning_tokens\":192},\"total_tokens\":272},\"user\":null}\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://api.perplexity.ai/v1/agent",
+    "request_body": "{\"model\":\"openai/gpt-5-mini\",\"input\":[{\"role\":\"user\",\"content\":\"Who is the creator of the programming language Ruby?\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"Ruby was created by Yukihiro \\\"Matz\\\" Matsumoto (松本行弘). He began developing Ruby in 1993 and released the first public version in 1995.\"}]},{\"role\":\"user\",\"content\":\"What year did he create Ruby?\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Fri, 25 Sep 2026 08:37:05 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Server": "cloudflare",
+      "X-Ratelimit-Limit": "1",
+      "X-Ratelimit-Remaining": "0",
+      "X-Ratelimit-Reset": "1790325426",
+      "X-Ratelimit-Used": "1",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Access-Control-Allow-Origin": "*",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Set-Cookie": "<COOKIE>",
+      "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\"background\":false,\"completed_at\":1790325420,\"created_at\":1790325420,\"error\":null,\"frequency_penalty\":0,\"id\":\"resp_1e1879ee-9271-4cb9-9607-44362eb760bd\",\"incomplete_details\":null,\"instructions\":null,\"max_output_tokens\":null,\"max_tool_calls\":null,\"metadata\":{},\"model\":\"openai/gpt-5-mini\",\"object\":\"response\",\"output\":[{\"content\":[{\"annotations\":[],\"text\":\"Yukihiro \\\"Matz\\\" Matsumoto began developing Ruby in 1993. The first public release (Ruby 0.95) came out in 1995 (with Ruby 1.0 following in 1996).\",\"type\":\"output_text\"}],\"id\":\"msg_427c628c-560c-4e00-8485-7f8aa50a6999\",\"role\":\"assistant\",\"status\":\"completed\",\"type\":\"message\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"reasoning\":null,\"safety_identifier\":null,\"service_tier\":\"default\",\"status\":\"completed\",\"store\":false,\"temperature\":1,\"text\":{\"format\":{\"type\":\"text\"}},\"tool_choice\":\"auto\",\"tools\":[],\"top_logprobs\":0,\"top_p\":1,\"truncation\":\"\",\"usage\":{\"cost\":{\"currency\":\"USD\",\"input_cost\":0.00002,\"output_cost\":0.00093,\"total_cost\":0.00095},\"input_tokens\":91,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":466,\"output_tokens_details\":{\"reasoning_tokens\":384},\"total_tokens\":557},\"user\":null}\n"
+  }
+]

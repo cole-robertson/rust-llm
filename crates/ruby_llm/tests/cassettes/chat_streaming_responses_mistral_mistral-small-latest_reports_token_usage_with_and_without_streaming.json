@@ -1,0 +1,61 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.mistral.ai/v1/chat/completions",
+    "request_body": "{\"model\":\"mistral-small-latest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: 1, 2, 3\"}],\"stream\":true,\"temperature\":0.0}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:06:42 GMT",
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Mistral-Correlation-Id": "01a0b168-5c90-7458-96f5-8b9f8741b9f3",
+      "X-Kong-Request-Id": "01a0b168-5c90-7458-96f5-8b9f8741b9f3",
+      "X-Max-Retry-Attempts-Reached": "false",
+      "X-Envoy-Upstream-Service-Time": "188",
+      "Server": "cloudflare",
+      "Access-Control-Allow-Origin": "*",
+      "X-Kong-Upstream-Latency": "189",
+      "X-Kong-Proxy-Latency": "12",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Set-Cookie": "<COOKIE>",
+      "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "data: {\"id\":\"546967c156674e6eac803782fdaaccc6\",\"object\":\"chat.completion.chunk\",\"created\":1789682801,\"model\":\"mistral-small-latest\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"546967c156674e6eac803782fdaaccc6\",\"object\":\"chat.completion.chunk\",\"created\":1789682801,\"model\":\"mistral-small-latest\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"1\"},\"finish_reason\":null}],\"p\":\"abcdefghijklmnop\"}\n\ndata: {\"id\":\"546967c156674e6eac803782fdaaccc6\",\"object\":\"chat.completion.chunk\",\"created\":1789682801,\"model\":\"mistral-small-latest\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\", 2,\"},\"finish_reason\":null}],\"p\":\"abcdefghijklmnopqrstuvwx\"}\n\ndata: {\"id\":\"546967c156674e6eac803782fdaaccc6\",\"object\":\"chat.completion.chunk\",\"created\":1789682801,\"model\":\"mistral-small-latest\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" 3\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":27,\"total_tokens\":35,\"completion_tokens\":8,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"p\":\"abcdefghijklmnopqrstu\"}\n\ndata: [DONE]\n\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://api.mistral.ai/v1/chat/completions",
+    "request_body": "{\"model\":\"mistral-small-latest\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: 1, 2, 3\"}],\"stream\":false,\"temperature\":0.0}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:06:42 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Mistral-Correlation-Id": "01a0b168-5ddb-716f-b7cd-1dad9bc2a53f",
+      "X-Kong-Request-Id": "01a0b168-5ddb-716f-b7cd-1dad9bc2a53f",
+      "X-Max-Retry-Attempts-Reached": "false",
+      "X-Ratelimit-Limit-Tokens-Minute": "100000",
+      "X-Ratelimit-Remaining-Tokens-Minute": "81787",
+      "X-Ratelimit-Tokens-Query-Cost": "35",
+      "X-Ratelimit-Limit-Req-Minute": "100",
+      "X-Ratelimit-Remaining-Req-Minute": "95",
+      "X-Envoy-Upstream-Service-Time": "190",
+      "Server": "cloudflare",
+      "Access-Control-Allow-Origin": "*",
+      "X-Kong-Upstream-Latency": "192",
+      "X-Kong-Proxy-Latency": "14",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Set-Cookie": "<COOKIE>",
+      "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\"id\":\"1b9f7b1d8de84c3590ab3507ee56a983\",\"created\":1789682802,\"model\":\"mistral-small-latest\",\"usage\":{\"prompt_tokens\":27,\"total_tokens\":35,\"completion_tokens\":8,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":\"1, 2, 3\"}}]}"
+  }
+]

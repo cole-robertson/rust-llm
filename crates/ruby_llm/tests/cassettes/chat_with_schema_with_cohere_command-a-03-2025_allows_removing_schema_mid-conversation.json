@@ -1,0 +1,52 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.cohere.com/v2/chat",
+    "request_body": "{\"model\":\"command-a-03-2025\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Generate a person named Bob\"}]}],\"stream\":false,\"response_format\":{\"type\":\"json_object\",\"json_schema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":\"integer\"}},\"required\":[\"name\",\"age\"],\"additionalProperties\":false}}}",
+    "status": 200,
+    "response_headers": {
+      "Access-Control-Expose-Headers": "X-Debug-Trace-ID",
+      "Cache-Control": "no-cache, no-store, no-transform, must-revalidate, private, max-age=0",
+      "Content-Type": "application/json",
+      "Expires": "Thu, 01 Jan 1970 00:00:00 GMT",
+      "Num-Chars": "3161",
+      "Num-Tokens": "15",
+      "Pragma": "no-cache",
+      "Vary": "Origin,Accept-Encoding",
+      "X-Accel-Expires": "0",
+      "X-Debug-Trace-Id": "57c839b17113775b9063c09d35fd61ed",
+      "Date": "Thu, 17 Sep 2026 22:07:44 GMT",
+      "X-Envoy-Upstream-Service-Time": "408",
+      "Server": "envoy",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\"id\":\"6e5a724d-b179-4ef1-a63a-117b58536054\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"name\\\":\\\"Bob\\\",\\\"age\\\":30}\"}]},\"finish_reason\":\"COMPLETE\",\"usage\":{\"billed_units\":{\"input_tokens\":5,\"output_tokens\":10},\"tokens\":{\"input_tokens\":607,\"output_tokens\":13},\"cached_tokens\":480}}"
+  },
+  {
+    "method": "post",
+    "uri": "https://api.cohere.com/v2/chat",
+    "request_body": "{\"model\":\"command-a-03-2025\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Generate a person named Bob\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"name\\\":\\\"Bob\\\",\\\"age\\\":30}\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Now just tell me about Ruby\"}]}],\"stream\":false}",
+    "status": 200,
+    "response_headers": {
+      "Access-Control-Expose-Headers": "X-Debug-Trace-ID",
+      "Cache-Control": "no-cache, no-store, no-transform, must-revalidate, private, max-age=0",
+      "Content-Type": "application/json",
+      "Expires": "Thu, 01 Jan 1970 00:00:00 GMT",
+      "Num-Chars": "2808",
+      "Num-Tokens": "433",
+      "Pragma": "no-cache",
+      "Vary": "Origin,Accept-Encoding",
+      "X-Accel-Expires": "0",
+      "X-Debug-Trace-Id": "f462fb878cb6e1ba24280c4a75505c4b",
+      "Date": "Thu, 17 Sep 2026 22:07:50 GMT",
+      "X-Envoy-Upstream-Service-Time": "6445",
+      "Server": "envoy",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\"id\":\"7b706772-ba1f-409a-9d1b-547b2b221b64\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Ruby is a dynamic, open-source programming language that focuses on simplicity and productivity. It was created by Yukihiro \\\"Matz\\\" Matsumoto in the mid-1990s in Japan. Here are some key features and characteristics of Ruby:\\n\\n1. **Philosophy**: Ruby is designed to be human-friendly, emphasizing readability and expressiveness. Matz often says, *\\\"Ruby is designed to make programmers happy.\\\"*\\n\\n2. **Syntax**: Ruby has a clean and intuitive syntax, inspired by languages like Perl, Smalltalk, Eiffel, Ada, and Lisp. It allows for flexible and concise code.\\n\\n3. **Dynamic Typing**: Ruby is dynamically typed, meaning you don't need to declare variable types explicitly. This makes development faster and more flexible.\\n\\n4. **Object-Oriented**: Everything in Ruby is an object, including primitive data types like integers and booleans. It supports classes, inheritance, and mixins.\\n\\n5. **Mixins**: Ruby uses modules for mixins, allowing you to include additional functionality into classes without using traditional inheritance.\\n\\n6. **Blocks, Procs, and Lambdas**: Ruby has powerful features for handling blocks of code, which are essential for writing concise and reusable code.\\n\\n7. **Ruby on Rails**: Ruby gained widespread popularity due to the Ruby on Rails web framework, which simplifies web development by following the convention over configuration philosophy.\\n\\n8. **Community and Ecosystem**: Ruby has a vibrant community and a rich ecosystem of libraries (gems) available via RubyGems, making it easy to add functionality to your projects.\\n\\n9. **Cross-Platform**: Ruby runs on multiple platforms, including Windows, macOS, and Linux.\\n\\n10. **Metaprogramming**: Ruby supports metaprogramming, allowing developers to write code that writes code, enabling powerful abstractions and dynamic behavior.\\n\\nRuby is widely used for web development, scripting, automation, and building command-line tools. Its focus on developer happiness and productivity makes it a favorite among programmers.\"}]},\"finish_reason\":\"COMPLETE\",\"usage\":{\"billed_units\":{\"input_tokens\":21,\"output_tokens\":412},\"tokens\":{\"input_tokens\":524,\"output_tokens\":415},\"cached_tokens\":448}}"
+  }
+]

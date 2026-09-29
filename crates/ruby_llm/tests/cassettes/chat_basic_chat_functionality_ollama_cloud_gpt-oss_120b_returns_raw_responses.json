@@ -1,0 +1,24 @@
+[
+  {
+    "method": "post",
+    "uri": "https://ollama.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"What is the capital of France?\"}],\"stream\":false}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Set-Cookie": "<COOKIE>",
+      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
+      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Frame-Options": "DENY",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Content-Length": "527",
+      "Date": "Thu, 17 Sep 2026 22:08:57 GMT",
+      "Server": "Google Frontend",
+      "Traceparent": "00-a42a04e48983e0da86df00d7a5539cee-56c2d5f446f30ff1-00",
+      "X-Cloud-Trace-Context": "a42a04e48983e0da86df00d7a5539cee/6251794477882740721",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000"
+    },
+    "response_body": "{\"id\":\"chatcmpl-917\",\"object\":\"chat.completion\",\"created\":1789682937,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The capital of France is **Paris**.\",\"reasoning\":\"The user asks: \\\"What is the capital of France?\\\" Simple question: answer is Paris. Provide concise answer. Possibly add a brief note if needed.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":74,\"prompt_tokens_details\":{\"cached_tokens\":48},\"completion_tokens\":50,\"total_tokens\":124}}\n"
+  }
+]

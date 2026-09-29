@@ -1,0 +1,16 @@
+[
+  {
+    "method": "post",
+    "uri": "https://bedrock-runtime.<AWS_REGION>.amazonaws.com/model/us.amazon.nova-2-lite-v1:0/converse",
+    "request_body": "{\"messages\":[{\"role\":\"user\",\"content\":[{\"text\":\"What's 2 + 2?\"}]}],\"inferenceConfig\":{}}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:06:48 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "519",
+      "Connection": "keep-alive",
+      "X-Amzn-Requestid": "9efd210f-828a-4116-9694-f4f616ddcce0"
+    },
+    "response_body": "{\"metrics\":{\"latencyMs\":1013},\"output\":{\"message\":{\"content\":[{\"text\":\"2 + 2 equals **4**.\\n\\nThis is a basic arithmetic operation where you're adding two numbers together. When you add 2 and 2, you combine the quantities, resulting in a total of 4. \\n\\nIf you're exploring this in a different context (like binary, or as part of a larger math problem), feel free to share more details!\"}],\"role\":\"assistant\"}},\"stopReason\":\"end_turn\",\"usage\":{\"inputTokens\":53,\"outputTokens\":75,\"serverToolUsage\":{},\"totalTokens\":128}}"
+  }
+]

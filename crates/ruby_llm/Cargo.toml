@@ -1,0 +1,27 @@
+[package]
+name = "ruby_llm"
+description = "A 1:1 Rust port of RubyLLM 2.0: one API for chat, tools, agents, and embeddings across providers."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+base64.workspace = true
+futures.workspace = true
+mime_guess.workspace = true
+rand.workspace = true
+regex.workspace = true
+reqwest.workspace = true
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+futures.workspace = true
+serde_yaml = "0.9"
+wiremock = "0.6"

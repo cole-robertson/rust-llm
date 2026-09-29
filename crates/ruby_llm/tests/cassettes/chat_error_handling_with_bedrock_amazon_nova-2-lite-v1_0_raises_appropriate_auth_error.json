@@ -1,0 +1,17 @@
+[
+  {
+    "method": "post",
+    "uri": "https://bedrock-runtime.<AWS_REGION>.amazonaws.com/model/us.amazon.nova-2-lite-v1:0/converse",
+    "request_body": "{\"messages\":[{\"role\":\"user\",\"content\":[{\"text\":\"Hello\"}]}],\"inferenceConfig\":{}}",
+    "status": 403,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:06:30 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "68",
+      "Connection": "keep-alive",
+      "X-Amzn-Requestid": "56e0710a-2b01-46e8-acf7-e7909a2ee294",
+      "X-Amzn-Errortype": "UnrecognizedClientException:http://internal.amazon.com/coral/com.amazon.coral.service/"
+    },
+    "response_body": "{\"message\":\"The security token included in the request is invalid.\"}"
+  }
+]

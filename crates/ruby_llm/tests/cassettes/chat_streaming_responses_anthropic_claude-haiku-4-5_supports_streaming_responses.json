@@ -1,0 +1,39 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.anthropic.com/v1/messages",
+    "request_body": "{\"model\":\"claude-haiku-4-5-20251001\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Count from 1 to 3\"}]}],\"stream\":true,\"max_tokens\":64000}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:06:23 GMT",
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Cache-Control": "no-cache",
+      "Anthropic-Ratelimit-Input-Tokens-Limit": "10000000",
+      "Anthropic-Ratelimit-Input-Tokens-Remaining": "10000000",
+      "Anthropic-Ratelimit-Input-Tokens-Reset": "2026-09-17T22:06:23Z",
+      "Anthropic-Ratelimit-Output-Tokens-Limit": "2000000",
+      "Anthropic-Ratelimit-Output-Tokens-Remaining": "2000000",
+      "Anthropic-Ratelimit-Output-Tokens-Reset": "2026-09-17T22:06:23Z",
+      "Anthropic-Ratelimit-Requests-Limit": "10000",
+      "Anthropic-Ratelimit-Requests-Remaining": "9999",
+      "Anthropic-Ratelimit-Requests-Reset": "2026-09-17T22:06:23Z",
+      "Anthropic-Ratelimit-Tokens-Limit": "12000000",
+      "Anthropic-Ratelimit-Tokens-Remaining": "12000000",
+      "Anthropic-Ratelimit-Tokens-Reset": "2026-09-17T22:06:23Z",
+      "Server": "cloudflare",
+      "Request-Id": "<REQUEST_ID>",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "Anthropic-Organization-Id": "<ANTHROPIC_ORGANIZATION_ID>",
+      "Anthropic-Workspace-Id": "wrkspc_01MZW3YzUeytZsFc9LHFxP78",
+      "Traceresponse": "00-1913ed264021a99addf1cfb98321b2cd-6d7c80253ee2f8e4-01",
+      "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+      "Vary": "Accept-Encoding",
+      "Cf-Cache-Status": "DYNAMIC",
+      "X-Robots-Tag": "none",
+      "Cf-Ray": "<CF_RAY>"
+    },
+    "response_body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_011Cf9mhiv32fvs7J6TDzAka\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"container\":null,\"stop_reason\":null,\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":15,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1,\"service_tier\":\"standard\",\"inference_geo\":\"not_available\"}}          }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}        }\n\nevent: ping\ndata: {\"type\": \"ping\"}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"1\\n2\\n3\"}        }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0             }\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"container\":null},\"usage\":{\"input_tokens\":15,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":9}              }\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"               }\n\n"
+  }
+]

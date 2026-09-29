@@ -1,0 +1,24 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.anthropic.com/v1/messages",
+    "request_body": "{\"model\":\"claude-haiku-4-5-20251001\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Hello\"}]}],\"stream\":false,\"max_tokens\":64000}",
+    "status": 401,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:06:29 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "X-Should-Retry": "false",
+      "Request-Id": "<REQUEST_ID>",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "Server": "cloudflare",
+      "Vary": "Accept-Encoding",
+      "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+      "Cf-Cache-Status": "DYNAMIC",
+      "X-Robots-Tag": "none",
+      "Cf-Ray": "<CF_RAY>"
+    },
+    "response_body": "{\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011Cf9miCnLiD6RnczfNS9dP\"}"
+  }
+]

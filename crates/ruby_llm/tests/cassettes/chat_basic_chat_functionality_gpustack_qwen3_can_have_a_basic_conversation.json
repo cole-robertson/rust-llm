@@ -1,0 +1,21 @@
+[
+  {
+    "method": "post",
+    "uri": "<GPUSTACK_API_BASE>/chat/completions",
+    "request_body": "{\"model\":\"qwen3\",\"messages\":[{\"role\":\"user\",\"content\":\"What's 2 + 2?\"}],\"stream\":false}",
+    "status": 200,
+    "response_headers": {
+      "Req-Cost-Time": "2352",
+      "Resp-Start-Time": "1789682886760",
+      "X-Envoy-Upstream-Service-Time": "2349",
+      "Date": "Thu, 17 Sep 2026 22:08:04 GMT",
+      "Server": "istio-envoy",
+      "Access-Control-Allow-Origin": "",
+      "Content-Type": "application/json; charset=utf-8",
+      "Req-Arrive-Time": "1789682884407",
+      "Vary": "Accept-Encoding",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"2 + 2 equals 4. \\n\\nIn basic arithmetic, adding 2 and 2 combines their quantities, resulting in a total of 4. This is a fundamental concept in mathematics, often introduced early in education. If you meant a different context (e.g., binary, modular arithmetic, etc.), please clarify!\",\"reasoning_content\":\"Okay, let's see. The user asked, \\\"What's 2 + 2?\\\" Hmm, that seems straightforward. But maybe they want a detailed explanation? Let me think. Well, 2 + 2 is a basic arithmetic problem. I know that in elementary math, addition is one of the first operations taught. So, 2 plus 2 equals 4. But wait, maybe they're testing if I can recognize the question or if there's a trick here. Let me double-check. In standard arithmetic, 2 + 2 is indeed 4. There's no hidden meaning or alternative interpretation unless specified. Maybe they're just confirming my knowledge. I should make sure to explain the process as well. So, adding two numbers: 2 and 2. When you add them together, you combine the quantities. So, two groups of two items each would total four items. That's the basic concept. I don't think there's any other way to interpret this unless it's in a different context, like binary or something else. But the question doesn't specify, so it's safe to assume it's in base 10. Yeah, I think that's all. The answer is 4.\\n\"}}],\"created\":1789682886,\"model\":\"qwen3\",\"system_fingerprint\":\"b10830-465e49b9c\",\"object\":\"chat.completion\",\"usage\":{\"completion_tokens\":320,\"prompt_tokens\":16,\"total_tokens\":336,\"prompt_tokens_details\":{\"cached_tokens\":5}},\"id\":\"chatcmpl-Pzh9X6GSkWu3zsQDLA0RmwAC83ytA7uf\",\"timings\":{\"cache_n\":5,\"prompt_n\":11,\"prompt_ms\":18.841,\"prompt_per_token_ms\":1.712818181818182,\"prompt_per_second\":583.8331298763335,\"predicted_n\":320,\"predicted_ms\":2323.985,\"predicted_per_token_ms\":7.2852194357366775,\"predicted_per_second\":137.26422502726996}}"
+  }
+]

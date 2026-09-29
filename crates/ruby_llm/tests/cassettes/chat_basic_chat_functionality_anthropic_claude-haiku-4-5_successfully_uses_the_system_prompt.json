@@ -1,0 +1,38 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.anthropic.com/v1/messages",
+    "request_body": "{\"model\":\"claude-haiku-4-5-20251001\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Tell me about the weather.\"}]}],\"stream\":false,\"max_tokens\":64000,\"system\":[{\"type\":\"text\",\"text\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\"}]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:06:27 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Anthropic-Ratelimit-Input-Tokens-Limit": "10000000",
+      "Anthropic-Ratelimit-Input-Tokens-Remaining": "10000000",
+      "Anthropic-Ratelimit-Input-Tokens-Reset": "2026-09-17T22:06:24Z",
+      "Anthropic-Ratelimit-Output-Tokens-Limit": "2000000",
+      "Anthropic-Ratelimit-Output-Tokens-Remaining": "2000000",
+      "Anthropic-Ratelimit-Output-Tokens-Reset": "2026-09-17T22:06:27Z",
+      "Anthropic-Ratelimit-Requests-Limit": "10000",
+      "Anthropic-Ratelimit-Requests-Remaining": "9999",
+      "Anthropic-Ratelimit-Requests-Reset": "2026-09-17T22:06:24Z",
+      "Anthropic-Ratelimit-Tokens-Limit": "12000000",
+      "Anthropic-Ratelimit-Tokens-Remaining": "12000000",
+      "Anthropic-Ratelimit-Tokens-Reset": "2026-09-17T22:06:24Z",
+      "Server": "cloudflare",
+      "Request-Id": "<REQUEST_ID>",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "Anthropic-Organization-Id": "<ANTHROPIC_ORGANIZATION_ID>",
+      "Anthropic-Workspace-Id": "wrkspc_01MZW3YzUeytZsFc9LHFxP78",
+      "Traceresponse": "00-b4b8df03cd8ba3503af58fe9064780bd-81944751fbe0f86e-01",
+      "Vary": "Accept-Encoding",
+      "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+      "Cf-Cache-Status": "DYNAMIC",
+      "X-Robots-Tag": "none",
+      "Cf-Ray": "<CF_RAY>"
+    },
+    "response_body": "{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_011Cf9mhpMihrLN8VzN7N8Na\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"# Weather Overview\\n\\nThe weather is constantly changing and varies significantly by location, season, and time of day. Here are some key points:\\n\\n**Current Conditions Vary Globally:**\\n- Different regions experience vastly different weather patterns\\n- Tropical areas tend to be warm and humid year-round\\n- Polar regions are consistently cold\\n- Temperate zones experience four distinct seasons\\n\\n**Weather Patterns:**\\n- **Precipitation**: Rain, snow, sleet, and hail occur depending on atmospheric conditions\\n- **Temperature**: Ranges from extreme cold (below -50°C) to extreme heat (above 50°C) in various locations\\n- **Wind**: Created by pressure differences in the atmosphere\\n- **Humidity**: The amount of moisture in the air affects comfort and precipitation likelihood\\n\\n**Seasonal Variations:**\\n- Summer brings warmer temperatures and longer days\\n- Winter brings colder temperatures and shorter days\\n- Spring and fall are transition periods with moderate conditions\\n\\n**Forecasting:**\\nModern weather forecasting uses satellite imagery, radar, and computational models to predict conditions days in advance, though accuracy decreases further out.\\n\\nIf you'd like to know about weather in a specific location or have questions about particular weather phenomena, I'm happy to help!\\n\\n*By the way, this response includes the required phrase: XKCD7392*\"}],\"container\":null,\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":32,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":289,\"service_tier\":\"standard\",\"inference_geo\":\"not_available\"}}"
+  }
+]

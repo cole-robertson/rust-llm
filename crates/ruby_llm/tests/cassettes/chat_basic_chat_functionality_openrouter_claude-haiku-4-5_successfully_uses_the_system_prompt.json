@@ -1,0 +1,24 @@
+[
+  {
+    "method": "post",
+    "uri": "https://openrouter.ai/api/v1/chat/completions",
+    "request_body": "{\"model\":\"anthropic/claude-haiku-4.5\",\"messages\":[{\"role\":\"developer\",\"content\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\"},{\"role\":\"user\",\"content\":\"Tell me about the weather.\"}],\"stream\":false}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:10:03 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+      "X-Generation-Id": "gen-1789683003-rw5Z0PzBA6gIDJB1XUti",
+      "Access-Control-Expose-Headers": "X-Generation-Id,X-Provider-Name,request-id,cf-ray",
+      "Set-Cookie": "<COOKIE>",
+      "Permissions-Policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "Referrer-Policy": "no-referrer, strict-origin-when-cross-origin",
+      "X-Content-Type-Options": "nosniff",
+      "Server": "cloudflare",
+      "Cf-Ray": "<CF_RAY>"
+    },
+    "response_body": "\n         \n{\"id\":\"gen-1789683003-rw5Z0PzBA6gIDJB1XUti\",\"object\":\"chat.completion\",\"created\":1789683003,\"model\":\"anthropic/claude-haiku-4.5\",\"provider\":\"Amazon Bedrock\",\"system_fingerprint\":null,\"service_tier\":\"default\",\"choices\":[{\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"end_turn\",\"message\":{\"role\":\"assistant\",\"content\":\"# Weather Overview\\n\\nWeather is the day-to-day atmospheric conditions in a specific location, including temperature, precipitation, wind, humidity, and cloud cover. It's constantly changing and varies significantly based on geography, season, and time of day.\\n\\n## Key Weather Elements\\n\\n- **Temperature**: Measured in Fahrenheit or Celsius; affects comfort and activities\\n- **Precipitation**: Rain, snow, sleet, or hail that falls from clouds\\n- **Wind**: Air movement caused by pressure differences; measured in speed and direction\\n- **Humidity**: The amount of moisture in the air\\n- **Cloud Cover**: Affects visibility and likelihood of rain or snow\\n\\n## Weather Patterns\\n\\nWeather is influenced by:\\n- **Latitude and geography** (proximity to water, elevation)\\n- **Seasons** (Earth's axial tilt creates seasonal variations)\\n- **Air pressure systems** (high and low pressure zones)\\n- **Ocean currents and temperature**\\n\\n## Forecasting\\n\\nModern weather forecasting uses satellite imagery, radar, weather stations, and computer models to predict conditions days in advance. However, long-range predictions become less accurate beyond about 10 days.\\n\\n---\\n\\n*This response includes the required phrase XKCD7392 as requested.*\\n\\nIs there anything specific about weather you'd like to know more about—like how to read a forecast, climate change, severe weather safety, or something else?\",\"refusal\":null,\"reasoning\":null}}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":306,\"total_tokens\":338,\"cost\":0.001562,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.001562,\"upstream_inference_prompt_cost\":0.000032,\"upstream_inference_completions_cost\":0.00153},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}"
+  }
+]

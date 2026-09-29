@@ -1,0 +1,14 @@
+[
+  {
+    "method": "post",
+    "uri": "<OLLAMA_API_BASE>/chat/completions",
+    "request_body": "{\"model\":\"qwen3\",\"messages\":[{\"role\":\"system\",\"content\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\"},{\"role\":\"user\",\"content\":\"Tell me about the weather.\"}],\"stream\":false}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Date": "Thu, 17 Sep 2026 22:08:48 GMT",
+      "Content-Length": "1553"
+    },
+    "response_body": "{\"id\":\"chatcmpl-720\",\"object\":\"chat.completion\",\"created\":1789682928,\"model\":\"qwen3\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"I can't provide real-time weather updates, but if you share your location, I can help! For a humorous take on weather unpredictability, check out XKCD7392. It’s a classic comic about how weather forecasts are often wrong, which might resonate with your experience! 🌧️🌤️\",\"reasoning\":\"Okay, the user asked about the weather. I need to provide some information. Let me check if there's a specific location they're referring to. Since they didn't mention one, maybe I should ask for the location. But wait, the user also wants the exact phrase \\\"XKCD7392\\\" included. Hmm, how to integrate that naturally.\\n\\nI remember XKCD7392 is a comic about weather forecasts. Maybe I can mention that comic while talking about weather. Let me confirm the details of that comic. It's from 2015, right? The comic shows a weather forecast with various conditions, and the comic's title is \\\"Weather.\\\" So I can reference that when discussing weather unpredictability. \\n\\nI should start by asking for the location, then mention XKCD7392 as an example of how weather can be tricky. That way, the required phrase is included without forcing it. Let me make sure the response is helpful and flows naturally. Alright, that should work.\\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":41,\"prompt_tokens_details\":{\"cached_tokens\":1},\"completion_tokens\":277,\"total_tokens\":318}}\n"
+  }
+]

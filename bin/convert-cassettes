@@ -1,0 +1,27 @@
+#!/usr/bin/env ruby
+# Converts the upstream VCR cassettes the Rust replay tests use into JSON (keeps !binary bodies decoded).
+require 'yaml'
+require 'json'
+src = File.expand_path('../upstream/spec/fixtures/vcr_cassettes', __dir__)
+dst = File.expand_path('../crates/ruby_llm/tests/cassettes', __dir__)
+patterns = ARGV.empty? ? ['*'] : ARGV
+count = 0
+patterns.each do |pat|
+  Dir.glob(File.join(src, "#{pat}.yml")).each do |file|
+    data = YAML.unsafe_load_file(file)
+    interactions = data.fetch('http_interactions').map do |i|
+      body = ->(b) { s = b['string'].to_s; s.force_encoding('UTF-8'); s.valid_encoding? ? s : s.scrub }
+      {
+        'method' => i['request']['method'],
+        'uri' => i['request']['uri'],
+        'request_body' => body.(i['request']['body']),
+        'status' => i['response']['status']['code'],
+        'response_headers' => i['response']['headers'].transform_values { |v| Array(v).first },
+        'response_body' => body.(i['response']['body'])
+      }
+    end
+    File.write(File.join(dst, File.basename(file, '.yml') + '.json'), JSON.pretty_generate(interactions))
+    count += 1
+  end
+end
+puts "converted #{count}"

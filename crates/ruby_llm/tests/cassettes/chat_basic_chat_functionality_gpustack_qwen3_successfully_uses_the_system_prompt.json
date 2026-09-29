@@ -1,0 +1,21 @@
+[
+  {
+    "method": "post",
+    "uri": "<GPUSTACK_API_BASE>/chat/completions",
+    "request_body": "{\"model\":\"qwen3\",\"messages\":[{\"role\":\"system\",\"content\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\"},{\"role\":\"user\",\"content\":\"Tell me about the weather.\"}],\"stream\":false}",
+    "status": 200,
+    "response_headers": {
+      "Req-Arrive-Time": "1789682898055",
+      "Date": "Thu, 17 Sep 2026 22:08:17 GMT",
+      "Access-Control-Allow-Origin": "",
+      "Req-Cost-Time": "1863",
+      "Resp-Start-Time": "1789682899919",
+      "X-Envoy-Upstream-Service-Time": "1853",
+      "Server": "istio-envoy",
+      "Content-Type": "application/json; charset=utf-8",
+      "Vary": "Accept-Encoding",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"I can't provide real-time weather data, but I can share a fun weather-related tidbit! XKCD7392 is a comic that humorously illustrates how people often overcomplicate weather predictions with elaborate models, when the simplest answer (like checking a forecast) would suffice. If you're curious about the weather, I recommend checking a reliable weather service or app! 🌤️\",\"reasoning_content\":\"Okay, the user asked about the weather. I need to include XKCD7392 somewhere. Let me think about how to connect that. XKCD7392 is a comic about a person trying to predict the weather using a very complex model, but it's actually a simple thing. Maybe I can mention that comic in the response. The user might not know about it, so I should explain it briefly. Let me check if I can reference the comic naturally. Also, I should provide current weather info. Wait, I can't access real-time data, so I'll have to say I can't provide current info. Maybe suggest checking a weather service. Then link XKCD7392 as an example of overcomplicating things. That should work. Let me put it all together.\\n\"}}],\"created\":1789682899,\"model\":\"qwen3\",\"system_fingerprint\":\"b10830-465e49b9c\",\"object\":\"chat.completion\",\"usage\":{\"completion_tokens\":250,\"prompt_tokens\":39,\"total_tokens\":289,\"prompt_tokens_details\":{\"cached_tokens\":1}},\"id\":\"chatcmpl-1M4VsnKTiWoNrlXnyvbwnXlIEHDnJw26\",\"timings\":{\"cache_n\":1,\"prompt_n\":38,\"prompt_ms\":17.866,\"prompt_per_token_ms\":0.4701578947368421,\"prompt_per_second\":2126.94503526251,\"predicted_n\":250,\"predicted_ms\":1814.979,\"predicted_per_token_ms\":7.289072289156627,\"predicted_per_second\":137.19166998626432}}"
+  }
+]

@@ -1,0 +1,34 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.openai.com/v1/responses",
+    "request_body": "{\"model\":\"gpt-5-nano\",\"input\":[{\"role\":\"user\",\"content\":\"What is the capital of France?\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:09:16 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Cf-Ray": "<CF_RAY>",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Server": "cloudflare",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "Access-Control-Expose-Headers": "CF-Ray",
+      "Openai-Organization": "<OPENAI_ORGANIZATION>",
+      "Openai-Processing-Ms": "1082",
+      "Openai-Project": "<OPENAI_PROJECT>",
+      "Openai-Version": "2020-10-01",
+      "X-Ratelimit-Limit-Requests": "5000",
+      "X-Ratelimit-Limit-Tokens": "2000000",
+      "X-Ratelimit-Remaining-Requests": "4999",
+      "X-Ratelimit-Remaining-Tokens": "2000000",
+      "X-Ratelimit-Reset-Requests": "12ms",
+      "X-Ratelimit-Reset-Tokens": "0s",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Set-Cookie": "<COOKIE>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\n  \"id\": \"resp_04a3648972d8c4bf016aac650b9ba087d2b530728ee24b5b40\",\n  \"object\": \"response\",\n  \"created_at\": 1789682955,\n  \"status\": \"completed\",\n  \"background\": false,\n  \"billing\": {\n    \"payer\": \"developer\"\n  },\n  \"completed_at\": 1789682956,\n  \"error\": null,\n  \"frequency_penalty\": 0.0,\n  \"incomplete_details\": null,\n  \"instructions\": null,\n  \"max_output_tokens\": null,\n  \"max_tool_calls\": null,\n  \"model\": \"gpt-5-nano-2025-08-07\",\n  \"moderation\": null,\n  \"output\": [\n    {\n      \"id\": \"rs_04a3648972d8c4bf016aac650bf60c87d28e3c6fba53cfda4a\",\n      \"type\": \"reasoning\",\n      \"content\": [],\n      \"encrypted_content\": \"gAAAAABqrGUM60cgKYnDCnxOYcFA6QsJgun_T6VnGTxebq4pEl9g6rCGB40Hb21HQBOrJjhgE8J1fpNhrieQUTzy5HYxgXtPzZ_7OMELxgKDwyv5Zia9rBZvMYWcJd9OiGCEO-zxDBJ6PViVaKTjQDf724YlCtS2z0p2DIMoVcRgqoCd6ornl_HyyNbi9KnF-SGiRDOg_oIyllInN_y-aDNUZQgMCFCFYPRGbIWkwZZbn3-3urjXDDiR62LwZd1GcPRByCg8Os6dAxbEaQhppgoZo8nj4YuNwRE6xLW75EQuFoSUt219X4slq3Rsl7WLCo0Wn43DWQdtdIhvhf1CHpPk_CVarVdTlOhNqrBHlYwtwrwrgGkAAdSglTiw37lXk8cqnYXpM7xzGxwMMeEB7ir9wBP01TrbfJDKg0ifFV_JHtTXv-ZSHxd0FlEQN_YEDu3cY5JBUmO1g_xv0WCjzDWchiIWo6t2qIatLumVcKba86CvpCabfnh_N9umHTV8xb0lgGRSEwcxx86kpVbhS_rZv0kzxW_0GSNu4-Vpba_BxI4seS-6ZTtz1KPWzItLQKKpYaG732At3OWBD7KnGZlXnfDMcZGTCyRVUM2OJRv39vx0fgeIwgUTlv9y-fHL2MylNk4lATnPvN1nyJtt0h1p8_VqW9xlSRLU8Rtm5iyV2mCN_92M_QdmW-yzDyjMb0x_TDw2fVCCzX24s-cQSBUJeLtQFewJ5N53dDmNYZmyevmQ82kNQmTLo-FsrTq7tbw4bT2ElWo1SEPtJAMh657qjB3TXy38HAKFlc1GzvuLy8GPzqAn_KO0ADV4ib9XcDUazfgsuc7dgMXKFSXhNprsMQJHx-U72eNMg6HUuOlihGneZM1yoji80r8TpHwgUjRP1Hzcw2TW8IIsLE-5iOoyweeeQW3zc40sMx0NeC4B-2N5DQQDAvZG-qkK0gXbzf-fIyxM96YsxT4Ap54ZfzlNIivF1_qQi1xA1SyvlnMciDT0hthyr74KV050tY-zVSW7eDLks72eThaB4sLypOrxapWMVov7-eOK38FYI4L80-C8Sah8lX_Sv1PzoOWG8QrpRRHP4NIwtHDwKLX4MYxW74GmvE1qAWsGMDIQt2NvnoZorw4w5FwmJ1OMUcT04ZkECUpeNfSkv_jLMCt4itjxs_RB8hk7aj67bTIVaDJgP9NVVM-dyP0XQk1jOzAshBuk2l2x5f8-WhOaB5H3UPAWURhsab6Rnao9noqFYxYnTUw-WwtTAdbjBOjSMN3Ykqfa4_r9Y1LDA_ZqhFQBx5kLQiXVWmFhfDrr63y6HwS7QHjbJvdUh4T2FxbFP9HOj7kcuoGa0L9KBwclBVymLrtH27_mUScOB_CiVka-CwQK4giRz3uoHKe5s1N2WXpvrvp6xPkadexIw0U15hki39Vz6ddemYhJnP1no_mrT358uiOE9sOJqZRPgHXQwK3d9164swtOv-Y6MtrhYql2x4A1ARvOFDZIlgndyfVHj3sv83oBVpi8vQTBUYySzKzzwZVahocT4CDR_LgS3fVWg5VwkNT2OZE5QukeromsYbrd9JF00qZUb-sNsIJ3WBiF7Xt9pJxTi903vVERlvgeRiIg99GEVlnsw-cdeoX5ZaYlQ4l1AiJd74PLVipO0cTIbf7Ufi-0jP7aJgLkplaqwiUZPQz8FRoVLRH0sRmjKX9_K5_6jsZjfFjLC27lw7gD6WwcsdPq7tCEOf2-8sys_Ozg73aUKsJMaA==\",\n      \"summary\": []\n    },\n    {\n      \"id\": \"msg_04a3648972d8c4bf016aac650c99f087d2b4a2d2447d40002b\",\n      \"type\": \"message\",\n      \"status\": \"completed\",\n      \"content\": [\n        {\n          \"type\": \"output_text\",\n          \"annotations\": [],\n          \"logprobs\": [],\n          \"text\": \"Paris.\"\n        }\n      ],\n      \"role\": \"assistant\"\n    }\n  ],\n  \"parallel_tool_calls\": true,\n  \"presence_penalty\": 0.0,\n  \"previous_response_id\": null,\n  \"prompt_cache_key\": null,\n  \"prompt_cache_retention\": \"in_memory\",\n  \"reasoning\": {\n    \"context\": \"current_turn\",\n    \"effort\": \"medium\",\n    \"mode\": \"standard\",\n    \"summary\": null\n  },\n  \"safety_identifier\": null,\n  \"service_tier\": \"default\",\n  \"store\": false,\n  \"temperature\": 1.0,\n  \"text\": {\n    \"format\": {\n      \"type\": \"text\"\n    },\n    \"verbosity\": \"medium\"\n  },\n  \"tool_choice\": \"auto\",\n  \"tool_usage\": {\n    \"image_gen\": {\n      \"input_tokens\": 0,\n      \"input_tokens_details\": {\n        \"image_tokens\": 0,\n        \"text_tokens\": 0\n      },\n      \"output_tokens\": 0,\n      \"output_tokens_details\": {\n        \"image_tokens\": 0,\n        \"text_tokens\": 0\n      },\n      \"total_tokens\": 0\n    },\n    \"web_search\": {\n      \"num_requests\": 0\n    }\n  },\n  \"tools\": [],\n  \"top_logprobs\": 0,\n  \"top_p\": 1.0,\n  \"truncation\": \"disabled\",\n  \"usage\": {\n    \"input_tokens\": 13,\n    \"input_tokens_details\": {\n      \"cache_write_tokens\": 0,\n      \"cached_tokens\": 0\n    },\n    \"output_tokens\": 101,\n    \"output_tokens_details\": {\n      \"reasoning_tokens\": 64\n    },\n    \"total_tokens\": 114\n  },\n  \"user\": null,\n  \"metadata\": {}\n}"
+  }
+]

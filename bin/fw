@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Sync this repo to the Framework box and run a command there (builds stay off Archie).
+# Usage: bin/fw cargo test -p ruby_llm
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REMOTE_DIR="src/tries/ruby-llm-rs"
+case "$REMOTE_DIR" in */ruby-llm-rs) ;; *) echo "refusing: unexpected remote dir" >&2; exit 1;; esac
+ssh framework "mkdir -p ~/$REMOTE_DIR"
+rsync -a --delete --exclude target --exclude upstream --exclude .git "$ROOT/" "framework:$REMOTE_DIR/"
+ssh framework "cd ~/$REMOTE_DIR && $(printf '%q ' "$@")"

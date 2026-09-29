@@ -1,0 +1,27 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.cohere.com/v2/chat",
+    "request_body": "{\"model\":\"command-a-03-2025\",\"messages\":[{\"role\":\"system\",\"content\":[{\"type\":\"text\",\"text\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Tell me about the weather.\"}]}],\"stream\":false}",
+    "status": 200,
+    "response_headers": {
+      "Access-Control-Expose-Headers": "X-Debug-Trace-ID",
+      "Cache-Control": "no-cache, no-store, no-transform, must-revalidate, private, max-age=0",
+      "Content-Type": "application/json",
+      "Expires": "Thu, 01 Jan 1970 00:00:00 GMT",
+      "Num-Chars": "2879",
+      "Num-Tokens": "101",
+      "Pragma": "no-cache",
+      "Vary": "Origin,Accept-Encoding",
+      "X-Accel-Expires": "0",
+      "X-Debug-Trace-Id": "9ffeab1f4a464a2f96a6a8e3f179aaf2",
+      "Date": "Thu, 17 Sep 2026 22:07:11 GMT",
+      "X-Envoy-Upstream-Service-Time": "1696",
+      "Server": "envoy",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\"id\":\"e251b047-3240-4805-a4de-fb498bd39cec\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"I'm just a text-based AI, so I don't have access to real-time information like current weather conditions. To find out about the weather, I recommend checking a reliable weather website or using a weather app on your device. They'll provide you with the most up-to-date and accurate information for your specific location. \\n XKCD7392\"}]},\"finish_reason\":\"COMPLETE\",\"usage\":{\"billed_units\":{\"input_tokens\":26,\"output_tokens\":75},\"tokens\":{\"input_tokens\":555,\"output_tokens\":79},\"cached_tokens\":480}}"
+  }
+]

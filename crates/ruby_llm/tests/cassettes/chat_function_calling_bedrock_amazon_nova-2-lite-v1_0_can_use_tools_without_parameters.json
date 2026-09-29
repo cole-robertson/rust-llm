@@ -1,0 +1,30 @@
+[
+  {
+    "method": "post",
+    "uri": "https://bedrock-runtime.<AWS_REGION>.amazonaws.com/model/us.amazon.nova-2-lite-v1:0/converse",
+    "request_body": "{\"messages\":[{\"role\":\"user\",\"content\":[{\"text\":\"Use the best_language_to_learn tool to tell me which language to learn.\"}]}],\"inferenceConfig\":{},\"toolConfig\":{\"tools\":[{\"toolSpec\":{\"name\":\"best_language_to_learn\",\"description\":\"Gets the best language to learn\",\"inputSchema\":{\"json\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}}]}}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:17:46 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "294",
+      "Connection": "keep-alive",
+      "X-Amzn-Requestid": "46b886eb-423a-47c4-9ac9-92768cf22475"
+    },
+    "response_body": "{\"metrics\":{\"latencyMs\":460},\"output\":{\"message\":{\"content\":[{\"toolUse\":{\"input\":{},\"name\":\"best_language_to_learn\",\"toolUseId\":\"tooluse_psysjh796wT4tsZoMabg60\"}}],\"role\":\"assistant\"}},\"stopReason\":\"tool_use\",\"usage\":{\"inputTokens\":934,\"outputTokens\":18,\"serverToolUsage\":{},\"totalTokens\":952}}"
+  },
+  {
+    "method": "post",
+    "uri": "https://bedrock-runtime.<AWS_REGION>.amazonaws.com/model/us.amazon.nova-2-lite-v1:0/converse",
+    "request_body": "{\"messages\":[{\"role\":\"user\",\"content\":[{\"text\":\"Use the best_language_to_learn tool to tell me which language to learn.\"}]},{\"role\":\"assistant\",\"content\":[{\"toolUse\":{\"toolUseId\":\"tooluse_psysjh796wT4tsZoMabg60\",\"name\":\"best_language_to_learn\",\"input\":{}}}]},{\"role\":\"user\",\"content\":[{\"toolResult\":{\"toolUseId\":\"tooluse_psysjh796wT4tsZoMabg60\",\"content\":[{\"text\":\"Ruby\"}]}}]}],\"inferenceConfig\":{},\"toolConfig\":{\"tools\":[{\"toolSpec\":{\"name\":\"best_language_to_learn\",\"description\":\"Gets the best language to learn\",\"inputSchema\":{\"json\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}}]}}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:17:48 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "790",
+      "Connection": "keep-alive",
+      "X-Amzn-Requestid": "655f9ae0-b707-45b1-89c8-6a61491419a4"
+    },
+    "response_body": "{\"metrics\":{\"latencyMs\":913},\"output\":{\"message\":{\"content\":[{\"text\":\"Based on the analysis from the best_language_to_learn tool, **Ruby** is the recommended language for you to learn.\\n\\nRuby is a versatile and elegant programming language that emphasizes developer productivity and fun. It's known for its clean syntax and is particularly well-suited for:\\n\\n- **Web development** (via frameworks like Ruby on Rails)\\n- **Scripting and automation**\\n- **Data processing**\\n- **Building web applications quickly**\\n\\nThe language has a strong, supportive community and is widely used in the tech industry, making it a valuable addition to your skillset.\"}],\"role\":\"assistant\"}},\"stopReason\":\"end_turn\",\"usage\":{\"inputTokens\":982,\"outputTokens\":115,\"serverToolUsage\":{},\"totalTokens\":1097}}"
+  }
+]

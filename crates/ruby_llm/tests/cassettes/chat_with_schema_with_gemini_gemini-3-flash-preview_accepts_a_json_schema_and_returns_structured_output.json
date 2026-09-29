@@ -1,0 +1,22 @@
+[
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Generate a person named John who is 30 years old\"}]}],\"generationConfig\":{\"responseMimeType\":\"application/json\",\"responseJsonSchema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":\"integer\"}},\"required\":[\"name\",\"age\"],\"additionalProperties\":false}}}",
+    "status": 200,
+    "response_headers": {
+      "X-Gemini-Service-Tier": "standard",
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:07:53 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=1870",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"{\\\"name\\\":\\\"John\\\",\\\"age\\\":30}\",\n            \"thoughtSignature\": \"Et0HCtoHAWkUfRNx8F0bw2gV4WbQ1/WwbabODIt9gA6EvT8mZvOac5On3QLJuvRGbOBe6NsPqKm6+/mzHns2QsCWsh33otex1gmoOKyPu48Is/pNhiUrff99yVlfB5zy00qbtd/MczxwRxQS3kM7f5GdClvbhhmY+kb568pD5CAFMf5u0DY6pWGo1gGxYYOQVP1UFNIEPs1FUY9/9Af/M6tqsmsJwhh9ZrpK6NUHuWb4C7hoCzhYTCUf3ANdmt9c+saVId3tn4ppLpKlMCSJz24YgA9YhvhtxsM1eX8bxfj9/M6ERR2ZekZomJhBPs/W8bnmG1AqwadIWrK+CC1cr2y4xLZ6yyXrJVULUDQFLXIRaqjrGcj2sVRoaYfHPvsI09RLI1pt1Bn88vOYXXdI118AVd6bH4NC5jNgdVCJDndWyO/L50DOZNYKwaNxpjA8/8UIVn0pmGaYWAoPHt2l7JrIODjlxvNSUlLKdEVR0LVwDZVwHSfOKBPvY/vg8ni8widjj5zHCtvBMOjdUOhrRjo56+hdPu+22QkyQpXyHWyLMblwBV6mjcmKiX2c3/sinrh/0eANMXSpZV3AbWnon5fq7rF7jdkdOU/pDnP0XRmkp6hHSqaaV3AEnOM6GyApiWNuFPE2ApZ5LO2UkRDVe6sU3gQOU8NTao+h6FcsgijBPuvA+tdodWo/aLHVbiTH6DMW6NdiP60jAW9Y5wkupkiwTUSJKtogCDkuoGetBS5nU+dcA0rEIHQQc+PF7xWcuzj7X5deFqXVa33FwPTq3aDWfa7OZaHPLq5W4hKaxwNQNmwSLVVIiNn5yPuvJsVC1Ge6klIKbsL7OrC411HA0YQn3S6FPiinLn2u9leI3fjWVZFpgh2+oPiH9WXYIlKhO5IK4UFMw00vi+HCpx1XdgVxmFURKzUZDYy0R1ay1b2A6ZuYNQyuyUlynDQzhR36hWrujPRtrBlDM7P7LGjTaq+1yVijRWFWqPPTYZPl8T+hVV9mOmwOqFqNa4697kfUUCmNnSUdw4qFqyBXb7JeGZEPy3wGsZ0IbrLneiMLl7j41AArI6Pr44iNQ90u1hHNxPjBx9bKytuLc6jEHK2g31ViG03X/iFGWCBgNkhHVNyOouBz9Fn7ZPcCW8ZaujQqaW6csO0IZy8xlHWRmS4x7DvS32AFPPXHe9WiW3uQAR7+sBKilPp228IA9EIgiV4RDcsu67MjkGUr3zHH+9J5lS8vakJeZc7QVtXQWeQfHNuVIfVc8e2kXf4FNDVa19Pku4vAzc5SLFeatYCMSVBdyDGBvPVmuhy7MFVfq5dQjEA=\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 13,\n    \"candidatesTokenCount\": 10,\n    \"totalTokenCount\": 295,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 13\n      }\n    ],\n    \"thoughtsTokenCount\": 272,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3-flash-preview\",\n  \"responseId\": \"t2Ssaq3BK8Ga28oP4dGmQQ\"\n}\n"
+  }
+]

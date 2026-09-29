@@ -1,0 +1,82 @@
+[
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What's the weather in Berlin? (52.5200, 13.4050)\"}]}],\"generationConfig\":{},\"tools\":[{\"functionDeclarations\":[{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parametersJsonSchema\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}]}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "text/event-stream",
+      "Content-Disposition": "attachment",
+      "Vary": "Origin",
+      "Transfer-Encoding": "chunked",
+      "Date": "Thu, 17 Sep 2026 22:18:59 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=1076",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
+    },
+    "response_body": "data: {\"candidates\": [{\"content\": {\"parts\": [{\"functionCall\": {\"name\": \"weather\",\"args\": {\"latitude\": \"52.5200\",\"longitude\": \"13.4050\"}},\"thoughtSignature\": \"CiQBaRR9E1GUNj+yhTNFUEjgHcwiiElbSMYyfF0ndO0kpMuXQEoKfAFpFH0TfDZato1h7d0pwrLNafCqOygbYISNWABxl+2/wI0a0eHV+hBzn+pK1bC1nctq+MnAwbQLIc5blEmH48EhoU0is0JXC+/F+huwteka8QJFi346EurxD1hsnQQ8whXsBpft5FUZxHs1AUJkIfbYsnyGQXzI7yjnLNgK9gEBaRR9Ez/b7SAYCDayLKyrbMK9o3m665KQBZC+LgRNF6D6mOpE8AVudjBvbUAQFVax8KDqUfeMrf8Ay30GWY4JWA09fBQ0A5i1GjT1lKzfE9RigBsGSHAd8X7s6l6Vxv8wFvso5z+Qk+mcEziw3EhRH16BTey+Ha+6Q/YyfkWSlhvJroAya7QD9d9qEReTb5knOO/G7KXvy11K22lN3P3z0c7fU41b8HjqHfWJVXPQW3OqetX2XqRmzkvLJqjJLIdz038VcbB9szLa45gD8DR7/XQRNxkNjscduS5OxCo/NmEtjfg5n+W+91QIJjTJwhLh7T4q440K6wEBaRR9E+mQ8Xl0wPMBUR79dN8F9zAMJ+akMqyJcc0xA13VznCn8//6K5uyqFlqxIuPKBrRbPqe2/YHAWyK5wUmRfPNgemeig34KZIvK14J4fHiXubow2q/9JodTG3vRabvNIxY7ennD9vE/eqEa0YALWbfe4UAPGZ+pwa5E60uzszOcNxjYEKEN4zQYBWsBZp9mckEgDPdo4f0vgd6XhBkvRrspyQ2JgkFwvmphPHB7bJXa1KAe0JcLRv/o53Lvy+7b5KKhgUIeOjaI7qAz40dhtvtepZBgVI1N/ktC0Sx6fJyxZq6S3rPwk7C\"}],\"role\": \"model\"},\"finishReason\": \"STOP\",\"index\": 0,\"finishMessage\": \"Model generated function call(s).\"}],\"usageMetadata\": {\"promptTokenCount\": 103,\"candidatesTokenCount\": 30,\"totalTokenCount\": 251,\"promptTokensDetails\": [{\"modality\": \"TEXT\",\"tokenCount\": 103}],\"thoughtsTokenCount\": 118,\"serviceTier\": \"standard\"},\"modelVersion\": \"gemini-2.5-flash\",\"responseId\": \"U2esaonTBsuX28oP1si1QA\"}\r\n\r\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What's the weather in Berlin? (52.5200, 13.4050)\"}]},{\"role\":\"model\",\"parts\":[{\"functionCall\":{\"name\":\"weather\",\"args\":{\"latitude\":\"52.5200\",\"longitude\":\"13.4050\"}},\"thoughtSignature\":\"CiQBaRR9E1GUNj+yhTNFUEjgHcwiiElbSMYyfF0ndO0kpMuXQEoKfAFpFH0TfDZato1h7d0pwrLNafCqOygbYISNWABxl+2/wI0a0eHV+hBzn+pK1bC1nctq+MnAwbQLIc5blEmH48EhoU0is0JXC+/F+huwteka8QJFi346EurxD1hsnQQ8whXsBpft5FUZxHs1AUJkIfbYsnyGQXzI7yjnLNgK9gEBaRR9Ez/b7SAYCDayLKyrbMK9o3m665KQBZC+LgRNF6D6mOpE8AVudjBvbUAQFVax8KDqUfeMrf8Ay30GWY4JWA09fBQ0A5i1GjT1lKzfE9RigBsGSHAd8X7s6l6Vxv8wFvso5z+Qk+mcEziw3EhRH16BTey+Ha+6Q/YyfkWSlhvJroAya7QD9d9qEReTb5knOO/G7KXvy11K22lN3P3z0c7fU41b8HjqHfWJVXPQW3OqetX2XqRmzkvLJqjJLIdz038VcbB9szLa45gD8DR7/XQRNxkNjscduS5OxCo/NmEtjfg5n+W+91QIJjTJwhLh7T4q440K6wEBaRR9E+mQ8Xl0wPMBUR79dN8F9zAMJ+akMqyJcc0xA13VznCn8//6K5uyqFlqxIuPKBrRbPqe2/YHAWyK5wUmRfPNgemeig34KZIvK14J4fHiXubow2q/9JodTG3vRabvNIxY7ennD9vE/eqEa0YALWbfe4UAPGZ+pwa5E60uzszOcNxjYEKEN4zQYBWsBZp9mckEgDPdo4f0vgd6XhBkvRrspyQ2JgkFwvmphPHB7bJXa1KAe0JcLRv/o53Lvy+7b5KKhgUIeOjaI7qAz40dhtvtepZBgVI1N/ktC0Sx6fJyxZq6S3rPwk7C\"}]},{\"role\":\"user\",\"parts\":[{\"functionResponse\":{\"name\":\"weather\",\"response\":{\"name\":\"weather\",\"content\":[{\"text\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\"}]}}}]}],\"generationConfig\":{},\"tools\":[{\"functionDeclarations\":[{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parametersJsonSchema\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}]}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "text/event-stream",
+      "Content-Disposition": "attachment",
+      "Vary": "Origin",
+      "Transfer-Encoding": "chunked",
+      "Date": "Thu, 17 Sep 2026 22:19:00 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=318",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
+    },
+    "response_body": "data: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"The weather in Berlin\"}],\"role\": \"model\"},\"index\": 0}],\"usageMetadata\": {\"promptTokenCount\": 308,\"candidatesTokenCount\": 4,\"totalTokenCount\": 312,\"promptTokensDetails\": [{\"modality\": \"TEXT\",\"tokenCount\": 308}],\"serviceTier\": \"standard\"},\"modelVersion\": \"gemini-2.5-flash\",\"responseId\": \"VGesaursCvHS28oP1c3GsA0\"}\r\n\r\ndata: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \" is 15°C, with wind at 10 km/h.\"}],\"role\": \"model\"},\"index\": 0}],\"usageMetadata\": {\"promptTokenCount\": 308,\"candidatesTokenCount\": 21,\"totalTokenCount\": 329,\"promptTokensDetails\": [{\"modality\": \"TEXT\",\"tokenCount\": 308}],\"serviceTier\": \"standard\"},\"modelVersion\": \"gemini-2.5-flash\",\"responseId\": \"VGesaursCvHS28oP1c3GsA0\"}\r\n\r\ndata: {\"candidates\": [{\"content\": {\"role\": \"model\"},\"finishReason\": \"STOP\",\"index\": 0}],\"usageMetadata\": {\"promptTokenCount\": 308,\"candidatesTokenCount\": 21,\"totalTokenCount\": 329,\"promptTokensDetails\": [{\"modality\": \"TEXT\",\"tokenCount\": 308}],\"serviceTier\": \"standard\"},\"modelVersion\": \"gemini-2.5-flash\",\"responseId\": \"VGesaursCvHS28oP1c3GsA0\"}\r\n\r\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What's the weather in Berlin? (52.5200, 13.4050)\"}]},{\"role\":\"model\",\"parts\":[{\"functionCall\":{\"name\":\"weather\",\"args\":{\"latitude\":\"52.5200\",\"longitude\":\"13.4050\"}},\"thoughtSignature\":\"CiQBaRR9E1GUNj+yhTNFUEjgHcwiiElbSMYyfF0ndO0kpMuXQEoKfAFpFH0TfDZato1h7d0pwrLNafCqOygbYISNWABxl+2/wI0a0eHV+hBzn+pK1bC1nctq+MnAwbQLIc5blEmH48EhoU0is0JXC+/F+huwteka8QJFi346EurxD1hsnQQ8whXsBpft5FUZxHs1AUJkIfbYsnyGQXzI7yjnLNgK9gEBaRR9Ez/b7SAYCDayLKyrbMK9o3m665KQBZC+LgRNF6D6mOpE8AVudjBvbUAQFVax8KDqUfeMrf8Ay30GWY4JWA09fBQ0A5i1GjT1lKzfE9RigBsGSHAd8X7s6l6Vxv8wFvso5z+Qk+mcEziw3EhRH16BTey+Ha+6Q/YyfkWSlhvJroAya7QD9d9qEReTb5knOO/G7KXvy11K22lN3P3z0c7fU41b8HjqHfWJVXPQW3OqetX2XqRmzkvLJqjJLIdz038VcbB9szLa45gD8DR7/XQRNxkNjscduS5OxCo/NmEtjfg5n+W+91QIJjTJwhLh7T4q440K6wEBaRR9E+mQ8Xl0wPMBUR79dN8F9zAMJ+akMqyJcc0xA13VznCn8//6K5uyqFlqxIuPKBrRbPqe2/YHAWyK5wUmRfPNgemeig34KZIvK14J4fHiXubow2q/9JodTG3vRabvNIxY7ennD9vE/eqEa0YALWbfe4UAPGZ+pwa5E60uzszOcNxjYEKEN4zQYBWsBZp9mckEgDPdo4f0vgd6XhBkvRrspyQ2JgkFwvmphPHB7bJXa1KAe0JcLRv/o53Lvy+7b5KKhgUIeOjaI7qAz40dhtvtepZBgVI1N/ktC0Sx6fJyxZq6S3rPwk7C\"}]},{\"role\":\"user\",\"parts\":[{\"functionResponse\":{\"name\":\"weather\",\"response\":{\"name\":\"weather\",\"content\":[{\"text\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\"}]}}}]},{\"role\":\"model\",\"parts\":[{\"text\":\"The weather in Berlin is 15°C, with wind at 10 km/h.\"}]},{\"role\":\"user\",\"parts\":[{\"text\":\"What's the weather in Paris? (48.8575, 2.3514)\"}]}],\"generationConfig\":{},\"tools\":[{\"functionDeclarations\":[{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parametersJsonSchema\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}]}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "text/event-stream",
+      "Content-Disposition": "attachment",
+      "Vary": "Origin",
+      "Transfer-Encoding": "chunked",
+      "Date": "Thu, 17 Sep 2026 22:19:00 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=389",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
+    },
+    "response_body": "data: {\"candidates\": [{\"content\": {\"parts\": [{\"functionCall\": {\"name\": \"weather\",\"args\": {\"longitude\": \"2.3514\",\"latitude\": \"48.8575\"}}}],\"role\": \"model\"},\"finishReason\": \"STOP\",\"index\": 0,\"finishMessage\": \"Model generated function call(s).\"}],\"usageMetadata\": {\"promptTokenCount\": 238,\"candidatesTokenCount\": 29,\"totalTokenCount\": 267,\"promptTokensDetails\": [{\"modality\": \"TEXT\",\"tokenCount\": 238}],\"serviceTier\": \"standard\"},\"modelVersion\": \"gemini-2.5-flash\",\"responseId\": \"VGesasmmIoaAxs0Pwrb8EA\"}\r\n\r\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What's the weather in Berlin? (52.5200, 13.4050)\"}]},{\"role\":\"model\",\"parts\":[{\"functionCall\":{\"name\":\"weather\",\"args\":{\"latitude\":\"52.5200\",\"longitude\":\"13.4050\"}},\"thoughtSignature\":\"CiQBaRR9E1GUNj+yhTNFUEjgHcwiiElbSMYyfF0ndO0kpMuXQEoKfAFpFH0TfDZato1h7d0pwrLNafCqOygbYISNWABxl+2/wI0a0eHV+hBzn+pK1bC1nctq+MnAwbQLIc5blEmH48EhoU0is0JXC+/F+huwteka8QJFi346EurxD1hsnQQ8whXsBpft5FUZxHs1AUJkIfbYsnyGQXzI7yjnLNgK9gEBaRR9Ez/b7SAYCDayLKyrbMK9o3m665KQBZC+LgRNF6D6mOpE8AVudjBvbUAQFVax8KDqUfeMrf8Ay30GWY4JWA09fBQ0A5i1GjT1lKzfE9RigBsGSHAd8X7s6l6Vxv8wFvso5z+Qk+mcEziw3EhRH16BTey+Ha+6Q/YyfkWSlhvJroAya7QD9d9qEReTb5knOO/G7KXvy11K22lN3P3z0c7fU41b8HjqHfWJVXPQW3OqetX2XqRmzkvLJqjJLIdz038VcbB9szLa45gD8DR7/XQRNxkNjscduS5OxCo/NmEtjfg5n+W+91QIJjTJwhLh7T4q440K6wEBaRR9E+mQ8Xl0wPMBUR79dN8F9zAMJ+akMqyJcc0xA13VznCn8//6K5uyqFlqxIuPKBrRbPqe2/YHAWyK5wUmRfPNgemeig34KZIvK14J4fHiXubow2q/9JodTG3vRabvNIxY7ennD9vE/eqEa0YALWbfe4UAPGZ+pwa5E60uzszOcNxjYEKEN4zQYBWsBZp9mckEgDPdo4f0vgd6XhBkvRrspyQ2JgkFwvmphPHB7bJXa1KAe0JcLRv/o53Lvy+7b5KKhgUIeOjaI7qAz40dhtvtepZBgVI1N/ktC0Sx6fJyxZq6S3rPwk7C\"}]},{\"role\":\"user\",\"parts\":[{\"functionResponse\":{\"name\":\"weather\",\"response\":{\"name\":\"weather\",\"content\":[{\"text\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\"}]}}}]},{\"role\":\"model\",\"parts\":[{\"text\":\"The weather in Berlin is 15°C, with wind at 10 km/h.\"}]},{\"role\":\"user\",\"parts\":[{\"text\":\"What's the weather in Paris? (48.8575, 2.3514)\"}]},{\"role\":\"model\",\"parts\":[{\"functionCall\":{\"name\":\"weather\",\"args\":{\"longitude\":\"2.3514\",\"latitude\":\"48.8575\"}}}]},{\"role\":\"user\",\"parts\":[{\"functionResponse\":{\"name\":\"weather\",\"response\":{\"name\":\"weather\",\"content\":[{\"text\":\"Current weather at 48.8575, 2.3514: 15°C, Wind: 10 km/h\"}]}}}]}],\"generationConfig\":{},\"tools\":[{\"functionDeclarations\":[{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parametersJsonSchema\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}]}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "text/event-stream",
+      "Content-Disposition": "attachment",
+      "Vary": "Origin",
+      "Transfer-Encoding": "chunked",
+      "Date": "Thu, 17 Sep 2026 22:19:01 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=372",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
+    },
+    "response_body": "data: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"The weather in Paris\"}],\"role\": \"model\"},\"index\": 0}],\"usageMetadata\": {\"promptTokenCount\": 323,\"candidatesTokenCount\": 4,\"totalTokenCount\": 327,\"promptTokensDetails\": [{\"modality\": \"TEXT\",\"tokenCount\": 323}],\"serviceTier\": \"standard\"},\"modelVersion\": \"gemini-2.5-flash\",\"responseId\": \"VWesaqvfA4PS28oP8vyRuAw\"}\r\n\r\ndata: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \" is 15°C, with wind at 10 km/h\"}],\"role\": \"model\"},\"index\": 0}],\"usageMetadata\": {\"promptTokenCount\": 323,\"candidatesTokenCount\": 20,\"totalTokenCount\": 343,\"promptTokensDetails\": [{\"modality\": \"TEXT\",\"tokenCount\": 323}],\"serviceTier\": \"standard\"},\"modelVersion\": \"gemini-2.5-flash\",\"responseId\": \"VWesaqvfA4PS28oP8vyRuAw\"}\r\n\r\ndata: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \".\"}],\"role\": \"model\"},\"finishReason\": \"STOP\",\"index\": 0}],\"usageMetadata\": {\"promptTokenCount\": 323,\"candidatesTokenCount\": 21,\"totalTokenCount\": 344,\"promptTokensDetails\": [{\"modality\": \"TEXT\",\"tokenCount\": 323}],\"serviceTier\": \"standard\"},\"modelVersion\": \"gemini-2.5-flash\",\"responseId\": \"VWesaqvfA4PS28oP8vyRuAw\"}\r\n\r\n"
+  }
+]

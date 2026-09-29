@@ -1,0 +1,48 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.deepseek.com/chat/completions",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin? (52.5200, 13.4050)\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Date": "Thu, 17 Sep 2026 22:06:21 GMT",
+      "Server": "elb",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Credentials": "true",
+      "X-Ds-Trace-Id": "c13448f2f3e264868c9e5c34d513b252",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "X-Cache": "Miss from cloudfront",
+      "Via": "1.1 55f2c8fde3c0e9b0f88eeb33b26fe360.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL52-P2",
+      "X-Amz-Cf-Id": "JXUqm_XAgYj4yaV16BtYhblHyirYszDYizlvSnuLXWxw-MFFHopB9g=="
+    },
+    "response_body": "{\"id\":\"8e47260a-8cb9-4bc1-86cf-cd46f14710d3\",\"object\":\"chat.completion\",\"created\":1789682781,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"I'll look that up for you.\",\"reasoning_content\":\"The user wants the weather in Berlin. Let me call the tool.\",\"tool_calls\":[{\"index\":0,\"id\":\"call_00_FID0YLf8O7rZmfBB0PJ16897\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\": \\\"52.5200\\\", \\\"longitude\\\": \\\"13.4050\\\"}\"}}]},\"logprobs\":null,\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":364,\"completion_tokens\":81,\"total_tokens\":445,\"prompt_tokens_details\":{\"cached_tokens\":128},\"completion_tokens_details\":{\"reasoning_tokens\":14},\"prompt_cache_hit_tokens\":128,\"prompt_cache_miss_tokens\":236},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+  },
+  {
+    "method": "post",
+    "uri": "https://api.deepseek.com/chat/completions",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin? (52.5200, 13.4050)\"},{\"role\":\"assistant\",\"content\":\"I'll look that up for you.\",\"tool_calls\":[{\"id\":\"call_00_FID0YLf8O7rZmfBB0PJ16897\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}],\"reasoning_content\":\"The user wants the weather in Berlin. Let me call the tool.\",\"reasoning\":\"The user wants the weather in Berlin. Let me call the tool.\"},{\"role\":\"tool\",\"content\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_00_FID0YLf8O7rZmfBB0PJ16897\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Date": "Thu, 17 Sep 2026 22:06:22 GMT",
+      "Server": "elb",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Credentials": "true",
+      "X-Ds-Trace-Id": "1649c8aff35d887f42161656fecff771",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "X-Cache": "Miss from cloudfront",
+      "Via": "1.1 1b73d2d63bf1d475138b6429983516f8.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL52-P1",
+      "X-Amz-Cf-Id": "0xVky-VUhQ-aJOc4cHrXz9q4IaTjqGqwsL9j_R4a2xf-xojeDhZsfA=="
+    },
+    "response_body": "{\"id\":\"a293347e-04ef-4a43-a33c-c8007bde590e\",\"object\":\"chat.completion\",\"created\":1789682782,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Here's the current weather in Berlin (52.5200, 13.4050):\\n\\n- **Temperature:** 15°C (59°F)\\n- **Wind:** 10 km/h\\n\\nThat's a fairly mild, comfortable temperature. Note that the data source only returned temperature and wind speed, so I can't tell you about cloud cover, precipitation, or humidity for that location right now.\",\"reasoning_content\":\"Report the result. Note the tool doesn't give conditions like sunny/cloudy, so I should be honest that only temperature and wind are available.\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":483,\"completion_tokens\":113,\"total_tokens\":596,\"prompt_tokens_details\":{\"cached_tokens\":256},\"completion_tokens_details\":{\"reasoning_tokens\":30},\"prompt_cache_hit_tokens\":256,\"prompt_cache_miss_tokens\":227},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+  }
+]

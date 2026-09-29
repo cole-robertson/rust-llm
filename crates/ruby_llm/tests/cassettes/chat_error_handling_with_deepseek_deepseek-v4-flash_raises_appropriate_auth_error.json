@@ -1,0 +1,25 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.deepseek.com/chat/completions",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}],\"stream\":false}",
+    "status": 401,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Content-Length": "153",
+      "Connection": "keep-alive",
+      "Date": "Thu, 17 Sep 2026 22:06:30 GMT",
+      "Server": "elb",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Credentials": "true",
+      "X-Ds-Trace-Id": "1cc349a4d5550d1dafaa9a21ab16f516",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "X-Cache": "Error from cloudfront",
+      "Via": "1.1 7df3557c3d03c1259c580428921b9dbe.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL52-P2",
+      "X-Amz-Cf-Id": "GdOYliQnHLfQWEjkriEl1M0DiYznL8DApDhatcnMf4pH9jqe5erHWA=="
+    },
+    "response_body": "{\"error\":{\"message\":\"Authentication Fails, Your api key: ****-key is invalid\",\"type\":\"authentication_error\",\"param\":null,\"code\":\"invalid_request_error\"}}"
+  }
+]

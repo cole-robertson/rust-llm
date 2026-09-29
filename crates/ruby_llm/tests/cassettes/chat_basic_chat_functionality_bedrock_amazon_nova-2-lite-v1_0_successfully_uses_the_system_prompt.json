@@ -1,0 +1,16 @@
+[
+  {
+    "method": "post",
+    "uri": "https://bedrock-runtime.<AWS_REGION>.amazonaws.com/model/us.amazon.nova-2-lite-v1:0/converse",
+    "request_body": "{\"messages\":[{\"role\":\"user\",\"content\":[{\"text\":\"Tell me about the weather.\"}]}],\"system\":[{\"text\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\"}],\"inferenceConfig\":{}}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:06:58 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "1177",
+      "Connection": "keep-alive",
+      "X-Amzn-Requestid": "be3a095b-e3f6-4676-b239-90e984211a31"
+    },
+    "response_body": "{\"metrics\":{\"latencyMs\":1568},\"output\":{\"message\":{\"content\":[{\"text\":\"The weather can vary dramatically depending on your location, time of year, and current atmospheric conditions. To get accurate and relevant information about the weather **today**, I recommend checking a trusted weather service or app, such as the National Weather Service (NWS), Weather.com, or a local meteorological department website. These platforms provide real-time updates, forecasts, radar maps, and alerts for severe weather events.\\n\\nFor a more personalized forecast, you’ll need to share your city or coordinates—without that detail, I can’t give specifics. Remember, weather patterns are influenced by factors like temperature, humidity, wind, and pressure systems, which interact in complex ways. \\n\\nIf you’re ever curious about how weather data is modeled or visualized in a humorous yet insightful way, the webcomic **XKCD7392** often simplifies complex scientific concepts—including climate and meteorology—into easy-to-digest explanations.\"}],\"role\":\"assistant\"}},\"stopReason\":\"end_turn\",\"usage\":{\"inputTokens\":69,\"outputTokens\":182,\"serverToolUsage\":{},\"totalTokens\":251}}"
+  }
+]

@@ -1,0 +1,696 @@
+{
+  "claude-fable-5": {
+    "anthropic": "claude-fable-5",
+    "openrouter": "anthropic/claude-fable-5",
+    "bedrock": "anthropic.claude-fable-5",
+    "vertexai": "claude-fable-5",
+    "azure": "claude-fable-5"
+  },
+  "claude-fable-5-1": {
+    "anthropic": "claude-fable-5-1",
+    "openrouter": "anthropic/claude-fable-5.1",
+    "bedrock": "anthropic.claude-fable-5-1",
+    "vertexai": "claude-fable-5-1",
+    "azure": "claude-fable-5-1"
+  },
+  "claude-haiku-4-5": {
+    "anthropic": "claude-haiku-4-5-20251001",
+    "openrouter": "anthropic/claude-haiku-4.5",
+    "bedrock": "anthropic.claude-haiku-4-5-20251001-v1:0",
+    "vertexai": "claude-haiku-4-5",
+    "azure": "claude-haiku-4-5-20251001"
+  },
+  "claude-opus-4-1": {
+    "bedrock": "anthropic.claude-opus-4-1-20250805-v1:0",
+    "vertexai": "claude-opus-4-1"
+  },
+  "claude-opus-4-5": {
+    "anthropic": "claude-opus-4-5-20251101",
+    "openrouter": "anthropic/claude-opus-4.5",
+    "bedrock": "anthropic.claude-opus-4-5-20251101-v1:0",
+    "vertexai": "claude-opus-4-5",
+    "azure": "claude-opus-4-5-20251101"
+  },
+  "claude-opus-4-6": {
+    "anthropic": "claude-opus-4-6",
+    "openrouter": "anthropic/claude-opus-4.6",
+    "bedrock": "anthropic.claude-opus-4-6-v1",
+    "vertexai": "claude-opus-4-6",
+    "azure": "claude-opus-4-6"
+  },
+  "claude-opus-4-7": {
+    "anthropic": "claude-opus-4-7",
+    "openrouter": "anthropic/claude-opus-4.7",
+    "bedrock": "anthropic.claude-opus-4-7",
+    "vertexai": "claude-opus-4-7",
+    "azure": "claude-opus-4-7"
+  },
+  "claude-opus-4-8": {
+    "anthropic": "claude-opus-4-8",
+    "openrouter": "anthropic/claude-opus-4.8",
+    "bedrock": "anthropic.claude-opus-4-8",
+    "vertexai": "claude-opus-4-8",
+    "azure": "claude-opus-4-8"
+  },
+  "claude-opus-5": {
+    "anthropic": "claude-opus-5",
+    "openrouter": "anthropic/claude-opus-5",
+    "bedrock": "anthropic.claude-opus-5",
+    "vertexai": "claude-opus-5",
+    "azure": "claude-opus-5"
+  },
+  "claude-opus-5-5": {
+    "anthropic": "claude-opus-5-5",
+    "openrouter": "anthropic/claude-opus-5.5",
+    "bedrock": "anthropic.claude-opus-5-5",
+    "vertexai": "claude-opus-5-5",
+    "azure": "claude-opus-5-5"
+  },
+  "claude-sonnet-4-5": {
+    "anthropic": "claude-sonnet-4-5-20250929",
+    "openrouter": "anthropic/claude-sonnet-4.5",
+    "bedrock": "anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "vertexai": "claude-sonnet-4-5",
+    "azure": "claude-sonnet-4-5-20250929"
+  },
+  "claude-sonnet-4-6": {
+    "anthropic": "claude-sonnet-4-6",
+    "openrouter": "anthropic/claude-sonnet-4.6",
+    "bedrock": "anthropic.claude-sonnet-4-6",
+    "vertexai": "claude-sonnet-4-6",
+    "azure": "claude-sonnet-4-6"
+  },
+  "claude-sonnet-5": {
+    "anthropic": "claude-sonnet-5",
+    "openrouter": "anthropic/claude-sonnet-5",
+    "bedrock": "anthropic.claude-sonnet-5",
+    "vertexai": "claude-sonnet-5",
+    "azure": "claude-sonnet-5"
+  },
+  "deepseek-ocr": {
+    "vertexai": "deepseek-ai/deepseek-ocr-maas"
+  },
+  "deepseek-r1-0528": {
+    "vertexai": "deepseek-ai/deepseek-r1-0528-maas",
+    "openrouter": "deepseek/deepseek-r1-0528"
+  },
+  "deepseek-v3.1": {
+    "vertexai": "deepseek-ai/deepseek-v3.1-maas"
+  },
+  "deepseek-v3.2": {
+    "vertexai": "deepseek-ai/deepseek-v3.2-maas",
+    "openrouter": "deepseek/deepseek-v3.2"
+  },
+  "deepseek-v4-flash": {
+    "deepseek": "deepseek-v4-flash",
+    "openrouter": "deepseek/deepseek-v4-flash"
+  },
+  "deepseek-v4-flash-vision-exp": {
+    "deepseek": "deepseek-v4-flash-vision-exp",
+    "openrouter": "deepseek/deepseek-v4-flash-vision-exp"
+  },
+  "deepseek-v4-pro": {
+    "deepseek": "deepseek-v4-pro",
+    "openrouter": "deepseek/deepseek-v4-pro"
+  },
+  "enhanced": {
+    "deepgram": "enhanced-general"
+  },
+  "gemini-2.5-computer-use-preview-10-2025": {
+    "gemini": "gemini-2.5-computer-use-preview-10-2025",
+    "vertexai": "gemini-2.5-computer-use-preview-10-2025"
+  },
+  "gemini-2.5-flash": {
+    "gemini": "gemini-2.5-flash",
+    "openrouter": "google/gemini-2.5-flash",
+    "vertexai": "gemini-2.5-flash"
+  },
+  "gemini-2.5-flash-image": {
+    "gemini": "gemini-2.5-flash-image",
+    "openrouter": "google/gemini-2.5-flash-image",
+    "vertexai": "gemini-2.5-flash-image"
+  },
+  "gemini-2.5-flash-lite": {
+    "gemini": "gemini-2.5-flash-lite",
+    "openrouter": "google/gemini-2.5-flash-lite",
+    "vertexai": "gemini-2.5-flash-lite"
+  },
+  "gemini-2.5-pro": {
+    "gemini": "gemini-2.5-pro",
+    "openrouter": "google/gemini-2.5-pro",
+    "vertexai": "gemini-2.5-pro"
+  },
+  "gemini-3-flash-preview": {
+    "gemini": "gemini-3-flash-preview",
+    "openrouter": "google/gemini-3-flash-preview",
+    "vertexai": "gemini-3-flash-preview"
+  },
+  "gemini-3-pro-image": {
+    "gemini": "gemini-3-pro-image",
+    "openrouter": "google/gemini-3-pro-image",
+    "vertexai": "gemini-3-pro-image"
+  },
+  "gemini-3-pro-image-preview": {
+    "gemini": "gemini-3-pro-image-preview",
+    "openrouter": "google/gemini-3-pro-image-preview"
+  },
+  "gemini-3.1-flash-image": {
+    "gemini": "gemini-3.1-flash-image",
+    "openrouter": "google/gemini-3.1-flash-image",
+    "vertexai": "gemini-3.1-flash-image"
+  },
+  "gemini-3.1-flash-image-preview": {
+    "gemini": "gemini-3.1-flash-image-preview",
+    "openrouter": "google/gemini-3.1-flash-image-preview",
+    "vertexai": "gemini-3.1-flash-image-preview"
+  },
+  "gemini-3.1-flash-lite": {
+    "gemini": "gemini-3.1-flash-lite",
+    "openrouter": "google/gemini-3.1-flash-lite",
+    "vertexai": "gemini-3.1-flash-lite"
+  },
+  "gemini-3.1-flash-lite-image": {
+    "gemini": "gemini-3.1-flash-lite-image",
+    "openrouter": "google/gemini-3.1-flash-lite-image",
+    "vertexai": "gemini-3.1-flash-lite-image"
+  },
+  "gemini-3.1-flash-lite-preview": {
+    "gemini": "gemini-3.1-flash-lite-preview",
+    "openrouter": "google/gemini-3.1-flash-lite-preview",
+    "vertexai": "gemini-3.1-flash-lite-preview"
+  },
+  "gemini-3.1-flash-tts-preview": {
+    "gemini": "gemini-3.1-flash-tts-preview",
+    "openrouter": "google/gemini-3.1-flash-tts-preview",
+    "vertexai": "gemini-3.1-flash-tts-preview"
+  },
+  "gemini-3.1-pro-preview": {
+    "gemini": "gemini-3.1-pro-preview",
+    "openrouter": "google/gemini-3.1-pro-preview",
+    "vertexai": "gemini-3.1-pro-preview"
+  },
+  "gemini-3.1-pro-preview-customtools": {
+    "gemini": "gemini-3.1-pro-preview-customtools",
+    "openrouter": "google/gemini-3.1-pro-preview-customtools",
+    "vertexai": "gemini-3.1-pro-preview-customtools"
+  },
+  "gemini-3.5-flash": {
+    "gemini": "gemini-3.5-flash",
+    "openrouter": "google/gemini-3.5-flash",
+    "vertexai": "gemini-3.5-flash"
+  },
+  "gemini-3.5-flash-lite": {
+    "gemini": "gemini-3.5-flash-lite",
+    "openrouter": "google/gemini-3.5-flash-lite",
+    "vertexai": "gemini-3.5-flash-lite"
+  },
+  "gemini-3.5-live-translate-preview": {
+    "gemini": "gemini-3.5-live-translate-preview",
+    "vertexai": "gemini-3.5-live-translate-preview"
+  },
+  "gemini-3.5-transcribe": {
+    "gemini": "gemini-3.5-transcribe",
+    "openrouter": "google/gemini-3.5-transcribe"
+  },
+  "gemini-3.6-flash": {
+    "gemini": "gemini-3.6-flash",
+    "openrouter": "google/gemini-3.6-flash",
+    "vertexai": "gemini-3.6-flash"
+  },
+  "gemini-3.7-flash": {
+    "gemini": "gemini-3.7-flash",
+    "openrouter": "google/gemini-3.7-flash",
+    "vertexai": "gemini-3.7-flash"
+  },
+  "gemini-3.8-flash": {
+    "gemini": "gemini-3.8-flash",
+    "openrouter": "google/gemini-3.8-flash",
+    "vertexai": "gemini-3.8-flash"
+  },
+  "gemini-3.8-flash-lite-tts": {
+    "gemini": "gemini-3.8-flash-lite-tts",
+    "openrouter": "google/gemini-3.8-flash-lite-tts"
+  },
+  "gemini-3.8-flash-tts": {
+    "gemini": "gemini-3.8-flash-tts",
+    "openrouter": "google/gemini-3.8-flash-tts"
+  },
+  "gemini-3.8-live": {
+    "gemini": "gemini-3.8-live",
+    "vertexai": "gemini-3.8-live"
+  },
+  "gemini-embedding-001": {
+    "gemini": "gemini-embedding-001",
+    "openrouter": "google/gemini-embedding-001",
+    "vertexai": "gemini-embedding-001"
+  },
+  "gemini-embedding-2": {
+    "gemini": "gemini-embedding-2",
+    "openrouter": "google/gemini-embedding-2",
+    "vertexai": "gemini-embedding-2"
+  },
+  "gemini-embedding-2-preview": {
+    "gemini": "gemini-embedding-2-preview",
+    "openrouter": "google/gemini-embedding-2-preview"
+  },
+  "gemini-flash": {
+    "gemini": "gemini-flash-latest",
+    "vertexai": "gemini-flash-latest"
+  },
+  "gemini-flash-lite": {
+    "gemini": "gemini-flash-lite-latest",
+    "vertexai": "gemini-flash-lite-latest"
+  },
+  "gemini-omni-flash-preview": {
+    "gemini": "gemini-omni-flash-preview",
+    "vertexai": "gemini-omni-flash-preview"
+  },
+  "gemma-4-26b-a4b-it": {
+    "gemini": "gemma-4-26b-a4b-it",
+    "openrouter": "google/gemma-4-26b-a4b-it",
+    "vertexai": "google/gemma-4-26b-a4b-it-maas"
+  },
+  "gemma-4-31b-it": {
+    "gemini": "gemma-4-31b-it",
+    "openrouter": "google/gemma-4-31b-it"
+  },
+  "glm-4.7": {
+    "vertexai": "zai-org/glm-4.7-maas",
+    "openrouter": "z-ai/glm-4.7"
+  },
+  "glm-5": {
+    "vertexai": "zai-org/glm-5-maas",
+    "openrouter": "z-ai/glm-5"
+  },
+  "glm-5.2": {
+    "vertexai": "zai-org/glm-5.2-maas",
+    "openrouter": "z-ai/glm-5.2"
+  },
+  "gpt-3.5-turbo": {
+    "openai": "gpt-3.5-turbo",
+    "openrouter": "openai/gpt-3.5-turbo"
+  },
+  "gpt-3.5-turbo-16k": {
+    "openai": "gpt-3.5-turbo-16k",
+    "openrouter": "openai/gpt-3.5-turbo-16k"
+  },
+  "gpt-3.5-turbo-instruct": {
+    "openai": "gpt-3.5-turbo-instruct",
+    "openrouter": "openai/gpt-3.5-turbo-instruct",
+    "azure": "gpt-3.5-turbo-instruct"
+  },
+  "gpt-4": {
+    "openai": "gpt-4",
+    "openrouter": "openai/gpt-4"
+  },
+  "gpt-4-turbo": {
+    "openai": "gpt-4-turbo",
+    "openrouter": "openai/gpt-4-turbo",
+    "azure": "gpt-4-turbo"
+  },
+  "gpt-4.1": {
+    "openai": "gpt-4.1",
+    "openrouter": "openai/gpt-4.1",
+    "azure": "gpt-4.1"
+  },
+  "gpt-4.1-mini": {
+    "openai": "gpt-4.1-mini",
+    "openrouter": "openai/gpt-4.1-mini",
+    "azure": "gpt-4.1-mini"
+  },
+  "gpt-4.1-nano": {
+    "openai": "gpt-4.1-nano",
+    "openrouter": "openai/gpt-4.1-nano",
+    "azure": "gpt-4.1-nano"
+  },
+  "gpt-4o": {
+    "openai": "gpt-4o",
+    "openrouter": "openai/gpt-4o",
+    "azure": "gpt-4o"
+  },
+  "gpt-4o-2024-05-13": {
+    "openai": "gpt-4o-2024-05-13",
+    "openrouter": "openai/gpt-4o-2024-05-13",
+    "azure": "gpt-4o-2024-05-13"
+  },
+  "gpt-4o-2024-08-06": {
+    "openai": "gpt-4o-2024-08-06",
+    "openrouter": "openai/gpt-4o-2024-08-06",
+    "azure": "gpt-4o-2024-08-06"
+  },
+  "gpt-4o-2024-11-20": {
+    "openai": "gpt-4o-2024-11-20",
+    "openrouter": "openai/gpt-4o-2024-11-20",
+    "azure": "gpt-4o-2024-11-20"
+  },
+  "gpt-4o-mini": {
+    "openai": "gpt-4o-mini",
+    "openrouter": "openai/gpt-4o-mini",
+    "azure": "gpt-4o-mini"
+  },
+  "gpt-4o-mini-2024-07-18": {
+    "openai": "gpt-4o-mini-2024-07-18",
+    "openrouter": "openai/gpt-4o-mini-2024-07-18",
+    "azure": "gpt-4o-mini-2024-07-18"
+  },
+  "gpt-4o-mini-transcribe": {
+    "openai": "gpt-4o-mini-transcribe",
+    "openrouter": "openai/gpt-4o-mini-transcribe",
+    "azure": "gpt-4o-mini-transcribe"
+  },
+  "gpt-4o-transcribe": {
+    "openai": "gpt-4o-transcribe",
+    "openrouter": "openai/gpt-4o-transcribe",
+    "azure": "gpt-4o-transcribe"
+  },
+  "gpt-5": {
+    "openai": "gpt-5",
+    "openrouter": "openai/gpt-5",
+    "azure": "gpt-5"
+  },
+  "gpt-5-mini": {
+    "openai": "gpt-5-mini",
+    "openrouter": "openai/gpt-5-mini",
+    "azure": "gpt-5-mini"
+  },
+  "gpt-5-nano": {
+    "openai": "gpt-5-nano",
+    "openrouter": "openai/gpt-5-nano",
+    "azure": "gpt-5-nano"
+  },
+  "gpt-5-pro": {
+    "openai": "gpt-5-pro",
+    "openrouter": "openai/gpt-5-pro",
+    "azure": "gpt-5-pro"
+  },
+  "gpt-5.1": {
+    "openai": "gpt-5.1",
+    "openrouter": "openai/gpt-5.1",
+    "azure": "gpt-5.1"
+  },
+  "gpt-5.1-codex": {
+    "openai": "gpt-5.1-codex",
+    "openrouter": "openai/gpt-5.1-codex",
+    "azure": "gpt-5.1-codex"
+  },
+  "gpt-5.1-codex-max": {
+    "openai": "gpt-5.1-codex-max",
+    "openrouter": "openai/gpt-5.1-codex-max",
+    "azure": "gpt-5.1-codex-max"
+  },
+  "gpt-5.1-codex-mini": {
+    "openai": "gpt-5.1-codex-mini",
+    "openrouter": "openai/gpt-5.1-codex-mini",
+    "azure": "gpt-5.1-codex-mini"
+  },
+  "gpt-5.2": {
+    "openai": "gpt-5.2",
+    "openrouter": "openai/gpt-5.2",
+    "azure": "gpt-5.2"
+  },
+  "gpt-5.2-codex": {
+    "openai": "gpt-5.2-codex",
+    "openrouter": "openai/gpt-5.2-codex",
+    "azure": "gpt-5.2-codex"
+  },
+  "gpt-5.2-pro": {
+    "openai": "gpt-5.2-pro",
+    "openrouter": "openai/gpt-5.2-pro"
+  },
+  "gpt-5.3-codex": {
+    "openai": "gpt-5.3-codex",
+    "openrouter": "openai/gpt-5.3-codex",
+    "azure": "gpt-5.3-codex"
+  },
+  "gpt-5.4": {
+    "openai": "gpt-5.4",
+    "openrouter": "openai/gpt-5.4",
+    "azure": "gpt-5.4"
+  },
+  "gpt-5.4-mini": {
+    "openai": "gpt-5.4-mini",
+    "openrouter": "openai/gpt-5.4-mini",
+    "azure": "gpt-5.4-mini"
+  },
+  "gpt-5.4-nano": {
+    "openai": "gpt-5.4-nano",
+    "openrouter": "openai/gpt-5.4-nano",
+    "azure": "gpt-5.4-nano"
+  },
+  "gpt-5.4-pro": {
+    "openai": "gpt-5.4-pro",
+    "openrouter": "openai/gpt-5.4-pro",
+    "azure": "gpt-5.4-pro"
+  },
+  "gpt-5.5": {
+    "openai": "gpt-5.5",
+    "openrouter": "openai/gpt-5.5",
+    "azure": "gpt-5.5"
+  },
+  "gpt-5.5-pro": {
+    "openai": "gpt-5.5-pro",
+    "openrouter": "openai/gpt-5.5-pro"
+  },
+  "gpt-5.6-luna": {
+    "openai": "gpt-5.6-luna",
+    "openrouter": "openai/gpt-5.6-luna",
+    "azure": "gpt-5.6-luna"
+  },
+  "gpt-5.6-sol": {
+    "openai": "gpt-5.6-sol",
+    "openrouter": "openai/gpt-5.6-sol",
+    "azure": "gpt-5.6-sol"
+  },
+  "gpt-5.6-terra": {
+    "openai": "gpt-5.6-terra",
+    "openrouter": "openai/gpt-5.6-terra",
+    "azure": "gpt-5.6-terra"
+  },
+  "gpt-6-astra": {
+    "openai": "gpt-6-astra",
+    "openrouter": "openai/gpt-6-astra",
+    "azure": "gpt-6-astra"
+  },
+  "gpt-6-luna": {
+    "openai": "gpt-6-luna",
+    "openrouter": "openai/gpt-6-luna",
+    "azure": "gpt-6-luna"
+  },
+  "gpt-6-sol": {
+    "openai": "gpt-6-sol",
+    "openrouter": "openai/gpt-6-sol",
+    "azure": "gpt-6-sol"
+  },
+  "gpt-audio": {
+    "openai": "gpt-audio",
+    "openrouter": "openai/gpt-audio",
+    "azure": "gpt-audio"
+  },
+  "gpt-audio-mini": {
+    "openai": "gpt-audio-mini",
+    "openrouter": "openai/gpt-audio-mini",
+    "azure": "gpt-audio-mini"
+  },
+  "gpt-image-1": {
+    "openai": "gpt-image-1",
+    "openrouter": "openai/gpt-image-1",
+    "azure": "gpt-image-1"
+  },
+  "gpt-image-1-mini": {
+    "openai": "gpt-image-1-mini",
+    "openrouter": "openai/gpt-image-1-mini",
+    "azure": "gpt-image-1-mini"
+  },
+  "gpt-image-2": {
+    "openai": "gpt-image-2",
+    "openrouter": "openai/gpt-image-2",
+    "azure": "gpt-image-2"
+  },
+  "gpt-image-2.5-flare": {
+    "openai": "gpt-image-2.5-flare",
+    "openrouter": "openai/gpt-image-2.5-flare",
+    "azure": "gpt-image-2.5-flare"
+  },
+  "gpt-image-2.5-sunburst": {
+    "openai": "gpt-image-2.5-sunburst",
+    "openrouter": "openai/gpt-image-2.5-sunburst",
+    "azure": "gpt-image-2.5-sunburst"
+  },
+  "gpt-oss-120b": {
+    "vertexai": "openai/gpt-oss-120b-maas",
+    "openrouter": "openai/gpt-oss-120b"
+  },
+  "gpt-oss-20b": {
+    "vertexai": "openai/gpt-oss-20b-maas",
+    "openrouter": "openai/gpt-oss-20b"
+  },
+  "gpt-transcribe": {
+    "openai": "gpt-transcribe",
+    "openrouter": "openai/gpt-transcribe",
+    "azure": "gpt-transcribe"
+  },
+  "grok-3": {
+    "xai": "grok-4.3"
+  },
+  "grok-3-latest": {
+    "xai": "grok-4.3"
+  },
+  "grok-3-mini": {
+    "xai": "grok-4.3"
+  },
+  "grok-3-mini-latest": {
+    "xai": "grok-4.3"
+  },
+  "grok-4": {
+    "xai": "grok-4.3"
+  },
+  "grok-4-1-fast": {
+    "xai": "grok-4.3"
+  },
+  "grok-4-1-fast-non-reasoning": {
+    "xai": "grok-4.3"
+  },
+  "grok-4-1-fast-non-reasoning-latest": {
+    "xai": "grok-4.3"
+  },
+  "grok-4-1-fast-reasoning": {
+    "xai": "grok-4.3"
+  },
+  "grok-4-1-fast-reasoning-latest": {
+    "xai": "grok-4.3"
+  },
+  "grok-4-fast": {
+    "xai": "grok-4.3"
+  },
+  "grok-4-fast-non-reasoning": {
+    "xai": "grok-4.3"
+  },
+  "grok-4-fast-non-reasoning-latest": {
+    "xai": "grok-4.3"
+  },
+  "grok-4-fast-reasoning": {
+    "xai": "grok-4.3"
+  },
+  "grok-4-fast-reasoning-latest": {
+    "xai": "grok-4.3"
+  },
+  "grok-4-latest": {
+    "xai": "grok-4.3"
+  },
+  "grok-4.1-fast-non-reasoning": {
+    "vertexai": "xai/grok-4.1-fast-non-reasoning"
+  },
+  "grok-4.1-fast-reasoning": {
+    "vertexai": "xai/grok-4.1-fast-reasoning"
+  },
+  "grok-4.20-non-reasoning": {
+    "vertexai": "xai/grok-4.20-non-reasoning"
+  },
+  "grok-4.20-reasoning": {
+    "vertexai": "xai/grok-4.20-reasoning"
+  },
+  "grok-4.3": {
+    "vertexai": "xai/grok-4.3"
+  },
+  "grok-4.6": {
+    "vertexai": "xai/grok-4.6"
+  },
+  "grok-latest": {
+    "xai": "grok-4.3"
+  },
+  "kimi-k2-thinking": {
+    "vertexai": "moonshotai/kimi-k2-thinking-maas",
+    "openrouter": "moonshotai/kimi-k2-thinking"
+  },
+  "llama-3.3-70b-instruct": {
+    "vertexai": "meta/llama-3.3-70b-instruct-maas",
+    "openrouter": "meta-llama/llama-3.3-70b-instruct"
+  },
+  "llama-4-maverick-17b-128e-instruct": {
+    "vertexai": "meta/llama-4-maverick-17b-128e-instruct-maas"
+  },
+  "lyria-3-clip-preview": {
+    "gemini": "lyria-3-clip-preview",
+    "openrouter": "google/lyria-3-clip-preview"
+  },
+  "lyria-3-pro-preview": {
+    "gemini": "lyria-3-pro-preview",
+    "openrouter": "google/lyria-3-pro-preview"
+  },
+  "mistral-medium-3": {
+    "vertexai": "mistral-medium-3",
+    "mistral": "mistral-medium-3",
+    "openrouter": "mistralai/mistral-medium-3"
+  },
+  "nova": {
+    "deepgram": "nova-general"
+  },
+  "nova-2": {
+    "deepgram": "nova-2-general"
+  },
+  "nova-3": {
+    "deepgram": "nova-3-general"
+  },
+  "o1": {
+    "openai": "o1",
+    "openrouter": "openai/o1",
+    "azure": "o1"
+  },
+  "o1-pro": {
+    "openai": "o1-pro",
+    "openrouter": "openai/o1-pro",
+    "azure": "o1-pro"
+  },
+  "o3": {
+    "openai": "o3",
+    "openrouter": "openai/o3",
+    "azure": "o3"
+  },
+  "o3-mini": {
+    "openai": "o3-mini",
+    "openrouter": "openai/o3-mini",
+    "azure": "o3-mini"
+  },
+  "o3-pro": {
+    "openai": "o3-pro",
+    "openrouter": "openai/o3-pro"
+  },
+  "o4-mini": {
+    "openai": "o4-mini",
+    "openrouter": "openai/o4-mini",
+    "azure": "o4-mini"
+  },
+  "qwen3-235b-a22b-instruct-2507": {
+    "vertexai": "qwen/qwen3-235b-a22b-instruct-2507-maas"
+  },
+  "qwen3-coder-480b-a35b-instruct": {
+    "vertexai": "qwen/qwen3-coder-480b-a35b-instruct-maas"
+  },
+  "qwen3-next-80b-a3b-instruct": {
+    "vertexai": "qwen/qwen3-next-80b-a3b-instruct-maas",
+    "openrouter": "qwen/qwen3-next-80b-a3b-instruct"
+  },
+  "qwen3-next-80b-a3b-thinking": {
+    "vertexai": "qwen/qwen3-next-80b-a3b-thinking-maas",
+    "openrouter": "qwen/qwen3-next-80b-a3b-thinking"
+  },
+  "text-embedding-3-large": {
+    "openai": "text-embedding-3-large",
+    "openrouter": "openai/text-embedding-3-large",
+    "azure": "text-embedding-3-large"
+  },
+  "text-embedding-3-small": {
+    "openai": "text-embedding-3-small",
+    "openrouter": "openai/text-embedding-3-small",
+    "azure": "text-embedding-3-small"
+  },
+  "text-embedding-ada-002": {
+    "openai": "text-embedding-ada-002",
+    "openrouter": "openai/text-embedding-ada-002",
+    "azure": "text-embedding-ada-002"
+  },
+  "whisper-1": {
+    "openai": "whisper-1",
+    "openrouter": "openai/whisper-1"
+  }
+}

@@ -1,0 +1,40 @@
+[
+  {
+    "method": "post",
+    "uri": "<GPUSTACK_API_BASE>/chat/completions",
+    "request_body": "{\"model\":\"qwen3\",\"messages\":[{\"role\":\"system\",\"content\":\"You must call the dice_roll tool exactly 3 times when asked to roll dice 3 times.\"},{\"role\":\"user\",\"content\":\"Roll the dice 3 times\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"description\":\"Rolls a single six-sided die and returns the result\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Req-Cost-Time": "1348",
+      "Req-Arrive-Time": "1789683568979",
+      "Date": "Thu, 17 Sep 2026 22:19:28 GMT",
+      "Server": "istio-envoy",
+      "Access-Control-Allow-Origin": "",
+      "Resp-Start-Time": "1789683570328",
+      "X-Envoy-Upstream-Service-Time": "1345",
+      "Content-Type": "application/json; charset=utf-8",
+      "Vary": "Accept-Encoding",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\"choices\":[{\"finish_reason\":\"tool_calls\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning_content\":\"Okay, the user wants me to roll the dice three times. Let me check the tools available. There's a function called dice_roll that rolls a single six-sided die. The user said exactly three times, so I need to call that function three separate times. Each call doesn't need any parameters, so each tool call is just the name with empty arguments. I'll make sure to structure each tool_call properly in JSON within the XML tags. Let me count: first roll, second roll, third roll. That's three times. Alright, I'll generate each of those.\\n\",\"tool_calls\":[{\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"},\"id\":\"TkVB6cvQM52Z6qUNXja6Gx6aMiWDgG3L\"},{\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"},\"id\":\"JaGUnHhH2uvWt3CTMWNvky8LMHT5ec3C\"},{\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"},\"id\":\"eAcjNOFM6ePGMEGSadUo1OqrihSbWNyb\"}]}}],\"created\":1789683570,\"model\":\"qwen3\",\"system_fingerprint\":\"b10830-465e49b9c\",\"object\":\"chat.completion\",\"usage\":{\"completion_tokens\":169,\"prompt_tokens\":177,\"total_tokens\":346,\"prompt_tokens_details\":{\"cached_tokens\":176}},\"id\":\"chatcmpl-p5Hpne51GMtqhQ3owOt8vQNeKf9AP9v0\",\"timings\":{\"cache_n\":176,\"prompt_n\":1,\"prompt_ms\":8.509,\"prompt_per_token_ms\":8.509,\"prompt_per_second\":117.5226231049477,\"predicted_n\":169,\"predicted_ms\":1251.971,\"predicted_per_token_ms\":7.452208333333333,\"predicted_per_second\":134.18841171241186}}"
+  },
+  {
+    "method": "post",
+    "uri": "<GPUSTACK_API_BASE>/chat/completions",
+    "request_body": "{\"model\":\"qwen3\",\"messages\":[{\"role\":\"system\",\"content\":\"You must call the dice_roll tool exactly 3 times when asked to roll dice 3 times.\"},{\"role\":\"user\",\"content\":\"Roll the dice 3 times\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"TkVB6cvQM52Z6qUNXja6Gx6aMiWDgG3L\",\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}},{\"id\":\"JaGUnHhH2uvWt3CTMWNvky8LMHT5ec3C\",\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}},{\"id\":\"eAcjNOFM6ePGMEGSadUo1OqrihSbWNyb\",\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}}],\"reasoning\":\"Okay, the user wants me to roll the dice three times. Let me check the tools available. There's a function called dice_roll that rolls a single six-sided die. The user said exactly three times, so I need to call that function three separate times. Each call doesn't need any parameters, so each tool call is just the name with empty arguments. I'll make sure to structure each tool_call properly in JSON within the XML tags. Let me count: first roll, second roll, third roll. That's three times. Alright, I'll generate each of those.\\n\",\"reasoning_content\":\"Okay, the user wants me to roll the dice three times. Let me check the tools available. There's a function called dice_roll that rolls a single six-sided die. The user said exactly three times, so I need to call that function three separate times. Each call doesn't need any parameters, so each tool call is just the name with empty arguments. I'll make sure to structure each tool_call properly in JSON within the XML tags. Let me count: first roll, second roll, third roll. That's three times. Alright, I'll generate each of those.\\n\"},{\"role\":\"tool\",\"content\":\"{\\\"roll\\\":1}\",\"tool_call_id\":\"TkVB6cvQM52Z6qUNXja6Gx6aMiWDgG3L\"},{\"role\":\"tool\",\"content\":\"{\\\"roll\\\":2}\",\"tool_call_id\":\"JaGUnHhH2uvWt3CTMWNvky8LMHT5ec3C\"},{\"role\":\"tool\",\"content\":\"{\\\"roll\\\":3}\",\"tool_call_id\":\"eAcjNOFM6ePGMEGSadUo1OqrihSbWNyb\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"description\":\"Rolls a single six-sided die and returns the result\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Server": "istio-envoy",
+      "Access-Control-Allow-Origin": "",
+      "Req-Cost-Time": "1601",
+      "Date": "Thu, 17 Sep 2026 22:19:29 GMT",
+      "Content-Type": "application/json; charset=utf-8",
+      "Req-Arrive-Time": "1789683570332",
+      "Resp-Start-Time": "1789683571933",
+      "X-Envoy-Upstream-Service-Time": "1598",
+      "Vary": "Accept-Encoding",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The results of the three dice rolls are:\\n1. 🎲 Roll 1: 1\\n2. 🎲 Roll 2: 2\\n3. 🎲 Roll 3: 3\\n\\nLet me know if you'd like to roll again!\",\"reasoning_content\":\"Okay, let me see. The user asked to roll the dice three times, and I called the dice_roll function three times. Each response from the tool gave a roll result: 1, 2, and 3. Now I need to present these results in a clear way.\\n\\nHmm, maybe list each roll with a message. Like, \\\"The first roll is 1, the second is 2, and the third is 3.\\\" That's straightforward. Alternatively, I could format them as separate points. But the user might just want the sequence of numbers. Let me check if there's any other info needed, but the problem seems simple. Just report the three results in order. Alright, I'll structure the answer to show each roll's outcome clearly.\\n\"}}],\"created\":1789683571,\"model\":\"qwen3\",\"system_fingerprint\":\"b10830-465e49b9c\",\"object\":\"chat.completion\",\"usage\":{\"completion_tokens\":217,\"prompt_tokens\":381,\"total_tokens\":598,\"prompt_tokens_details\":{\"cached_tokens\":345}},\"id\":\"chatcmpl-Ib97E3H1nQnsRNYlGF1DrbsRKRlhHP7q\",\"timings\":{\"cache_n\":345,\"prompt_n\":36,\"prompt_ms\":17.342,\"prompt_per_token_ms\":0.48172222222222216,\"prompt_per_second\":2075.885134355899,\"predicted_n\":217,\"predicted_ms\":1571.367,\"predicted_per_token_ms\":7.274847222222222,\"predicted_per_second\":137.45993138458425}}"
+  }
+]

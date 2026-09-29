@@ -1,0 +1,36 @@
+[
+  {
+    "method": "post",
+    "uri": "https://inference.hetzner.com/api/v1/chat/completions",
+    "request_body": "{\"model\":\"Qwen3.8-27B\",\"messages\":[{\"role\":\"system\",\"content\":\"You must call the dice_roll tool exactly 3 times when asked to roll dice 3 times.\"},{\"role\":\"user\",\"content\":\"Roll the dice 3 times\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"description\":\"Rolls a single six-sided die and returns the result\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 24 Sep 2026 18:48:03 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "1257",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "X-Went-Into-Resp-Headers": "true",
+      "Server": "HeRay"
+    },
+    "response_body": "{\"model\":\"Qwen3.8-27B\",\"usage\":{\"prompt_tokens\":338,\"completion_tokens\":88,\"total_tokens\":426,\"completion_tokens_details\":{\"reasoning_tokens\":41},\"prompt_tokens_details\":{\"cached_tokens\":0,\"created_cache_tokens\":0,\"multimodal_tokens\":null}},\"choices\":[{\"message\":{\"role\":\"assistant\",\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"tool_calls\":[{\"id\":\"chatcmpl-tool-af875a9696c7884a\",\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}},{\"id\":\"chatcmpl-tool-8d9f11d5f223f27a\",\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}},{\"id\":\"chatcmpl-tool-bcbef2c3e6c53802\",\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}}],\"reasoning\":\"The user is requesting to roll the dice 3 times. I should call the dice_roll tool exactly 3 times. Since these are independent calls, they can all be executed in the same block.\\n\"},\"index\":0,\"logprobs\":null,\"finish_reason\":\"tool_calls\",\"stop_reason\":null,\"token_ids\":null,\"routed_experts\":null}],\"id\":\"chatcmpl-3371190d-1487-4809-be32-fd5b8c6bdcbb\",\"object\":\"chat.completion\",\"created\":1790275679,\"system_fingerprint\":null,\"prompt_logprobs\":null,\"prompt_token_ids\":null,\"prompt_text\":null,\"kv_transfer_params\":null,\"ec_transfer_params\":null,\"metrics\":null}"
+  },
+  {
+    "method": "post",
+    "uri": "https://inference.hetzner.com/api/v1/chat/completions",
+    "request_body": "{\"model\":\"Qwen3.8-27B\",\"messages\":[{\"role\":\"system\",\"content\":\"You must call the dice_roll tool exactly 3 times when asked to roll dice 3 times.\"},{\"role\":\"user\",\"content\":\"Roll the dice 3 times\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"chatcmpl-tool-af875a9696c7884a\",\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}},{\"id\":\"chatcmpl-tool-8d9f11d5f223f27a\",\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}},{\"id\":\"chatcmpl-tool-bcbef2c3e6c53802\",\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}}],\"reasoning\":\"The user is requesting to roll the dice 3 times. I should call the dice_roll tool exactly 3 times. Since these are independent calls, they can all be executed in the same block.\\n\",\"reasoning_content\":\"The user is requesting to roll the dice 3 times. I should call the dice_roll tool exactly 3 times. Since these are independent calls, they can all be executed in the same block.\\n\"},{\"role\":\"tool\",\"content\":\"{\\\"roll\\\":1}\",\"tool_call_id\":\"chatcmpl-tool-af875a9696c7884a\"},{\"role\":\"tool\",\"content\":\"{\\\"roll\\\":2}\",\"tool_call_id\":\"chatcmpl-tool-8d9f11d5f223f27a\"},{\"role\":\"tool\",\"content\":\"{\\\"roll\\\":3}\",\"tool_call_id\":\"chatcmpl-tool-bcbef2c3e6c53802\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"description\":\"Rolls a single six-sided die and returns the result\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 24 Sep 2026 18:48:14 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "972",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "X-Went-Into-Resp-Headers": "true",
+      "Server": "HeRay"
+    },
+    "response_body": "{\"model\":\"Qwen3.8-27B\",\"usage\":{\"prompt_tokens\":466,\"completion_tokens\":80,\"total_tokens\":546,\"completion_tokens_details\":{\"reasoning_tokens\":26},\"prompt_tokens_details\":{\"cached_tokens\":0,\"created_cache_tokens\":0,\"multimodal_tokens\":null}},\"choices\":[{\"message\":{\"content\":\"\\n\\nHere are your 3 dice rolls:\\n\\n1. 🎲 **1**\\n2. 🎲 **2**\\n3. 🎲 **3**\\n\\nA perfect 1-2-3 sequence! Total: **6**.\",\"role\":\"assistant\",\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"reasoning\":\"The user asked me to roll the dice 3 times, and I did exactly that. Now I should report the results.\\n\"},\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"stop_reason\":null,\"token_ids\":null,\"routed_experts\":null}],\"id\":\"chatcmpl-053e4be1-00b1-4972-8795-0b77ff878cb7\",\"object\":\"chat.completion\",\"created\":1790275683,\"system_fingerprint\":null,\"prompt_logprobs\":null,\"prompt_token_ids\":null,\"prompt_text\":null,\"kv_transfer_params\":null,\"ec_transfer_params\":null,\"metrics\":null}"
+  }
+]

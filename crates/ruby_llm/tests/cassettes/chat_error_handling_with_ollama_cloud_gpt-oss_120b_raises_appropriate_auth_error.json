@@ -1,0 +1,24 @@
+[
+  {
+    "method": "post",
+    "uri": "https://ollama.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}],\"stream\":false}",
+    "status": 401,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Set-Cookie": "<COOKIE>",
+      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
+      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Frame-Options": "DENY",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Content-Length": "81",
+      "Date": "Thu, 17 Sep 2026 22:06:31 GMT",
+      "Server": "Google Frontend",
+      "Traceparent": "00-2672a73e115c51dcdf3558d248367670-56a8ba17725d1743-00",
+      "X-Cloud-Trace-Context": "2672a73e115c51dcdf3558d248367670/6244445493214910275",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
+    },
+    "response_body": "{\"error\":{\"message\":\"Unauthorized\",\"type\":\"api_error\",\"param\":null,\"code\":null}}\n"
+  }
+]

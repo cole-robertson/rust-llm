@@ -1,0 +1,36 @@
+[
+  {
+    "method": "post",
+    "uri": "https://inference.hetzner.com/api/v1/chat/completions",
+    "request_body": "{\"model\":\"Qwen3.8-27B\",\"messages\":[{\"role\":\"user\",\"content\":\"Use the best_language_to_learn tool to tell me which language to learn.\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"description\":\"Gets the best language to learn\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 24 Sep 2026 18:47:03 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "1004",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "X-Went-Into-Resp-Headers": "true",
+      "Server": "HeRay"
+    },
+    "response_body": "{\"model\":\"Qwen3.8-27B\",\"usage\":{\"prompt_tokens\":323,\"completion_tokens\":47,\"total_tokens\":370,\"completion_tokens_details\":{\"reasoning_tokens\":28},\"prompt_tokens_details\":{\"cached_tokens\":0,\"created_cache_tokens\":0,\"multimodal_tokens\":null}},\"choices\":[{\"message\":{\"role\":\"assistant\",\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"tool_calls\":[{\"id\":\"chatcmpl-tool-a2aaa86f50513b2f\",\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"arguments\":\"{}\"}}],\"reasoning\":\"The user is asking to use the best_language_to_learn tool to tell them which language they should learn. Let's call the tool.\\n\"},\"index\":0,\"logprobs\":null,\"finish_reason\":\"tool_calls\",\"stop_reason\":null,\"token_ids\":null,\"routed_experts\":null}],\"id\":\"chatcmpl-53954781-662a-48f9-87fe-79f39297b684\",\"object\":\"chat.completion\",\"created\":1790275620,\"system_fingerprint\":null,\"prompt_logprobs\":null,\"prompt_token_ids\":null,\"prompt_text\":null,\"kv_transfer_params\":null,\"ec_transfer_params\":null,\"metrics\":null}"
+  },
+  {
+    "method": "post",
+    "uri": "https://inference.hetzner.com/api/v1/chat/completions",
+    "request_body": "{\"model\":\"Qwen3.8-27B\",\"messages\":[{\"role\":\"user\",\"content\":\"Use the best_language_to_learn tool to tell me which language to learn.\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"chatcmpl-tool-a2aaa86f50513b2f\",\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"arguments\":\"{}\"}}],\"reasoning\":\"The user is asking to use the best_language_to_learn tool to tell them which language they should learn. Let's call the tool.\\n\",\"reasoning_content\":\"The user is asking to use the best_language_to_learn tool to tell them which language they should learn. Let's call the tool.\\n\"},{\"role\":\"tool\",\"content\":\"Ruby\",\"tool_call_id\":\"chatcmpl-tool-a2aaa86f50513b2f\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"description\":\"Gets the best language to learn\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 24 Sep 2026 18:47:24 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "1741",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "X-Went-Into-Resp-Headers": "true",
+      "Server": "HeRay"
+    },
+    "response_body": "{\"model\":\"Qwen3.8-27B\",\"usage\":{\"prompt_tokens\":386,\"completion_tokens\":209,\"total_tokens\":595,\"completion_tokens_details\":{\"reasoning_tokens\":136},\"prompt_tokens_details\":{\"cached_tokens\":0,\"created_cache_tokens\":0,\"multimodal_tokens\":null}},\"choices\":[{\"message\":{\"content\":\"\\n\\nThe tool says the best language to learn is **Ruby**.\\n\\n(Just so you know, Ruby is a programming language created by Yukihiro Matsumoto, known for its elegant, readable syntax and \\\"programming for fun and happiness\\\" philosophy. If you were asking about a human language instead, let me know and I can try to clarify!)\",\"role\":\"assistant\",\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"reasoning\":\"The tool returned \\\"Ruby\\\". This is interesting—it's ambiguous whether it's referring to the programming language or the human language. Let me think about this. The tool is named \\\"best_language_to_learn\\\" and returned \\\"Ruby\\\". Since no context was given, Ruby could be a programming language (created by Yukihiro Matsumoto, known for \\\"programming for fun and joy\\\"). However, it could also be interpreted in another way.\\n\\nI should report the result: the tool says Ruby. Since there's no specific context (programming or human language), I should either mention that it's ambiguous or simply answer as the tool stated. I'll provide a straightforward answer.\\n\"},\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"stop_reason\":null,\"token_ids\":null,\"routed_experts\":null}],\"id\":\"chatcmpl-07cc7674-a40b-44c1-b7b4-8cf2fae68f7d\",\"object\":\"chat.completion\",\"created\":1790275623,\"system_fingerprint\":null,\"prompt_logprobs\":null,\"prompt_token_ids\":null,\"prompt_text\":null,\"kv_transfer_params\":null,\"ec_transfer_params\":null,\"metrics\":null}"
+  }
+]

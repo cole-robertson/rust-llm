@@ -1,0 +1,22 @@
+[
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Generate a person named Alice who is 28 years old\"}]}],\"generationConfig\":{\"responseMimeType\":\"application/json\",\"responseJsonSchema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":\"number\"}},\"required\":[\"name\",\"age\"],\"additionalProperties\":false}}}",
+    "status": 200,
+    "response_headers": {
+      "X-Gemini-Service-Tier": "standard",
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:08:05 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=1695",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"{\\\"name\\\":\\\"Alice\\\",\\\"age\\\":28}\",\n            \"thoughtSignature\": \"ErYHCrMHAWkUfROWRKT0yc2oBmqfgeMXzmKb7W5DSkvEMBmrYTEfBGYqQ0XPALu31QzzDWF4V/aNYO3+yh6pLzZWHlRM9rBoPid2Y0vrtu95F2kacXu4YkaiXENoH2Sytt+cJnk38nAVjcOpbqMI061j9YLtiGNZggXO7GkEccAG7HdoUKtatXiQL0UT2TV1KiKdzpSvWrYkcvvxQlEfMAafLvRetv+HSqY/SAzmUzvmyVg5z0yCtHZYSrrFP8jtZZcg091jpp8FK/9/iisllCs64nmD84vG6+u6UAcG5Z5uKya0Cisf3IF4uURJtqerdWaMTJypwCFwV5mEH1SUwIshTIZlKVzkOU4D5LAEWflSCdLv1YE1ls9xqIi8/dTVA4fZZmNC4MIT9v7wUh2aCNcy0X2OuNW5zTxRZRLqeEVHNfKk8qFNc6r78RYwOoHRHeyWBMUf8z/uQfIYenIdmianA8VkcWyCAs8OI37vmMaAQ8dV1fRNvwXNQIJdFXziyfBfzSbyH6kX89Bf+F3sn8CEt1CXOKsZYloaec1MeY65itKQq3KOsuvkUS5r7FthpgnfxJfLPPkyhfe3Xz1hiSRzyyv4uY4TaPwapbxWFJdzRLqo+HNDXaFSWyge52gj/JltF+gXsPa9DBN8+f/VWn9o2k3l1Qbg9k/dfaI3W469jPYEkbs+4cjn25Fbixd76c/EdjfmPlIGWYWIwySoZg7m/4vqJCnFDo//ChBVdbP+JM3wWgppJanNUVf5nn/giApAgi2juoMm4+oyvyTjujMs84YIaricNX1OZtvDHngxeNp7zmYdSwN3Mg3Nj5uwNdWpNLBk4WI8JAp1u7vU3aAQit+DJ6bgleiPA+ur7wVaY0e4GFlNbYekadY7L2QkZOKywuoGuq/k0C3gyMvnQDImaZFc55KYdl9t858WxMYBgAecR8ZWn9qQSnYgDC22Wer1dq4BzUneuEufuFu4wKk5+rCearr5yw+M4Oc+O2TaGwttS5QEjoBvfildVcZTaKtPgYaWElnDEBGKT4Y31V11bjzy6ecYc9WcFd955KnPQc0awRiYwmHPu+TZFvNpvY5UlUFmXFDgPp/bdKV0yqQC4238gyPPtb9haikyonTZdFSYvog9Xde0MOaMTdB1Ksggeb6LEJNTjY8SRTL1haiU+lS/moXzSqFtNcFOk/Ml5at3VFlH44mbW4pGhszSLHwtekOcB8pYQqKaa7GjHiFMiG7OqUWWJp19nmmOXJUNx4b4H9aJo30=\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 13,\n    \"candidatesTokenCount\": 10,\n    \"totalTokenCount\": 292,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 13\n      }\n    ],\n    \"thoughtsTokenCount\": 269,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3-flash-preview\",\n  \"responseId\": \"w2SsaofeMqr5vdIPzIyRoQ4\"\n}\n"
+  }
+]

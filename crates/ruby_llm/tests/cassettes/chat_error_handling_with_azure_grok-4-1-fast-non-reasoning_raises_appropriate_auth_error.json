@@ -1,0 +1,15 @@
+[
+  {
+    "method": "post",
+    "uri": "https://rubyllm.services.ai.azure.com/models/chat/completions?api-version=2024-05-01-preview",
+    "request_body": "{\"model\":\"grok-4-1-fast-non-reasoning\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}],\"stream\":false}",
+    "status": 401,
+    "response_headers": {
+      "Content-Length": "224",
+      "Content-Type": "application/json",
+      "Date": "Thu, 17 Sep 2026 22:06:29 GMT",
+      "Apim-Request-Id": "5fab7b40-dd75-48bd-aebf-b4813c54deeb"
+    },
+    "response_body": "{\"error\":{\"code\":\"401\",\"message\":\"Access denied due to invalid subscription key or wrong API endpoint. Make sure to provide a valid key for an active subscription and use a correct regional API endpoint for your resource.\"}}"
+  }
+]

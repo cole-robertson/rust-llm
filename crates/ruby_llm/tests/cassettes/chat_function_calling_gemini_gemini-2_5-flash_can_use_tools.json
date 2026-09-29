@@ -1,0 +1,42 @@
+[
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What's the weather in Berlin? (52.5200, 13.4050)\"}]}],\"generationConfig\":{},\"tools\":[{\"functionDeclarations\":[{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parametersJsonSchema\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}]}]}",
+    "status": 200,
+    "response_headers": {
+      "X-Gemini-Service-Tier": "standard",
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:06:24 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=700",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"functionCall\": {\n              \"name\": \"weather\",\n              \"args\": {\n                \"longitude\": \"13.4050\",\n                \"latitude\": \"52.5200\"\n              }\n            },\n            \"thoughtSignature\": \"CvkBAWkUfRO7mD5aTRnIOmMhWN5uEcG0KwoWROofDk6WOfgNOD62vYuqqvtr3UsVNHTZqs9XB30Gei2t3HDq3qRAnLzfFtN3R3VVmeXuVjS79IFY47kc+9RQssWLPKHdpARNVjGkCPAJFjyesmcGsFD6ynztNPC+PDxGf6nXMKc/6zM4biid71Q4PBw4pzxXvUkxFaDK4djD+H+SPfiGQTvsfDXo+p7S44/M1hhvmuPIC49pMOeCt2JI4RnncA0lLfpfBhwZvGLP/GZC0OGp3UEKym4bSHB4GOjcNR6lLyLhJYJK20SKTkUPFQvopBTaK6uJFhGh4ODhzKUt\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0,\n      \"finishMessage\": \"Model generated function call(s).\"\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 103,\n    \"candidatesTokenCount\": 30,\n    \"totalTokenCount\": 176,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 103\n      }\n    ],\n    \"thoughtsTokenCount\": 43,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"X2SsatvdJriXvdIPhJ6diQ8\"\n}\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What's the weather in Berlin? (52.5200, 13.4050)\"}]},{\"role\":\"model\",\"parts\":[{\"functionCall\":{\"name\":\"weather\",\"args\":{\"longitude\":\"13.4050\",\"latitude\":\"52.5200\"}},\"thoughtSignature\":\"CvkBAWkUfRO7mD5aTRnIOmMhWN5uEcG0KwoWROofDk6WOfgNOD62vYuqqvtr3UsVNHTZqs9XB30Gei2t3HDq3qRAnLzfFtN3R3VVmeXuVjS79IFY47kc+9RQssWLPKHdpARNVjGkCPAJFjyesmcGsFD6ynztNPC+PDxGf6nXMKc/6zM4biid71Q4PBw4pzxXvUkxFaDK4djD+H+SPfiGQTvsfDXo+p7S44/M1hhvmuPIC49pMOeCt2JI4RnncA0lLfpfBhwZvGLP/GZC0OGp3UEKym4bSHB4GOjcNR6lLyLhJYJK20SKTkUPFQvopBTaK6uJFhGh4ODhzKUt\"}]},{\"role\":\"user\",\"parts\":[{\"functionResponse\":{\"name\":\"weather\",\"response\":{\"name\":\"weather\",\"content\":[{\"text\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\"}]}}}]}],\"generationConfig\":{},\"tools\":[{\"functionDeclarations\":[{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parametersJsonSchema\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}]}]}",
+    "status": 200,
+    "response_headers": {
+      "X-Gemini-Service-Tier": "standard",
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:06:24 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=573",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"The weather in Berlin is 15°C with a wind of 10 km/h.\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 190,\n    \"candidatesTokenCount\": 21,\n    \"totalTokenCount\": 211,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 190\n      }\n    ],\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"YGSsaoatG_PpnsEPxPfKsQQ\"\n}\n"
+  }
+]

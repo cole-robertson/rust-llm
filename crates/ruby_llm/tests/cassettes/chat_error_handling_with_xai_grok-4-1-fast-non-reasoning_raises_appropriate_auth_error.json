@@ -1,0 +1,23 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.x.ai/v1/responses",
+    "request_body": "{\"model\":\"grok-4.3\",\"input\":[{\"role\":\"user\",\"content\":\"Hello\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"]}",
+    "status": 400,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:06:32 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "118",
+      "Connection": "keep-alive",
+      "Strict-Transport-Security": "max-age=31536000",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Expose-Headers": "*",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Set-Cookie": "<COOKIE>",
+      "Server": "cloudflare",
+      "Cf-Ray": "<CF_RAY>"
+    },
+    "response_body": "{\"code\":\"invalid-argument\",\"error\":\"Incorrect API key provided. You can obtain an API key from https://console.x.ai.\"}"
+  }
+]

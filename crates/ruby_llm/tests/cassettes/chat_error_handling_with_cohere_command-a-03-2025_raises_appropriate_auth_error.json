@@ -1,0 +1,23 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.cohere.com/v2/chat",
+    "request_body": "{\"model\":\"command-a-03-2025\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Hello\"}]}],\"stream\":false}",
+    "status": 401,
+    "response_headers": {
+      "Cache-Control": "no-cache, no-store, no-transform, must-revalidate, private, max-age=0",
+      "Content-Type": "application/json",
+      "Expires": "Thu, 01 Jan 1970 00:00:00 GMT",
+      "Pragma": "no-cache",
+      "Vary": "Origin,Accept-Encoding",
+      "X-Accel-Expires": "0",
+      "Date": "Thu, 17 Sep 2026 22:06:30 GMT",
+      "X-Envoy-Upstream-Service-Time": "1",
+      "Server": "envoy",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\"id\":\"64d948c3-10be-4474-b97b-baeaeba74349\",\"message\":\"Incorrect API key provided: ***********. You can find your API key at https://dashboard.cohere.com/api-keys.\"}"
+  }
+]

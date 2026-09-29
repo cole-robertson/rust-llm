@@ -1,0 +1,90 @@
+[
+  {
+    "method": "post",
+    "uri": "https://ollama.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"system\",\"content\":\"You must call the dice_roll tool exactly 3 times when asked to roll dice 3 times.\"},{\"role\":\"user\",\"content\":\"Roll the dice 3 times\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"description\":\"Rolls a single six-sided die and returns the result\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Set-Cookie": "<COOKIE>",
+      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
+      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Frame-Options": "DENY",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Content-Length": "670",
+      "Date": "Thu, 17 Sep 2026 22:20:40 GMT",
+      "Server": "Google Frontend",
+      "Traceparent": "00-5b91cef829d41c4107047990e7ea3077-a28227f380ccc608-00",
+      "X-Cloud-Trace-Context": "5b91cef829d41c4107047990e7ea3077/11709965907908150792",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000"
+    },
+    "response_body": "{\"id\":\"chatcmpl-720\",\"object\":\"chat.completion\",\"created\":1789683640,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning\":\"The user asks to roll the dice 3 times. According to instructions, we must call the dice_roll tool exactly 3 times. Then we should output the results. We'll call the function three times sequentially.\",\"tool_calls\":[{\"id\":\"call_c6rt9rr9\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":147,\"prompt_tokens_details\":{\"cached_tokens\":64},\"completion_tokens\":64,\"total_tokens\":211}}\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://ollama.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"system\",\"content\":\"You must call the dice_roll tool exactly 3 times when asked to roll dice 3 times.\"},{\"role\":\"user\",\"content\":\"Roll the dice 3 times\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_c6rt9rr9\",\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}}],\"reasoning\":\"The user asks to roll the dice 3 times. According to instructions, we must call the dice_roll tool exactly 3 times. Then we should output the results. We'll call the function three times sequentially.\",\"reasoning_content\":\"The user asks to roll the dice 3 times. According to instructions, we must call the dice_roll tool exactly 3 times. Then we should output the results. We'll call the function three times sequentially.\"},{\"role\":\"tool\",\"content\":\"{\\\"roll\\\":1}\",\"tool_call_id\":\"call_c6rt9rr9\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"description\":\"Rolls a single six-sided die and returns the result\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Set-Cookie": "<COOKIE>",
+      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
+      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Frame-Options": "DENY",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Content-Length": "456",
+      "Date": "Thu, 17 Sep 2026 22:20:41 GMT",
+      "Server": "Google Frontend",
+      "Traceparent": "00-1804f6bfda37a448edf61df599af9f84-d46339854f66500f-00",
+      "X-Cloud-Trace-Context": "1804f6bfda37a448edf61df599af9f84/15304139203460616207",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000"
+    },
+    "response_body": "{\"id\":\"chatcmpl-205\",\"object\":\"chat.completion\",\"created\":1789683641,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_kdewvevi\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":228,\"prompt_tokens_details\":{\"cached_tokens\":192},\"completion_tokens\":15,\"total_tokens\":243}}\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://ollama.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"system\",\"content\":\"You must call the dice_roll tool exactly 3 times when asked to roll dice 3 times.\"},{\"role\":\"user\",\"content\":\"Roll the dice 3 times\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_c6rt9rr9\",\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}}],\"reasoning\":\"The user asks to roll the dice 3 times. According to instructions, we must call the dice_roll tool exactly 3 times. Then we should output the results. We'll call the function three times sequentially.\",\"reasoning_content\":\"The user asks to roll the dice 3 times. According to instructions, we must call the dice_roll tool exactly 3 times. Then we should output the results. We'll call the function three times sequentially.\"},{\"role\":\"tool\",\"content\":\"{\\\"roll\\\":1}\",\"tool_call_id\":\"call_c6rt9rr9\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_kdewvevi\",\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}}]},{\"role\":\"tool\",\"content\":\"{\\\"roll\\\":2}\",\"tool_call_id\":\"call_kdewvevi\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"description\":\"Rolls a single six-sided die and returns the result\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Set-Cookie": "<COOKIE>",
+      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
+      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Frame-Options": "DENY",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Content-Length": "456",
+      "Date": "Thu, 17 Sep 2026 22:20:42 GMT",
+      "Server": "Google Frontend",
+      "X-Cloud-Trace-Context": "6fa92dda546d216375e07303b3be2103/12612851940023270616",
+      "Traceparent": "00-6fa92dda546d216375e07303b3be2103-af09da0381aefcd8-00",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000"
+    },
+    "response_body": "{\"id\":\"chatcmpl-897\",\"object\":\"chat.completion\",\"created\":1789683642,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_itrnqtjj\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":260,\"prompt_tokens_details\":{\"cached_tokens\":224},\"completion_tokens\":15,\"total_tokens\":275}}\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://ollama.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"system\",\"content\":\"You must call the dice_roll tool exactly 3 times when asked to roll dice 3 times.\"},{\"role\":\"user\",\"content\":\"Roll the dice 3 times\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_c6rt9rr9\",\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}}],\"reasoning\":\"The user asks to roll the dice 3 times. According to instructions, we must call the dice_roll tool exactly 3 times. Then we should output the results. We'll call the function three times sequentially.\",\"reasoning_content\":\"The user asks to roll the dice 3 times. According to instructions, we must call the dice_roll tool exactly 3 times. Then we should output the results. We'll call the function three times sequentially.\"},{\"role\":\"tool\",\"content\":\"{\\\"roll\\\":1}\",\"tool_call_id\":\"call_c6rt9rr9\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_kdewvevi\",\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}}]},{\"role\":\"tool\",\"content\":\"{\\\"roll\\\":2}\",\"tool_call_id\":\"call_kdewvevi\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_itrnqtjj\",\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"arguments\":\"{}\"}}]},{\"role\":\"tool\",\"content\":\"{\\\"roll\\\":3}\",\"tool_call_id\":\"call_itrnqtjj\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"dice_roll\",\"description\":\"Rolls a single six-sided die and returns the result\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Set-Cookie": "<COOKIE>",
+      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
+      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Frame-Options": "DENY",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Content-Length": "436",
+      "Date": "Thu, 17 Sep 2026 22:20:42 GMT",
+      "Server": "Google Frontend",
+      "X-Cloud-Trace-Context": "d1e6081e81ad19be27b17c8cb66fd7b6/10851625650230817736",
+      "Traceparent": "00-d1e6081e81ad19be27b17c8cb66fd7b6-9698b808d58673c8-00",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000"
+    },
+    "response_body": "{\"id\":\"chatcmpl-164\",\"object\":\"chat.completion\",\"created\":1789683642,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Here are the results of the three dice rolls:\\n\\n1. Roll 1: **1**\\n2. Roll 2: **2**\\n3. Roll 3: **3**\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":292,\"prompt_tokens_details\":{\"cached_tokens\":256},\"completion_tokens\":41,\"total_tokens\":333}}\n"
+  }
+]

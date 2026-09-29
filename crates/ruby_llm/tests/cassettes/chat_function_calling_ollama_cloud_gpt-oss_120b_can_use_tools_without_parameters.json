@@ -1,0 +1,46 @@
+[
+  {
+    "method": "post",
+    "uri": "https://ollama.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"Use the best_language_to_learn tool to tell me which language to learn.\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"description\":\"Gets the best language to learn\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Set-Cookie": "<COOKIE>",
+      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
+      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Frame-Options": "DENY",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Content-Length": "531",
+      "Date": "Thu, 17 Sep 2026 22:20:31 GMT",
+      "Server": "Google Frontend",
+      "Traceparent": "00-441f65fb47c2c4b122187210a92387af-887e6d07aeee5131-00",
+      "X-Cloud-Trace-Context": "441f65fb47c2c4b122187210a92387af/9835418515990794545",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
+    },
+    "response_body": "{\"id\":\"chatcmpl-901\",\"object\":\"chat.completion\",\"created\":1789683631,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning\":\"We need to call the tool best_language_to_learn.\",\"tool_calls\":[{\"id\":\"call_vqx1s4ql\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"arguments\":\"{}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":132,\"prompt_tokens_details\":{\"cached_tokens\":64},\"completion_tokens\":35,\"total_tokens\":167}}\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://ollama.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"Use the best_language_to_learn tool to tell me which language to learn.\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_vqx1s4ql\",\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"arguments\":\"{}\"}}],\"reasoning\":\"We need to call the tool best_language_to_learn.\",\"reasoning_content\":\"We need to call the tool best_language_to_learn.\"},{\"role\":\"tool\",\"content\":\"Ruby\",\"tool_call_id\":\"call_vqx1s4ql\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"description\":\"Gets the best language to learn\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Set-Cookie": "<COOKIE>",
+      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
+      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Frame-Options": "DENY",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Content-Length": "633",
+      "Date": "Thu, 17 Sep 2026 22:20:31 GMT",
+      "Server": "Google Frontend",
+      "X-Cloud-Trace-Context": "176ea7c9de249f7d5806aa1af787e904/963042433108838448",
+      "Traceparent": "00-176ea7c9de249f7d5806aa1af787e904-0d5d69fd91148830-00",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000"
+    },
+    "response_body": "{\"id\":\"chatcmpl-672\",\"object\":\"chat.completion\",\"created\":1789683631,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Based on the current trends and opportunities, **Ruby** is the best language to learn right now. It’s especially strong for web development (thanks to Ruby on Rails), has a supportive community, and offers a gentle learning curve that helps you pick up programming concepts quickly. Happy coding!\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":182,\"prompt_tokens_details\":{\"cached_tokens\":144},\"completion_tokens\":61,\"total_tokens\":243}}\n"
+  }
+]
