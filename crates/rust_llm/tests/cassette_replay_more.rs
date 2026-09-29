@@ -2,7 +2,7 @@
 
 mod support;
 
-use ruby_llm::{Chat, EmbedOptions, Vectors, embed};
+use rust_llm::{Chat, EmbedOptions, Vectors, embed};
 use serde_json::json;
 use support::{Cassette, config_for};
 

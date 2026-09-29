@@ -4,9 +4,9 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use ruby_llm::{Parameter, Role, Tool, ToolCall, ToolError, ToolResult};
-use ruby_llm_loco::entities::{ruby_llm_tool_calls, ruby_llm_usages};
-use ruby_llm_loco::{ChatRecord, migrations};
+use rust_llm::{Parameter, Role, Tool, ToolCall, ToolError, ToolResult};
+use rust_llm_loco::entities::{rust_llm_tool_calls, rust_llm_usages};
+use rust_llm_loco::{ChatRecord, migrations};
 use sea_orm::{Database, DatabaseConnection, EntityTrait};
 use sea_orm_migration::SchemaManager;
 use serde_json::{Map, Value};
@@ -66,7 +66,7 @@ struct Interaction {
 
 /// Serves the recorded Anthropic responses in order.
 async fn anthropic_replay(cassette: &str) -> MockServer {
-    let path = format!("{}/../ruby_llm/tests/cassettes/{cassette}.json", env!("CARGO_MANIFEST_DIR"));
+    let path = format!("{}/../rust_llm/tests/cassettes/{cassette}.json", env!("CARGO_MANIFEST_DIR"));
     let interactions: Vec<Interaction> = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     let server = MockServer::start().await;
     for (i, interaction) in interactions.iter().enumerate() {
@@ -80,8 +80,8 @@ async fn anthropic_replay(cassette: &str) -> MockServer {
     server
 }
 
-fn config(server: &MockServer) -> Arc<ruby_llm::Config> {
-    let mut c = ruby_llm::Config::default();
+fn config(server: &MockServer) -> Arc<rust_llm::Config> {
+    let mut c = rust_llm::Config::default();
     c.set("anthropic_api_base", server.uri());
     c.set("anthropic_api_key", "test");
     c.max_retries = 0;
@@ -103,7 +103,7 @@ async fn persists_a_tool_calling_conversation_and_reloads_it() {
     let roles: Vec<&str> = rows.iter().map(|m| m.role.as_str()).collect();
     assert_eq!(roles, ["user", "assistant", "tool", "assistant"]);
 
-    let calls = ruby_llm_tool_calls::Entity::find().all(&db).await.unwrap();
+    let calls = rust_llm_tool_calls::Entity::find().all(&db).await.unwrap();
     assert_eq!(calls.len(), 1);
     assert_eq!(calls[0].name, "weather");
     assert_eq!(calls[0].message_id, rows[1].id as i64, "tool call belongs to the assistant message");
@@ -111,7 +111,7 @@ async fn persists_a_tool_calling_conversation_and_reloads_it() {
     assert_eq!(calls[0].arguments.as_ref().unwrap()["latitude"], "52.5200");
 
     // Two billed requests, each linked to the assistant message it produced, priced from the registry.
-    let usages = ruby_llm_usages::Entity::find().all(&db).await.unwrap();
+    let usages = rust_llm_usages::Entity::find().all(&db).await.unwrap();
     assert_eq!(usages.len(), 2);
     assert!(usages.iter().all(|u| u.status == "succeeded" && u.provider == "anthropic"));
     assert_eq!(usages[0].message_id, Some(rows[1].id as i64));
@@ -165,7 +165,7 @@ async fn a_chat_parked_on_approval_resumes_from_the_database() {
     let answer = record.complete(&db, &mut resumed).await.unwrap();
     assert_eq!(answer.content(), "Done.");
 
-    let calls = ruby_llm_tool_calls::Entity::find().all(&db).await.unwrap();
+    let calls = rust_llm_tool_calls::Entity::find().all(&db).await.unwrap();
     assert_eq!(calls[0].approval.as_deref(), Some("approved"));
     let roles: Vec<String> = record.messages(&db).await.unwrap().into_iter().map(|m| m.role).collect();
     assert_eq!(roles, ["user", "assistant", "tool", "assistant"]);
@@ -224,7 +224,7 @@ async fn approving_another_chats_tool_call_is_rejected() {
     let attacker = ChatRecord::create(&db, "claude-haiku-4-5", Some("anthropic")).await.unwrap();
     let mut attacker_chat = attacker.to_llm_with(&db, config(&server)).await.unwrap();
     assert!(attacker.approve(&db, &mut attacker_chat, "toolu_other").await.is_err());
-    let calls = ruby_llm_tool_calls::Entity::find().all(&db).await.unwrap();
+    let calls = rust_llm_tool_calls::Entity::find().all(&db).await.unwrap();
     assert_eq!(calls[0].approval, None);
 }
 
@@ -265,9 +265,9 @@ async fn a_failed_tool_round_is_rolled_back_and_the_chat_stays_usable() {
     assert!(err.to_string().contains("This tool is broken"));
     let roles: Vec<String> = record.messages(&db).await.unwrap().into_iter().map(|m| m.role).collect();
     assert_eq!(roles, ["user"], "the dangling tool-call message was destroyed");
-    assert!(ruby_llm_tool_calls::Entity::find().all(&db).await.unwrap().is_empty());
+    assert!(rust_llm_tool_calls::Entity::find().all(&db).await.unwrap().is_empty());
     // The billed attempt survives, unlinked, like RubyLLM's ledger.
-    let usages = ruby_llm_usages::Entity::find().all(&db).await.unwrap();
+    let usages = rust_llm_usages::Entity::find().all(&db).await.unwrap();
     assert_eq!(usages.len(), 1);
     assert_eq!(usages[0].message_id, None);
 

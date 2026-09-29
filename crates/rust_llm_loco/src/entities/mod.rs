@@ -9,7 +9,7 @@ pub mod chats {
     pub struct Model {
         #[sea_orm(primary_key)]
         pub id: i32,
-        pub ruby_llm_model_id: i32,
+        pub rust_llm_model_id: i32,
         pub cancelled: bool,
         pub created_at: DateTimeWithTimeZone,
         pub updated_at: DateTimeWithTimeZone,
@@ -20,11 +20,11 @@ pub mod chats {
         #[sea_orm(has_many = "super::messages::Entity")]
         Messages,
         #[sea_orm(
-            belongs_to = "super::ruby_llm_models::Entity",
-            from = "Column::RubyLlmModelId",
-            to = "super::ruby_llm_models::Column::Id"
+            belongs_to = "super::rust_llm_models::Entity",
+            from = "Column::RustLlmModelId",
+            to = "super::rust_llm_models::Column::Id"
         )]
-        RubyLlmModel,
+        RustLlmModel,
     }
 
     impl Related<super::messages::Entity> for Entity {
@@ -33,9 +33,9 @@ pub mod chats {
         }
     }
 
-    impl Related<super::ruby_llm_models::Entity> for Entity {
+    impl Related<super::rust_llm_models::Entity> for Entity {
         fn to() -> RelationDef {
-            Relation::RubyLlmModel.def()
+            Relation::RustLlmModel.def()
         }
     }
 
@@ -80,11 +80,11 @@ pub mod messages {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-pub mod ruby_llm_models {
+pub mod rust_llm_models {
     use sea_orm::entity::prelude::*;
 
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-    #[sea_orm(table_name = "ruby_llm_models")]
+    #[sea_orm(table_name = "rust_llm_models")]
     pub struct Model {
         #[sea_orm(primary_key)]
         pub id: i32,
@@ -111,11 +111,11 @@ pub mod ruby_llm_models {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-pub mod ruby_llm_tool_calls {
+pub mod rust_llm_tool_calls {
     use sea_orm::entity::prelude::*;
 
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-    #[sea_orm(table_name = "ruby_llm_tool_calls")]
+    #[sea_orm(table_name = "rust_llm_tool_calls")]
     pub struct Model {
         #[sea_orm(primary_key)]
         pub id: i32,
@@ -141,11 +141,11 @@ pub mod ruby_llm_tool_calls {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-pub mod ruby_llm_usages {
+pub mod rust_llm_usages {
     use sea_orm::entity::prelude::*;
 
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-    #[sea_orm(table_name = "ruby_llm_usages")]
+    #[sea_orm(table_name = "rust_llm_usages")]
     pub struct Model {
         #[sea_orm(primary_key)]
         pub id: i32,

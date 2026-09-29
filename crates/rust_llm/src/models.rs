@@ -116,7 +116,7 @@ fn not_found(model_id: &str, provider: Option<&str>) -> Error {
         message = format!("{message} for provider: {p:?}");
     }
     Error::ModelNotFound(format!(
-        "{message}. If the model exists at the provider, refresh the registry with `ruby_llm::models::refresh`."
+        "{message}. If the model exists at the provider, refresh the registry with `rust_llm::models::refresh`."
     ))
 }
 

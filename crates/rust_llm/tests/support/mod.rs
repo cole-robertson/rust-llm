@@ -119,7 +119,7 @@ impl Cassette {
     }
 
     /// Points every provider this test might use at the replay server.
-    pub fn configure(&self, config: &mut ruby_llm::Config, provider: &str) {
+    pub fn configure(&self, config: &mut rust_llm::Config, provider: &str) {
         let base = self.server.uri();
         let base = match provider {
             "openai" | "mistral" | "xai" | "ollama_cloud" => format!("{base}/v1"),
@@ -142,8 +142,8 @@ impl Cassette {
     }
 }
 
-pub fn config_for(cassette: &Cassette, provider: &str) -> Arc<ruby_llm::Config> {
-    let mut config = ruby_llm::Config::default();
+pub fn config_for(cassette: &Cassette, provider: &str) -> Arc<rust_llm::Config> {
+    let mut config = rust_llm::Config::default();
     cassette.configure(&mut config, provider);
     Arc::new(config)
 }

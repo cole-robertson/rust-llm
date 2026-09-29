@@ -6,7 +6,7 @@
 //! ```
 //!
 //! ```ignore
-//! let mut chat = ruby_llm::chat().with_model("claude-haiku-4-5")?.with_tool(Weather);
+//! let mut chat = rust_llm::chat().with_model("claude-haiku-4-5")?.with_tool(Weather);
 //! chat.ask("What's the weather in Berlin?").await?;
 //! ```
 

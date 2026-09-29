@@ -63,7 +63,7 @@ impl Config {
                     config.values.insert(option.to_string(), value);
                 }
         }
-        if let Ok(model) = std::env::var("RUBY_LLM_DEFAULT_MODEL") {
+        if let Ok(model) = std::env::var("RUST_LLM_DEFAULT_MODEL") {
             config.default_model = model;
         }
         config

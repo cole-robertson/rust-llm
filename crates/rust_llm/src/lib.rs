@@ -1,6 +1,6 @@
-//! # ruby_llm
+//! # rust_llm
 //!
-//! A 1:1 Rust port of [RubyLLM](https://rubyllm.com) 2.0: one API for chat, tools, agents,
+//! A 1:1 Rust port of [RubyLLM](https://github.com/cole-robertson/rust_llm) 2.0: one API for chat, tools, agents,
 //! structured output, streaming, and embeddings across providers.
 //!
 //! ```ruby
@@ -8,8 +8,8 @@
 //! ```
 //!
 //! ```no_run
-//! # async fn run() -> ruby_llm::Result<()> {
-//! ruby_llm::chat()?.ask("What's the best way to learn Rust?").await?;
+//! # async fn run() -> rust_llm::Result<()> {
+//! rust_llm::chat()?.ask("What's the best way to learn Rust?").await?;
 //! # Ok(()) }
 //! ```
 //!

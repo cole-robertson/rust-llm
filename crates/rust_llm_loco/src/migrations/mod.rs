@@ -1,24 +1,24 @@
-//! Port of `rails generate ruby_llm:install`'s migrations: the same tables and columns, as
-//! SeaORM migrations. Add `ruby_llm_loco::migrations()` to your app's `Migrator`.
+//! Port of `rails generate rust_llm:install`'s migrations: the same tables and columns, as
+//! SeaORM migrations. Add `rust_llm_loco::migrations()` to your app's `Migrator`.
 
 use sea_orm_migration::prelude::*;
 use sea_orm_migration::schema::*;
 
 /// All RubyLLM migrations, in order.
 pub fn all() -> Vec<Box<dyn MigrationTrait>> {
-    vec![Box::new(CreateRubyLlmRecords), Box::new(CreateChats), Box::new(CreateMessages)]
+    vec![Box::new(CreateRustLlmRecords), Box::new(CreateChats), Box::new(CreateMessages)]
 }
 
-/// `create_ruby_llm_records_migration.rb.tt`: models, tool calls, usages.
+/// `create_rust_llm_records_migration.rb.tt`: models, tool calls, usages.
 #[derive(DeriveMigrationName)]
-pub struct CreateRubyLlmRecords;
+pub struct CreateRustLlmRecords;
 
 #[async_trait::async_trait]
-impl MigrationTrait for CreateRubyLlmRecords {
+impl MigrationTrait for CreateRustLlmRecords {
     async fn up(&self, m: &SchemaManager) -> Result<(), DbErr> {
         m.create_table(
             Table::create()
-                .table("ruby_llm_models")
+                .table("rust_llm_models")
                 .if_not_exists()
                 .col(pk_auto("id"))
                 .col(string("model_id"))
@@ -40,15 +40,15 @@ impl MigrationTrait for CreateRubyLlmRecords {
         )
         .await?;
         m.create_index(
-            Index::create().name("idx-ruby_llm_models-provider-model_id").table("ruby_llm_models").col("provider").col("model_id").unique().to_owned(),
+            Index::create().name("idx-rust_llm_models-provider-model_id").table("rust_llm_models").col("provider").col("model_id").unique().to_owned(),
         )
         .await?;
-        m.create_index(Index::create().name("idx-ruby_llm_models-family").table("ruby_llm_models").col("family").to_owned()).await?;
+        m.create_index(Index::create().name("idx-rust_llm_models-family").table("rust_llm_models").col("family").to_owned()).await?;
 
         // Polymorphic message/result references, like the Rails table.
         m.create_table(
             Table::create()
-                .table("ruby_llm_tool_calls")
+                .table("rust_llm_tool_calls")
                 .if_not_exists()
                 .col(pk_auto("id"))
                 .col(string("message_type"))
@@ -67,14 +67,14 @@ impl MigrationTrait for CreateRubyLlmRecords {
                 .to_owned(),
         )
         .await?;
-        m.create_index(Index::create().name("idx-ruby_llm_tool_calls-message").table("ruby_llm_tool_calls").col("message_type").col("message_id").to_owned()).await?;
-        m.create_index(Index::create().name("idx-ruby_llm_tool_calls-result").table("ruby_llm_tool_calls").col("result_type").col("result_id").to_owned()).await?;
-        m.create_index(Index::create().name("idx-ruby_llm_tool_calls-tool_call_id").table("ruby_llm_tool_calls").col("tool_call_id").unique().to_owned()).await?;
-        m.create_index(Index::create().name("idx-ruby_llm_tool_calls-name").table("ruby_llm_tool_calls").col("name").to_owned()).await?;
+        m.create_index(Index::create().name("idx-rust_llm_tool_calls-message").table("rust_llm_tool_calls").col("message_type").col("message_id").to_owned()).await?;
+        m.create_index(Index::create().name("idx-rust_llm_tool_calls-result").table("rust_llm_tool_calls").col("result_type").col("result_id").to_owned()).await?;
+        m.create_index(Index::create().name("idx-rust_llm_tool_calls-tool_call_id").table("rust_llm_tool_calls").col("tool_call_id").unique().to_owned()).await?;
+        m.create_index(Index::create().name("idx-rust_llm_tool_calls-name").table("rust_llm_tool_calls").col("name").to_owned()).await?;
 
         m.create_table(
             Table::create()
-                .table("ruby_llm_usages")
+                .table("rust_llm_usages")
                 .if_not_exists()
                 .col(pk_auto("id"))
                 .col(string("chat_type"))
@@ -105,14 +105,14 @@ impl MigrationTrait for CreateRubyLlmRecords {
                 .to_owned(),
         )
         .await?;
-        m.create_index(Index::create().name("idx-ruby_llm_usages-chat").table("ruby_llm_usages").col("chat_type").col("chat_id").to_owned()).await?;
-        m.create_index(Index::create().name("idx-ruby_llm_usages-message").table("ruby_llm_usages").col("message_type").col("message_id").to_owned()).await?;
-        m.create_index(Index::create().name("idx-ruby_llm_usages-status").table("ruby_llm_usages").col("status").to_owned()).await?;
+        m.create_index(Index::create().name("idx-rust_llm_usages-chat").table("rust_llm_usages").col("chat_type").col("chat_id").to_owned()).await?;
+        m.create_index(Index::create().name("idx-rust_llm_usages-message").table("rust_llm_usages").col("message_type").col("message_id").to_owned()).await?;
+        m.create_index(Index::create().name("idx-rust_llm_usages-status").table("rust_llm_usages").col("status").to_owned()).await?;
         Ok(())
     }
 
     async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
-        for t in ["ruby_llm_usages", "ruby_llm_tool_calls", "ruby_llm_models"] {
+        for t in ["rust_llm_usages", "rust_llm_tool_calls", "rust_llm_models"] {
             m.drop_table(Table::drop().table(t).if_exists().to_owned()).await?;
         }
         Ok(())
@@ -131,20 +131,20 @@ impl MigrationTrait for CreateChats {
                 .table("chats")
                 .if_not_exists()
                 .col(pk_auto("id"))
-                .col(integer("ruby_llm_model_id"))
+                .col(integer("rust_llm_model_id"))
                 .col(boolean("cancelled").default(false))
                 .col(timestamp_with_time_zone("created_at").default(Expr::current_timestamp()))
                 .col(timestamp_with_time_zone("updated_at").default(Expr::current_timestamp()))
                 .foreign_key(
                     ForeignKey::create()
-                        .name("fk-chats-ruby_llm_model_id")
-                        .from("chats", "ruby_llm_model_id")
-                        .to("ruby_llm_models", "id"),
+                        .name("fk-chats-rust_llm_model_id")
+                        .from("chats", "rust_llm_model_id")
+                        .to("rust_llm_models", "id"),
                 )
                 .to_owned(),
         )
         .await?;
-        m.create_index(Index::create().name("idx-chats-ruby_llm_model_id").table("chats").col("ruby_llm_model_id").to_owned()).await
+        m.create_index(Index::create().name("idx-chats-rust_llm_model_id").table("chats").col("rust_llm_model_id").to_owned()).await
     }
 
     async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {

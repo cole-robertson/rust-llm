@@ -1,12 +1,12 @@
 [package]
-name = "ruby_llm_loco"
+name = "rust_llm_loco"
 description = "RubyLLM's acts_as_chat for Loco: persist chats, messages, tool calls, and usage with SeaORM."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
-ruby_llm = { path = "../ruby_llm" }
+rust_llm = { path = "../rust_llm" }
 async-trait.workspace = true
 chrono.workspace = true
 sea-orm.workspace = true

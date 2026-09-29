@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
-use ruby_llm::{Chat, Parameter, Role, Tool, ToolCall, ToolError, ToolResult};
+use rust_llm::{Chat, Parameter, Role, Tool, ToolCall, ToolError, ToolResult};
 use serde_json::{Map, Value, json};
 use support::{CHAT_MODELS, Cassette, cassette_name, config_for};
 
@@ -62,7 +62,7 @@ impl Tool for DiceRoll {
     }
 }
 
-fn total_input(m: &ruby_llm::Message) -> i64 {
+fn total_input(m: &rust_llm::Message) -> i64 {
     let t = m.tokens();
     t.input.unwrap_or(0) + t.cache_read.unwrap_or(0) + t.cache_write.unwrap_or(0)
 }

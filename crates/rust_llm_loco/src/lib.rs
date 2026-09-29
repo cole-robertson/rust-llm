@@ -1,7 +1,7 @@
-//! # ruby_llm_loco
+//! # rust_llm_loco
 //!
 //! RubyLLM's Rails integration (`acts_as_chat`, `acts_as_message`, `acts_as_tool_call`, the
-//! `ruby_llm_models`/`ruby_llm_usages` ledgers) for Loco's default ORM, SeaORM.
+//! `rust_llm_models`/`rust_llm_usages` ledgers) for Loco's default ORM, SeaORM.
 //!
 //! ```ruby
 //! class Chat < ApplicationRecord
@@ -26,15 +26,15 @@ pub mod migrations;
 
 use std::sync::{Arc, Mutex};
 
-use ruby_llm::message::indexmap_lite::IndexMap;
-use ruby_llm::{Chat, Citation, FinishReason, Message, Role, Thinking, ToolCall, UsageEntry, UsageStatus};
+use rust_llm::message::indexmap_lite::IndexMap;
+use rust_llm::{Chat, Citation, FinishReason, Message, Role, Thinking, ToolCall, UsageEntry, UsageStatus};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
     TransactionTrait,
 };
 use serde_json::Value;
 
-use entities::{chats, messages, ruby_llm_models, ruby_llm_tool_calls, ruby_llm_usages};
+use entities::{chats, messages, rust_llm_models, rust_llm_tool_calls, rust_llm_usages};
 
 /// The polymorphic type names written into `message_type`/`chat_type`, like Rails' class names.
 pub const CHAT_TYPE: &str = "Chat";
@@ -45,7 +45,7 @@ pub enum Error {
     #[error(transparent)]
     Db(#[from] sea_orm::DbErr),
     #[error(transparent)]
-    Llm(#[from] ruby_llm::Error),
+    Llm(#[from] rust_llm::Error),
     #[error("{0}")]
     NotFound(String),
 }
@@ -62,16 +62,16 @@ fn now() -> sea_orm::prelude::DateTimeWithTimeZone {
 }
 
 /// `RubyLLM::ActiveRecord::Model.find_or_create_by!(provider:, model_id:)` from the registry.
-pub async fn find_or_create_model(db: &impl ConnectionTrait, model: &ruby_llm::Model) -> Result<ruby_llm_models::Model> {
-    if let Some(existing) = ruby_llm_models::Entity::find()
-        .filter(ruby_llm_models::Column::Provider.eq(&model.provider))
-        .filter(ruby_llm_models::Column::ModelId.eq(&model.id))
+pub async fn find_or_create_model(db: &impl ConnectionTrait, model: &rust_llm::Model) -> Result<rust_llm_models::Model> {
+    if let Some(existing) = rust_llm_models::Entity::find()
+        .filter(rust_llm_models::Column::Provider.eq(&model.provider))
+        .filter(rust_llm_models::Column::ModelId.eq(&model.id))
         .one(db)
         .await?
     {
         return Ok(existing);
     }
-    let record = ruby_llm_models::ActiveModel {
+    let record = rust_llm_models::ActiveModel {
         model_id: Set(model.id.clone()),
         name: Set(model.name.clone()),
         provider: Set(model.provider.clone()),
@@ -98,15 +98,15 @@ pub struct ChatRecord {
 impl ChatRecord {
     /// `Chat.create!(model:, provider:)`.
     pub async fn create(db: &DatabaseConnection, model: &str, provider: Option<&str>) -> Result<ChatRecord> {
-        let assume = provider.and_then(ruby_llm::Provider::resolve).is_some_and(|p| p.assume_models_exist());
+        let assume = provider.and_then(rust_llm::Provider::resolve).is_some_and(|p| p.assume_models_exist());
         let info = if assume {
-            ruby_llm::models().find(model, provider).unwrap_or_else(|_| ruby_llm::Model::default_for(model, provider.unwrap()))
+            rust_llm::models().find(model, provider).unwrap_or_else(|_| rust_llm::Model::default_for(model, provider.unwrap()))
         } else {
-            ruby_llm::models().find(model, provider)?
+            rust_llm::models().find(model, provider)?
         };
         let model_row = find_or_create_model(db, &info).await?;
         let record = chats::ActiveModel {
-            ruby_llm_model_id: Set(model_row.id),
+            rust_llm_model_id: Set(model_row.id),
             cancelled: Set(false),
             created_at: Set(now()),
             updated_at: Set(now()),
@@ -127,11 +127,11 @@ impl ChatRecord {
     }
 
     /// The chat's model row (`chat.model`).
-    pub async fn model(&self, db: &impl ConnectionTrait) -> Result<ruby_llm_models::Model> {
-        ruby_llm_models::Entity::find_by_id(self.record.ruby_llm_model_id)
+    pub async fn model(&self, db: &impl ConnectionTrait) -> Result<rust_llm_models::Model> {
+        rust_llm_models::Entity::find_by_id(self.record.rust_llm_model_id)
             .one(db)
             .await?
-            .ok_or_else(|| Error::NotFound("ruby_llm_model".into()))
+            .ok_or_else(|| Error::NotFound("rust_llm_model".into()))
     }
 
     /// `chat.messages`, oldest first.
@@ -143,33 +143,33 @@ impl ChatRecord {
             .await?)
     }
 
-    /// `chat.ruby_llm_usages`.
-    pub async fn usages(&self, db: &impl ConnectionTrait) -> Result<Vec<ruby_llm_usages::Model>> {
-        Ok(ruby_llm_usages::Entity::find()
-            .filter(ruby_llm_usages::Column::ChatType.eq(CHAT_TYPE))
-            .filter(ruby_llm_usages::Column::ChatId.eq(self.record.id as i64))
-            .order_by_asc(ruby_llm_usages::Column::Id)
+    /// `chat.rust_llm_usages`.
+    pub async fn usages(&self, db: &impl ConnectionTrait) -> Result<Vec<rust_llm_usages::Model>> {
+        Ok(rust_llm_usages::Entity::find()
+            .filter(rust_llm_usages::Column::ChatType.eq(CHAT_TYPE))
+            .filter(rust_llm_usages::Column::ChatId.eq(self.record.id as i64))
+            .order_by_asc(rust_llm_usages::Column::Id)
             .all(db)
             .await?)
     }
 
-    /// `chat.to_llm`: an in-memory `ruby_llm::Chat` rebuilt from rows, including approval decisions.
+    /// `chat.to_llm`: an in-memory `rust_llm::Chat` rebuilt from rows, including approval decisions.
     pub async fn to_llm(&self, db: &DatabaseConnection) -> Result<Chat> {
-        self.to_llm_with(db, ruby_llm::config()).await
+        self.to_llm_with(db, rust_llm::config()).await
     }
 
     /// `to_llm` with an explicit configuration (RubyLLM's `context:`).
-    pub async fn to_llm_with(&self, db: &DatabaseConnection, config: Arc<ruby_llm::Config>) -> Result<Chat> {
+    pub async fn to_llm_with(&self, db: &DatabaseConnection, config: Arc<rust_llm::Config>) -> Result<Chat> {
         let model = self.model(db).await?;
-        let provider = ruby_llm::Provider::resolve(&model.provider);
+        let provider = rust_llm::Provider::resolve(&model.provider);
         let assume = provider.is_some_and(|p| p.assume_models_exist());
         let mut chat = Chat::with_config(config, Some(&model.model_id), Some(&model.provider), assume)?;
         let rows = self.messages(db).await?;
         let ids: Vec<i64> = rows.iter().map(|m| m.id as i64).collect();
-        let calls = ruby_llm_tool_calls::Entity::find()
-            .filter(ruby_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
-            .filter(ruby_llm_tool_calls::Column::MessageId.is_in(ids))
-            .order_by_asc(ruby_llm_tool_calls::Column::Id)
+        let calls = rust_llm_tool_calls::Entity::find()
+            .filter(rust_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
+            .filter(rust_llm_tool_calls::Column::MessageId.is_in(ids))
+            .order_by_asc(rust_llm_tool_calls::Column::Id)
             .all(db)
             .await?;
         let usages = self.usages(db).await?;
@@ -177,7 +177,7 @@ impl ChatRecord {
         let mut decisions = Vec::new();
         let mut restored = Vec::new();
         for row in &rows {
-            let own_calls: Vec<&ruby_llm_tool_calls::Model> = calls.iter().filter(|c| c.message_id == row.id as i64).collect();
+            let own_calls: Vec<&rust_llm_tool_calls::Model> = calls.iter().filter(|c| c.message_id == row.id as i64).collect();
             let parent = calls.iter().find(|c| c.result_id == Some(row.id as i64) && c.result_type.as_deref() == Some(MESSAGE_TYPE));
             let mut m = Message::new(Role::parse(&row.role)?, row.content.clone());
             m.cache_until_here = row.cache_until_here;
@@ -311,7 +311,7 @@ impl ChatRecord {
         let row = insert_message(&txn, self.record.id, m).await?;
         if let Some(calls) = &m.tool_calls {
             for call in calls.values() {
-                ruby_llm_tool_calls::ActiveModel {
+                rust_llm_tool_calls::ActiveModel {
                     message_type: Set(MESSAGE_TYPE.into()),
                     message_id: Set(row.id as i64),
                     tool_call_id: Set(call.id.clone()),
@@ -330,7 +330,7 @@ impl ChatRecord {
         if let Some(id) = &m.tool_call_id
             && let Some(call) = self.find_tool_call(&txn, id).await?
         {
-            let mut call: ruby_llm_tool_calls::ActiveModel = call.into();
+            let mut call: rust_llm_tool_calls::ActiveModel = call.into();
             call.result_type = Set(Some(MESSAGE_TYPE.into()));
             call.result_id = Set(Some(row.id as i64));
             call.updated_at = Set(now());
@@ -345,12 +345,12 @@ impl ChatRecord {
     }
 
     /// `find_tool_call`: only this chat's tool calls, never another chat's with the same id.
-    async fn find_tool_call(&self, db: &impl ConnectionTrait, tool_call_id: &str) -> Result<Option<ruby_llm_tool_calls::Model>> {
+    async fn find_tool_call(&self, db: &impl ConnectionTrait, tool_call_id: &str) -> Result<Option<rust_llm_tool_calls::Model>> {
         let ids: Vec<i64> = self.messages(db).await?.iter().map(|m| m.id as i64).collect();
-        Ok(ruby_llm_tool_calls::Entity::find()
-            .filter(ruby_llm_tool_calls::Column::ToolCallId.eq(tool_call_id))
-            .filter(ruby_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
-            .filter(ruby_llm_tool_calls::Column::MessageId.is_in(ids))
+        Ok(rust_llm_tool_calls::Entity::find()
+            .filter(rust_llm_tool_calls::Column::ToolCallId.eq(tool_call_id))
+            .filter(rust_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
+            .filter(rust_llm_tool_calls::Column::MessageId.is_in(ids))
             .one(db)
             .await?)
     }
@@ -361,18 +361,18 @@ impl ChatRecord {
         let rows = self.messages(db).await?;
         let Some(last) = rows.last() else { return Ok(()) };
         let own_calls = |message_id: i32| {
-            ruby_llm_tool_calls::Entity::find()
-                .filter(ruby_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
-                .filter(ruby_llm_tool_calls::Column::MessageId.eq(message_id as i64))
+            rust_llm_tool_calls::Entity::find()
+                .filter(rust_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
+                .filter(rust_llm_tool_calls::Column::MessageId.eq(message_id as i64))
                 .all(db)
         };
         let mut doomed: Vec<i32> = Vec::new();
         let calls = own_calls(last.id).await?;
         if !calls.is_empty() {
             doomed.push(last.id);
-        } else if let Some(parent) = ruby_llm_tool_calls::Entity::find()
-            .filter(ruby_llm_tool_calls::Column::ResultType.eq(MESSAGE_TYPE))
-            .filter(ruby_llm_tool_calls::Column::ResultId.eq(last.id as i64))
+        } else if let Some(parent) = rust_llm_tool_calls::Entity::find()
+            .filter(rust_llm_tool_calls::Column::ResultType.eq(MESSAGE_TYPE))
+            .filter(rust_llm_tool_calls::Column::ResultId.eq(last.id as i64))
             .one(db)
             .await?
         {
@@ -387,16 +387,16 @@ impl ChatRecord {
         }
         let txn = db.begin().await?;
         for id in &doomed {
-            tracing::warn!("RubyLLM: API call failed, destroying message: {id}");
-            ruby_llm_tool_calls::Entity::delete_many()
-                .filter(ruby_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
-                .filter(ruby_llm_tool_calls::Column::MessageId.eq(*id as i64))
+            tracing::warn!("RustLLM: API call failed, destroying message: {id}");
+            rust_llm_tool_calls::Entity::delete_many()
+                .filter(rust_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
+                .filter(rust_llm_tool_calls::Column::MessageId.eq(*id as i64))
                 .exec(&txn)
                 .await?;
-            ruby_llm_usages::Entity::update_many()
-                .col_expr(ruby_llm_usages::Column::MessageId, sea_orm::sea_query::Expr::value(Option::<i64>::None))
-                .col_expr(ruby_llm_usages::Column::MessageType, sea_orm::sea_query::Expr::value(Option::<String>::None))
-                .filter(ruby_llm_usages::Column::MessageId.eq(*id as i64))
+            rust_llm_usages::Entity::update_many()
+                .col_expr(rust_llm_usages::Column::MessageId, sea_orm::sea_query::Expr::value(Option::<i64>::None))
+                .col_expr(rust_llm_usages::Column::MessageType, sea_orm::sea_query::Expr::value(Option::<String>::None))
+                .filter(rust_llm_usages::Column::MessageId.eq(*id as i64))
                 .exec(&txn)
                 .await?;
             messages::Entity::delete_by_id(*id).exec(&txn).await?;
@@ -425,7 +425,7 @@ impl ChatRecord {
             .find_tool_call(db, tool_call_id)
             .await?
             .ok_or_else(|| Error::NotFound(format!("Unknown tool call: {tool_call_id:?}")))?;
-        let mut call: ruby_llm_tool_calls::ActiveModel = call.into();
+        let mut call: rust_llm_tool_calls::ActiveModel = call.into();
         call.approval = Set(Some(decision.into()));
         call.updated_at = Set(now());
         call.update(db).await?;
@@ -433,16 +433,16 @@ impl ChatRecord {
     }
 
     /// `chat.tokens` from the persisted ledger.
-    pub async fn tokens(&self, db: &DatabaseConnection) -> Result<ruby_llm::Tokens> {
+    pub async fn tokens(&self, db: &DatabaseConnection) -> Result<rust_llm::Tokens> {
         let entries: Vec<UsageEntry> = self.usages(db).await?.iter().map(usage_entry).collect();
-        Ok(ruby_llm::Tokens::aggregate(entries.iter().map(|e| &e.tokens)))
+        Ok(rust_llm::Tokens::aggregate(entries.iter().map(|e| &e.tokens)))
     }
 
     /// `chat.cost` from the persisted ledger, using the costs as recorded (never re-priced).
-    pub async fn cost(&self, db: &DatabaseConnection) -> Result<ruby_llm::Cost> {
+    pub async fn cost(&self, db: &DatabaseConnection) -> Result<rust_llm::Cost> {
         let entries: Vec<UsageEntry> = self.usages(db).await?.iter().map(usage_entry).collect();
         let complete = entries.iter().all(UsageEntry::cost_available);
-        Ok(ruby_llm::Cost::aggregate(entries.iter().map(|e| &e.cost), complete))
+        Ok(rust_llm::Cost::aggregate(entries.iter().map(|e| &e.cost), complete))
     }
 
     /// `chat.cost.total`: `None` when any attempt could not be priced, like the in-memory chat.
@@ -475,7 +475,7 @@ async fn insert_message(db: &impl ConnectionTrait, chat_id: i32, m: &Message) ->
 
 async fn insert_usage(db: &impl ConnectionTrait, chat_id: i32, message_id: Option<i32>, e: &UsageEntry) -> Result<()> {
     let i = |v: Option<i64>| v.map(|v| v as i32);
-    ruby_llm_usages::ActiveModel {
+    rust_llm_usages::ActiveModel {
         chat_type: Set(CHAT_TYPE.into()),
         chat_id: Set(chat_id as i64),
         message_type: Set(message_id.map(|_| MESSAGE_TYPE.to_string())),
@@ -504,16 +504,16 @@ async fn insert_usage(db: &impl ConnectionTrait, chat_id: i32, message_id: Optio
     Ok(())
 }
 
-/// `ruby_llm_usages` row -> `Accounting::Usage::Entry` (`Usage#to_entry`). The cost comes from
+/// `rust_llm_usages` row -> `Accounting::Usage::Entry` (`Usage#to_entry`). The cost comes from
 /// the stored columns (`Cost.from_h`), so provider-reported costs survive a reload.
-fn usage_entry(u: &ruby_llm_usages::Model) -> UsageEntry {
+fn usage_entry(u: &rust_llm_usages::Model) -> UsageEntry {
     let status = match u.status.as_str() {
         "succeeded" => UsageStatus::Succeeded,
         "failed" => UsageStatus::Failed,
         "cancelled" => UsageStatus::Cancelled,
         _ => UsageStatus::Pending,
     };
-    let tokens = ruby_llm::Tokens {
+    let tokens = rust_llm::Tokens {
         input: u.input_tokens.map(i64::from),
         output: u.output_tokens.map(i64::from),
         cache_read: u.cache_read_tokens.map(i64::from),
@@ -521,14 +521,14 @@ fn usage_entry(u: &ruby_llm_usages::Model) -> UsageEntry {
         thinking: u.thinking_tokens.map(i64::from),
         ..Default::default()
     };
-    let cost = ruby_llm::Cost::from_recorded(
+    let cost = rust_llm::Cost::from_recorded(
         [u.input_cost, u.output_cost, u.cache_read_cost, u.cache_write_cost, u.thinking_cost],
         u.total_cost,
         &tokens,
     );
     UsageEntry {
         id: UsageEntry::next_id(),
-        operation: ruby_llm::message::Operation::Chat,
+        operation: rust_llm::message::Operation::Chat,
         provider: u.provider.clone(),
         model: u.model.clone(),
         status,

@@ -1,12 +1,12 @@
 //! The RubyLLM README, in Rust, against a live provider.
 //!
-//!   ANTHROPIC_API_KEY=... cargo run -p ruby_llm --example readme
+//!   ANTHROPIC_API_KEY=... cargo run -p rust_llm --example readme
 //!   (ANTHROPIC_API_BASE points it at a proxy.)
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use ruby_llm::{Agent, Parameter, SharedTool, Tool, ToolCall, ToolError, ToolResult};
+use rust_llm::{Agent, Parameter, SharedTool, Tool, ToolCall, ToolError, ToolResult};
 use serde_json::{Map, Value, json};
 
 /// ```ruby
@@ -64,13 +64,13 @@ struct Product {
 
 /// `RubyLLM.chat(model: "claude-haiku-4-5", provider: :anthropic)`: with a provider the alias
 /// resolves to Anthropic's dated id, which the local proxy requires.
-fn new_chat() -> ruby_llm::Result<ruby_llm::Chat> {
-    ruby_llm::Chat::new(Some("claude-haiku-4-5"), Some("anthropic"))
+fn new_chat() -> rust_llm::Result<rust_llm::Chat> {
+    rust_llm::Chat::new(Some("claude-haiku-4-5"), Some("anthropic"))
 }
 
 #[tokio::main]
-async fn main() -> ruby_llm::Result<()> {
-    ruby_llm::configure(|c| {
+async fn main() -> rust_llm::Result<()> {
+    rust_llm::configure(|c| {
         c.default_model = "claude-haiku-4-5".into();
         if let Ok(base) = std::env::var("ANTHROPIC_BASE_URL") {
             c.set("anthropic_api_base", base);

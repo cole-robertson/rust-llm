@@ -1,5 +1,5 @@
 [package]
-name = "ruby_llm"
+name = "rust_llm"
 description = "A 1:1 Rust port of RubyLLM 2.0: one API for chat, tools, agents, and embeddings across providers."
 version.workspace = true
 edition.workspace = true

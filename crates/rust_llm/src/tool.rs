@@ -330,7 +330,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tool_names_follow_ruby_llm_underscoring() {
+    fn tool_names_follow_rust_llm_underscoring() {
         assert_eq!(tool_name_from_type("app::tools::WeatherLookup"), "weather_lookup");
         assert_eq!(tool_name_from_type("HTTPProxyTool"), "http_proxy");
         assert_eq!(tool_name_from_type("BestLanguageToLearn"), "best_language_to_learn");

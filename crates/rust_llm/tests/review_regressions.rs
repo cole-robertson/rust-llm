@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use ruby_llm::{Chat, UsageStatus};
+use rust_llm::{Chat, UsageStatus};
 use serde_json::json;
 use wiremock::{Mock, MockServer, ResponseTemplate, matchers};
 
@@ -15,8 +15,8 @@ fn anthropic_ok() -> serde_json::Value {
     })
 }
 
-fn config(server: &MockServer, provider: &str, retries: u32) -> Arc<ruby_llm::Config> {
-    let mut c = ruby_llm::Config::default();
+fn config(server: &MockServer, provider: &str, retries: u32) -> Arc<rust_llm::Config> {
+    let mut c = rust_llm::Config::default();
     let base = if provider == "openai" { format!("{}/v1", server.uri()) } else { server.uri() };
     c.set(format!("{provider}_api_base"), base);
     c.set(format!("{provider}_api_key"), "k");
@@ -35,7 +35,7 @@ async fn a_retry_after_beyond_the_max_interval_is_not_retried() {
         .await;
     let mut chat = Chat::with_config(config(&server, "anthropic", 3), Some("claude-haiku-4-5"), Some("anthropic"), false).unwrap();
     let err = chat.ask("hi").await.unwrap_err();
-    assert_eq!(err.kind(), ruby_llm::ErrorKind::RateLimit);
+    assert_eq!(err.kind(), rust_llm::ErrorKind::RateLimit);
     assert_eq!(server.received_requests().await.unwrap().len(), 1, "no pointless retries");
 }
 
@@ -98,7 +98,7 @@ async fn an_error_after_a_delivered_chunk_is_not_retried() {
     let mut chat = Chat::with_config(config(&server, "anthropic", 3), Some("claude-haiku-4-5"), Some("anthropic"), false).unwrap();
     let mut chunks = 0;
     let err = chat.ask_stream("hi", |_| chunks += 1).await.unwrap_err();
-    assert_eq!(err.kind(), ruby_llm::ErrorKind::Overloaded);
+    assert_eq!(err.kind(), rust_llm::ErrorKind::Overloaded);
     assert_eq!(server.received_requests().await.unwrap().len(), 1);
     // Tracker#observe: tokens reported before the failure are billed, not dropped.
     let failed = chat.usage_entries().last().unwrap();
@@ -119,7 +119,7 @@ async fn streamed_tool_calls_with_empty_ids_and_stray_fragments() {
     ];
     let body: String = events.iter().map(|e| format!("data: {e}\n\n")).collect::<String>() + "data: [DONE]\n\n";
     Mock::given(matchers::method("POST")).respond_with(ResponseTemplate::new(200).set_body_raw(body, "text/event-stream")).mount(&server).await;
-    let mut c = ruby_llm::Config::default();
+    let mut c = rust_llm::Config::default();
     c.set("ollama_api_base", format!("{}/v1", server.uri()));
     c.max_retries = 0;
     let mut chat = Chat::with_config(Arc::new(c), Some("qwen3"), Some("ollama"), true).unwrap();

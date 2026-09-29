@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/ruby_llm", "crates/ruby_llm_loco"]
+members = ["crates/rust_llm", "crates/rust_llm_loco"]
 
 [workspace.package]
 version = "2.0.0"

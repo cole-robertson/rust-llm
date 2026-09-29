@@ -373,7 +373,7 @@ pub struct Message {
     pub cache_until_here: bool,
     pub usage_entries: Vec<UsageEntry>,
     /// Primary key of the row this message is stored as, set by a persistence layer
-    /// (`ruby_llm_loco`). `None` means not yet persisted.
+    /// (`rust_llm_loco`). `None` means not yet persisted.
     pub record_id: Option<i64>,
     pub(crate) model_info: Option<Model>,
 }

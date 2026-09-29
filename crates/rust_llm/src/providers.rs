@@ -161,7 +161,7 @@ impl Provider {
             .map(|r| format!("    config.set(\"{r}\", std::env::var(\"{}\")?);", r.to_uppercase()))
             .collect();
         Err(Error::Configuration(format!(
-            "{} provider is not configured. Add this to your initialization:\n\nruby_llm::configure(|config| {{\n{}\n}});",
+            "{} provider is not configured. Add this to your initialization:\n\nrust_llm::configure(|config| {{\n{}\n}});",
             self.display(),
             lines.join("\n")
         )))
@@ -216,8 +216,8 @@ impl Provider {
             Provider::Mistral => bearer("mistral_api_key"),
             Provider::OpenRouter => {
                 let mut h = bearer("openrouter_api_key");
-                h.push(("HTTP-Referer".into(), config.get("openrouter_app_url").unwrap_or("https://rubyllm.com").into()));
-                h.push(("X-OpenRouter-Title".into(), config.get("openrouter_app_name").unwrap_or("RubyLLM").into()));
+                h.push(("HTTP-Referer".into(), config.get("openrouter_app_url").unwrap_or("https://github.com/cole-robertson/rust_llm").into()));
+                h.push(("X-OpenRouter-Title".into(), config.get("openrouter_app_name").unwrap_or("RustLLM").into()));
                 h
             }
             Provider::XAI => bearer("xai_api_key"),

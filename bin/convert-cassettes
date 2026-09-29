@@ -3,7 +3,7 @@
 require 'yaml'
 require 'json'
 src = File.expand_path('../upstream/spec/fixtures/vcr_cassettes', __dir__)
-dst = File.expand_path('../crates/ruby_llm/tests/cassettes', __dir__)
+dst = File.expand_path('../crates/rust_llm/tests/cassettes', __dir__)
 patterns = ARGV.empty? ? ['*'] : ARGV
 count = 0
 patterns.each do |pat|
