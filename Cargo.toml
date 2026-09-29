@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/rust_llm", "crates/rust_llm_loco"]
+members = ["crates/rust_llm", "crates/rust_llm_loco", "crates/rust_llm_cli"]
 
 [workspace.package]
 version = "2.0.0"
@@ -14,7 +14,7 @@ futures = "0.3"
 mime_guess = "2"
 rand = "0.8"
 regex = "1"
-reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "multipart"] }
 schemars = "1.2"
 sea-orm = { version = "2.0", default-features = false, features = ["macros", "with-json", "with-chrono", "runtime-tokio-rustls", "sqlx-sqlite", "sqlx-postgres"] }
 sea-orm-migration = { version = "2.0", default-features = false, features = ["runtime-tokio-rustls", "sqlx-sqlite", "sqlx-postgres"] }

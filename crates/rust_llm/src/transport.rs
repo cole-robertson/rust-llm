@@ -100,6 +100,10 @@ impl Connection {
         &self.client
     }
 
+    pub fn config(&self) -> &std::sync::Arc<Config> {
+        &self.config
+    }
+
     fn url(&self, path: &str) -> Result<String> {
         if path.starts_with("http://") || path.starts_with("https://") {
             return Ok(path.to_string());
@@ -147,11 +151,21 @@ impl Connection {
         extra: &[(String, String)],
         on_attempt: &mut (dyn FnMut(Option<&Error>) + Send),
     ) -> Result<reqwest::Response> {
+        self.send_built(&|| self.request(url, payload, extra), true, on_attempt).await
+    }
+
+    /// Sends the request `build` makes, retrying it under the rules above when `retry` is set.
+    async fn send_built(
+        &self,
+        build: &(dyn Fn() -> reqwest::RequestBuilder + Send + Sync),
+        retry: bool,
+        on_attempt: &mut (dyn FnMut(Option<&Error>) + Send),
+    ) -> Result<reqwest::Response> {
         let mut attempt = 0;
         let mut previous: Option<Error> = None;
         loop {
             on_attempt(previous.as_ref());
-            let result = self.request(url, payload, extra).send().await;
+            let result = build().send().await;
             let (error, retry_after) = match result {
                 Ok(resp) if resp.status().is_success() => return Ok(resp),
                 Ok(resp) => {
@@ -164,7 +178,8 @@ impl Connection {
                 Err(e) if e.is_timeout() => (Error::Timeout(e.to_string()), None),
                 Err(e) => (Error::ConnectionFailed(e.to_string()), None),
             };
-            let Some(delay) = self.retry_delay(&error, attempt, retry_after) else { return Err(error) };
+            let delay = if retry { self.retry_delay(&error, attempt, retry_after) } else { None };
+            let Some(delay) = delay else { return Err(error) };
             tracing::debug!(provider = self.provider.slug(), attempt, "retrying after {error}");
             tokio::time::sleep(delay).await;
             previous = Some(error);
@@ -191,6 +206,67 @@ impl Connection {
         }
         let body: Value = serde_json::from_str(&text).unwrap_or(Value::String(text));
         Ok(RawResponse { status, headers, body, request_body: payload.clone() })
+    }
+
+    /// `Connection#post` with a multipart body, for Files and Batches uploads. `form` builds a fresh
+    /// body per attempt. Pass `idempotent: false` (`mark_non_idempotent`) for a request that creates
+    /// server-side state: it is then never retried, since a retry after a lost response would
+    /// create it twice.
+    pub async fn post_multipart(
+        &self,
+        path: &str,
+        form: impl Fn() -> reqwest::multipart::Form + Send + Sync,
+        extra: &[(String, String)],
+        idempotent: bool,
+    ) -> Result<RawResponse> {
+        let resp = self.send(reqwest::Method::POST, path, extra, idempotent, &|req| req.multipart(form())).await?;
+        json_response(resp, Value::Null).await
+    }
+
+    /// `Connection#get`, parsing a JSON response. GETs retry like any idempotent request.
+    pub async fn get(&self, path: &str, extra: &[(String, String)]) -> Result<RawResponse> {
+        let resp = self.send(reqwest::Method::GET, path, extra, true, &|req| req).await?;
+        json_response(resp, Value::Null).await
+    }
+
+    /// `Connection#get` for a binary body, such as a file download.
+    pub async fn get_bytes(&self, path: &str, extra: &[(String, String)]) -> Result<Vec<u8>> {
+        let resp = self.send(reqwest::Method::GET, path, extra, true, &|req| req).await?;
+        Ok(resp.bytes().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?.to_vec())
+    }
+
+    /// `Connection#delete`, parsing a JSON response if there is one.
+    pub async fn delete(&self, path: &str, extra: &[(String, String)]) -> Result<RawResponse> {
+        let resp = self.send(reqwest::Method::DELETE, path, extra, true, &|req| req).await?;
+        let status = resp.status().as_u16();
+        let headers = header_pairs(&resp);
+        let text = resp.text().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
+        let body = if text.trim().is_empty() { Value::Null } else { serde_json::from_str(&text).unwrap_or(Value::String(text)) };
+        Ok(RawResponse { status, headers, body, request_body: Value::Null })
+    }
+
+    /// Any request with the provider's headers plus `extra`, with errors mapped like `post`.
+    /// `body` adds the body to the builder; it runs once per attempt. `retry: false` sends once.
+    pub async fn send(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        extra: &[(String, String)],
+        retry: bool,
+        body: &(dyn Fn(reqwest::RequestBuilder) -> reqwest::RequestBuilder + Send + Sync),
+    ) -> Result<reqwest::Response> {
+        let url = self.url(path)?;
+        let build = || {
+            let mut req = self.client.request(method.clone(), &url);
+            for (k, v) in self.provider.headers(&self.config) {
+                req = req.header(k, v);
+            }
+            for (k, v) in extra {
+                req = req.header(k.as_str(), v.as_str());
+            }
+            body(req)
+        };
+        self.send_built(&build, retry, &mut |_| {}).await
     }
 
     /// POST JSON and feed each server-sent event to `on_event`. Errors inside the stream
@@ -268,6 +344,18 @@ impl Connection {
         }
         Ok(())
     }
+}
+
+/// Reads a JSON body the way `post` does: an empty body is an error, a non-JSON one a string.
+pub(crate) async fn json_response(resp: reqwest::Response, request_body: Value) -> Result<RawResponse> {
+    let status = resp.status().as_u16();
+    let headers = header_pairs(&resp);
+    let text = resp.text().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
+    if text.trim().is_empty() {
+        return Err(Error::Api("Provider returned an empty response body".into(), None));
+    }
+    let body: Value = serde_json::from_str(&text).unwrap_or(Value::String(text));
+    Ok(RawResponse { status, headers, body, request_body })
 }
 
 fn header_pairs(resp: &reqwest::Response) -> Vec<(String, String)> {

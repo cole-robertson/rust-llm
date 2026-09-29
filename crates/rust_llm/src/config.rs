@@ -10,6 +10,8 @@ use std::time::Duration;
 pub struct Config {
     pub default_model: String,
     pub default_embedding_model: String,
+    /// `default_image_model`: the model `rust_llm::paint` uses when none is given.
+    pub default_image_model: String,
     pub request_timeout: Duration,
     pub max_retries: u32,
     pub retry_interval: f64,
@@ -17,6 +19,8 @@ pub struct Config {
     pub retry_interval_randomness: f64,
     pub retry_max_interval: f64,
     pub tool_concurrency: bool,
+    /// `auto_upload_large_files`: upload oversized local attachments to the provider's Files API.
+    pub auto_upload_large_files: bool,
     values: HashMap<String, String>,
 }
 
@@ -41,6 +45,7 @@ impl Default for Config {
         Config {
             default_model: "gpt-5.6".into(),
             default_embedding_model: "text-embedding-3-small".into(),
+            default_image_model: "gpt-image-2".into(),
             request_timeout: Duration::from_secs(300),
             max_retries: 3,
             retry_interval: 0.1,
@@ -48,6 +53,7 @@ impl Default for Config {
             retry_interval_randomness: 0.5,
             retry_max_interval: 30.0,
             tool_concurrency: false,
+            auto_upload_large_files: true,
             values: HashMap::new(),
         }
     }

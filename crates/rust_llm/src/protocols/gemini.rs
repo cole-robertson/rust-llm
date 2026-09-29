@@ -221,12 +221,17 @@ fn format_attachment(a: &Attachment) -> Result<Value> {
         AttachmentType::Document | AttachmentType::Unknown => {
             Err(Error::UnsupportedAttachment(super::anthropic::unsupported(&a.mime_type)))
         }
+        // `format_file_data`: a stored file is referenced by URI.
+        _ if a.is_provider_file() => Ok(json!({ "file_data": {
+            "mime_type": a.mime_type,
+            "file_uri": a.provider_file_uri().or(a.provider_file_id()),
+        }})),
         _ => Ok(json!({ "inline_data": { "mime_type": a.mime_type, "data": a.encoded()? } })),
     }
 }
 
 /// `Gemini::Media.format_content`.
-fn format_content(content: Option<&str>, attachments: &[Attachment]) -> Result<Vec<Value>> {
+pub(crate) fn format_content(content: Option<&str>, attachments: &[Attachment]) -> Result<Vec<Value>> {
     let mut parts = Vec::new();
     if let Some(text) = content {
         parts.push(json!({ "text": text }));

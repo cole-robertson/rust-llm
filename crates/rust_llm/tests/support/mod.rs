@@ -93,9 +93,23 @@ impl Respond for Replay {
             .and_then(|(_, v)| v.as_str())
             .unwrap_or("application/json")
             .to_string();
-        ResponseTemplate::new(interaction.status)
-            .insert_header("content-type", content_type.as_str())
-            .set_body_raw(interaction.response_body.clone().into_bytes(), &content_type)
+        let mut response = ResponseTemplate::new(interaction.status).insert_header("content-type", content_type.as_str());
+        // Gemini's resumable upload returns the URL to send the bytes to; point it at this server.
+        if let Some(url) = interaction
+            .response_headers
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case("x-goog-upload-url"))
+            .and_then(|(_, v)| v.as_str())
+        {
+            let host = request.headers.get("host").and_then(|v| v.to_str().ok()).unwrap_or_default();
+            let here = format!("http://{host}");
+            let rewritten = match url.split_once("://").and_then(|(_, rest)| rest.split_once('/')) {
+                Some((_, path)) => format!("{here}/{path}"),
+                None => url.to_string(),
+            };
+            response = response.insert_header("x-goog-upload-url", rewritten.as_str());
+        }
+        response.set_body_raw(interaction.response_body.clone().into_bytes(), &content_type)
     }
 }
 

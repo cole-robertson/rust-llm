@@ -141,9 +141,51 @@ impl Cost {
         (!amounts.is_empty()).then(|| amounts.iter().sum())
     }
 
+    /// `Cost.new(amounts:, missing:, reported:)`: already-priced components, e.g. at batch rates.
+    pub fn from_amounts(amounts: [Option<f64>; 5], missing: Vec<Component>, reported: bool) -> Cost {
+        let mut cost = Cost { complete: true, reported, missing, ..Default::default() };
+        for (i, component) in COMPONENTS.into_iter().enumerate() {
+            cost.set(component, amounts[i]);
+        }
+        cost
+    }
+
+    /// `tokens?`: whether there was any usage to price.
+    pub fn is_reported(&self) -> bool {
+        self.reported
+    }
+
     pub(crate) fn mark_incomplete(mut self) -> Self {
         self.complete = false;
         self
+    }
+
+    /// `Cost.new(category: :images, input_details:)`: output uses the image output price (text
+    /// as fallback); input splits into text and image tokens when the provider reports both.
+    pub fn images(tokens: &Tokens, model: Option<&Model>, input_details: Option<&serde_json::Value>) -> Cost {
+        let mut cost = Cost::new(tokens, model, Tier::Standard);
+        let text = model.and_then(|m| m.pricing.text_tokens.clone()).unwrap_or_default();
+        let images = model.and_then(|m| m.pricing.images.clone()).unwrap_or_default();
+        let prompt = tokens.input.unwrap_or(0) + tokens.cache_read.unwrap_or(0) + tokens.cache_write.unwrap_or(0);
+        let text_input = text.tier_for(prompt).and_then(|t| t.input_per_million).or_else(|| text.input());
+        let per = |count: i64, price: Option<f64>| if count == 0 { Some(0.0) } else { price.map(|p| count as f64 * p / PER_MILLION) };
+
+        if let (Some(output), Some(price)) = (tokens.output, images.output()) {
+            cost.output = per(output, Some(price));
+            cost.missing.retain(|c| *c != Component::Output);
+        }
+        let detail = |key: &str| input_details.and_then(|d| d.get(key)).and_then(serde_json::Value::as_i64);
+        let parts = [(detail("text_tokens"), text_input), (detail("image_tokens"), images.input().or(text_input))];
+        if parts.iter().any(|(count, _)| count.is_some()) {
+            cost.missing.retain(|c| *c != Component::Input);
+            if parts.iter().any(|(count, price)| count.unwrap_or(0) > 0 && price.is_none()) {
+                cost.input = None;
+                cost.missing.push(Component::Input);
+            } else {
+                cost.input = Some(parts.iter().filter_map(|(count, price)| per(count.unwrap_or(0), *price)).sum());
+            }
+        }
+        cost
     }
 }
 

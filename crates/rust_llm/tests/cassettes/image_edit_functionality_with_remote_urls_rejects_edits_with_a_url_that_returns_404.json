@@ -1,0 +1,28 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.openai.com/v1/images/edits",
+    "request_body": "{\"model\":\"gpt-image-1.5\",\"prompt\":\"turn the logo to green\",\"n\":1,\"images\":[{\"image_url\":\"https://rubyllm.com/some-asset-that-does-not-exist.png\"}]}",
+    "status": 400,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:10:33 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "180",
+      "Connection": "keep-alive",
+      "Openai-Version": "2020-10-01",
+      "Openai-Organization": "<OPENAI_ORGANIZATION>",
+      "Openai-Project": "<OPENAI_PROJECT>",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Openai-Processing-Ms": "428",
+      "Server": "cloudflare",
+      "Access-Control-Expose-Headers": "CF-Ray",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Set-Cookie": "<COOKIE>",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\n  \"error\": {\n    \"message\": \"Error while downloading file. Upstream status code: 404.\",\n    \"type\": \"invalid_request_error\",\n    \"param\": \"url\",\n    \"code\": \"invalid_value\"\n  }\n}"
+  }
+]

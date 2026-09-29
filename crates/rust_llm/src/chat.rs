@@ -30,14 +30,14 @@ use crate::tokens::Tokens;
 use crate::tool::{SharedTool, Tool, ToolResult, validate_arguments};
 use crate::transport::Connection;
 
-type MessageCallback = Box<dyn FnMut(&Message) + Send>;
-type UnitCallback = Box<dyn FnMut() + Send>;
-type ToolCallCallback = Box<dyn FnMut(&ToolCall) + Send>;
-type ToolResultCallback = Box<dyn FnMut(&ToolResult) + Send>;
-type FallbackCallback = Box<dyn FnMut(&FallbackAttempt) + Send>;
-type RequestCallback = Box<dyn FnMut(&mut Value) + Send>;
+type MessageCallback = Box<dyn FnMut(&Message) + Send + Sync>;
+type UnitCallback = Box<dyn FnMut() + Send + Sync>;
+type ToolCallCallback = Box<dyn FnMut(&ToolCall) + Send + Sync>;
+type ToolResultCallback = Box<dyn FnMut(&ToolResult) + Send + Sync>;
+type FallbackCallback = Box<dyn FnMut(&FallbackAttempt) + Send + Sync>;
+type RequestCallback = Box<dyn FnMut(&mut Value) + Send + Sync>;
 /// Called with each persisted-state change; the Loco integration uses these to write rows.
-pub type UsageRecorder = Box<dyn FnMut(&UsageEntry) + Send>;
+pub type UsageRecorder = Box<dyn FnMut(&UsageEntry) + Send + Sync>;
 
 /// A model to try when generation fails (`with_fallbacks`).
 #[derive(Debug, Clone)]
@@ -73,7 +73,11 @@ struct Callbacks {
     before_fallback: Vec<FallbackCallback>,
     after_fallback: Vec<FallbackCallback>,
     before_request: Vec<RequestCallback>,
+    /// Shared with the running tool's progress listener, which reports while `self` is borrowed.
+    after_tool_progress: Arc<std::sync::Mutex<Vec<ToolProgressCallback>>>,
 }
+
+type ToolProgressCallback = Box<dyn FnMut(&ToolCall, &crate::progress::Progress) + Send + Sync>;
 
 /// `RubyLLM::Chat`.
 pub struct Chat {
@@ -98,6 +102,10 @@ pub struct Chat {
     usage_recorder: Option<UsageRecorder>,
     tool_call_decisions: HashMap<String, bool>,
     cancelled: Arc<AtomicBool>,
+    mcp: crate::mcp::Collection,
+    /// `@tool_call_inputs`: per tool call id, the paused state (`InputRequiredError#to_h`).
+    tool_call_inputs: HashMap<String, Value>,
+    provider_tools: Vec<crate::provider_tools::ProviderTool>,
 }
 
 impl std::fmt::Debug for Chat {
@@ -175,6 +183,9 @@ impl Chat {
             usage_recorder: None,
             tool_call_decisions: HashMap::new(),
             cancelled: Arc::new(AtomicBool::new(false)),
+            mcp: crate::mcp::Collection::default(),
+            tool_call_inputs: HashMap::new(),
+            provider_tools: Vec::new(),
         })
     }
 
@@ -259,6 +270,73 @@ impl Chat {
     pub fn clear_tools(&mut self) -> &mut Self {
         self.tools.clear();
         self
+    }
+
+    /// `with_mcp(server)`: gives the model the server's tools. The server is contacted when the
+    /// chat first needs its tools.
+    pub fn with_mcp(mut self, server: crate::mcp::Mcp) -> Self {
+        self.mcp.push(server);
+        self
+    }
+
+    /// `with_mcp(nil)`: disconnects every server.
+    pub fn clear_mcp(&mut self) -> &mut Self {
+        self.mcp = crate::mcp::Collection::default();
+        self
+    }
+
+    /// `mcp`: the connected servers, readable by name (`chat.mcp().get("files")`).
+    pub fn mcp(&self) -> &crate::mcp::Collection {
+        &self.mcp
+    }
+
+    /// `tools` with the MCP servers' tools: registered tools followed by each server's, fetching
+    /// server lists not yet fetched. Fails with `Error::Argument` when two tools share a name.
+    pub async fn all_tools(&self) -> Result<Vec<SharedTool>> {
+        self.load_mcp_tools().await?;
+        self.combined_tools()
+    }
+
+    async fn load_mcp_tools(&self) -> Result<()> {
+        for server in self.mcp.iter() {
+            server.tools().await?;
+        }
+        Ok(())
+    }
+
+    /// `Chat#tools`, over the servers whose tool lists have been fetched.
+    fn combined_tools(&self) -> Result<Vec<SharedTool>> {
+        let mut tools = self.tools.clone();
+        for server in self.mcp.iter() {
+            let Some(server_tools) = server.cached_tools() else { continue };
+            for tool in server_tools? {
+                let name = tool.name();
+                if tools.iter().any(|t| t.name() == name) {
+                    return Err(Error::Argument(format!("Two tools are named {name}. Rename one with `tool :{name}, as:`")));
+                }
+                tools.push(tool);
+            }
+        }
+        Ok(tools)
+    }
+
+    /// `with_provider_tools(:web_search, mcp: { ... })`: tools that run on the provider's
+    /// servers. Entries add to any enabled earlier. Unknown aliases fail at request time with
+    /// `Error::UnsupportedServerTool`.
+    pub fn with_provider_tools(mut self, tools: impl IntoIterator<Item = crate::provider_tools::ProviderTool>) -> Self {
+        self.provider_tools.extend(tools);
+        self
+    }
+
+    /// `with_provider_tools(nil)`.
+    pub fn clear_provider_tools(&mut self) -> &mut Self {
+        self.provider_tools.clear();
+        self
+    }
+
+    /// `provider_tools`.
+    pub fn provider_tools(&self) -> &[crate::provider_tools::ProviderTool] {
+        &self.provider_tools
     }
 
     /// `with_tool_options(choice:)`.
@@ -373,32 +451,40 @@ impl Chat {
 
     // ---- callbacks -------------------------------------------------------------------------
 
-    pub fn before_message(mut self, f: impl FnMut() + Send + 'static) -> Self {
+    pub fn before_message(mut self, f: impl FnMut() + Send + Sync + 'static) -> Self {
         self.callbacks.before_message.push(Box::new(f));
         self
     }
-    pub fn after_message(mut self, f: impl FnMut(&Message) + Send + 'static) -> Self {
+    pub fn after_message(mut self, f: impl FnMut(&Message) + Send + Sync + 'static) -> Self {
         self.callbacks.after_message.push(Box::new(f));
         self
     }
-    pub fn before_tool_call(mut self, f: impl FnMut(&ToolCall) + Send + 'static) -> Self {
+    pub fn before_tool_call(mut self, f: impl FnMut(&ToolCall) + Send + Sync + 'static) -> Self {
         self.callbacks.before_tool_call.push(Box::new(f));
         self
     }
-    pub fn after_tool_result(mut self, f: impl FnMut(&ToolResult) + Send + 'static) -> Self {
+    pub fn after_tool_result(mut self, f: impl FnMut(&ToolResult) + Send + Sync + 'static) -> Self {
         self.callbacks.after_tool_result.push(Box::new(f));
         self
     }
-    pub fn before_fallback(mut self, f: impl FnMut(&FallbackAttempt) + Send + 'static) -> Self {
+    /// `after_tool_progress { |tool_call, progress| ... }`: what a running tool reports, including
+    /// an MCP server's progress notifications.
+    pub fn after_tool_progress(self, f: impl FnMut(&ToolCall, &crate::progress::Progress) + Send + Sync + 'static) -> Self {
+        if let Ok(mut callbacks) = self.callbacks.after_tool_progress.lock() {
+            callbacks.push(Box::new(f));
+        }
+        self
+    }
+    pub fn before_fallback(mut self, f: impl FnMut(&FallbackAttempt) + Send + Sync + 'static) -> Self {
         self.callbacks.before_fallback.push(Box::new(f));
         self
     }
-    pub fn after_fallback(mut self, f: impl FnMut(&FallbackAttempt) + Send + 'static) -> Self {
+    pub fn after_fallback(mut self, f: impl FnMut(&FallbackAttempt) + Send + Sync + 'static) -> Self {
         self.callbacks.after_fallback.push(Box::new(f));
         self
     }
     /// `before_request { |payload| ... }`: last chance to edit the rendered payload.
-    pub fn before_request(mut self, f: impl FnMut(&mut Value) + Send + 'static) -> Self {
+    pub fn before_request(mut self, f: impl FnMut(&mut Value) + Send + Sync + 'static) -> Self {
         self.callbacks.before_request.push(Box::new(f));
         self
     }
@@ -413,6 +499,37 @@ impl Chat {
     pub fn add_message(&mut self, message: Message) -> &Message {
         self.messages.push(message);
         self.messages.last().unwrap()
+    }
+
+    /// `add_completion(response, record_usage:)`: append an answer produced outside `complete`
+    /// (e.g. by a batch), recording its usage and running the message callbacks.
+    pub fn add_completion(&mut self, mut message: Message, record_usage: bool) -> &Message {
+        if message.usage_entries.is_empty() {
+            let entry = UsageEntry {
+                id: UsageEntry::next_id(),
+                operation: Operation::Chat,
+                provider: self.provider.slug().into(),
+                model: message.model.clone().unwrap_or_else(|| self.model.id.clone()),
+                status: UsageStatus::Succeeded,
+                tokens: message.tokens.clone(),
+                cost: message.cost(None),
+            };
+            message.usage_entries = vec![entry.clone()];
+            self.record_usage(entry);
+        } else if record_usage {
+            for entry in message.usage_entries.clone() {
+                self.record_usage(entry);
+            }
+        }
+        for cb in &mut self.callbacks.before_message {
+            cb();
+        }
+        self.messages.push(message);
+        let message = self.messages.last().unwrap();
+        for cb in &mut self.callbacks.after_message {
+            cb(message);
+        }
+        message
     }
 
     /// Replaces history, e.g. when reloading a persisted chat.
@@ -464,6 +581,19 @@ impl Chat {
     pub fn ask_later_with(&mut self, message: impl Into<String>, attachments: Vec<Attachment>) -> Result<&mut Self> {
         self.raise_if_pending_tool_calls()?;
         self.messages.push(Message::user(message).with_attachments(attachments));
+        Ok(self)
+    }
+
+    /// `ask(github.prompt(:code_review, code: diff))`: adds the prompt's messages, then completes.
+    pub async fn ask_prompt(&mut self, prompt: &crate::mcp::Prompt) -> Result<Message> {
+        self.ask_later_prompt(prompt)?;
+        self.complete().await
+    }
+
+    /// `ask_later(prompt)`: stages an MCP prompt's messages.
+    pub fn ask_later_prompt(&mut self, prompt: &crate::mcp::Prompt) -> Result<&mut Self> {
+        self.raise_if_pending_tool_calls()?;
+        self.messages.extend(prompt.messages.iter().cloned());
         Ok(self)
     }
 
@@ -624,12 +754,13 @@ impl Chat {
             Some(t) => t.resolve(&self.model)?,
             None => None,
         };
+        let tools = self.combined_tools()?;
         let request = Request {
             provider: self.provider,
             config: &self.config,
             model: &self.model,
             messages,
-            tools: &self.tools,
+            tools: &tools,
             tool_prefs: &self.tool_prefs,
             temperature: self.temperature,
             max_output_tokens: self.max_output_tokens,
@@ -639,6 +770,9 @@ impl Chat {
         };
         let mut payload = protocols::render(protocol, &request)?;
         protocols::deep_merge(&mut payload, &self.provider_options);
+        if let Some(resolution) = crate::provider_tools::resolve(protocol, self.provider, &self.provider_tools)? {
+            crate::provider_tools::apply(&mut payload, &resolution);
+        }
         Ok((payload, protocol))
     }
 
@@ -648,7 +782,10 @@ impl Chat {
         chunks_yielded: &mut bool,
     ) -> Result<Message> {
         self.raise_if_cancelled()?;
+        self.load_mcp_tools().await?;
         let mut messages = self.preprocessed_messages();
+        let upload_protocol = self.provider.resolve_protocol(self.protocol, &self.model, &self.config)?;
+        crate::files::preprocess_messages(&mut messages, upload_protocol, self.provider, &self.config, &self.connection).await?;
         for m in &mut messages {
             for a in &mut m.attachments {
                 a.load(self.connection.client()).await?;
@@ -661,7 +798,12 @@ impl Chat {
         }
         let endpoint = protocols::endpoint(protocol, self.provider, &self.model, streaming);
         let mut headers = endpoint.headers;
+        // `resolution.headers.merge(headers)`: the chat's own headers win.
+        if let Some(resolution) = crate::provider_tools::resolve(protocol, self.provider, &self.provider_tools)? {
+            headers.extend(resolution.headers.into_iter().filter(|(k, _)| !self.headers.iter().any(|(h, _)| h.eq_ignore_ascii_case(k))));
+        }
         headers.extend(self.headers.iter().cloned());
+        crate::files::apply_files_beta(protocol, &payload, &mut headers);
 
         // One entry per attempt: `retried` holds the tokens each retried attempt is billed.
         let mut attempts = 0usize;
@@ -782,7 +924,8 @@ impl Chat {
     }
 
     fn find_tool(&self, name: &str) -> Option<SharedTool> {
-        self.tools.iter().find(|t| t.name() == name).cloned()
+        let tools = self.combined_tools().unwrap_or_else(|_| self.tools.clone());
+        tools.into_iter().find(|t| t.name() == name)
     }
 
     fn approval_pending(&self, call: &ToolCall) -> bool {
@@ -797,8 +940,12 @@ impl Chat {
     pub async fn run_tools(&mut self) -> Result<&mut Self> {
         self.raise_if_cancelled()?;
         let Some(response) = self.pending_tool_response().cloned() else { return Ok(self) };
+        self.load_mcp_tools().await?;
         for call in self.pending_tool_calls(&response) {
             self.raise_if_cancelled()?;
+            if self.input_pending(&call) {
+                continue;
+            }
             if call.remote {
                 // Remote (provider-executed) approvals are answered on the next request.
                 if let Some(&approved) = self.tool_call_decisions.get(&call.id) {
@@ -825,7 +972,16 @@ impl Chat {
                     for cb in &mut self.callbacks.before_tool_call {
                         cb(&call);
                     }
-                    let result = self.execute_tool(tool.as_deref(), &call).await?;
+                    // `invoke_tool`: a paused MCP call records its input requests and adds no
+                    // result; a resumed one clears them.
+                    let result = match self.execute_tool(tool.as_deref(), &call).await {
+                        Err(Error::McpInputRequired(paused)) => {
+                            self.tool_call_inputs.insert(call.id.clone(), paused.input.to_h());
+                            continue;
+                        }
+                        other => other?,
+                    };
+                    self.tool_call_inputs.remove(&call.id);
                     self.raise_if_cancelled()?;
                     for cb in &mut self.callbacks.after_tool_result {
                         cb(&result);
@@ -842,7 +998,7 @@ impl Chat {
 
     async fn execute_tool(&self, tool: Option<&dyn Tool>, call: &ToolCall) -> Result<ToolResult> {
         let Some(tool) = tool else {
-            let names: Vec<String> = self.tools.iter().map(|t| t.name()).collect();
+            let names: Vec<String> = self.combined_tools().unwrap_or_else(|_| self.tools.clone()).iter().map(|t| t.name()).collect();
             return Ok(ToolResult::error(format!(
                 "Model tried to call unavailable tool `{}`. Available tools: {}.",
                 call.name,
@@ -853,7 +1009,42 @@ impl Chat {
         if let Some(problem) = validate_arguments(tool, &arguments) {
             return Ok(ToolResult::error(format!("Invalid tool arguments: {problem}")));
         }
-        tool.execute(arguments, call).await.map_err(|e| Error::Tool(e.to_string()))
+        // `Cancellation.watch` + `ProgressReporter.listen(progress_listener(tool_call))`.
+        let input = self.tool_call_inputs.get(&call.id);
+        let run = async {
+            match input {
+                Some(input) => tool.resume(input, arguments, call).await,
+                None => tool.execute(arguments, call).await,
+            }
+        };
+        let result = crate::progress::watch(self.cancelled.clone(), crate::progress::listen(self.progress_listener(call), run)).await;
+        result.map_err(|e| match e.downcast::<Error>() {
+            // MCP pauses, protocol errors, and cancellation keep their meaning.
+            Ok(e) if matches!(*e, Error::Cancelled | Error::Mcp(_) | Error::McpInputRequired(_)) => {
+                if matches!(*e, Error::Cancelled) {
+                    self.cancelled.store(false, Ordering::SeqCst);
+                }
+                *e
+            }
+            Ok(e) => Error::Tool(e.to_string()),
+            Err(e) => Error::Tool(e.to_string()),
+        })
+    }
+
+    /// `progress_listener(tool_call)`: `None` when no `after_tool_progress` callback listens.
+    fn progress_listener(&self, call: &ToolCall) -> Option<crate::progress::Listener> {
+        let callbacks = self.callbacks.after_tool_progress.clone();
+        if callbacks.lock().map(|c| c.is_empty()).unwrap_or(true) {
+            return None;
+        }
+        let call = call.clone();
+        Some(Arc::new(move |progress: &crate::progress::Progress| {
+            if let Ok(mut callbacks) = callbacks.lock() {
+                for cb in callbacks.iter_mut() {
+                    cb(&call, progress);
+                }
+            }
+        }))
     }
 
     fn push_tool_result(&mut self, call: &ToolCall, result: ToolResult) {
@@ -892,7 +1083,76 @@ impl Chat {
     fn waiting(&self) -> bool {
         let Some(response) = self.pending_tool_response() else { return false };
         let pending = self.pending_tool_calls(response);
-        !pending.is_empty() && pending.iter().all(|c| self.approval_pending(c))
+        !pending.is_empty() && pending.iter().all(|c| self.approval_pending(c) || self.input_pending(c))
+    }
+
+    /// `input_pending?(tool_call)`: the call paused on a request nobody has settled.
+    fn input_pending(&self, call: &ToolCall) -> bool {
+        self.tool_call_inputs
+            .get(&call.id)
+            .and_then(|input| input.get("requests"))
+            .and_then(Value::as_array)
+            .is_some_and(|requests| requests.iter().any(|r| r.get("response").is_none_or(Value::is_null)))
+    }
+
+    /// `awaiting_input?`: every pending tool call waits on input or an approval decision, and at
+    /// least one waits on input.
+    pub fn is_awaiting_input(&self) -> bool {
+        self.waiting() && !self.pending_inputs().is_empty()
+    }
+
+    /// `pending_inputs`: the unanswered requests that paused MCP tool calls. Settle each with
+    /// `answer` or `decline`, then call `complete` to resume the calls.
+    pub fn pending_inputs(&self) -> Vec<crate::mcp::InputRequest> {
+        let Some(response) = self.pending_tool_response() else { return Vec::new() };
+        self.pending_tool_calls(response)
+            .into_iter()
+            .flat_map(|call| {
+                let requests = self.tool_call_inputs.get(&call.id).and_then(|i| i.get("requests")).and_then(Value::as_array).cloned();
+                requests
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|data| crate::mcp::InputRequest::from_h(data, Some(call.clone())))
+                    .filter(|r| !r.is_answered())
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    }
+
+    /// `answer(request, **values)`: values for a form, or none to accept a URL request.
+    pub fn answer(&mut self, request: &crate::mcp::InputRequest, values: Map<String, Value>) -> Result<&mut Self> {
+        self.settle_input(request, |pending| pending.answer(values))
+    }
+
+    /// `decline(request)`.
+    pub fn decline(&mut self, request: &crate::mcp::InputRequest) -> Result<&mut Self> {
+        self.settle_input(request, crate::mcp::InputRequest::decline)
+    }
+
+    fn settle_input(
+        &mut self,
+        request: &crate::mcp::InputRequest,
+        settle: impl FnOnce(&mut crate::mcp::InputRequest),
+    ) -> Result<&mut Self> {
+        let unknown = || Error::Argument("Unknown input request".into());
+        let call_id = request.tool_call.as_ref().map(|c| c.id.clone()).ok_or_else(unknown)?;
+        let input = self.tool_call_inputs.get_mut(&call_id).ok_or_else(unknown)?;
+        let requests = input.get_mut("requests").and_then(Value::as_array_mut).ok_or_else(unknown)?;
+        let data = requests.iter_mut().find(|d| d.get("key").and_then(Value::as_str) == Some(request.key.as_str())).ok_or_else(unknown)?;
+        let mut pending = crate::mcp::InputRequest::from_h(data, None);
+        settle(&mut pending);
+        *data = pending.to_h();
+        Ok(self)
+    }
+
+    /// Paused MCP calls' state per tool call id, for persistence (`input_recorder`).
+    pub fn tool_call_inputs(&self) -> &HashMap<String, Value> {
+        &self.tool_call_inputs
+    }
+
+    /// Restores paused MCP calls' state, e.g. from persisted tool-call rows (`input_checker`).
+    pub fn set_tool_call_inputs(&mut self, inputs: impl IntoIterator<Item = (String, Value)>) {
+        self.tool_call_inputs.extend(inputs);
     }
 
     /// `awaiting_approval?`.
@@ -947,7 +1207,7 @@ impl Chat {
 /// `Tracker#failure_tokens`: tokens a stream reported before failing are kept; a request the
 /// provider refused (4xx) or that never reached it is billed as zero; anything else is unknown,
 /// which keeps `cost.total` honest instead of silently low.
-fn failure_tokens(error: &Error, observed: Option<Tokens>) -> Tokens {
+pub(crate) fn failure_tokens(error: &Error, observed: Option<Tokens>) -> Tokens {
     if let Some(tokens) = observed {
         return tokens;
     }

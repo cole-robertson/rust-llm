@@ -338,6 +338,17 @@ pub(crate) fn format_content(provider: Provider, content: Option<&str>, attachme
     let unsupported = |a: &Attachment| Error::UnsupportedAttachment(super::anthropic::unsupported(&a.mime_type));
     for a in attachments {
         let kind = a.kind();
+        // `Media.format_provider_file`, reached by the providers that use the shared
+        // `format_attachment`; those with `document_attachments: :none` refuse it.
+        let own_media = matches!(provider, Provider::Mistral | Provider::Ollama | Provider::OllamaCloud | Provider::GPUStack | Provider::Perplexity)
+            || (provider == Provider::OpenRouter && kind == AttachmentType::Video);
+        if let Some(file_id) = a.provider_file_id().filter(|_| !own_media) {
+            if matches!(provider, Provider::DeepSeek | Provider::XAI | Provider::Hetzner) {
+                return Err(unsupported(a));
+            }
+            parts.push(json!({ "type": "file", "file": { "file_id": file_id } }));
+            continue;
+        }
         let part = match (provider, kind) {
             (Provider::Mistral, AttachmentType::Image) => json!({ "type": "image_url", "image_url": a.url_or_data_uri()? }),
             (Provider::Mistral, AttachmentType::Pdf | AttachmentType::Document) => {
@@ -436,7 +447,7 @@ fn thinking_tokens(usage: &Value) -> Option<i64> {
     int(usage.pointer("/completion_tokens_details/reasoning_tokens")).or_else(|| int(usage.get("reasoning_tokens")))
 }
 
-fn reported_cost(provider: Provider, usage: &Value) -> Option<f64> {
+pub(crate) fn reported_cost(provider: Provider, usage: &Value) -> Option<f64> {
     match provider {
         Provider::OpenRouter => {
             let mut cost = usage.get("cost")?.as_f64()?;

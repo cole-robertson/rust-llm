@@ -274,3 +274,11 @@ async fn a_failed_tool_round_is_rolled_back_and_the_chat_stays_usable() {
     let answer = record.ask(&db, &mut chat, "try again without it").await.unwrap();
     assert_eq!(answer.content(), "fine");
 }
+
+/// A chat can be completed inside a Loco worker or an axum handler, which both require `Send`
+/// futures (the generated chat_ui worker awaits `ChatRecord::complete` directly).
+#[allow(dead_code)]
+fn complete_future_is_send(db: &'static DatabaseConnection, record: &'static ChatRecord, chat: &'static mut rust_llm::Chat) {
+    fn assert_send<T: Send>(_: T) {}
+    assert_send(record.complete(db, chat));
+}

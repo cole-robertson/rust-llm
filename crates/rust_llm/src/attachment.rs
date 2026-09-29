@@ -30,6 +30,8 @@ pub enum Source {
     Path(PathBuf),
     Url(String),
     Bytes(Vec<u8>),
+    /// A file already stored with a provider (`Attachment.new(uploaded_file)`).
+    ProviderFile(Box<crate::files::UploadedFile>),
 }
 
 /// A file sent to (or returned by) a model. Local paths are read when the request is rendered;
@@ -41,6 +43,7 @@ pub struct Attachment {
     pub mime_type: String,
     pub resolution: Option<Resolution>,
     content: Option<Vec<u8>>,
+    provider_uploads: crate::files::ProviderUploads,
 }
 
 const DOCUMENT_EXTENSIONS: &[&str] = &[
@@ -79,6 +82,18 @@ fn mime_for_name(name: &str) -> String {
     }
 }
 
+impl From<&str> for Attachment {
+    fn from(source: &str) -> Attachment {
+        Attachment::new(source)
+    }
+}
+
+impl From<crate::files::UploadedFile> for Attachment {
+    fn from(file: crate::files::UploadedFile) -> Attachment {
+        Attachment::from_uploaded(file)
+    }
+}
+
 impl Attachment {
     /// `Attachment.new(source)`: a local path or an http(s) URL.
     pub fn new(source: impl AsRef<str>) -> Attachment {
@@ -87,12 +102,12 @@ impl Attachment {
             let path = source.split(['?', '#']).next().unwrap_or(source);
             let filename = path.rsplit('/').next().map(str::to_string);
             let mime = mime_for_name(filename.as_deref().unwrap_or(""));
-            Attachment { source: Source::Url(source.to_string()), filename, mime_type: mime, resolution: None, content: None }
+            Attachment { source: Source::Url(source.to_string()), filename, mime_type: mime, resolution: None, content: None, provider_uploads: Default::default() }
         } else {
             let path = PathBuf::from(source);
             let filename = path.file_name().map(|f| f.to_string_lossy().into_owned());
             let mime = mime_for_name(source);
-            Attachment { source: Source::Path(path), filename, mime_type: mime, resolution: None, content: None }
+            Attachment { source: Source::Path(path), filename, mime_type: mime, resolution: None, content: None, provider_uploads: Default::default() }
         }
     }
 
@@ -105,6 +120,7 @@ impl Attachment {
             mime_type: mime,
             resolution: None,
             content: Some(bytes),
+            provider_uploads: Default::default(),
         }
     }
 
@@ -124,12 +140,74 @@ impl Attachment {
         }
     }
 
+    /// `Attachment.new(uploaded_file)`: the filename and MIME type come from the provider's record.
+    pub fn from_uploaded(file: crate::files::UploadedFile) -> Attachment {
+        let filename = file.filename.clone();
+        let mime = file.mime_type.clone().unwrap_or_else(|| mime_for_name(filename.as_deref().unwrap_or("")));
+        Attachment {
+            source: Source::ProviderFile(Box::new(file)),
+            filename,
+            mime_type: mime,
+            resolution: None,
+            content: None,
+            provider_uploads: Default::default(),
+        }
+    }
+
+    /// `Attachment.new(source, filename:)`: the same source under another name, typed by that name.
+    pub(crate) fn with_filename(&self, filename: &str) -> Attachment {
+        let mime_type = match &self.source {
+            Source::ProviderFile(f) => f.mime_type.clone().unwrap_or_else(|| mime_for_name(filename)),
+            _ => mime_for_name(filename),
+        };
+        Attachment {
+            filename: Some(filename.to_string()),
+            mime_type,
+            provider_uploads: Default::default(),
+            ..self.clone()
+        }
+    }
+
+    pub fn is_provider_file(&self) -> bool {
+        matches!(self.source, Source::ProviderFile(_))
+    }
+
+    pub fn provider_file_id(&self) -> Option<&str> {
+        match &self.source {
+            Source::ProviderFile(f) => Some(&f.id),
+            _ => None,
+        }
+    }
+
+    pub fn provider_file_uri(&self) -> Option<&str> {
+        match &self.source {
+            Source::ProviderFile(f) => f.uri.as_deref(),
+            _ => None,
+        }
+    }
+
+    /// Files this attachment has been auto-uploaded to, keyed by provider and credentials. Shared
+    /// by clones, so the per-request copy of history reuses the upload.
+    pub(crate) fn provider_uploads(&self) -> &crate::files::ProviderUploads {
+        &self.provider_uploads
+    }
+
+    /// `Attachment#byte_size`: the provider's size, the file's size on disk, or the loaded bytes.
+    pub fn byte_size(&self) -> Option<u64> {
+        match &self.source {
+            Source::ProviderFile(f) => f.byte_size,
+            Source::Path(p) => std::fs::metadata(p).ok().map(|m| m.len()),
+            _ => self.content.as_ref().map(|c| c.len() as u64),
+        }
+    }
+
     /// Reads the bytes now, so rendering a request never blocks on the network.
     pub(crate) async fn load(&mut self, client: &reqwest::Client) -> Result<()> {
         if self.content.is_some() {
             return Ok(());
         }
         let bytes = match &self.source {
+            Source::ProviderFile(_) => return Ok(()),
             Source::Path(p) => tokio::fs::read(p).await?,
             Source::Bytes(b) => b.clone(),
             Source::Url(u) => client
@@ -147,7 +225,10 @@ impl Attachment {
         Ok(())
     }
 
-    fn bytes(&self) -> Result<&[u8]> {
+    pub(crate) fn bytes(&self) -> Result<&[u8]> {
+        if let Some(id) = self.provider_file_id() {
+            return Err(Error::Api(format!("Provider-managed file {id} cannot be read as inline attachment content"), None));
+        }
         self.content.as_deref().ok_or_else(|| {
             Error::Argument(format!("attachment {:?} was not loaded before rendering", self.filename))
         })

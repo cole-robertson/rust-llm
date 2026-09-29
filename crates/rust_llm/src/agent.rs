@@ -67,6 +67,14 @@ pub trait Agent {
     fn fallbacks(&self) -> Vec<Fallback> {
         Vec::new()
     }
+    /// `mcp Files` / `mcp { [Linear.new(user: user)] }`: servers connected via `with_mcp`.
+    fn mcp(&self) -> Vec<crate::mcp::Mcp> {
+        Vec::new()
+    }
+    /// `provider_tools :web_search`: applied via `with_provider_tools`.
+    fn provider_tools(&self) -> Vec<crate::provider_tools::ProviderTool> {
+        Vec::new()
+    }
 
     /// Applies this agent's configuration to an existing chat (`Agent.new(chat:)`), which is how
     /// a persisted chat record picks its agent back up.
@@ -75,6 +83,10 @@ pub trait Agent {
             chat.set_instructions(Some(text), false, false);
         }
         chat = chat.with_tools(self.tools());
+        for server in self.mcp() {
+            chat = chat.with_mcp(server);
+        }
+        chat = chat.with_provider_tools(self.provider_tools());
         if let Some(choice) = self.tool_choice() {
             chat = chat.with_tool_choice(choice)?;
         }

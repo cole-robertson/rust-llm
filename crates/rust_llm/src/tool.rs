@@ -127,6 +127,13 @@ pub trait Tool: Send + Sync {
     }
 
     async fn execute(&self, arguments: Map<String, Value>, tool_call: &ToolCall) -> Result<ToolResult, ToolError>;
+
+    /// `resume(input, arguments)`: continues a call that paused on input requests (MCP
+    /// elicitation), now answered. `input` is the paused state `InputRequiredError#to_h` gave.
+    /// Tools that never pause run again.
+    async fn resume(&self, _input: &Value, arguments: Map<String, Value>, tool_call: &ToolCall) -> Result<ToolResult, ToolError> {
+        self.execute(arguments, tool_call).await
+    }
 }
 
 /// `Tool.tool_name`: `WeatherLookupTool` -> `weather_lookup`.

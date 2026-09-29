@@ -173,6 +173,12 @@ pub fn format_content(content: Option<&str>, attachments: &[Attachment]) -> Resu
         parts.push(json!({ "type": "text", "text": text }));
     }
     for a in attachments {
+        // `format_provider_file`: a stored file is referenced by id.
+        if let Some(file_id) = a.provider_file_id() {
+            let kind = if a.kind() == AttachmentType::Image { "image" } else { "document" };
+            parts.push(json!({ "type": kind, "source": { "type": "file", "file_id": file_id } }));
+            continue;
+        }
         let part = match a.kind() {
             AttachmentType::Image => match a.url() {
                 Some(url) => json!({ "type": "image", "source": { "type": "url", "url": url } }),

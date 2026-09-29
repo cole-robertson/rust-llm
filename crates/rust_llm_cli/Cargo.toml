@@ -1,0 +1,18 @@
+[package]
+name = "rust_llm_cli"
+description = "RubyLLM's Rails generators as a CLI for Loco + Inertia + React apps: install, tool, agent, schema, chat_ui, provider, upgrade."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "rust-llm"
+path = "src/main.rs"
+
+[dependencies]
+# `tool::underscore` keeps generated tool file names equal to the runtime `Tool::name()`.
+rust_llm = { path = "../rust_llm" }
+chrono.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

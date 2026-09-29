@@ -23,16 +23,39 @@ pub struct Embedding {
     pub vectors: Vectors,
     pub model: String,
     pub input_tokens: Option<i64>,
+    /// `ruby_llm_usage_entries`: set when a batch prices the embedding at batch rates.
+    pub usage_entries: Vec<crate::message::UsageEntry>,
     model_info: Option<Model>,
 }
 
 impl Embedding {
     pub fn tokens(&self) -> Tokens {
+        if !self.usage_entries.is_empty() {
+            return Tokens::aggregate(self.usage_entries.iter().map(|e| &e.tokens));
+        }
         Tokens { input: self.input_tokens, ..Default::default() }
     }
 
     pub fn cost(&self) -> Cost {
+        if !self.usage_entries.is_empty() {
+            let complete = self.usage_entries.iter().all(crate::message::UsageEntry::cost_available);
+            return Cost::aggregate(self.usage_entries.iter().map(|e| &e.cost), complete);
+        }
         Cost::new(&self.tokens(), self.model_info.as_ref(), Tier::Standard)
+    }
+
+    /// `parse_embedding_response` for an OpenAI-compatible body, e.g. one line of a batch result.
+    pub(crate) fn from_openai_body(body: &Value, single: bool) -> Embedding {
+        let rows: Vec<Vec<f64>> =
+            body.get("data").and_then(Value::as_array).map(|d| d.iter().map(|x| floats(&x["embedding"])).collect()).unwrap_or_default();
+        let model = body.get("model").and_then(Value::as_str).unwrap_or_default().to_string();
+        Embedding {
+            vectors: vectors_from(rows, single),
+            model_info: crate::models::models().find(&model, None).ok(),
+            model,
+            input_tokens: body.pointer("/usage/prompt_tokens").and_then(Value::as_i64),
+            usage_entries: Vec::new(),
+        }
     }
 }
 
@@ -133,5 +156,5 @@ pub async fn embed(input: impl Into<EmbedInput>, options: EmbedOptions<'_>) -> R
             body.pointer("/usage/prompt_tokens").and_then(Value::as_i64),
         ),
     };
-    Ok(Embedding { vectors: vectors_from(rows, single), model: model.id.clone(), input_tokens, model_info: Some(model) })
+    Ok(Embedding { vectors: vectors_from(rows, single), model: model.id.clone(), input_tokens, usage_entries: Vec::new(), model_info: Some(model) })
 }

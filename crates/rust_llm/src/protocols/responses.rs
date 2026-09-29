@@ -186,6 +186,11 @@ fn format_content(content: Option<&str>, attachments: &[Attachment]) -> Result<V
         parts.push(json!({ "type": "input_text", "text": c }));
     }
     for a in attachments {
+        // `format_provider_file`
+        if let Some(file_id) = a.provider_file_id() {
+            parts.push(json!({ "type": "input_file", "file_id": file_id }));
+            continue;
+        }
         parts.push(match a.kind() {
             AttachmentType::Image => {
                 let mut part = json!({ "type": "input_image", "image_url": a.url_or_data_uri()? });

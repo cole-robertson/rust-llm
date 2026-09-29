@@ -58,6 +58,15 @@ pub enum Error {
     /// A tool's own failure, re-raised to the caller like an exception escaping `execute`.
     #[error("{0}")]
     Tool(String),
+    /// `UnsupportedServerToolError`: a provider tool alias the protocol does not define.
+    #[error("{0}")]
+    UnsupportedServerTool(String),
+    /// `MCP::Error`: an MCP server answered with a JSON-RPC error, a bad status, or not at all.
+    #[error(transparent)]
+    Mcp(Box<crate::mcp::McpError>),
+    /// `MCP::InputRequiredError`: a server needs input from the user that no callback gave.
+    #[error(transparent)]
+    McpInputRequired(Box<crate::mcp::InputRequiredError>),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error(transparent)]

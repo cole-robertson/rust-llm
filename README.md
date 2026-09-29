@@ -25,6 +25,20 @@ WeatherAssistant.chat()?.ask("What's the weather in Berlin?").await?;
 
 // RubyLLM.embed "Ruby is elegant and expressive"
 rust_llm::embed("Rust is fast and safe", Default::default()).await?.vectors;
+
+// RubyLLM.paint "a sunset over mountains in watercolor style"
+rust_llm::paint("a sunset over mountains in watercolor style", Default::default()).await?;
+
+// chats = tickets.map { |t| RubyLLM.chat.ask_later(t.body) }; RubyLLM.batch(chats)
+let batch = rust_llm::batch(chats).await?;   // later: batch.refresh().await?; batch.messages()
+
+// file = RubyLLM.upload("contract.pdf"); chat.ask "Summarize", with: file
+let file = rust_llm::upload("contract.pdf", Default::default()).await?;
+chat.ask_with("Summarize this", vec![file.into()]).await?;
+
+// chat.with_mcp(RubyLLM.mcp(command: ["npx", "-y", "@modelcontextprotocol/server-github"]))
+let github = rust_llm::mcp::Mcp::command(["npx", "-y", "@modelcontextprotocol/server-github"]).build()?;
+chat.with_mcp(github).ask("List my open PRs").await?;
 ```
 
 `cargo run -p rust_llm --example readme` runs the whole RubyLLM README against a live provider.
@@ -85,12 +99,26 @@ record.complete(&ctx.db, &mut chat).await?;
 `bin/fw cargo test --workspace` builds and tests on the `framework` box; `bin/convert-cassettes`
 turns more upstream cassettes into test fixtures.
 
+## Generators
+
+`cargo install --path crates/rust_llm_cli`, then from a Loco app:
+
+```
+rust-llm generate install        # deps, migration, initializer, Chat/Message models
+rust-llm generate chat_ui        # Inertia + React chat pages, controllers, a Loco worker
+rust-llm generate tool Weather   # src/tools/weather_tool.rs + React tool call/result components
+rust-llm generate agent Support  # src/agents/support.rs + src/prompts/support/instructions.txt
+rust-llm generate schema Product
+```
+
+Verified against a copy of the Loco + Inertia starter kit: it builds with no warnings, migrations
+run up and down, the frontend passes check/lint/build, and a chat round-trips through the worker.
+The chat UI polls for new messages while a reply is pending; it doesn't stream tokens.
+
 ## Not ported yet
 
 These are listed so nothing is silently missing:
-- Bedrock, Vertex AI, and Azure (cloud auth); Cohere; ElevenLabs; Deepgram; TypeSafe/`Judge`.
-- `paint`, `animate`, `speak`, `transcribe`, `ocr`, `rerank`, `moderate`, and `batch`.
-- MCP; provider tools (`with_provider_tools`); `with_compaction`; `count_tokens`.
-- Provider file uploads, and prompt-caching options beyond `cache_until_here`.
-- Generators; Active Storage attachments on persisted messages.
-- `with_citations` as a request option. Citations in responses are parsed.
+- Bedrock, Vertex AI, Azure (cloud auth); Cohere; ElevenLabs; Deepgram; TypeSafe/`Judge`.
+- `animate`, `speak`, `transcribe`, `ocr`, `rerank`, `moderate`.
+- MCP OAuth; Gemini embedding batches; multipart image edits for non-gpt-image models (dall-e-2).
+- `with_compaction`, `count_tokens`, `with_citations` as a request option; instrumentation events.
