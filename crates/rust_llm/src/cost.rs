@@ -187,6 +187,22 @@ impl Cost {
         }
         cost
     }
+
+    /// `Cost.new(category: :audio_tokens)` for speech and transcription: input and output use the
+    /// model's audio token prices, falling back to its text prices; cache and thinking stay text.
+    pub fn audio(tokens: &Tokens, model: Option<&Model>) -> Cost {
+        let mut cost = Cost::new(tokens, model, Tier::Standard);
+        let audio = model.and_then(|m| m.pricing.audio_tokens.clone()).unwrap_or_default();
+        for (component, count, price) in [
+            (Component::Input, tokens.input, audio.input()),
+            (Component::Output, tokens.output, audio.output()),
+        ] {
+            let (Some(count), Some(price)) = (count, price) else { continue };
+            cost.set(component, Some(if count == 0 { 0.0 } else { count as f64 * price / PER_MILLION }));
+            cost.missing.retain(|c| *c != component);
+        }
+        cost
+    }
 }
 
 struct Pricer<'a> {

@@ -1,0 +1,35 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.openai.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-5-search-api\",\"messages\":[{\"role\":\"user\",\"content\":\"What is the latest stable version of Ruby? Cite your sources.\"}],\"stream\":false,\"web_search_options\":{}}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:12:08 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Cf-Ray": "<CF_RAY>",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Server": "cloudflare",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "Access-Control-Expose-Headers": "CF-Ray",
+      "Openai-Organization": "<OPENAI_ORGANIZATION>",
+      "Openai-Processing-Ms": "8228",
+      "Openai-Project": "<OPENAI_PROJECT>",
+      "Openai-Version": "2020-10-01",
+      "X-Openai-Proxy-Wasm": "v0.1",
+      "X-Ratelimit-Limit-Requests": "500",
+      "X-Ratelimit-Limit-Tokens": "45000",
+      "X-Ratelimit-Remaining-Requests": "499",
+      "X-Ratelimit-Remaining-Tokens": "44982",
+      "X-Ratelimit-Reset-Requests": "120ms",
+      "X-Ratelimit-Reset-Tokens": "24ms",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Set-Cookie": "<COOKIE>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\n  \"id\": \"chatcmpl-c77c9be5-98fd-49ba-b654-562eb6fa97a9\",\n  \"object\": \"chat.completion\",\n  \"created\": 1789683128,\n  \"model\": \"gpt-5-search-api-2025-10-14\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"The latest stable version of the Ruby programming language is **Ruby 4.0.7**, released on **September 15, 2026**. ([ruby-lang.org](https://www.ruby-lang.org/en/downloads/releases/?utm_source=openai))\\n\\nHere are some related stable releases:  \\n- Ruby 3.4.10 — stable ([ruby-lang.org](https://www.ruby-lang.org/en/downloads/?utm_source=openai))  \\n- Ruby 3.3.12 — stable ([ruby-lang.org](https://www.ruby-lang.org/en/downloads/releases/?utm_source=openai))  \\n- Ruby 3.2.11 — stable (still maintained) ([ruby-lang.org](https://www.ruby-lang.org/en/downloads/?utm_source=openai))\",\n        \"refusal\": null,\n        \"annotations\": [\n          {\n            \"type\": \"url_citation\",\n            \"url_citation\": {\n              \"end_index\": 199,\n              \"start_index\": 114,\n              \"title\": \"Ruby Releases | Ruby\",\n              \"url\": \"https://www.ruby-lang.org/en/downloads/releases/?utm_source=openai\"\n            }\n          },\n          {\n            \"type\": \"url_citation\",\n            \"url_citation\": {\n              \"end_index\": 341,\n              \"start_index\": 265,\n              \"title\": \"Download Ruby | Ruby\",\n              \"url\": \"https://www.ruby-lang.org/en/downloads/?utm_source=openai\"\n            }\n          },\n          {\n            \"type\": \"url_citation\",\n            \"url_citation\": {\n              \"end_index\": 452,\n              \"start_index\": 367,\n              \"title\": \"Ruby Releases | Ruby\",\n              \"url\": \"https://www.ruby-lang.org/en/downloads/releases/?utm_source=openai\"\n            }\n          },\n          {\n            \"type\": \"url_citation\",\n            \"url_citation\": {\n              \"end_index\": 573,\n              \"start_index\": 497,\n              \"title\": \"Download Ruby | Ruby\",\n              \"url\": \"https://www.ruby-lang.org/en/downloads/?utm_source=openai\"\n            }\n          }\n        ]\n      },\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 16596,\n    \"completion_tokens\": 171,\n    \"total_tokens\": 16767,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"system_fingerprint\": null\n}\n"
+  }
+]

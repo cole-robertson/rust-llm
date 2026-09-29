@@ -1,0 +1,22 @@
+[
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"<MASSIVE_TEXT>\"}]},{\"role\":\"model\",\"parts\":[{\"text\":\"<MASSIVE_TEXT>\"}]},{\"role\":\"user\",\"parts\":[{\"text\":\"<MASSIVE_TEXT>\"}]},{\"role\":\"model\",\"parts\":[{\"text\":\"<MASSIVE_TEXT>\"}]},{\"role\":\"user\",\"parts\":[{\"text\":\"<MASSIVE_TEXT>\"}]},{\"role\":\"model\",\"parts\":[{\"text\":\"<MASSIVE_TEXT>\"}]},{\"role\":\"user\",\"parts\":[{\"text\":\"<MASSIVE_TEXT>\"}]},{\"role\":\"model\",\"parts\":[{\"text\":\"<MASSIVE_TEXT>\"}]},{\"role\":\"user\",\"parts\":[{\"text\":\"<MASSIVE_TEXT>\"}]},{\"role\":\"model\",\"parts\":[{\"text\":\"<MASSIVE_TEXT>\"}]},{\"role\":\"user\",\"parts\":[{\"text\":\"Hi\"}]}],\"generationConfig\":{}}",
+    "status": 400,
+    "response_headers": {
+      "X-Gemini-Service-Tier": "standard",
+      "Vary": "Origin",
+      "Content-Type": "application/json; charset=UTF-8",
+      "Date": "Thu, 17 Sep 2026 22:07:48 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=10864",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"The input token count exceeds the maximum number of tokens allowed (1048576).\",\n    \"status\": \"INVALID_ARGUMENT\"\n  }\n}\n"
+  }
+]

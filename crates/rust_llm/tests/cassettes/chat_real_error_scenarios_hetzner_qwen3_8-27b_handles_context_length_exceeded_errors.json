@@ -1,0 +1,18 @@
+[
+  {
+    "method": "post",
+    "uri": "https://inference.hetzner.com/api/v1/chat/completions",
+    "request_body": "{\"model\":\"Qwen3.8-27B\",\"messages\":[{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"user\",\"content\":\"Hi\"}],\"stream\":false}",
+    "status": 413,
+    "response_headers": {
+      "Date": "Thu, 24 Sep 2026 18:33:04 GMT",
+      "Content-Type": "text/plain; charset=utf-8",
+      "Content-Length": "52",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Server": "HeRay"
+    },
+    "response_body": "failed to process LLM request: request was too large"
+  }
+]

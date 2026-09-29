@@ -1,0 +1,22 @@
+[
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Call the any-of params tool for task \\\"Review PR\\\" with status \\\"pending\\\" and report the result.\"}]}],\"generationConfig\":{},\"tools\":[{\"functionDeclarations\":[{\"name\":\"any_of_params\",\"description\":\"Uses params DSL any_of support\",\"parametersJsonSchema\":{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\",\"description\":\"Task description\"},\"status\":{\"description\":\"Optional task status\",\"anyOf\":[{\"type\":\"string\",\"enum\":[\"pending\",\"done\"]},{\"type\":\"null\"}]}},\"required\":[\"task\",\"status\"],\"additionalProperties\":false}}]}]}",
+    "status": 200,
+    "response_headers": {
+      "X-Gemini-Service-Tier": "standard",
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:19:05 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=666",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"functionCall\": {\n              \"name\": \"any_of_params\",\n              \"args\": {\n                \"task\": \"Review PR\",\n                \"status\": \"pending\"\n              }\n            },\n            \"thoughtSignature\": \"CtIBAWkUfRMdEus4t6TzMzHeHb6SLs8vVlV3QlzFAuoozBfpbGJqqjQKxIGAhics6FYGmqnoq94CWI+IpX36/pShNibYmxW/DKplBDJX2MR3asG35ZPyqQcB39zMls8h9YGXLJTOQrDUFV+aa4DUpt5V3soCOjbWxK+IgX0wEVoWoLgv1g07CvO61FlTu5ZMZ+e76i7529r4AD0hY3/qBZNvxQH4+CxuCxghfZKJgrP/WD+q6++d4sj8kSZeW/nU3DJjFmIACtdYto1rn/nd0NLZuMnZ\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0,\n      \"finishMessage\": \"Model generated function call(s).\"\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 87,\n    \"candidatesTokenCount\": 23,\n    \"totalTokenCount\": 166,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 87\n      }\n    ],\n    \"thoughtsTokenCount\": 56,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"WGesarW5LM-ZvdIPueTW-Q8\"\n}\n"
+  }
+]

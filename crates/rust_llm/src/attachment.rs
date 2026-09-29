@@ -1,6 +1,8 @@
 //! Port of `lib/ruby_llm/attachment.rb` and `files/mime_type.rb`.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, OnceLock};
 
 use base64::Engine;
 
@@ -42,8 +44,23 @@ pub struct Attachment {
     pub filename: Option<String>,
     pub mime_type: String,
     pub resolution: Option<Resolution>,
-    content: Option<Vec<u8>>,
+    /// `@content`, read once and shared by clones, so a later turn's copy of history reuses the
+    /// bytes instead of fetching the URL again.
+    content: Arc<OnceLock<Vec<u8>>>,
+    /// Set when rendering asked for a URL's bytes before they were fetched (Ruby's lazy `content`).
+    wanted: Wanted,
     provider_uploads: crate::files::ProviderUploads,
+}
+
+/// Shared by clones, so the copy a render reads flags the attachment history keeps.
+#[derive(Debug, Clone, Default)]
+struct Wanted(Arc<AtomicBool>);
+
+impl PartialEq for Wanted {
+    /// Whether a render asked for the bytes is not part of an attachment's identity.
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
 }
 
 const DOCUMENT_EXTENSIONS: &[&str] = &[
@@ -67,6 +84,30 @@ const DOCUMENT_MIME_TYPES: &[&str] = &[
 const DOCUMENT_MIME_PREFIXES: &[&str] =
     &["application/vnd.openxmlformats-officedocument.", "application/vnd.oasis.opendocument."];
 
+/// The magic numbers Marcel checks for the media types attachments carry.
+fn sniff(bytes: &[u8]) -> Option<&'static str> {
+    let at = |offset: usize, magic: &[u8]| bytes.get(offset..offset + magic.len()) == Some(magic);
+    if at(0, b"\x89PNG\r\n\x1a\n") {
+        Some("image/png")
+    } else if at(0, b"\xff\xd8\xff") {
+        Some("image/jpeg")
+    } else if at(0, b"GIF87a") || at(0, b"GIF89a") {
+        Some("image/gif")
+    } else if at(0, b"RIFF") && at(8, b"WEBP") {
+        Some("image/webp")
+    } else if at(0, b"RIFF") && at(8, b"WAVE") {
+        Some("audio/wav")
+    } else if at(0, b"%PDF-") {
+        Some("application/pdf")
+    } else if at(4, b"ftyp") {
+        Some("video/mp4")
+    } else if at(0, b"ID3") {
+        Some("audio/mpeg")
+    } else {
+        None
+    }
+}
+
 /// Text formats `mime_guess` maps to octet-stream but Marcel knows as text.
 const TEXT_EXTENSIONS: &[&str] = &["rb", "rs", "py", "go", "ts", "tsx", "jsx", "md", "yml", "yaml", "toml", "sh"];
 
@@ -77,6 +118,8 @@ fn mime_for_name(name: &str) -> String {
     }
     match mime_guess::from_path(name).first() {
         Some(m) if m.essence_str() == "audio/x-wav" => "audio/wav".into(),
+        // Marcel types `.xml` as application/xml where mime_guess says text/xml.
+        Some(m) if m.essence_str() == "text/xml" => "application/xml".into(),
         Some(m) => m.essence_str().to_string(),
         None => "application/octet-stream".into(),
     }
@@ -102,12 +145,12 @@ impl Attachment {
             let path = source.split(['?', '#']).next().unwrap_or(source);
             let filename = path.rsplit('/').next().map(str::to_string);
             let mime = mime_for_name(filename.as_deref().unwrap_or(""));
-            Attachment { source: Source::Url(source.to_string()), filename, mime_type: mime, resolution: None, content: None, provider_uploads: Default::default() }
+            Attachment { source: Source::Url(source.to_string()), filename, mime_type: mime, resolution: None, content: Default::default(), wanted: Default::default(), provider_uploads: Default::default() }
         } else {
             let path = PathBuf::from(source);
             let filename = path.file_name().map(|f| f.to_string_lossy().into_owned());
             let mime = mime_for_name(source);
-            Attachment { source: Source::Path(path), filename, mime_type: mime, resolution: None, content: None, provider_uploads: Default::default() }
+            Attachment { source: Source::Path(path), filename, mime_type: mime, resolution: None, content: Default::default(), wanted: Default::default(), provider_uploads: Default::default() }
         }
     }
 
@@ -119,7 +162,8 @@ impl Attachment {
             filename: Some(filename),
             mime_type: mime,
             resolution: None,
-            content: Some(bytes),
+            content: Arc::new(OnceLock::from(bytes)),
+            wanted: Default::default(),
             provider_uploads: Default::default(),
         }
     }
@@ -149,7 +193,8 @@ impl Attachment {
             filename,
             mime_type: mime,
             resolution: None,
-            content: None,
+            content: Default::default(),
+            wanted: Default::default(),
             provider_uploads: Default::default(),
         }
     }
@@ -197,13 +242,19 @@ impl Attachment {
         match &self.source {
             Source::ProviderFile(f) => f.byte_size,
             Source::Path(p) => std::fs::metadata(p).ok().map(|m| m.len()),
-            _ => self.content.as_ref().map(|c| c.len() as u64),
+            _ => self.content.get().map(|c| c.len() as u64),
         }
     }
 
-    /// Reads the bytes now, so rendering a request never blocks on the network.
+    /// A URL whose bytes a render asked for before they were fetched.
+    pub(crate) fn is_wanted(&self) -> bool {
+        self.is_url() && self.content.get().is_none() && self.wanted.0.load(Ordering::SeqCst)
+    }
+
+    /// Reads the bytes now, so rendering a request never blocks on the network. A source whose
+    /// name gives no MIME type is typed from its bytes (`MimeType.for(content)`).
     pub(crate) async fn load(&mut self, client: &reqwest::Client) -> Result<()> {
-        if self.content.is_some() {
+        if self.content.get().is_some() {
             return Ok(());
         }
         let bytes = match &self.source {
@@ -221,7 +272,21 @@ impl Attachment {
                 .map_err(|e| Error::ConnectionFailed(e.to_string()))?
                 .to_vec(),
         };
-        self.content = Some(bytes);
+        if self.mime_type == "application/octet-stream"
+            && let Some(mime) = sniff(&bytes) {
+                self.mime_type = mime.to_string();
+            }
+        let _ = self.content.set(bytes);
+        Ok(())
+    }
+
+    /// What `Attachment.new` reads before a request: local files, and a URL whose name leaves
+    /// the MIME type unknown (Ruby fetches it to detect the type). Other URLs are fetched only
+    /// if the request needs their bytes.
+    pub(crate) async fn prepare(&mut self, client: &reqwest::Client) -> Result<()> {
+        if !self.is_url() || self.mime_type == "application/octet-stream" {
+            self.load(client).await?;
+        }
         Ok(())
     }
 
@@ -229,7 +294,10 @@ impl Attachment {
         if let Some(id) = self.provider_file_id() {
             return Err(Error::Api(format!("Provider-managed file {id} cannot be read as inline attachment content"), None));
         }
-        self.content.as_deref().ok_or_else(|| {
+        if self.is_url() && self.content.get().is_none() {
+            self.wanted.0.store(true, Ordering::SeqCst);
+        }
+        self.content.get().map(Vec::as_slice).ok_or_else(|| {
             Error::Argument(format!("attachment {:?} was not loaded before rendering", self.filename))
         })
     }

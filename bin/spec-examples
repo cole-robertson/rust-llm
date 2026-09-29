@@ -1,0 +1,47 @@
+#!/usr/bin/env ruby
+# Lists every `it` example in upstream/spec/ruby_llm/**/*_spec.rb with its describe/context path,
+# parsed statically with Prism (no bundle needed). Interpolated strings keep their `#{...}` source,
+# so a loop over CHAT_MODELS counts as one example template. Output: JSON lines
+# {"file", "line", "path": [describe, context, ...], "it"}.
+require 'prism'
+require 'json'
+
+root = File.expand_path('../upstream', __dir__)
+GROUPS = %i[describe context shared_examples shared_examples_for shared_context feature].freeze
+EXAMPLES = %i[it specify example scenario xit].freeze
+
+def label(node, src)
+  arg = node.arguments&.arguments&.first
+  return '(no description)' unless arg
+
+  case arg
+  when Prism::StringNode then arg.unescaped
+  when Prism::SymbolNode then arg.unescaped
+  else src.byteslice(arg.location.start_offset, arg.location.length).delete_prefix('"').delete_suffix('"')
+  end
+end
+
+def walk(node, path, src, file, out)
+  return unless node.is_a?(Prism::Node)
+
+  if node.is_a?(Prism::CallNode) && node.block.is_a?(Prism::BlockNode) && (node.receiver.nil? || node.name == :describe)
+    if GROUPS.include?(node.name)
+      walk(node.block, path + [label(node, src)], src, file, out)
+      return
+    elsif EXAMPLES.include?(node.name)
+      out << { file: file, line: node.location.start_line, path: path, it: label(node, src) }
+      return
+    end
+  elsif node.is_a?(Prism::CallNode) && EXAMPLES.include?(node.name) && node.receiver.nil? && node.arguments
+    out << { file: file, line: node.location.start_line, path: path, it: label(node, src) }
+    return
+  end
+  node.compact_child_nodes.each { |c| walk(c, path, src, file, out) }
+end
+
+out = []
+Dir.glob(File.join(root, 'spec/ruby_llm/**/*_spec.rb')).sort.each do |f|
+  src = File.read(f)
+  walk(Prism.parse(src).value, [], src, f.delete_prefix("#{root}/"), out)
+end
+out.each { |e| puts JSON.generate(e) }

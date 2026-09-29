@@ -266,13 +266,23 @@ pub struct ServerToolCall {
     pub raw: Value,
 }
 
-/// The raw HTTP exchange behind a response (`message.raw`).
+/// The raw HTTP exchange behind a response (`message.raw`). Like Faraday's `env.request_body`,
+/// the request is kept as the exact serialized text that was sent: every message of a long chat
+/// keeps its request, and each request holds the whole conversation so far, so a JSON tree per
+/// message cost ~20x the memory. Parse it on demand with `request_body_json`.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct RawResponse {
     pub status: u16,
     pub headers: Vec<(String, String)>,
     pub body: Value,
-    pub request_body: Value,
+    pub request_body: std::sync::Arc<str>,
+}
+
+impl RawResponse {
+    /// The request as JSON (`Null` when there was no JSON body, e.g. a GET or multipart upload).
+    pub fn request_body_json(&self) -> Value {
+        serde_json::from_str(&self.request_body).unwrap_or(Value::Null)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -509,6 +519,32 @@ impl Message {
     }
 
     /// `Message#without_thinking`: what gets replayed to a provider that did not produce the thinking.
+    /// The per-request view of a stored message: everything a protocol renders, without the
+    /// bookkeeping it never reads (the HTTP exchange, usage ledger, registry entry). Cloning
+    /// those for every message on every request made long chats quadratic.
+    pub(crate) fn for_request(&self) -> Message {
+        Message {
+            role: self.role,
+            content: self.content.clone(),
+            attachments: self.attachments.clone(),
+            model: self.model.clone(),
+            tool_calls: self.tool_calls.clone(),
+            tool_call_id: self.tool_call_id.clone(),
+            tokens: Tokens::default(),
+            thinking: self.thinking.clone(),
+            citations: self.citations.clone(),
+            server_tool_calls: self.server_tool_calls.clone(),
+            raw_content: self.raw_content.clone(),
+            raw_reasoning: self.raw_reasoning.clone(),
+            finish_reason: self.finish_reason.clone(),
+            raw: None,
+            cache_until_here: self.cache_until_here,
+            usage_entries: Vec::new(),
+            record_id: self.record_id,
+            model_info: None,
+        }
+    }
+
     pub(crate) fn without_thinking(&self) -> Message {
         let mut m = self.clone();
         m.thinking = None;

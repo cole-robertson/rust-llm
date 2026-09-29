@@ -1,0 +1,48 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.deepseek.com/responses",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"input\":[{\"role\":\"user\",\"content\":\"What is 2 + 2? Just the number.\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Date": "Thu, 17 Sep 2026 22:13:14 GMT",
+      "Server": "elb",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Credentials": "true",
+      "X-Ds-Trace-Id": "6480f739ee4e95ae9faf0438fdbe37d9",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "X-Cache": "Miss from cloudfront",
+      "Via": "1.1 672096d0d92d3141442f75941c957076.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL50-P1",
+      "X-Amz-Cf-Id": "G-_fiP9Hq89BsLNFmSJYJQxMA7EFdwSixwSVkHsvM04fx17cmg9mgA=="
+    },
+    "response_body": "{\"id\":\"9146c44f-cc2b-46fb-90a8-62d27b5d9cbb\",\"object\":\"response\",\"created_at\":1789683194,\"status\":\"completed\",\"background\":false,\"completed_at\":1789683194,\"content_filters\":null,\"error\":null,\"frequency_penalty\":0.0,\"incomplete_details\":null,\"instructions\":null,\"max_output_tokens\":null,\"max_tool_calls\":null,\"model\":\"deepseek-flash\",\"moderation\":null,\"output\":[{\"type\":\"reasoning\",\"id\":\"bb49eb40-a406-492f-9f3d-c1af7197efe1\",\"status\":\"completed\",\"content\":[{\"type\":\"reasoning_text\",\"text\":\"We need answer just number. Need comply. 2+2=4. final just \\\"4\\\". \"}],\"summary\":[],\"encrypted_content\":\"9146c44f-cc2b-46fb-90a8-62d27b5d9cbb-0\"},{\"type\":\"message\",\"id\":\"98d43f99-f832-40be-9a09-cc4793ef5eb8\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"annotations\":[],\"logprobs\":[],\"text\":\"4\"}],\"phase\":\"final_answer\",\"role\":\"assistant\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0.0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"prompt_cache_retention\":null,\"reasoning\":{\"effort\":null,\"summary\":null},\"safety_identifier\":null,\"service_tier\":\"default\",\"store\":false,\"temperature\":1.0,\"text\":{\"format\":{\"type\":\"text\"},\"verbosity\":null},\"tool_choice\":\"auto\",\"tools\":[],\"top_logprobs\":0,\"top_p\":1.0,\"truncation\":\"disabled\",\"usage\":{\"input_tokens\":42,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":24,\"output_tokens_details\":{\"reasoning_tokens\":22},\"total_tokens\":66},\"user\":null,\"metadata\":{}}"
+  },
+  {
+    "method": "post",
+    "uri": "https://api.deepseek.com/responses",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"input\":[{\"role\":\"user\",\"content\":\"What is 2 + 2? Just the number.\"},{\"type\":\"reasoning\",\"content\":[{\"type\":\"reasoning_text\",\"text\":\"We need answer just number. Need comply. 2+2=4. final just \\\"4\\\". \"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"4\"}]},{\"role\":\"user\",\"content\":\"Multiply that answer by 3. Just the number.\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Date": "Thu, 17 Sep 2026 22:13:15 GMT",
+      "Server": "elb",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Credentials": "true",
+      "X-Ds-Trace-Id": "72b9aef0819c2ff719e30d78bc5546c6",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "X-Cache": "Miss from cloudfront",
+      "Via": "1.1 dcd4e62bcdb6b3788f609084cff8d9b0.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL52-P2",
+      "X-Amz-Cf-Id": "VNDwtcEfy9sWzdwDE-oPaAG9GPWUl4yGvxujXonjG94UWH8XN9n14Q=="
+    },
+    "response_body": "{\"id\":\"cf8033ce-62ca-48e5-a770-5e1f99d34474\",\"object\":\"response\",\"created_at\":1789683195,\"status\":\"completed\",\"background\":false,\"completed_at\":1789683195,\"content_filters\":null,\"error\":null,\"frequency_penalty\":0.0,\"incomplete_details\":null,\"instructions\":null,\"max_output_tokens\":null,\"max_tool_calls\":null,\"model\":\"deepseek-flash\",\"moderation\":null,\"output\":[{\"type\":\"reasoning\",\"id\":\"7b1e61d9-b389-47f0-92ef-23465138dc20\",\"status\":\"completed\",\"content\":[{\"type\":\"reasoning_text\",\"text\":\"We need answer only number. Need parse context: previous answer 4. Multiply by 3 =12. Just number.\"}],\"summary\":[],\"encrypted_content\":\"cf8033ce-62ca-48e5-a770-5e1f99d34474-0\"},{\"type\":\"message\",\"id\":\"e7039dd3-e3df-4991-90e3-babbd3f4a915\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"annotations\":[],\"logprobs\":[],\"text\":\"12\"}],\"phase\":\"final_answer\",\"role\":\"assistant\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0.0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"prompt_cache_retention\":null,\"reasoning\":{\"effort\":null,\"summary\":null},\"safety_identifier\":null,\"service_tier\":\"default\",\"store\":false,\"temperature\":1.0,\"text\":{\"format\":{\"type\":\"text\"},\"verbosity\":null},\"tool_choice\":\"auto\",\"tools\":[],\"top_logprobs\":0,\"top_p\":1.0,\"truncation\":\"disabled\",\"usage\":{\"input_tokens\":58,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":27,\"output_tokens_details\":{\"reasoning_tokens\":25},\"total_tokens\":85},\"user\":null,\"metadata\":{}}"
+  }
+]

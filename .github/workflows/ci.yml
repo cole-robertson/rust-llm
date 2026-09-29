@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  test:
+    name: test (stable)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Builds every crate, test, and example (examples/*.rs are built, never run: they need keys).
+      - run: cargo build --workspace --all-targets
+      # Unit tests, cassette replays of RubyLLM's recordings, the Loco persistence test, and the
+      # generator tests. No network and no API keys.
+      - run: cargo test --workspace --all-targets
+      # Doctests, including every ```rust sample in docs/*.md (the rust_llm_docs crate).
+      - run: cargo test --workspace --doc
+
+  # rust-version in each Cargo.toml: rust_llm 1.88 (the icu crates under reqwest's url), and
+  # rust_llm_loco / rust_llm_cli 1.94 (sea-orm 2 and sqlx 0.9).
+  msrv:
+    name: build (MSRV ${{ matrix.rust }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - rust: "1.88"
+            crates: -p rust_llm
+          - rust: "1.94"
+            crates: -p rust_llm_loco -p rust_llm_cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check ${{ matrix.crates }}
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      # Reported, not enforced (no -D warnings) until the existing warnings are fixed.
+      - run: cargo clippy --workspace --all-targets
+      # `cargo fmt --check` is not run: the tree is not rustfmt-clean yet (65 files differ).
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo doc --workspace --no-deps
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # What would be uploaded to crates.io, and that it stays under the 10 MB limit. --no-verify
+      # because rust_llm_loco and rust_llm_cli depend on a rust_llm version not yet on crates.io.
+      - name: Package contents
+        run: |
+          cargo package --workspace --exclude rust_llm_docs --no-verify --allow-dirty
+          ls -l target/package/*.crate
+          for f in target/package/*.crate; do
+            size=$(stat -c %s "$f")
+            if [ "$size" -gt 10000000 ]; then echo "$f is $size bytes, over crates.io's 10 MB limit"; exit 1; fi
+          done
+      # The library verifies standalone: it builds from its own .crate with no workspace around it.
+      - run: cargo package -p rust_llm --allow-dirty

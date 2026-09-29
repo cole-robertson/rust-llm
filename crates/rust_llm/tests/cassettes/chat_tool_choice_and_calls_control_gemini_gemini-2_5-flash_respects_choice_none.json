@@ -1,0 +1,22 @@
+[
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What's the weather in Berlin? (52.5200, 13.4050)\"}]}],\"generationConfig\":{},\"tools\":[{\"functionDeclarations\":[{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parametersJsonSchema\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}]}],\"toolConfig\":{\"functionCallingConfig\":{\"mode\":\"none\"}}}",
+    "status": 200,
+    "response_headers": {
+      "X-Gemini-Service-Tier": "standard",
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:27:30 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=3225",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"The weather in Berlin, Germany (at 52.5200, 13.4050) is currently:\\n\\n*   **Temperature:** 20°C (68°F)\\n*   **Conditions:** Overcast clouds\\n*   **Feels like:** 20°C (68°F)\\n*   **Wind:** Light breeze from the West at 10 km/h (6 mph)\\n*   **Humidity:** 68%\\n\\n*(As of my last update around 12:00 PM CEST on June 10, 2024)*\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 103,\n    \"candidatesTokenCount\": 133,\n    \"totalTokenCount\": 689,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 103\n      }\n    ],\n    \"thoughtsTokenCount\": 453,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"T2msao_2GNSKvdIPx7fTmAY\"\n}\n"
+  }
+]

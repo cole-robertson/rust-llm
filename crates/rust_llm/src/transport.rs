@@ -205,7 +205,7 @@ impl Connection {
             return Err(Error::Api("Provider returned an empty response body".into(), None));
         }
         let body: Value = serde_json::from_str(&text).unwrap_or(Value::String(text));
-        Ok(RawResponse { status, headers, body, request_body: payload.clone() })
+        Ok(RawResponse { status, headers, body, request_body: payload.to_string().into() })
     }
 
     /// `Connection#post` with a multipart body, for Files and Batches uploads. `form` builds a fresh
@@ -242,7 +242,7 @@ impl Connection {
         let headers = header_pairs(&resp);
         let text = resp.text().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
         let body = if text.trim().is_empty() { Value::Null } else { serde_json::from_str(&text).unwrap_or(Value::String(text)) };
-        Ok(RawResponse { status, headers, body, request_body: Value::Null })
+        Ok(RawResponse { status, headers, body, request_body: Default::default() })
     }
 
     /// Any request with the provider's headers plus `extra`, with errors mapped like `post`.
@@ -255,6 +255,20 @@ impl Connection {
         retry: bool,
         body: &(dyn Fn(reqwest::RequestBuilder) -> reqwest::RequestBuilder + Send + Sync),
     ) -> Result<reqwest::Response> {
+        self.send_tracked(method, path, extra, retry, body, &mut |_| {}).await
+    }
+
+    /// `send` with `on_attempt` firing before every attempt, like `post`, so the usage ledger can
+    /// record retries of a request whose response is not JSON (speech audio, multipart uploads).
+    pub async fn send_tracked(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        extra: &[(String, String)],
+        retry: bool,
+        body: &(dyn Fn(reqwest::RequestBuilder) -> reqwest::RequestBuilder + Send + Sync),
+        on_attempt: &mut (dyn FnMut(Option<&Error>) + Send),
+    ) -> Result<reqwest::Response> {
         let url = self.url(path)?;
         let build = || {
             let mut req = self.client.request(method.clone(), &url);
@@ -266,7 +280,7 @@ impl Connection {
             }
             body(req)
         };
-        self.send_built(&build, retry, &mut |_| {}).await
+        self.send_built(&build, retry, on_attempt).await
     }
 
     /// POST JSON and feed each server-sent event to `on_event`. Errors inside the stream
@@ -293,7 +307,7 @@ impl Connection {
             let headers = header_pairs(&resp);
             let mut delivered = false;
             match self.read_stream(resp, on_event, streaming_error, &mut delivered).await {
-                Ok(()) => return Ok(RawResponse { status, headers, body: Value::Null, request_body: payload.clone() }),
+                Ok(()) => return Ok(RawResponse { status, headers, body: Value::Null, request_body: payload.to_string().into() }),
                 Err(error) if delivered => return Err(error),
                 Err(error) => {
                     let Some(delay) = self.retry_delay(&error, attempt, None) else { return Err(error) };
@@ -306,7 +320,7 @@ impl Connection {
         }
     }
 
-    async fn read_stream(
+    pub(crate) async fn read_stream(
         &self,
         resp: reqwest::Response,
         on_event: &mut (dyn FnMut(SseEvent, Value) -> Result<()> + Send),
@@ -348,6 +362,7 @@ impl Connection {
 
 /// Reads a JSON body the way `post` does: an empty body is an error, a non-JSON one a string.
 pub(crate) async fn json_response(resp: reqwest::Response, request_body: Value) -> Result<RawResponse> {
+    let request_body: std::sync::Arc<str> = if request_body.is_null() { "".into() } else { request_body.to_string().into() };
     let status = resp.status().as_u16();
     let headers = header_pairs(&resp);
     let text = resp.text().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;

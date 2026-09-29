@@ -1,0 +1,39 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.anthropic.com/v1/messages",
+    "request_body": "{\"model\":\"claude-haiku-4-5-20251001\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Call the object params tool with window start 2025-01-01 and end 2025-01-02 and include the result.\"}]}],\"stream\":false,\"max_tokens\":64000,\"tools\":[{\"name\":\"object_params\",\"description\":\"Uses params DSL object support\",\"input_schema\":{\"type\":\"object\",\"properties\":{\"window\":{\"type\":\"object\",\"properties\":{\"start\":{\"type\":\"string\",\"description\":\"ISO start\"},\"end\":{\"type\":\"string\",\"description\":\"ISO end\"}},\"required\":[\"start\",\"end\"],\"additionalProperties\":false,\"description\":\"Time window to schedule\"}},\"required\":[\"window\"],\"additionalProperties\":false}}]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:17:13 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Anthropic-Ratelimit-Input-Tokens-Limit": "10000000",
+      "Anthropic-Ratelimit-Input-Tokens-Remaining": "10000000",
+      "Anthropic-Ratelimit-Input-Tokens-Reset": "2026-09-17T22:17:13Z",
+      "Anthropic-Ratelimit-Output-Tokens-Limit": "2000000",
+      "Anthropic-Ratelimit-Output-Tokens-Remaining": "2000000",
+      "Anthropic-Ratelimit-Output-Tokens-Reset": "2026-09-17T22:17:13Z",
+      "Anthropic-Ratelimit-Requests-Limit": "10000",
+      "Anthropic-Ratelimit-Requests-Remaining": "9999",
+      "Anthropic-Ratelimit-Requests-Reset": "2026-09-17T22:17:12Z",
+      "Anthropic-Ratelimit-Tokens-Limit": "12000000",
+      "Anthropic-Ratelimit-Tokens-Remaining": "12000000",
+      "Anthropic-Ratelimit-Tokens-Reset": "2026-09-17T22:17:13Z",
+      "Server": "cloudflare",
+      "Request-Id": "<REQUEST_ID>",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "Anthropic-Organization-Id": "<ANTHROPIC_ORGANIZATION_ID>",
+      "Anthropic-Workspace-Id": "wrkspc_01MZW3YzUeytZsFc9LHFxP78",
+      "Traceresponse": "00-e5394e402d483686f8a189ede99a177e-47d0d476560dbc15-01",
+      "Vary": "Accept-Encoding",
+      "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+      "Server-Timing": "x-originResponse;dur=885",
+      "Cf-Cache-Status": "DYNAMIC",
+      "X-Robots-Tag": "none",
+      "Cf-Ray": "<CF_RAY>"
+    },
+    "response_body": "{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_011Cf9nXcf63rBRRTTV1QBky\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"toolu_015TpfQqDNrZDYpzdD7yPt4a\",\"name\":\"object_params\",\"input\":{\"window\":{\"start\":\"2025-01-01\",\"end\":\"2025-01-02\"}},\"caller\":{\"type\":\"direct\"}}],\"container\":null,\"stop_reason\":\"tool_use\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":657,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":75,\"service_tier\":\"standard\",\"inference_geo\":\"not_available\"}}"
+  }
+]

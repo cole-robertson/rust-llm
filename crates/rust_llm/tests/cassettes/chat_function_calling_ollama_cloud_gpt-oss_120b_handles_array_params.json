@@ -1,0 +1,24 @@
+[
+  {
+    "method": "post",
+    "uri": "https://ollama.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"Call the array params tool with tags [\\\"red\\\",\\\"blue\\\"] and tell me the combined tags.\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"array_params\",\"description\":\"Uses params DSL array support\",\"parameters\":{\"type\":\"object\",\"properties\":{\"tags\":{\"type\":\"array\",\"description\":\"List of tags to combine\",\"items\":{\"type\":\"string\"}}},\"required\":[\"tags\"],\"additionalProperties\":false}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Set-Cookie": "<COOKIE>",
+      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
+      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Frame-Options": "DENY",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Content-Length": "682",
+      "Date": "Thu, 17 Sep 2026 22:20:43 GMT",
+      "Server": "Google Frontend",
+      "Traceparent": "00-165cbc11cb0f860dea936bb66ffee723-2b9acbfc4d6a709f-00",
+      "X-Cloud-Trace-Context": "165cbc11cb0f860dea936bb66ffee723/3142047974535360671",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000"
+    },
+    "response_body": "{\"id\":\"chatcmpl-176\",\"object\":\"chat.completion\",\"created\":1789683643,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning\":\"We need to call the array_params tool with tags [\\\"red\\\",\\\"blue\\\"] and then respond with the combined tags. Probably the tool combines them? Not sure what it does. We'll just invoke.\",\"tool_calls\":[{\"id\":\"call_ubvq9lw2\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"array_params\",\"arguments\":\"{\\\"tags\\\":[\\\"red\\\",\\\"blue\\\"]}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":147,\"prompt_tokens_details\":{\"cached_tokens\":64},\"completion_tokens\":75,\"total_tokens\":222}}\n"
+  }
+]

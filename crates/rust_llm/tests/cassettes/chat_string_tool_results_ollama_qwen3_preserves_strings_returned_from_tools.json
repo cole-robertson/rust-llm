@@ -1,0 +1,26 @@
+[
+  {
+    "method": "post",
+    "uri": "<OLLAMA_API_BASE>/chat/completions",
+    "request_body": "{\"model\":\"qwen3\",\"messages\":[{\"role\":\"user\",\"content\":\"Process this query: test data\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"content_returning\",\"description\":\"Returns a processed string result\",\"parameters\":{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"Query to process\"}},\"required\":[\"query\"],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Date": "Thu, 17 Sep 2026 22:26:18 GMT",
+      "Content-Length": "936"
+    },
+    "response_body": "{\"id\":\"chatcmpl-338\",\"object\":\"chat.completion\",\"created\":1789683978,\"model\":\"qwen3\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning\":\"Okay, the user wants me to process the query \\\"test data\\\". Let me check the tools available. There's a function called content_returning that takes a query as a string. The description says it returns a processed string result. So I need to call that function with the query \\\"test data\\\". I'll structure the tool call with the name and arguments in JSON. Make sure the arguments are properly formatted as a JSON object with the query key.\\n\",\"tool_calls\":[{\"id\":\"call_hl2ln2xt\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"content_returning\",\"arguments\":\"{\\\"query\\\":\\\"test data\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":142,\"prompt_tokens_details\":{\"cached_tokens\":2},\"completion_tokens\":117,\"total_tokens\":259}}\n"
+  },
+  {
+    "method": "post",
+    "uri": "<OLLAMA_API_BASE>/chat/completions",
+    "request_body": "{\"model\":\"qwen3\",\"messages\":[{\"role\":\"user\",\"content\":\"Process this query: test data\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_hl2ln2xt\",\"type\":\"function\",\"function\":{\"name\":\"content_returning\",\"arguments\":\"{\\\"query\\\":\\\"test data\\\"}\"}}],\"reasoning\":\"Okay, the user wants me to process the query \\\"test data\\\". Let me check the tools available. There's a function called content_returning that takes a query as a string. The description says it returns a processed string result. So I need to call that function with the query \\\"test data\\\". I'll structure the tool call with the name and arguments in JSON. Make sure the arguments are properly formatted as a JSON object with the query key.\\n\",\"reasoning_content\":\"Okay, the user wants me to process the query \\\"test data\\\". Let me check the tools available. There's a function called content_returning that takes a query as a string. The description says it returns a processed string result. So I need to call that function with the query \\\"test data\\\". I'll structure the tool call with the name and arguments in JSON. Make sure the arguments are properly formatted as a JSON object with the query key.\\n\"},{\"role\":\"tool\",\"content\":\"Processed: test data\",\"tool_call_id\":\"call_hl2ln2xt\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"content_returning\",\"description\":\"Returns a processed string result\",\"parameters\":{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"Query to process\"}},\"required\":[\"query\"],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Date": "Thu, 17 Sep 2026 22:26:19 GMT",
+      "Content-Length": "914"
+    },
+    "response_body": "{\"id\":\"chatcmpl-538\",\"object\":\"chat.completion\",\"created\":1789683979,\"model\":\"qwen3\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The processed result for your query is: **\\\"Processed: test data\\\"**.\\n\\nLet me know if you need further assistance!\",\"reasoning\":\"Okay, the user asked me to process the query \\\"test data\\\". I called the content_returning function with that query, and the response was \\\"Processed: test data\\\". Now I need to present this result to the user. Since the function returned the same string, it's possible that the processing didn't change the data. I should confirm that the processing is done and maybe ask if they need anything else. Let me make sure the response is clear and helpful.\\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":274,\"prompt_tokens_details\":{\"cached_tokens\":143},\"completion_tokens\":125,\"total_tokens\":399}}\n"
+  }
+]

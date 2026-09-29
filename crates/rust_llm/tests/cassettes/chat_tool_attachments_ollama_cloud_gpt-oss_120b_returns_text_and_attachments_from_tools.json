@@ -1,0 +1,46 @@
+[
+  {
+    "method": "post",
+    "uri": "https://ollama.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"Call file_fetch to get ruby.txt, then repeat the contents of the attached file.\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"file_fetch\",\"description\":\"Fetches a sample text file named ruby.txt\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Set-Cookie": "<COOKIE>",
+      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
+      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Frame-Options": "DENY",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Content-Length": "565",
+      "Date": "Thu, 17 Sep 2026 22:29:52 GMT",
+      "Server": "Google Frontend",
+      "X-Cloud-Trace-Context": "c6eec527c9101882aa3fbb0d5be7217d/5136659782105176456",
+      "Traceparent": "00-c6eec527c9101882aa3fbb0d5be7217d-474914db4c6a1988-00",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000"
+    },
+    "response_body": "{\"id\":\"chatcmpl-449\",\"object\":\"chat.completion\",\"created\":1789684192,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning\":\"The user wants to fetch ruby.txt and repeat its contents. We need to call the file_fetch tool.\",\"tool_calls\":[{\"id\":\"call_cjfxai2o\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"file_fetch\",\"arguments\":\"{}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":133,\"prompt_tokens_details\":{\"cached_tokens\":96},\"completion_tokens\":41,\"total_tokens\":174}}\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://ollama.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"Call file_fetch to get ruby.txt, then repeat the contents of the attached file.\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_cjfxai2o\",\"type\":\"function\",\"function\":{\"name\":\"file_fetch\",\"arguments\":\"{}\"}}],\"reasoning\":\"The user wants to fetch ruby.txt and repeat its contents. We need to call the file_fetch tool.\",\"reasoning_content\":\"The user wants to fetch ruby.txt and repeat its contents. We need to call the file_fetch tool.\"},{\"role\":\"tool\",\"content\":\"Fetched the file.\",\"tool_call_id\":\"call_cjfxai2o\"},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Attachments from tool call call_cjfxai2o:\"},{\"type\":\"text\",\"text\":\"<file name='ruby.txt' mime_type='text/plain'>Ruby is the best.</file>\"}]}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"file_fetch\",\"description\":\"Fetches a sample text file named ruby.txt\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Set-Cookie": "<COOKIE>",
+      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
+      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Frame-Options": "DENY",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Content-Length": "540",
+      "Date": "Thu, 17 Sep 2026 22:29:52 GMT",
+      "Server": "Google Frontend",
+      "X-Cloud-Trace-Context": "0e8201bbca9df8b6d35ce20ebff4d82a/13739879829841770002",
+      "Traceparent": "00-0e8201bbca9df8b6d35ce20ebff4d82a-beaddbe88245f612-00",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000"
+    },
+    "response_body": "{\"id\":\"chatcmpl-621\",\"object\":\"chat.completion\",\"created\":1789684192,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Ruby is the best.\",\"reasoning\":\"The user wants to repeat the contents of the attached file. The file ruby.txt contains \\\"Ruby is the best.\\\" So we should repeat that content. Probably just output the text.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":198,\"prompt_tokens_details\":{\"cached_tokens\":112},\"completion_tokens\":51,\"total_tokens\":249}}\n"
+  }
+]

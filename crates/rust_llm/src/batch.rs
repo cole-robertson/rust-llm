@@ -837,7 +837,7 @@ fn random_hex() -> String {
 }
 
 fn raw(body: &Value) -> RawResponse {
-    RawResponse { status: 200, headers: Vec::new(), body: body.clone(), request_body: Value::Null }
+    RawResponse { status: 200, headers: Vec::new(), body: body.clone(), request_body: Default::default() }
 }
 
 fn anthropic_attrs(data: &Value) -> Attrs {

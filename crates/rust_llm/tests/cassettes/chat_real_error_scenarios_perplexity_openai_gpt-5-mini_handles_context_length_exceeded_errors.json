@@ -1,0 +1,27 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.perplexity.ai/v1/agent",
+    "request_body": "{\"model\":\"openai/gpt-5-mini\",\"input\":[{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"<MASSIVE_TEXT>\"}]},{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"<MASSIVE_TEXT>\"}]},{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"<MASSIVE_TEXT>\"}]},{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"<MASSIVE_TEXT>\"}]},{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"<MASSIVE_TEXT>\"}]},{\"role\":\"user\",\"content\":\"Hi\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"]}",
+    "status": 400,
+    "response_headers": {
+      "Date": "Fri, 25 Sep 2026 08:36:49 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "76",
+      "Connection": "keep-alive",
+      "Server": "cloudflare",
+      "X-Ratelimit-Limit": "1",
+      "X-Ratelimit-Remaining": "0",
+      "X-Ratelimit-Reset": "1790325410",
+      "X-Ratelimit-Used": "1",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Access-Control-Allow-Origin": "*",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Set-Cookie": "<COOKIE>",
+      "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\"error\":{\"message\":\"invalid request\",\"type\":\"invalid_request\",\"code\":400}}\n"
+  }
+]

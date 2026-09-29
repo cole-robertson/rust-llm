@@ -14,6 +14,20 @@ pub struct Config {
     pub default_image_model: String,
     /// `default_judgment_model`: what `judge` uses; judges never fall back to the chat model.
     pub default_judgment_model: String,
+    /// `default_speech_model`: what `rust_llm::speak` uses when no model is given.
+    pub default_speech_model: String,
+    /// `default_transcription_model`: what `rust_llm::transcribe` uses when no model is given.
+    pub default_transcription_model: String,
+    /// `default_moderation_model`: what `rust_llm::moderate` uses when no model is given.
+    pub default_moderation_model: String,
+    /// `default_ocr_model`: what `rust_llm::ocr` uses when no model is given.
+    pub default_ocr_model: String,
+    /// `default_video_model`: what `rust_llm::animate` uses when no model is given.
+    pub default_video_model: String,
+    /// `video_generation_timeout`: how long `VideoJob::wait` polls before giving up.
+    pub video_generation_timeout: Duration,
+    /// `video_generation_poll_interval`: the pause between `VideoJob::wait` polls.
+    pub video_generation_poll_interval: Duration,
     pub request_timeout: Duration,
     pub max_retries: u32,
     pub retry_interval: f64,
@@ -50,6 +64,13 @@ impl Default for Config {
             default_embedding_model: "text-embedding-3-small".into(),
             default_image_model: "gpt-image-2".into(),
             default_judgment_model: "jev-latest".into(),
+            default_speech_model: "gpt-4o-mini-tts-2025-12-15".into(),
+            default_transcription_model: "gpt-transcribe".into(),
+            default_moderation_model: "omni-moderation-latest".into(),
+            default_ocr_model: "mistral-ocr-latest".into(),
+            default_video_model: "grok-imagine-video-1.5".into(),
+            video_generation_timeout: Duration::from_secs(600),
+            video_generation_poll_interval: Duration::from_secs(5),
             request_timeout: Duration::from_secs(300),
             max_retries: 3,
             retry_interval: 0.1,

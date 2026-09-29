@@ -1,0 +1,34 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.openai.com/v1/responses",
+    "request_body": "{\"model\":\"gpt-5-nano\",\"input\":[{\"role\":\"user\",\"content\":\"What is the square root of 64? Answer with a JSON object with the key `result`.\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"text\":{\"format\":{\"type\":\"json_object\"}}}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:14:05 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Cf-Ray": "<CF_RAY>",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Server": "cloudflare",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "Access-Control-Expose-Headers": "CF-Ray",
+      "Openai-Organization": "<OPENAI_ORGANIZATION>",
+      "Openai-Processing-Ms": "1711",
+      "Openai-Project": "<OPENAI_PROJECT>",
+      "Openai-Version": "2020-10-01",
+      "X-Ratelimit-Limit-Requests": "5000",
+      "X-Ratelimit-Limit-Tokens": "2000000",
+      "X-Ratelimit-Remaining-Requests": "4999",
+      "X-Ratelimit-Remaining-Tokens": "2000000",
+      "X-Ratelimit-Reset-Requests": "12ms",
+      "X-Ratelimit-Reset-Tokens": "0s",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Set-Cookie": "<COOKIE>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\n  \"id\": \"resp_05a0590964b91b23016aac662b877c87d29d0e9c475acb6bd6\",\n  \"object\": \"response\",\n  \"created_at\": 1789683243,\n  \"status\": \"completed\",\n  \"background\": false,\n  \"billing\": {\n    \"payer\": \"developer\"\n  },\n  \"completed_at\": 1789683245,\n  \"error\": null,\n  \"frequency_penalty\": 0.0,\n  \"incomplete_details\": null,\n  \"instructions\": null,\n  \"max_output_tokens\": null,\n  \"max_tool_calls\": null,\n  \"model\": \"gpt-5-nano-2025-08-07\",\n  \"moderation\": null,\n  \"output\": [\n    {\n      \"id\": \"rs_05a0590964b91b23016aac662bdb4887d2937b95bc3864e58c\",\n      \"type\": \"reasoning\",\n      \"content\": [],\n      \"encrypted_content\": \"gAAAAABqrGYt98jiFa0WWf-iKCkBg2fAon8yC51mdtD178JLZssgaVQpwLilBH-s_NTXFd-7s8pX5yOhfiW7n8ruV7ebEBhy_SSpptX575A0xIXnYGricF-0VW68q_a70gy7b9l2zJW3fPmU0w37JbRScmkLy7NOUIAGWXELg0tAJ9iT3N6tixRp0gpL_zna__s-v8fw6W7Jymd-SWYSAswyxXbxogZqxAT7aA_P6DQ_4ETufcAfWFSPv87WgbpjYPOo35KrAx4SKxe0kN4m6IIp1ppjVevk-Q38DkEQ7z5jWF6hyTG3tWyzWORhxfcTBK35d8InyXViPj3UA5-S7q4HJBaQ3JyIDC6ZfVzSIRGeD-O2JdP2FXv_ZPX5w6vF58TkrRkmJB2jyqVgoJ-dVLL-xD6BBRerdvtZBIrKazJoe4JoBV45gPURV4u4ijWtkFiEQ4n9aZ8oMOWOQxX1OMYqyp_yNxtlwdgNpULkZq1UlstmAzgftP60QLayp2Htr59Jgn4kDrcS85wCa2tw7CP6nB9hC48Vbr5MfUQ9i7kTEzbAcskB3IevqN_0wFJ5rsq4CKIERsZ1tUT2k0S6mNjwnbAXJ0y3dLffpt44yQV4M8g7Cfmzbd31rfuxpAOxoZ9Vx_yHgmsrzvT_dEJ4HF8Sr5dCnFkbOLDa2mui5GbSaAZJTcj6LNgKEx2B1mAzUZdzNGhiTtpU9GqthqHv7dxEqOZ1_zmzrC54dyvNqHgbKW7cdeiJexkh4-k-OueDJAimXTSFeuESZbwVyPuDZja1YgFmur7HIf-EYn-XLbdhAw49CO4yzK8Ae4Pz_o63Ul0p9kfBdxN78DFkEisz6j957LAzXIqI-JUBjPGFkKO2BNIwnwR_XGw5ldWBFsIOy2_NgWryVkZeUVCQRKztOlLPsMOUQlDM5BEVWptHNuMWf9_3VEMnZ2FzBkU6DhK_P9cXARFsf-RR_DN5AF281obOUUssecKoZk1LFlHZnG3PvJMWwDBXEkbxludkXuPZdEM_eQrnSCysLMGzXLwfyc2qLwgYPTE6YeOIcCFil2nDazBzGA9DHnfp5r-WiHcEAMGXYGus-A5DWGHV1K0fe9gegsDuf7mz5stZe-JVvj3VhkIEOxtJHHZI_Y4QtijHbocxpczK5JhnrcyYemBSdYU3E3cL1wFOwpECYcouuZR-SX3cxgc3Idvcfgvs-aPVCDpWQYz8i-wU3X5KYsJwgyKEGVbVycX8HI3M8uFuf1mqheOOtBZoDe7dnVbe1h3x18QCNLHdlrhuvdu4hWXrI3XIEquWZmtxChj_rGVIC3qQg_inZIkbZkxIe0IgYnS9HrPiO0PtBJBTTbGm-d4aKpPzPhoRvka6xeJ59eXSgMa304xB-2gFGJiPwIX9yFb2s44RnxbscKhleYKzRRn4WpTVTy79gKUcHsPtm3L3wbiKG_4gOm4mCKX_rgwZ4d2eI0uAA5tOO23CldC4mMD-0m_gZjk3TlPmZZR8nqnPTOSRK3FcocGu84eWrYN0VbAPhGMpUfP7EInftPNPVlIvjqMmmPB_FLh-Qu87ZVEkjK4-3NZdC1HEV18alJ9OmIJmpXKFyHh9YmKDGZEj8-_Cewp2nQljNKGHIdOZpiqYIjkB0fmx-eoK7teejmJGdJKKG9efYHFed0LJWLmt8iiDBdMfa8haM6IxL686J0f-9oM6wCHkFkntM5eiOR7mF7BjYUAUsQBtlRz6Jp0rBURgO5ilpx_eqH4IxmcrZKJkBQkoDZXJrbHbhXp8UKsWlALsjDPWjIByKq0gRb_3AXU8XjvlgzJvn6YVMAfEATEvdRW0zHVx_llTLk54J_vZjYrgTuJShRR12ZMqz957olihdmIBFRhKmDccO2TPvWErq2h84tPbSYBqzKzA7ks5jvaPBJ5c8kFC6OsiUlH30Xdkw1PhFD4FEbQ61imIPlO66iWfFd9nqNOqyS-4KVyX4bJ75Z9Mg5qpUrFtWe3oZaR6geS2lXfhw8tFELTpgo7fzLb_gQtA37UDoDmDrko6FdbD9SYlfA4v6RB9y94hNMn1_K06618f7K7_XabthMTfj5V9pO9WwubIu8w=\",\n      \"summary\": []\n    },\n    {\n      \"id\": \"msg_05a0590964b91b23016aac662d198887d2807a6f07c3c36cff\",\n      \"type\": \"message\",\n      \"status\": \"completed\",\n      \"content\": [\n        {\n          \"type\": \"output_text\",\n          \"annotations\": [],\n          \"logprobs\": [],\n          \"text\": \"{\\\"result\\\": 8}\"\n        }\n      ],\n      \"role\": \"assistant\"\n    }\n  ],\n  \"parallel_tool_calls\": true,\n  \"presence_penalty\": 0.0,\n  \"previous_response_id\": null,\n  \"prompt_cache_key\": null,\n  \"prompt_cache_retention\": \"in_memory\",\n  \"reasoning\": {\n    \"context\": \"current_turn\",\n    \"effort\": \"medium\",\n    \"mode\": \"standard\",\n    \"summary\": null\n  },\n  \"safety_identifier\": null,\n  \"service_tier\": \"default\",\n  \"store\": false,\n  \"temperature\": 1.0,\n  \"text\": {\n    \"format\": {\n      \"type\": \"json_object\"\n    },\n    \"verbosity\": \"medium\"\n  },\n  \"tool_choice\": \"auto\",\n  \"tool_usage\": {\n    \"image_gen\": {\n      \"input_tokens\": 0,\n      \"input_tokens_details\": {\n        \"image_tokens\": 0,\n        \"text_tokens\": 0\n      },\n      \"output_tokens\": 0,\n      \"output_tokens_details\": {\n        \"image_tokens\": 0,\n        \"text_tokens\": 0\n      },\n      \"total_tokens\": 0\n    },\n    \"web_search\": {\n      \"num_requests\": 0\n    }\n  },\n  \"tools\": [],\n  \"top_logprobs\": 0,\n  \"top_p\": 1.0,\n  \"truncation\": \"disabled\",\n  \"usage\": {\n    \"input_tokens\": 26,\n    \"input_tokens_details\": {\n      \"cache_write_tokens\": 0,\n      \"cached_tokens\": 0\n    },\n    \"output_tokens\": 182,\n    \"output_tokens_details\": {\n      \"reasoning_tokens\": 128\n    },\n    \"total_tokens\": 208\n  },\n  \"user\": null,\n  \"metadata\": {}\n}"
+  }
+]

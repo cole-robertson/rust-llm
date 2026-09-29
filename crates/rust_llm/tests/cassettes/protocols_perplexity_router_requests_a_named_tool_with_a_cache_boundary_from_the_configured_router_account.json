@@ -1,0 +1,23 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.perplexity.ai/router/v1/chat/completions",
+    "request_body": "{\"model\":\"perplexity/kimi-k3\",\"messages\":[{\"role\":\"developer\",\"content\":[{\"type\":\"text\",\"text\":\"Use arithmetic tools for arithmetic.\",\"prompt_cache_breakpoint\":{\"mode\":\"explicit\"}}]},{\"role\":\"user\",\"content\":\"Add two and two.\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"add\",\"description\":\"Add two integers.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"left\":{\"type\":\"integer\"},\"right\":{\"type\":\"integer\"}},\"required\":[\"left\",\"right\"],\"additionalProperties\":false,\"strict\":true}}}],\"tool_choice\":{\"type\":\"function\",\"function\":{\"name\":\"add\"}},\"parallel_tool_calls\":false}",
+    "status": 403,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:16:27 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Set-Cookie": "<COOKIE>",
+      "Server": "cloudflare",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Access-Control-Allow-Origin": "*",
+      "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\"error\":{\"code\":null,\"message\":\"The Router API is currently in limited preview. Contact api@perplexity.ai to request access.\",\"param\":null,\"type\":\"invalid_request_error\"}}\n"
+  }
+]

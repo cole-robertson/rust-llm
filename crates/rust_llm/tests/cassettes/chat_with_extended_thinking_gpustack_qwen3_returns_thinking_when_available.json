@@ -1,0 +1,21 @@
+[
+  {
+    "method": "post",
+    "uri": "<GPUSTACK_API_BASE>/chat/completions",
+    "request_body": "{\"model\":\"qwen3\",\"messages\":[{\"role\":\"user\",\"content\":\"What is 5 + 3? Think briefly before answering.\"}],\"stream\":false}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json; charset=utf-8",
+      "Req-Cost-Time": "1294",
+      "Resp-Start-Time": "1789682949806",
+      "X-Envoy-Upstream-Service-Time": "1291",
+      "Date": "Thu, 17 Sep 2026 22:09:08 GMT",
+      "Server": "istio-envoy",
+      "Access-Control-Allow-Origin": "",
+      "Req-Arrive-Time": "1789682948511",
+      "Vary": "Accept-Encoding",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"5 + 3 = 8.\",\"reasoning_content\":\"Okay, let's see. The question is asking what 5 plus 3 is. Hmm, addition. So 5 and 3. Let me count. 5 plus 3... if I start with 5 and add 3 more, that would be 5, 6, 7, 8. Wait, is that right? Let me check again. 5 + 1 is 6, 6 + 1 is 7, 7 + 1 is 8. Yeah, so 5 + 3 equals 8. I think that's correct. Maybe I can use another method. Like, 5 plus 2 is 7, so adding one more makes it 8. Yep, that works. So the answer should be 8.\\n\"}}],\"created\":1789682949,\"model\":\"qwen3\",\"system_fingerprint\":\"b10830-465e49b9c\",\"object\":\"chat.completion\",\"usage\":{\"completion_tokens\":175,\"prompt_tokens\":21,\"total_tokens\":196,\"prompt_tokens_details\":{\"cached_tokens\":1}},\"id\":\"chatcmpl-rWn8ycEdI7HE3PW2MJYoxAzdxBfguxEp\",\"timings\":{\"cache_n\":1,\"prompt_n\":20,\"prompt_ms\":14.077,\"prompt_per_token_ms\":0.70385,\"prompt_per_second\":1420.7572636215102,\"predicted_n\":175,\"predicted_ms\":1257.095,\"predicted_per_token_ms\":7.224683908045977,\"predicted_per_second\":138.41436009211714}}"
+  }
+]

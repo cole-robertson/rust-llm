@@ -67,6 +67,8 @@ const OPENAI_SEARCH_MODELS: &[&str] = &[
     "gpt-4o-mini-search-preview-2025-03-11",
     "gpt-4o-search-preview",
     "gpt-4o-search-preview-2025-03-11",
+    "gpt-5-search-api",
+    "gpt-5-search-api-2025-10-14",
 ];
 
 pub fn display_name(slug: &str) -> &str {

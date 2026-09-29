@@ -1,0 +1,29 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.openai.com/v1/moderations",
+    "request_body": "{\"model\":\"omni-moderation-latest\",\"input\":[{\"type\":\"text\",\"text\":\"check this image and caption\"},{\"type\":\"image_url\",\"image_url\":{\"url\":\"https://upload.wikimedia.org/wikipedia/en/7/7d/Lenna_%28test_image%29.png\"}}]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:15:47 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Server": "cloudflare",
+      "Openai-Version": "2020-10-01",
+      "Openai-Organization": "<OPENAI_ORGANIZATION>",
+      "Openai-Project": "<OPENAI_PROJECT>",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Openai-Processing-Ms": "980",
+      "X-Openai-Proxy-Wasm": "v0.1",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Access-Control-Expose-Headers": "CF-Ray",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "Set-Cookie": "<COOKIE>",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\n  \"id\": \"modr-552\",\n  \"model\": \"omni-moderation-latest\",\n  \"results\": [\n    {\n      \"flagged\": false,\n      \"categories\": {\n        \"harassment\": false,\n        \"harassment/threatening\": false,\n        \"sexual\": false,\n        \"hate\": false,\n        \"hate/threatening\": false,\n        \"illicit\": false,\n        \"illicit/violent\": false,\n        \"self-harm/intent\": false,\n        \"self-harm/instructions\": false,\n        \"self-harm\": false,\n        \"sexual/minors\": false,\n        \"violence\": false,\n        \"violence/graphic\": false\n      },\n      \"category_scores\": {\n        \"harassment\": 0.0005423362846882929,\n        \"harassment/threatening\": 4.757645425657629e-6,\n        \"sexual\": 0.00011160142598430911,\n        \"hate\": 0.00002199533724320648,\n        \"hate/threatening\": 6.748051590048605e-7,\n        \"illicit\": 7.722191834067996e-6,\n        \"illicit/violent\": 2.1112482331487175e-6,\n        \"self-harm/intent\": 4.1335397768930325e-6,\n        \"self-harm/instructions\": 1.8925148246037342e-6,\n        \"self-harm\": 0.00046119806894731965,\n        \"sexual/minors\": 3.120191139396651e-6,\n        \"violence\": 0.000510430845712912,\n        \"violence/graphic\": 7.967300986103147e-6\n      },\n      \"category_applied_input_types\": {\n        \"harassment\": [\n          \"text\"\n        ],\n        \"harassment/threatening\": [\n          \"text\"\n        ],\n        \"sexual\": [\n          \"text\",\n          \"image\"\n        ],\n        \"hate\": [\n          \"text\"\n        ],\n        \"hate/threatening\": [\n          \"text\"\n        ],\n        \"illicit\": [\n          \"text\"\n        ],\n        \"illicit/violent\": [\n          \"text\"\n        ],\n        \"self-harm/intent\": [\n          \"text\",\n          \"image\"\n        ],\n        \"self-harm/instructions\": [\n          \"text\",\n          \"image\"\n        ],\n        \"self-harm\": [\n          \"text\",\n          \"image\"\n        ],\n        \"sexual/minors\": [\n          \"text\"\n        ],\n        \"violence\": [\n          \"text\",\n          \"image\"\n        ],\n        \"violence/graphic\": [\n          \"text\",\n          \"image\"\n        ]\n      }\n    }\n  ]\n}"
+  }
+]

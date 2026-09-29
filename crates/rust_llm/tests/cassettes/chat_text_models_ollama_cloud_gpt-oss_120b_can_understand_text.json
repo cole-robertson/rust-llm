@@ -1,0 +1,46 @@
+[
+  {
+    "method": "post",
+    "uri": "https://ollama.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What's in this file?\"},{\"type\":\"text\",\"text\":\"<file name='ruby.txt' mime_type='text/plain'>Ruby is the best.</file>\"}]}],\"stream\":false}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Set-Cookie": "<COOKIE>",
+      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
+      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Frame-Options": "DENY",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Content-Length": "668",
+      "Date": "Thu, 17 Sep 2026 22:07:35 GMT",
+      "Server": "Google Frontend",
+      "X-Cloud-Trace-Context": "dff504e592689a482c72c535574f6c2e/764278374699522179",
+      "Traceparent": "00-dff504e592689a482c72c535574f6c2e-0a9b4321e97a5883-00",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
+    },
+    "response_body": "{\"id\":\"chatcmpl-584\",\"object\":\"chat.completion\",\"created\":1789682855,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The file **ruby.txt** contains the following text:\\n\\n```\\nRuby is the best.\\n```\",\"reasoning\":\"The user asks: \\\"What's in this file?\\\" and provides a file named ruby.txt with content: \\\"Ruby is the best.\\\" We need to output the content. Probably just print the content. There's no restriction. So respond with the content of the file.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":92,\"prompt_tokens_details\":{\"cached_tokens\":48},\"completion_tokens\":81,\"total_tokens\":173}}\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://ollama.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What's in this file?\"},{\"type\":\"text\",\"text\":\"<file name='ruby.txt' mime_type='text/plain'>Ruby is the best.</file>\"}]},{\"role\":\"assistant\",\"content\":\"The file **ruby.txt** contains the following text:\\n\\n```\\nRuby is the best.\\n```\",\"reasoning\":\"The user asks: \\\"What's in this file?\\\" and provides a file named ruby.txt with content: \\\"Ruby is the best.\\\" We need to output the content. Probably just print the content. There's no restriction. So respond with the content of the file.\",\"reasoning_content\":\"The user asks: \\\"What's in this file?\\\" and provides a file named ruby.txt with content: \\\"Ruby is the best.\\\" We need to output the content. Probably just print the content. There's no restriction. So respond with the content of the file.\"},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"and in this one?\"},{\"type\":\"text\",\"text\":\"<file name='ruby.xml' mime_type='application/xml'><truism>Ruby is the best</truism></file>\"}]}],\"stream\":false}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Set-Cookie": "<COOKIE>",
+      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
+      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Frame-Options": "DENY",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Content-Length": "709",
+      "Date": "Thu, 17 Sep 2026 22:07:36 GMT",
+      "Server": "Google Frontend",
+      "X-Cloud-Trace-Context": "213ff56fd70b5829ec29e89776b7a540/15724197458555292812",
+      "Traceparent": "00-213ff56fd70b5829ec29e89776b7a540-da3792473749cc8c-00",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
+    },
+    "response_body": "{\"id\":\"chatcmpl-73\",\"object\":\"chat.completion\",\"created\":1789682856,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The file **ruby.xml** contains this XML markup:\\n\\n```xml\\n\\u003ctruism\\u003eRuby is the best\\u003c/truism\\u003e\\n```\",\"reasoning\":\"User asks what's in the file ruby.xml which contains an XML snippet: \\u003ctruism\\u003eRuby is the best\\u003c/truism\\u003e. Need to answer with its content. Provide the content as formatted. Possibly also explain it's XML with a single element.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":152,\"prompt_tokens_details\":{\"cached_tokens\":64},\"completion_tokens\":86,\"total_tokens\":238}}\n"
+  }
+]

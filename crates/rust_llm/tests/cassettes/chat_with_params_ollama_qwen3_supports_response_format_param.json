@@ -1,0 +1,14 @@
+[
+  {
+    "method": "post",
+    "uri": "<OLLAMA_API_BASE>/chat/completions",
+    "request_body": "{\"model\":\"qwen3\",\"messages\":[{\"role\":\"user\",\"content\":\"What is the square root of 64? Answer with a JSON object with the key `result`.\"}],\"stream\":false,\"response_format\":{\"type\":\"json_object\"}}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Date": "Thu, 17 Sep 2026 22:14:03 GMT",
+      "Content-Length": "1051"
+    },
+    "response_body": "{\"id\":\"chatcmpl-243\",\"object\":\"chat.completion\",\"created\":1789683243,\"model\":\"qwen3\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"{\\\"result\\\": 8}\",\"reasoning\":\"Okay, the user is asking for the square root of 64. Let me think. Square root of a number is a value that, when multiplied by itself, gives the original number. So, what number multiplied by itself equals 64?\\n\\nWell, 8 times 8 is 64. So the square root of 64 should be 8. But wait, isn't there also a negative root? Because (-8) times (-8) is also 64. However, when people ask for the square root, they usually refer to the principal (positive) root. So the answer is 8.\\n\\nThe user wants the answer in a JSON object with the key \\\"result\\\". So I need to structure it as {\\\"result\\\": 8}. Let me double-check to make sure I didn't make a mistake. Yep, 8 squared is 64. Alright, that's correct.\\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":31,\"prompt_tokens_details\":{\"cached_tokens\":5},\"completion_tokens\":199,\"total_tokens\":230}}\n"
+  }
+]

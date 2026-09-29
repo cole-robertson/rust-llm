@@ -1,0 +1,46 @@
+[
+  {
+    "method": "post",
+    "uri": "https://openrouter.ai/api/v1/chat/completions",
+    "request_body": "{\"model\":\"anthropic/claude-haiku-4.5\",\"messages\":[{\"role\":\"user\",\"content\":\"What is 5 + 3?\"}],\"stream\":false,\"reasoning\":{\"effort\":\"medium\"}}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:11:17 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+      "X-Generation-Id": "gen-1789683076-E6j0co9Pz2OWDG6DuM6V",
+      "Access-Control-Expose-Headers": "X-Generation-Id,X-Provider-Name,request-id,cf-ray",
+      "Set-Cookie": "<COOKIE>",
+      "Permissions-Policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "Referrer-Policy": "no-referrer, strict-origin-when-cross-origin",
+      "X-Content-Type-Options": "nosniff",
+      "Server": "cloudflare",
+      "Cf-Ray": "<CF_RAY>"
+    },
+    "response_body": "\n         \n{\"id\":\"gen-1789683076-E6j0co9Pz2OWDG6DuM6V\",\"object\":\"chat.completion\",\"created\":1789683076,\"model\":\"anthropic/claude-haiku-4.5\",\"provider\":\"Amazon Bedrock\",\"system_fingerprint\":null,\"service_tier\":\"default\",\"choices\":[{\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"end_turn\",\"message\":{\"role\":\"assistant\",\"content\":\"5 + 3 = 8\",\"refusal\":null,\"reasoning\":\"This is a simple arithmetic question. 5 + 3 = 8.\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"This is a simple arithmetic question. 5 + 3 = 8.\",\"format\":\"anthropic-claude-v1\",\"index\":0,\"signature\":\"Eq8CCpwBCBEQARgCKkCyqtg4YSovHjJWjT5xWNBV0HDNY0NkeiSISwchPehu+JHqF14GKTlprSnmlk1ohL26KlGnQRhwg33jqkxTjsJiMhljbGF1ZGUtaGFpa3UtNC01LTIwMjUxMDAxOABCCHRoaW5raW5nWgw1MzY2OTcyNDk3MjhyEOIi79uJbELZgi9m1nMrW5SIAQGoAYXLsdUGsAECEgxWZ2cqM//az8ZwMeYaDFzYzltyEn+IQQ6Y9SIwh0Be2dMP5hDTlZTWtWjp5Ud0aEF2tWwY23i9HlwkV7BKHXGfnzEutbdQzdzmq5QeKkC5rraeTnjvCfkw0grhDjZlauoOQE0ZJuGReFifg2sbWFqTzYtw/zPNyHNqu8JozgaERBZylGvRULBy2yq8BqnhGAE=\"}]}}],\"usage\":{\"prompt_tokens\":45,\"completion_tokens\":38,\"total_tokens\":83,\"cost\":0.000235,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000235,\"upstream_inference_prompt_cost\":0.000045,\"upstream_inference_completions_cost\":0.00019},\"completion_tokens_details\":{\"reasoning_tokens\":23,\"image_tokens\":0,\"audio_tokens\":0}}}"
+  },
+  {
+    "method": "post",
+    "uri": "https://openrouter.ai/api/v1/chat/completions",
+    "request_body": "{\"model\":\"anthropic/claude-haiku-4.5\",\"messages\":[{\"role\":\"user\",\"content\":\"What is 5 + 3?\"},{\"role\":\"assistant\",\"content\":\"5 + 3 = 8\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"This is a simple arithmetic question. 5 + 3 = 8.\",\"format\":\"anthropic-claude-v1\",\"index\":0,\"signature\":\"Eq8CCpwBCBEQARgCKkCyqtg4YSovHjJWjT5xWNBV0HDNY0NkeiSISwchPehu+JHqF14GKTlprSnmlk1ohL26KlGnQRhwg33jqkxTjsJiMhljbGF1ZGUtaGFpa3UtNC01LTIwMjUxMDAxOABCCHRoaW5raW5nWgw1MzY2OTcyNDk3MjhyEOIi79uJbELZgi9m1nMrW5SIAQGoAYXLsdUGsAECEgxWZ2cqM//az8ZwMeYaDFzYzltyEn+IQQ6Y9SIwh0Be2dMP5hDTlZTWtWjp5Ud0aEF2tWwY23i9HlwkV7BKHXGfnzEutbdQzdzmq5QeKkC5rraeTnjvCfkw0grhDjZlauoOQE0ZJuGReFifg2sbWFqTzYtw/zPNyHNqu8JozgaERBZylGvRULBy2yq8BqnhGAE=\"}]},{\"role\":\"user\",\"content\":\"Now multiply that by 2\"}],\"stream\":false,\"reasoning\":{\"effort\":\"medium\"}}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:11:18 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+      "X-Generation-Id": "gen-1789683077-zwCwD6oxLn7nDXLah5yX",
+      "Access-Control-Expose-Headers": "X-Generation-Id,X-Provider-Name,request-id,cf-ray",
+      "Set-Cookie": "<COOKIE>",
+      "Permissions-Policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "Referrer-Policy": "no-referrer, strict-origin-when-cross-origin",
+      "X-Content-Type-Options": "nosniff",
+      "Server": "cloudflare",
+      "Cf-Ray": "<CF_RAY>"
+    },
+    "response_body": "\n         \n{\"id\":\"gen-1789683077-zwCwD6oxLn7nDXLah5yX\",\"object\":\"chat.completion\",\"created\":1789683077,\"model\":\"anthropic/claude-haiku-4.5\",\"provider\":\"Amazon Bedrock\",\"system_fingerprint\":null,\"service_tier\":\"default\",\"choices\":[{\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"end_turn\",\"message\":{\"role\":\"assistant\",\"content\":\"8 × 2 = 16\",\"refusal\":null,\"reasoning\":\"The user is asking me to multiply the previous result by 2.\\n\\nThe previous result was 8.\\n\\n8 × 2 = 16\",\"reasoning_details\":[{\"type\":\"reasoning.text\",\"text\":\"The user is asking me to multiply the previous result by 2.\\n\\nThe previous result was 8.\\n\\n8 × 2 = 16\",\"format\":\"anthropic-claude-v1\",\"index\":0,\"signature\":\"EuMCCpwBCBEQARgCKkDdXJv51IZPK8NM4QMhUS2MStCLMKnY+0Geveg5yaV2YZfUF+3SiWJQFBq/aFBy4BSZTzuwNpu8Y6jNm1XXlNOuMhljbGF1ZGUtaGFpa3UtNC01LTIwMjUxMDAxOABCCHRoaW5raW5nWgw1MzY2OTcyNDk3MjhyEOIi79uJbELZgi9m1nMrW5SIAQGoAYbLsdUGsAECEgwWbjmcMEKn6wul9/0aDPg5cVByO0eQkjAvAiIwc6CplBtEwdDahhv4hxYkasuMlIo7hz2N0GvdDKO8CvyYtH2j9BF7+EKsMGg3++MeKnSGZ4YdvOz3iHRmH6jaW31Lbw7xrEjyanfC7ioqfkbZElBeJVy6K1alg/98v3rk3QyRCw2VuxuLqtda3ojW9E26stDFsQeY5Cy7WVnGDkRlgHi0w+YBdtchfYGPQyDb+5l6brmjIZrRYy2t3ird757yxuSCPRgB\"}]}}],\"usage\":{\"prompt_tokens\":67,\"completion_tokens\":52,\"total_tokens\":119,\"cost\":0.000327,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000327,\"upstream_inference_prompt_cost\":0.000067,\"upstream_inference_completions_cost\":0.00026},\"completion_tokens_details\":{\"reasoning_tokens\":38,\"image_tokens\":0,\"audio_tokens\":0}}}"
+  }
+]

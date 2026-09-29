@@ -1,11 +1,15 @@
 [workspace]
 resolver = "2"
-members = ["crates/rust_llm", "crates/rust_llm_loco", "crates/rust_llm_cli"]
+members = ["crates/rust_llm", "crates/rust_llm_loco", "crates/rust_llm_cli", "docs/check"]
 
 [workspace.package]
 version = "2.0.0"
 edition = "2024"
 license = "MIT"
+rust-version = "1.88"
+authors = ["Cole Robertson"]
+repository = "https://github.com/cole-robertson/rust-llm"
+homepage = "https://github.com/cole-robertson/rust-llm"
 
 [workspace.dependencies]
 async-trait = "0.1"

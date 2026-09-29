@@ -1,0 +1,31 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.mistral.ai/v1/ocr",
+    "request_body": "{\"model\":\"mistral-ocr-latest\",\"document\":{\"type\":\"document_url\",\"document_url\":\"data:text/csv;base64,aW52b2ljZSxhbW91bnQsZHVlCjEyMzQ1LDEwLjAwLDIwMjctMDEtMDEKNjc4OTAsMjUuNTAsMjAyNy0wMi0wMQo=\"}}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:15:52 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Mistral-Correlation-Id": "01a0b170-c183-78fe-bbee-1d407f2c0499",
+      "X-Kong-Request-Id": "01a0b170-c183-78fe-bbee-1d407f2c0499",
+      "X-Ratelimit-Limit-Ocr-Pages-Minute": "125",
+      "X-Ratelimit-Remaining-Ocr-Pages-Minute": "123",
+      "X-Ratelimit-Ocr-Pages-Query-Cost": "1",
+      "X-Envoy-Upstream-Service-Time": "113",
+      "Server": "cloudflare",
+      "Access-Control-Allow-Origin": "*",
+      "X-Kong-Upstream-Latency": "114",
+      "X-Kong-Proxy-Latency": "11",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Set-Cookie": "<COOKIE>",
+      "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\"pages\":[{\"index\":0,\"markdown\":\"|  invoice | amount | due  |\\n| --- | --- | --- |\\n|  12345 | 10.00 | 2027-01-01  |\\n|  67890 | 25.50 | 2027-02-01  |\",\"images\":[],\"tables\":[],\"hyperlinks\":[],\"header\":null,\"footer\":null,\"dimensions\":null,\"confidence_scores\":null,\"blocks\":null}],\"model\":\"mistral-ocr-latest\",\"document_annotation\":null,\"usage_info\":{\"pages_processed\":1,\"doc_size_bytes\":65}}"
+  }
+]

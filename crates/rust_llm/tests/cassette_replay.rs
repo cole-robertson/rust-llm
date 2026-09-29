@@ -149,7 +149,7 @@ async fn raw_responses() {
         let raw = response.raw.as_ref().ok_or("raw")?;
         check(raw.status == 200, "status")?;
         check(!raw.headers.is_empty(), "headers")?;
-        check(!raw.request_body.is_null(), "request body")
+        check(!raw.request_body_json().is_null(), "request body")
     });
 }
 

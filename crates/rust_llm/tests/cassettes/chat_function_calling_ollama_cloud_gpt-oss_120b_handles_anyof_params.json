@@ -1,0 +1,24 @@
+[
+  {
+    "method": "post",
+    "uri": "https://ollama.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"Call the any-of params tool for task \\\"Review PR\\\" with status \\\"pending\\\" and report the result.\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"any_of_params\",\"description\":\"Uses params DSL any_of support\",\"parameters\":{\"type\":\"object\",\"properties\":{\"task\":{\"type\":\"string\",\"description\":\"Task description\"},\"status\":{\"description\":\"Optional task status\",\"anyOf\":[{\"type\":\"string\",\"enum\":[\"pending\",\"done\"]},{\"type\":\"null\"}]}},\"required\":[\"task\",\"status\"],\"additionalProperties\":false}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Set-Cookie": "<COOKIE>",
+      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
+      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Frame-Options": "DENY",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Content-Length": "652",
+      "Date": "Thu, 17 Sep 2026 22:20:44 GMT",
+      "Server": "Google Frontend",
+      "Traceparent": "00-83a690cbcf8691d93de78706cfd86908-754654b9f560660a-00",
+      "X-Cloud-Trace-Context": "83a690cbcf8691d93de78706cfd86908/8450534908469732874",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000"
+    },
+    "response_body": "{\"id\":\"chatcmpl-838\",\"object\":\"chat.completion\",\"created\":1789683644,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning\":\"We need to call the any_of_params tool in functions namespace with status \\\"pending\\\" and task \\\"Review PR\\\". Then report the result.\",\"tool_calls\":[{\"id\":\"call_kmq2dgmi\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"any_of_params\",\"arguments\":\"{\\\"status\\\":\\\"pending\\\",\\\"task\\\":\\\"Review PR\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":162,\"prompt_tokens_details\":{\"cached_tokens\":64},\"completion_tokens\":65,\"total_tokens\":227}}\n"
+  }
+]

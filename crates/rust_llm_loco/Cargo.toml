@@ -4,9 +4,20 @@ description = "RubyLLM's acts_as_chat for Loco: persist chats, messages, tool ca
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+rust-version = "1.94"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/rust_llm_loco"
+readme = "README.md"
+keywords = ["llm", "ai", "loco", "sea-orm", "chat"]
+categories = ["database", "web-programming"]
+# Tests replay 64 MB of RubyLLM cassettes (over crates.io's 10 MB limit), so they run from the
+# git repository only; the package ships the library source.
+include = ["src/**/*.rs", "README.md", "LICENSE"]
 
 [dependencies]
-rust_llm = { path = "../rust_llm" }
+rust_llm = { path = "../rust_llm", version = "2.0.0" }
 async-trait.workspace = true
 chrono.workspace = true
 sea-orm.workspace = true

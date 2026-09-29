@@ -1,0 +1,38 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.anthropic.com/v1/messages",
+    "request_body": "{\"model\":\"claude-sonnet-5\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"A farmer has chickens and rabbits, 35 heads and 94 legs. How many of each? Reason step by step.\"}]}],\"stream\":false,\"max_tokens\":128000,\"thinking\":{\"type\":\"adaptive\",\"display\":\"summarized\"},\"output_config\":{\"effort\":\"xhigh\"}}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:06:27 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Anthropic-Ratelimit-Input-Tokens-Limit": "10000000",
+      "Anthropic-Ratelimit-Input-Tokens-Remaining": "10000000",
+      "Anthropic-Ratelimit-Input-Tokens-Reset": "2026-09-17T22:06:23Z",
+      "Anthropic-Ratelimit-Output-Tokens-Limit": "2000000",
+      "Anthropic-Ratelimit-Output-Tokens-Remaining": "1999000",
+      "Anthropic-Ratelimit-Output-Tokens-Reset": "2026-09-17T22:06:27Z",
+      "Anthropic-Ratelimit-Requests-Limit": "10000",
+      "Anthropic-Ratelimit-Requests-Remaining": "9999",
+      "Anthropic-Ratelimit-Requests-Reset": "2026-09-17T22:06:22Z",
+      "Anthropic-Ratelimit-Tokens-Limit": "12000000",
+      "Anthropic-Ratelimit-Tokens-Remaining": "11999000",
+      "Anthropic-Ratelimit-Tokens-Reset": "2026-09-17T22:06:23Z",
+      "Server": "cloudflare",
+      "Request-Id": "<REQUEST_ID>",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "Anthropic-Organization-Id": "<ANTHROPIC_ORGANIZATION_ID>",
+      "Anthropic-Workspace-Id": "wrkspc_01MZW3YzUeytZsFc9LHFxP78",
+      "Traceresponse": "00-e59ea399e82076ce7ae1555334c90fb0-6224a26e4b77de6b-01",
+      "Vary": "Accept-Encoding",
+      "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+      "Cf-Cache-Status": "DYNAMIC",
+      "X-Robots-Tag": "none",
+      "Cf-Ray": "<CF_RAY>"
+    },
+    "response_body": "{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011Cf9mhfD3Sx4po2qJYaNcv\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"Setting up two equations for heads and legs, I solve by substitution: 35 heads and 94 legs gives 12 rabbits and 23 chickens. Checking: 23 chickens plus 12 rabbits equals 35 heads, confirming the setup works.\\n\\n\",\"signature\":\"Ev8DCpABCBEYAipAEDvmGAMzOqXlaCNTYvly/H0K6g+o9KBc27D7Z3KEpZlyizsfKMq5bq19wsTtz+lHG1nd6HiSvj0ytlo7V8Q7lTIPY2xhdWRlLXNvbm5ldC01OABCCHRoaW5raW5nWiQwMTM3YjE1Yy0xNmJmLTQ5MGQtOWY5MC04Y2ZkN2UzMjVlYzCoAeLIsdUGEgyvGCGmtGzauKzWJCAaDAZvVI1zUAGko42TQyIw/nyNd7k2jR1YNEizEq3IT9N8rLid+09CgCTVdAL+JrokwWkGTOkLIbbvLf7eVKyKKpsC9t0UOHTrH+CbHn74ldVVeuLg3G2DY+G0CN1Oyz6rhdmEk5CxOoegoAYhBDNVFqV0L64chTIwMMMeNP0ij+J9ZXyPobN5C3ea4rVVVSKkC+FvhTitDExj/NGGuBWmDxKGygLQ0LL2VR+HwsJiA22sCGrj2BjQGIcoIyzZ1C5MEEMeZV/C+4/F7aQw4e07NzfmjpSXRkUKQKrVf8xiMQphQE1ZJXOamUuc13PFRKy8aS2xEpVLfmKmXQdOpfrvARHo2WhuycC8MJNJ1igFGaXERDgDLVMyk2DL5u32geCy2zy28kbT2E1HSA9RE17+i2hU7SIXPXiD0SOTJMUrM3oDi/9JFDpSJWvMZrJBNAE+OZ8kOv12/TXg/Ord7hgB\"},{\"type\":\"text\",\"text\":\"# Setting Up the Problem\\n\\nLet me define variables:\\n- **c** = number of chickens\\n- **r** = number of rabbits\\n\\n**Key facts:**\\n- Chickens have 2 legs each\\n- Rabbits have 4 legs each\\n- Total heads = 35 (one head per animal)\\n- Total legs = 94\\n\\n# Writing the Equations\\n\\n**Equation 1 (heads):**\\n$$c + r = 35$$\\n\\n**Equation 2 (legs):**\\n$$2c + 4r = 94$$\\n\\n# Solving the System\\n\\n**Step 1:** Solve Equation 1 for c:\\n$$c = 35 - r$$\\n\\n**Step 2:** Substitute into Equation 2:\\n$$2(35 - r) + 4r = 94$$\\n\\n**Step 3:** Expand and simplify:\\n$$70 - 2r + 4r = 94$$\\n$$70 + 2r = 94$$\\n\\n**Step 4:** Solve for r:\\n$$2r = 24$$\\n$$r = 12$$\\n\\n**Step 5:** Find c using Equation 1:\\n$$c = 35 - 12 = 23$$\\n\\n# Verification\\n\\n✅ **Heads:** 23 + 12 = 35 ✓\\n\\n✅ **Legs:** (23 × 2) + (12 × 4) = 46 + 48 = 94 ✓\\n\\n# Answer\\n\\nThe farmer has **23 chickens** and **12 rabbits**.\"}],\"container\":null,\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":44,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":627,\"output_tokens_details\":{\"thinking_tokens\":173},\"service_tier\":\"standard\",\"inference_geo\":\"<GOOGLE_CLOUD_LOCATION>\"}}"
+  }
+]

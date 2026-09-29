@@ -1,0 +1,24 @@
+[
+  {
+    "method": "post",
+    "uri": "https://openrouter.ai/api/v1/chat/completions",
+    "request_body": "{\"model\":\"anthropic/claude-haiku-4.5\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin? (52.5200, 13.4050)\"}],\"stream\":false,\"tool_choice\":\"none\"}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:41:00 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+      "X-Generation-Id": "gen-1789684859-joX7yYZrv5Rm4nbEt6e2",
+      "Access-Control-Expose-Headers": "X-Generation-Id,X-Provider-Name,request-id,cf-ray",
+      "Set-Cookie": "<COOKIE>",
+      "Permissions-Policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "Referrer-Policy": "no-referrer, strict-origin-when-cross-origin",
+      "X-Content-Type-Options": "nosniff",
+      "Server": "cloudflare",
+      "Cf-Ray": "<CF_RAY>"
+    },
+    "response_body": "\n         \n{\"id\":\"gen-1789684859-joX7yYZrv5Rm4nbEt6e2\",\"object\":\"chat.completion\",\"created\":1789684859,\"model\":\"anthropic/claude-haiku-4.5\",\"provider\":\"Amazon Bedrock\",\"system_fingerprint\":null,\"service_tier\":\"default\",\"choices\":[{\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"end_turn\",\"message\":{\"role\":\"assistant\",\"content\":\"I don't have access to real-time weather data or the ability to browse the internet, so I can't tell you the current weather in Berlin right now.\\n\\nTo check the weather in Berlin, you can try:\\n\\n- **Weather websites**: weather.com, weather.gov, or your local weather service\\n- **Search engines**: Google \\\"Berlin weather\\\"\\n- **Weather apps**: Most smartphone weather apps will show current conditions\\n- **Local sources**: DWD (Deutscher Wetterdienst) - Germany's national weather service\\n\\nIf you'd like help with something else about Berlin or interpreting weather data you already have, I'm happy to help!\",\"refusal\":null,\"reasoning\":null}}],\"usage\":{\"prompt_tokens\":26,\"completion_tokens\":143,\"total_tokens\":169,\"cost\":0.000741,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000741,\"upstream_inference_prompt_cost\":0.000026,\"upstream_inference_completions_cost\":0.000715},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}"
+  }
+]

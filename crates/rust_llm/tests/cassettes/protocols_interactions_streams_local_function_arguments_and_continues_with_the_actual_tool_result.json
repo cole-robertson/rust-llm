@@ -1,0 +1,40 @@
+[
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/interactions",
+    "request_body": "{\"model\":\"gemini-3.8-flash\",\"input\":[{\"type\":\"user_input\",\"content\":[{\"type\":\"text\",\"text\":\"Use multiply to calculate 17 times 19. State the result.\"}]}],\"stream\":true,\"store\":false,\"system_instruction\":\"\",\"generation_config\":{},\"tools\":[{\"type\":\"function\",\"name\":\"multiply\",\"description\":\"Multiply two numbers\",\"parameters\":{\"type\":\"object\",\"properties\":{\"left\":{\"type\":\"integer\"},\"right\":{\"type\":\"integer\"}},\"required\":[\"left\",\"right\"],\"additionalProperties\":false,\"strict\":true}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "text/event-stream",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:15:48 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=1492",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "event: interaction.created\ndata: {\"interaction\":{\"id\":\"\",\"status\":\"in_progress\",\"object\":\"interaction\",\"model\":\"gemini-3.8-flash\"},\"event_type\":\"interaction.created\"}\n\nevent: interaction.status_update\ndata: {\"interaction_id\":\"\",\"status\":\"in_progress\",\"event_type\":\"interaction.status_update\"}\n\nevent: step.start\ndata: {\"index\":0,\"step\":{\"type\":\"thought\"},\"event_type\":\"step.start\"}\n\nevent: step.delta\ndata: {\"index\":0,\"delta\":{\"signature\":\"EvYBCvMBAWkUfRNsDPqvMultX0t7wZxmUGdlLwwpAzwznJis6QVB7SB8wkoR25JFfnfvIB4lLCR3U3SGIrGVIhDsOzuk5vZUHsk4T1AiqY2AFrlNti5k21/YRsXvUrfzt8KhMzyngRCp5U+7APrIM2lzBYMELWLLvxDgpn5RCUSLSTalGZmFS8ZqNmQVadVR0UEDv0Ao5xsdTbXEPRhgKSoUfwaWGGO5RO47Q6N67fwbRjVt8Qg06QdwipbU+UoEDURAogj5HWyBLxDg2jbfBrlZFdbGogE1RjZ4fZnvpxNaPm9BQ9IEDHjfQnJe6OSdYmrDFmPhGEep\",\"type\":\"thought_signature\"},\"event_type\":\"step.delta\"}\n\nevent: step.stop\ndata: {\"index\":0,\"event_type\":\"step.stop\"}\n\nevent: step.start\ndata: {\"index\":1,\"step\":{\"id\":\"call_137459\",\"type\":\"function_call\",\"name\":\"multiply\",\"arguments\":{}},\"event_type\":\"step.start\"}\n\nevent: step.delta\ndata: {\"index\":1,\"delta\":{\"arguments\":\"{\\\"right\\\":19,\\\"left\\\":17}\",\"type\":\"arguments_delta\"},\"event_type\":\"step.delta\"}\n\nevent: step.stop\ndata: {\"index\":1,\"event_type\":\"step.stop\"}\n\nevent: interaction.completed\ndata: {\"interaction\":{\"id\":\"\",\"status\":\"requires_action\",\"usage\":{\"total_tokens\":123,\"total_input_tokens\":68,\"input_tokens_by_modality\":[{\"modality\":\"text\",\"tokens\":68}],\"total_cached_tokens\":0,\"total_output_tokens\":18,\"total_tool_use_tokens\":0,\"total_thought_tokens\":37,\"raw_prompt_token\":107,\"model_invocation_token_counts\":[{\"prompt_tokens_details\":[{\"modality\":\"text\",\"tokens\":107}],\"candidates_tokens_details\":[{\"modality\":\"text\",\"tokens\":24}],\"thoughts_tokens_details\":[{\"modality\":\"text\",\"tokens\":37}]}]},\"created\":\"2026-09-17T22:15:49Z\",\"updated\":\"2026-09-17T22:15:49Z\",\"service_tier\":\"standard\",\"object\":\"interaction\",\"model\":\"gemini-3.8-flash\"},\"event_type\":\"interaction.completed\"}\n\nevent: done\ndata: [DONE]\n\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/interactions",
+    "request_body": "{\"model\":\"gemini-3.8-flash\",\"input\":[{\"type\":\"user_input\",\"content\":[{\"type\":\"text\",\"text\":\"Use multiply to calculate 17 times 19. State the result.\"}]},{\"type\":\"thought\",\"signature\":\"EvYBCvMBAWkUfRNsDPqvMultX0t7wZxmUGdlLwwpAzwznJis6QVB7SB8wkoR25JFfnfvIB4lLCR3U3SGIrGVIhDsOzuk5vZUHsk4T1AiqY2AFrlNti5k21/YRsXvUrfzt8KhMzyngRCp5U+7APrIM2lzBYMELWLLvxDgpn5RCUSLSTalGZmFS8ZqNmQVadVR0UEDv0Ao5xsdTbXEPRhgKSoUfwaWGGO5RO47Q6N67fwbRjVt8Qg06QdwipbU+UoEDURAogj5HWyBLxDg2jbfBrlZFdbGogE1RjZ4fZnvpxNaPm9BQ9IEDHjfQnJe6OSdYmrDFmPhGEep\"},{\"id\":\"call_137459\",\"type\":\"function_call\",\"name\":\"multiply\",\"arguments\":{\"right\":19,\"left\":17}},{\"type\":\"function_result\",\"call_id\":\"call_137459\",\"name\":\"multiply\",\"result\":[{\"type\":\"text\",\"text\":\"323\"}]}],\"stream\":true,\"store\":false,\"system_instruction\":\"\",\"generation_config\":{},\"tools\":[{\"type\":\"function\",\"name\":\"multiply\",\"description\":\"Multiply two numbers\",\"parameters\":{\"type\":\"object\",\"properties\":{\"left\":{\"type\":\"integer\"},\"right\":{\"type\":\"integer\"}},\"required\":[\"left\",\"right\"],\"additionalProperties\":false,\"strict\":true}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "text/event-stream",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:15:50 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=1310",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "event: interaction.created\ndata: {\"interaction\":{\"id\":\"\",\"status\":\"in_progress\",\"object\":\"interaction\",\"model\":\"gemini-3.8-flash\"},\"event_type\":\"interaction.created\"}\n\nevent: interaction.status_update\ndata: {\"interaction_id\":\"\",\"status\":\"in_progress\",\"event_type\":\"interaction.status_update\"}\n\nevent: step.start\ndata: {\"index\":0,\"step\":{\"type\":\"thought\"},\"event_type\":\"step.start\"}\n\nevent: step.delta\ndata: {\"index\":0,\"delta\":{\"signature\":\"EqoBCqcBAWkUfRMjjh7oMwKGpLhMn441YmdHMg7SMy8rzgoBVJ+qfjREMFeHbaWb71r1ZtLa7y/m6yG1cqR8nj7Pj8icTBYaLz9zOhSqM4RIylFoTQCTZwu2ZDC69CTYCLHG4yywya5vHeqyR22w5brn+BnY2J9eZSGQwlaQIg5PvAGBk5zeG/zQ7+JyLuVNIVGPSm4QkUGPwQXTYedT+1Bf3WAjuxpcpb/wEL4=\",\"type\":\"thought_signature\"},\"event_type\":\"step.delta\"}\n\nevent: step.stop\ndata: {\"index\":0,\"event_type\":\"step.stop\"}\n\nevent: step.start\ndata: {\"index\":1,\"step\":{\"type\":\"model_output\"},\"event_type\":\"step.start\"}\n\nevent: step.delta\ndata: {\"index\":1,\"delta\":{\"text\":\"The result of \",\"type\":\"text\"},\"event_type\":\"step.delta\"}\n\nevent: step.delta\ndata: {\"index\":1,\"delta\":{\"text\":\"17 times 19 is 323.\",\"type\":\"text\"},\"event_type\":\"step.delta\"}\n\nevent: step.stop\ndata: {\"index\":1,\"event_type\":\"step.stop\"}\n\nevent: interaction.completed\ndata: {\"interaction\":{\"id\":\"\",\"status\":\"completed\",\"usage\":{\"total_tokens\":162,\"total_input_tokens\":132,\"input_tokens_by_modality\":[{\"modality\":\"text\",\"tokens\":132}],\"total_cached_tokens\":0,\"total_output_tokens\":16,\"total_tool_use_tokens\":0,\"total_thought_tokens\":14,\"raw_prompt_token\":184,\"model_invocation_token_counts\":[{\"prompt_tokens_details\":[{\"modality\":\"text\",\"tokens\":184}],\"candidates_tokens_details\":[{\"modality\":\"text\",\"tokens\":20}],\"thoughts_tokens_details\":[{\"modality\":\"text\",\"tokens\":14}]}]},\"created\":\"2026-09-17T22:15:50Z\",\"updated\":\"2026-09-17T22:15:50Z\",\"service_tier\":\"standard\",\"object\":\"interaction\",\"model\":\"gemini-3.8-flash\"},\"event_type\":\"interaction.completed\"}\n\nevent: done\ndata: [DONE]\n\n"
+  }
+]

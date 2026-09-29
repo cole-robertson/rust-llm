@@ -1,0 +1,40 @@
+[
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:countTokens",
+    "request_body": "{\"generateContentRequest\":{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the capital of France?\"}]}],\"model\":\"models/gemini-3.5-flash\"}}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:15:04 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=48",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"totalTokens\": 8,\n  \"promptTokensDetails\": [\n    {\n      \"modality\": \"TEXT\",\n      \"tokenCount\": 8\n    }\n  ]\n}\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:countTokens",
+    "request_body": "{\"generateContentRequest\":{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the capital of France?\"}]}],\"systemInstruction\":{\"parts\":[{\"text\":\"Be terse.\"}]},\"tools\":[{\"functionDeclarations\":[{\"name\":\"counting_weather\",\"description\":\"Gets current weather for a city\",\"parametersJsonSchema\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"],\"additionalProperties\":false,\"strict\":true}}]}],\"model\":\"models/gemini-3.5-flash\"}}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:15:04 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=84",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"totalTokens\": 61,\n  \"promptTokensDetails\": [\n    {\n      \"modality\": \"TEXT\",\n      \"tokenCount\": 61\n    }\n  ]\n}\n"
+  }
+]

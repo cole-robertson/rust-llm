@@ -17,11 +17,23 @@ pub struct Interaction {
     pub status: u16,
     pub response_headers: serde_json::Map<String, Value>,
     pub response_body: String,
+    /// The exact bytes of a binary download (an image a URL attachment fetches).
+    #[serde(default)]
+    pub response_body_base64: Option<String>,
 }
 
 pub fn load(name: &str) -> Option<Vec<Interaction>> {
     let path = format!("{}/tests/cassettes/{name}.json", env!("CARGO_MANIFEST_DIR"));
     let text = std::fs::read_to_string(path).ok()?;
+    // docs/PARITY.md's "replayed" column comes from this log (`bin/parity`).
+    if let Ok(log) = std::env::var("RUST_LLM_CASSETTE_LOG") {
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(log) {
+            let bin = std::env::current_exe().ok().and_then(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned())).unwrap_or_default();
+            let bin = bin.rsplit_once('-').map_or(bin.as_str(), |(b, _)| b).to_string();
+            let _ = f.write_all(format!("{name}\t{bin}\n").as_bytes()); // one write, so parallel tests don't interleave
+        }
+    }
     Some(serde_json::from_str(&text).expect("cassette json"))
 }
 
@@ -109,7 +121,11 @@ impl Respond for Replay {
             };
             response = response.insert_header("x-goog-upload-url", rewritten.as_str());
         }
-        response.set_body_raw(interaction.response_body.clone().into_bytes(), &content_type)
+        let body = match &interaction.response_body_base64 {
+            Some(b64) => base64::Engine::decode(&base64::engine::general_purpose::STANDARD, b64).unwrap_or_default(),
+            None => interaction.response_body.clone().into_bytes(),
+        };
+        response.set_body_raw(body, &content_type)
     }
 }
 
@@ -121,9 +137,21 @@ pub struct Cassette {
 
 impl Cassette {
     pub async fn start(name: &str) -> Option<Cassette> {
-        let interactions = load(name)?;
+        Cassette::start_serving(name, &[]).await
+    }
+
+    /// Like `start`, for a test that sends this server's URL where RubyLLM sent a real one (a
+    /// URL attachment passed to the model as a link): `hosts` in the recorded bodies are
+    /// rewritten to this server, so the comparison stays exact.
+    pub async fn start_serving(name: &str, hosts: &[&str]) -> Option<Cassette> {
+        let mut interactions = load(name)?;
         let count = interactions.len();
         let server = MockServer::start().await;
+        for interaction in &mut interactions {
+            for host in hosts {
+                interaction.request_body = interaction.request_body.replace(host, &server.uri());
+            }
+        }
         let mismatches = Arc::new(Mutex::new(Vec::new()));
         Mock::given(wiremock::matchers::any())
             .respond_with(Replay { interactions, next: Mutex::new(0), mismatches: mismatches.clone() })
@@ -195,4 +223,41 @@ pub fn cassette_name(describe: &str, provider: &str, model: &str, it: &str) -> S
         }
     }
     out
+}
+
+/// `RubyLLM.chat(model:, provider:)` against the replay server. Local and self-hosted providers
+/// aren't in the bundled registry, so they assume the model exists, as the Ruby specs do.
+pub fn chat_for(cassette: &Cassette, provider: &str, model: &str) -> rust_llm::Chat {
+    let assume = matches!(provider, "ollama" | "gpustack" | "ollama_cloud" | "hetzner");
+    rust_llm::Chat::with_config(config_for(cassette, provider), Some(model), Some(provider), assume).expect("chat")
+}
+
+/// `each_model(MODELS) { it "#{provider}/#{model} ..." }`: runs `body` for each model in
+/// `$models` that has a recorded cassette, and reports every failure together. Opt in with
+/// `#[macro_use] mod support;`.
+#[allow(unused_macros)]
+macro_rules! each_model {
+    ($models:expr, $describe:expr, $it:expr, |$chat:ident, $provider:ident, $model:ident| $body:block) => {{
+        let mut failures = Vec::new();
+        let mut ran = 0;
+        for &($provider, $model) in $models {
+            let name = crate::support::cassette_name($describe, $provider, $model, $it);
+            let Some(cassette) = crate::support::Cassette::start(&name).await else { continue };
+            ran += 1;
+            #[allow(unused_mut)]
+            let mut $chat = crate::support::chat_for(&cassette, $provider, $model);
+            let outcome: Result<(), String> = async { $body }.await;
+            let replay = std::panic::AssertUnwindSafe(cassette.assert_all_matched());
+            let replay = futures::FutureExt::catch_unwind(replay).await;
+            if let Err(e) = outcome {
+                failures.push(format!("{} {}: {e}", $provider, $model));
+            } else if let Err(p) = replay {
+                let msg = p.downcast_ref::<String>().cloned().unwrap_or_default();
+                failures.push(format!("{} {}: {msg}", $provider, $model));
+            }
+        }
+        assert!(ran > 0, "no cassettes found for {}", $it);
+        assert!(failures.is_empty(), "{} of {ran} providers failed:\n{}", failures.len(), failures.join("\n\n"));
+        eprintln!("{}: {ran} providers replayed", $it);
+    }};
 }

@@ -1,0 +1,48 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.deepseek.com/chat/completions",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"system\",\"content\":\"Your location is Berlin, at latitude 52.5200 and longitude 13.4050.\"},{\"role\":\"user\",\"content\":\"When was the fall of Rome?\"}],\"stream\":false,\"max_tokens\":4096,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}],\"tool_choice\":\"required\",\"thinking\":{\"type\":\"disabled\"}}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Date": "Thu, 17 Sep 2026 22:27:21 GMT",
+      "Server": "elb",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Credentials": "true",
+      "X-Ds-Trace-Id": "e86f4b475fa3db7c5225a364b046d436",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "X-Cache": "Miss from cloudfront",
+      "Via": "1.1 3d98ff2f094b729179a8f8c2a7dd59ba.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL52-P2",
+      "X-Amz-Cf-Id": "1fRlotRtdoO_INpou--ebwpVCyqLb53Pw1A_b_IuySjLEaZbPreDcg=="
+    },
+    "response_body": "{\"id\":\"0eaf2355-c010-4006-8cb8-7f5de58cd3af\",\"object\":\"chat.completion\",\"created\":1789684041,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"index\":0,\"id\":\"call_00_x7cSO85jLGtaRLsqVS2V7301\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\": \\\"52.5200\\\", \\\"longitude\\\": \\\"13.4050\\\"}\"}}]},\"logprobs\":null,\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":352,\"completion_tokens\":54,\"total_tokens\":406,\"prompt_tokens_details\":{\"cached_tokens\":128},\"prompt_cache_hit_tokens\":128,\"prompt_cache_miss_tokens\":224},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+  },
+  {
+    "method": "post",
+    "uri": "https://api.deepseek.com/chat/completions",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"system\",\"content\":\"Your location is Berlin, at latitude 52.5200 and longitude 13.4050.\"},{\"role\":\"user\",\"content\":\"When was the fall of Rome?\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_00_x7cSO85jLGtaRLsqVS2V7301\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}],\"reasoning_content\":\"\"},{\"role\":\"tool\",\"content\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_00_x7cSO85jLGtaRLsqVS2V7301\"}],\"stream\":false,\"max_tokens\":4096,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}],\"thinking\":{\"type\":\"disabled\"}}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Date": "Thu, 17 Sep 2026 22:27:21 GMT",
+      "Server": "elb",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Credentials": "true",
+      "X-Ds-Trace-Id": "8ab270772f446a88bbe42f084bfbd1e8",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "X-Cache": "Miss from cloudfront",
+      "Via": "1.1 1444224b4b97d67af7507c4e96f65844.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL50-P1",
+      "X-Amz-Cf-Id": "S14IR2AQ4WIlWt5wh1bHiWnXUf_aWv72qraybW47hWOk00wjuTWuWg=="
+    },
+    "response_body": "{\"id\":\"8d8bf92a-017d-4fcc-857b-a134a35aac09\",\"object\":\"chat.completion\",\"created\":1789684041,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The fall of Rome is traditionally dated to **476 AD**, when the Germanic chieftain Odoacer deposed Romulus Augustulus, the last emperor of the Western Roman Empire. That event is the conventional marker for the end of antiquity in the West.\\n\\nA few important caveats:\\n\\n- **It wasn't a single event.** Rome had already been sacked by the Visigoths in 410 and the Vandals in 454, and the Western Empire had been shrinking for decades before 476.\\n- **The Eastern Roman Empire continued.** Constantinople remained the capital of the Roman Empire until 1453, when it fell to the Ottomans.\\n- **Some historians prefer other dates** — such as 395 (permanent division of the empire), 410 (first sack of Rome), or 1453 (fall of the Eastern Empire).\\n\\n(As an aside: I checked the weather for your location in Berlin — currently 15°C with 10 km/h wind — but that wasn't needed to answer your question.)\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":444,\"completion_tokens\":209,\"total_tokens\":653,\"prompt_tokens_details\":{\"cached_tokens\":256},\"prompt_cache_hit_tokens\":256,\"prompt_cache_miss_tokens\":188},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+  }
+]

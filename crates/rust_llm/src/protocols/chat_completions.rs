@@ -4,7 +4,7 @@
 
 use serde_json::{Map, Value, json};
 
-use super::{Request, ToolCalls, ToolChoice, char_slice, deep_merge, int, normalize_finish_reason, str_of, tool_call_map};
+use super::{Caching, Request, ToolCalls, ToolChoice, char_slice, deep_merge, int, normalize_finish_reason, str_of, tool_call_map};
 use crate::attachment::{Attachment, AttachmentType};
 use crate::error::{Error, Result};
 use crate::message::{Citation, Message, RawResponse, Role, Thinking, ToolArguments, ToolCall};
@@ -161,7 +161,40 @@ pub fn render_payload(req: &Request) -> Result<Value> {
         }
         _ => {}
     }
+    apply_prompt_cache_params(req, &mut payload)?;
     Ok(Value::Object(payload))
+}
+
+/// `apply_prompt_cache_params` with the Mistral (`key:` only) and OpenRouter (top-level
+/// `cache_control`) overrides.
+fn apply_prompt_cache_params(req: &Request, payload: &mut Map<String, Value>) -> Result<()> {
+    match req.provider {
+        Provider::Mistral => {
+            if let Some(key) = Caching::checked(req.caching, &["key"], "Mistral")?.and_then(|o| o.get("key")).filter(|k| !k.is_null()) {
+                payload.insert("prompt_cache_key".into(), key.clone());
+            }
+        }
+        Provider::OpenRouter => {
+            if let Some(options) = Caching::checked(req.caching, &["ttl"], "OpenRouter")? {
+                payload.insert("cache_control".into(), openrouter_cache_control(Some(options)));
+            }
+        }
+        _ => {
+            if let Some(options) = Caching::checked(req.caching, super::responses::PROMPT_CACHE_OPTIONS, "Chat Completions")? {
+                payload.extend(super::responses::prompt_cache_params(options));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// OpenRouter's `prompt_cache_control(caching)`.
+fn openrouter_cache_control(options: Option<&Map<String, Value>>) -> Value {
+    let mut control = json!({ "type": "ephemeral" });
+    if let Some(ttl) = options.and_then(|o| o.get("ttl")).filter(|t| !t.is_null()) {
+        control["ttl"] = ttl.clone();
+    }
+    control
 }
 
 fn format_messages(req: &Request) -> Result<Vec<Value>> {
@@ -222,17 +255,19 @@ fn format_message(req: &Request, msg: &Message) -> Result<Value> {
             }
             content = Value::Array(blocks);
         }
-    if msg.cache_until_here && provider == Provider::OpenRouter {
+    let boundary = msg.cache_until_here && Caching::boundaries(req.caching);
+    if boundary && provider == Provider::OpenRouter {
         let mut blocks = match content {
             Value::Array(parts) => parts,
             Value::String(s) => vec![json!({ "type": "text", "text": s })],
             _ => Vec::new(),
         };
         if let Some(Value::Object(last)) = blocks.last_mut() {
-            last.entry("cache_control").or_insert_with(|| json!({ "type": "ephemeral" }));
+            let control = openrouter_cache_control(Caching::checked(req.caching, &["ttl"], "OpenRouter")?);
+            last.entry("cache_control").or_insert(control);
         }
         content = Value::Array(blocks);
-    } else if msg.cache_until_here && matches!(provider, Provider::OpenAI) {
+    } else if boundary && matches!(provider, Provider::OpenAI) {
         let parts = match &content {
             Value::Array(parts) => Some(parts.clone()),
             Value::String(s) if !s.is_empty() => Some(vec![json!({ "type": "text", "text": s })]),
@@ -632,6 +667,38 @@ pub fn parse_completion_body(provider: Provider, data: &Value, raw: RawResponse)
     m.model = str_of(data.get("model"));
     m.raw = Some(raw);
     Ok(m.normalized())
+}
+
+/// `OpenRouter::Streaming#accumulate_raw_reasoning` (`providers/openrouter/streaming.rb`): each
+/// delta's reasoning_details merge into the stream's list, matching an entry by `index` and `type`.
+/// `text`, `data`, and `summary` strings are appended; other keys are only filled when missing
+/// (the closing signature arrives in its own fragment). Every chunk carries the list so far.
+pub fn accumulate_raw_reasoning(acc: &mut Option<Vec<Value>>, details: Option<&Value>) -> Option<Value> {
+    const ACCUMULATED_REASONING_KEYS: [&str; 3] = ["text", "data", "summary"];
+    if let Some(details) = details.and_then(Value::as_array).filter(|d| !d.is_empty()) {
+        let entries = acc.get_or_insert_with(Vec::new);
+        for detail in details {
+            let target = detail.get("index").filter(|i| !i.is_null()).and_then(|index| {
+                entries.iter_mut().find(|e| e.get("index") == Some(index) && e.get("type") == detail.get("type"))
+            });
+            let (Some(target), Some(fields)) = (target, detail.as_object()) else {
+                entries.push(detail.clone());
+                continue;
+            };
+            for (key, value) in fields {
+                match (value, target.get_mut(key)) {
+                    (Value::String(more), Some(Value::String(existing))) if ACCUMULATED_REASONING_KEYS.contains(&key.as_str()) => {
+                        existing.push_str(more)
+                    }
+                    (_, None | Some(Value::Null)) => {
+                        target[key.as_str()] = value.clone();
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    acc.clone().map(Value::Array)
 }
 
 pub fn build_chunk(provider: Provider, data: &Value) -> Message {

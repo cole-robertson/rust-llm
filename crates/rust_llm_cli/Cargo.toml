@@ -4,14 +4,27 @@ description = "RubyLLM's Rails generators as a CLI for Loco + Inertia + React ap
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+rust-version = "1.94"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/rust_llm_cli"
+readme = "README.md"
+keywords = ["llm", "ai", "loco", "generator", "inertia"]
+categories = ["command-line-utilities", "development-tools", "web-programming"]
+# Tests (and the e2e harness) run from the git repository only; the package ships the CLI and the
+# templates it embeds with include_str!.
+include = ["src/**/*.rs", "templates/**/*", "README.md", "LICENSE"]
 
 [[bin]]
 name = "rust-llm"
 path = "src/main.rs"
+# The bin's doc name (rust_llm) collides with the rust_llm library's in `cargo doc --workspace`.
+doc = false
 
 [dependencies]
 # `tool::underscore` keeps generated tool file names equal to the runtime `Tool::name()`.
-rust_llm = { path = "../rust_llm" }
+rust_llm = { path = "../rust_llm", version = "2.0.0" }
 chrono.workspace = true
 
 [dev-dependencies]

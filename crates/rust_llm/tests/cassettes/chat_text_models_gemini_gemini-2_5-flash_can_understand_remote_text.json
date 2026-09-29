@@ -1,0 +1,54 @@
+[
+  {
+    "method": "get",
+    "uri": "https://www.ruby-lang.org/en/about/license.txt",
+    "request_body": "",
+    "status": 200,
+    "response_headers": {
+      "Connection": "keep-alive",
+      "Content-Length": "2502",
+      "Server": "GitHub.com",
+      "Content-Type": "text/plain; charset=utf-8",
+      "X-Origin-Cache": "HIT",
+      "Last-Modified": "Tue, 15 Sep 2026 04:37:41 GMT",
+      "Access-Control-Allow-Origin": "*",
+      "Etag": "W/\"6aa8cb95-9c6\"",
+      "Expires": "Thu, 17 Sep 2026 22:16:13 GMT",
+      "Cache-Control": "max-age=600",
+      "X-Proxy-Cache": "MISS",
+      "X-Github-Request-Id": "4914:338B02:3C8A1F8:3CDCFDE:6AAC6454",
+      "X-Github-Edge-Region": "fra",
+      "Accept-Ranges": "bytes",
+      "Date": "Thu, 17 Sep 2026 22:06:49 GMT",
+      "Via": "1.1 varnish",
+      "Age": "0",
+      "X-Served-By": "cache-ber1080026-BER",
+      "X-Cache": "HIT",
+      "X-Cache-Hits": "1",
+      "X-Timer": "S1789682810.515793,VS0,VE109",
+      "Vary": "Accept-Encoding",
+      "X-Fastly-Request-Id": "b4f3be7a330d928b5e9c66527f16a05a65025c83"
+    },
+    "response_body": "Ruby is copyrighted free software by Yukihiro Matsumoto <matz@netlab.jp>.\nYou can redistribute it and/or modify it under either the terms of the\n2-clause BSDL (see the file BSDL), or the conditions below:\n\n  1. You may make and give away verbatim copies of the source form of the\n     software without restriction, provided that you duplicate all of the\n     original copyright notices and associated disclaimers.\n\n  2. You may modify your copy of the software in any way, provided that\n     you do at least ONE of the following:\n\n       a) place your modifications in the Public Domain or otherwise\n          make them Freely Available, such as by posting said\n\t  modifications to Usenet or an equivalent medium, or by allowing\n\t  the author to include your modifications in the software.\n\n       b) use the modified software only within your corporation or\n          organization.\n\n       c) give non-standard binaries non-standard names, with\n          instructions on where to get the original software distribution.\n\n       d) make other distribution arrangements with the author.\n\n  3. You may distribute the software in object code or binary form,\n     provided that you do at least ONE of the following:\n\n       a) distribute the binaries and library files of the software,\n\t  together with instructions (in the manual page or equivalent)\n\t  on where to get the original distribution.\n\n       b) accompany the distribution with the machine-readable source of\n\t  the software.\n\n       c) give non-standard binaries non-standard names, with\n          instructions on where to get the original software distribution.\n\n       d) make other distribution arrangements with the author.\n\n  4. You may modify and include the part of the software into any other\n     software (possibly commercial).  But some files in the distribution\n     are not written by the author, so that they are not under these terms.\n\n     For the list of those files and their copying conditions, see the\n     file LEGAL.\n\n  5. The scripts and library files supplied as input to or produced as\n     output from the software do not automatically fall under the\n     copyright of the software, but belong to whomever generated them,\n     and may be sold commercially, and may be aggregated with this\n     software.\n\n  6. THIS SOFTWARE IS PROVIDED \"AS IS\" AND WITHOUT ANY EXPRESS OR\n     IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED\n     WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR\n     PURPOSE.\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What's in this file?\"},{\"text\":\"<file name='license.txt' mime_type='text/plain'>Ruby is copyrighted free software by Yukihiro Matsumoto <matz@netlab.jp>.\\nYou can redistribute it and/or modify it under either the terms of the\\n2-clause BSDL (see the file BSDL), or the conditions below:\\n\\n  1. You may make and give away verbatim copies of the source form of the\\n     software without restriction, provided that you duplicate all of the\\n     original copyright notices and associated disclaimers.\\n\\n  2. You may modify your copy of the software in any way, provided that\\n     you do at least ONE of the following:\\n\\n       a) place your modifications in the Public Domain or otherwise\\n          make them Freely Available, such as by posting said\\n\\t  modifications to Usenet or an equivalent medium, or by allowing\\n\\t  the author to include your modifications in the software.\\n\\n       b) use the modified software only within your corporation or\\n          organization.\\n\\n       c) give non-standard binaries non-standard names, with\\n          instructions on where to get the original software distribution.\\n\\n       d) make other distribution arrangements with the author.\\n\\n  3. You may distribute the software in object code or binary form,\\n     provided that you do at least ONE of the following:\\n\\n       a) distribute the binaries and library files of the software,\\n\\t  together with instructions (in the manual page or equivalent)\\n\\t  on where to get the original distribution.\\n\\n       b) accompany the distribution with the machine-readable source of\\n\\t  the software.\\n\\n       c) give non-standard binaries non-standard names, with\\n          instructions on where to get the original software distribution.\\n\\n       d) make other distribution arrangements with the author.\\n\\n  4. You may modify and include the part of the software into any other\\n     software (possibly commercial).  But some files in the distribution\\n     are not written by the author, so that they are not under these terms.\\n\\n     For the list of those files and their copying conditions, see the\\n     file LEGAL.\\n\\n  5. The scripts and library files supplied as input to or produced as\\n     output from the software do not automatically fall under the\\n     copyright of the software, but belong to whomever generated them,\\n     and may be sold commercially, and may be aggregated with this\\n     software.\\n\\n  6. THIS SOFTWARE IS PROVIDED \\\"AS IS\\\" AND WITHOUT ANY EXPRESS OR\\n     IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED\\n     WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR\\n     PURPOSE.\\n</file>\"}]}],\"generationConfig\":{}}",
+    "status": 200,
+    "response_headers": {
+      "X-Gemini-Service-Tier": "standard",
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:06:55 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=5721",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"This file is the **license for the Ruby programming language**, authored and copyrighted by Yukihiro Matsumoto (Matz).\\n\\nIt outlines the terms under which Ruby can be redistributed and modified. Key points include:\\n\\n*   **Dual Licensing:** Users can choose to license Ruby under either the terms of the **2-clause BSDL (BSD License)** or the specific conditions detailed within this file.\\n*   **Verbatim Copying:** Allowed without restriction, provided all original copyright notices and disclaimers are duplicated.\\n*   **Modifications:** Permitted if the changes are placed in the Public Domain, used internally within an organization, given non-standard names (with instructions to get the original), or through other arrangements with the author.\\n*   **Binary/Object Code Distribution:** Allowed if the distribution includes instructions on where to get the original source, is accompanied by the machine-readable source, uses non-standard names (with instructions), or through other arrangements with the author.\\n*   **Inclusion in Other Software:** Generally permitted, but notes that some files in the Ruby distribution might have different copying conditions (referencing a `LEGAL` file).\\n*   **Generated Files:** Scripts and library files created by or used as input for Ruby do not automatically fall under Ruby's copyright and belong to their generators.\\n*   **Warranty Disclaimer:** The software is provided \\\"AS IS\\\" without any express or implied warranties, including merchantability or fitness for a particular purpose.\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 568,\n    \"candidatesTokenCount\": 303,\n    \"totalTokenCount\": 1768,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 568\n      }\n    ],\n    \"thoughtsTokenCount\": 897,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"eWSsauL9NIPDvdIPx7Pm-Aw\"\n}\n"
+  }
+]

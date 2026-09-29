@@ -2,7 +2,7 @@
 
 use serde_json::{Map, Value, json};
 
-use super::{Request, StreamState, ToolChoice, int, normalize_finish_reason, str_of, tool_call_map};
+use super::{Caching, Request, StreamState, ToolChoice, int, normalize_finish_reason, str_of, tool_call_map};
 use crate::attachment::{Attachment, AttachmentType, Resolution};
 use crate::error::{Error, Result};
 use crate::message::{Citation, Message, RawResponse, Role, ServerToolCall, Thinking, ToolCall};
@@ -85,6 +85,11 @@ pub fn render_payload(req: &Request) -> Result<Value> {
             }
             payload.insert("toolConfig".into(), json!({ "functionCallingConfig": config }));
         }
+    }
+    // `with_caching(id:)` attaches an explicit cache; Gemini caches prefixes implicitly otherwise.
+    if let Some(id) = Caching::options(req.caching).and_then(|o| o.get("id")).and_then(Value::as_str) {
+        let name = if id.contains('/') { id.to_string() } else { format!("cachedContents/{id}") };
+        payload.insert("cachedContent".into(), name.into());
     }
     Ok(Value::Object(payload))
 }

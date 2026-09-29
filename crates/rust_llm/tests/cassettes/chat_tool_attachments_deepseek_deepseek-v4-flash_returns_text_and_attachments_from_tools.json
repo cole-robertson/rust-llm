@@ -1,0 +1,48 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.deepseek.com/chat/completions",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"Call file_fetch to get ruby.txt, then repeat the contents of the attached file.\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"file_fetch\",\"description\":\"Fetches a sample text file named ruby.txt\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Date": "Thu, 17 Sep 2026 22:29:36 GMT",
+      "Server": "elb",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Credentials": "true",
+      "X-Ds-Trace-Id": "8159663f36a083b82d0ade4c4a2e1637",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "X-Cache": "Miss from cloudfront",
+      "Via": "1.1 baf250e244bb7810e57efa7ca7e2176c.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL52-P1",
+      "X-Amz-Cf-Id": "ZFaVjuGSwkfvOlBHPIP2GWNe79BZRdWD_RRXBxa7MzFVUAp4Bnz41w=="
+    },
+    "response_body": "{\"id\":\"677ff2fa-78e9-441e-b602-a80dd3aed6aa\",\"object\":\"chat.completion\",\"created\":1789684176,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning_content\":\"The user wants me to call file_fetch to get ruby.txt, then repeat its contents. Let me do that.\",\"tool_calls\":[{\"index\":0,\"id\":\"call_00_MST2sfYdgAxU5nMPHpGR0258\",\"type\":\"function\",\"function\":{\"name\":\"file_fetch\",\"arguments\":\"{}\"}}]},\"logprobs\":null,\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":310,\"completion_tokens\":47,\"total_tokens\":357,\"prompt_tokens_details\":{\"cached_tokens\":128},\"completion_tokens_details\":{\"reasoning_tokens\":24},\"prompt_cache_hit_tokens\":128,\"prompt_cache_miss_tokens\":182},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+  },
+  {
+    "method": "post",
+    "uri": "https://api.deepseek.com/chat/completions",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"Call file_fetch to get ruby.txt, then repeat the contents of the attached file.\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_00_MST2sfYdgAxU5nMPHpGR0258\",\"type\":\"function\",\"function\":{\"name\":\"file_fetch\",\"arguments\":\"{}\"}}],\"reasoning_content\":\"The user wants me to call file_fetch to get ruby.txt, then repeat its contents. Let me do that.\",\"reasoning\":\"The user wants me to call file_fetch to get ruby.txt, then repeat its contents. Let me do that.\"},{\"role\":\"tool\",\"content\":\"Fetched the file.\",\"tool_call_id\":\"call_00_MST2sfYdgAxU5nMPHpGR0258\"},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Attachments from tool call call_00_MST2sfYdgAxU5nMPHpGR0258:\"},{\"type\":\"text\",\"text\":\"<file name='ruby.txt' mime_type='text/plain'>Ruby is the best.</file>\"}]}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"file_fetch\",\"description\":\"Fetches a sample text file named ruby.txt\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Date": "Thu, 17 Sep 2026 22:29:37 GMT",
+      "Server": "elb",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Credentials": "true",
+      "X-Ds-Trace-Id": "bf7d779e0fa5ffbc8611900cd728dbd8",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "X-Cache": "Miss from cloudfront",
+      "Via": "1.1 edd1b5bc7d0087f00636fe3b7878b848.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL52-P2",
+      "X-Amz-Cf-Id": "OMr6ksLrUiUWfV23oLBsrKjoYkJshXw_pPLX-6HP4D4lnqQ4ULLXvQ=="
+    },
+    "response_body": "{\"id\":\"8f234a22-9b16-481a-b353-e0587ff2f9f1\",\"object\":\"chat.completion\",\"created\":1789684177,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The contents of `ruby.txt` are:\\n\\n> Ruby is the best.\",\"reasoning_content\":\"The file contains \\\"Ruby is the best.\\\" I should repeat the contents.\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":422,\"completion_tokens\":32,\"total_tokens\":454,\"prompt_tokens_details\":{\"cached_tokens\":256},\"completion_tokens_details\":{\"reasoning_tokens\":15},\"prompt_cache_hit_tokens\":256,\"prompt_cache_miss_tokens\":166},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+  }
+]

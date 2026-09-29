@@ -1,0 +1,25 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.anthropic.com/v1/messages/count_tokens",
+    "request_body": "{\"model\":\"claude-haiku-4-5-20251001\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the capital of France?\"}]}]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:15:03 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Request-Id": "<REQUEST_ID>",
+      "Anthropic-Organization-Id": "<ANTHROPIC_ORGANIZATION_ID>",
+      "Anthropic-Workspace-Id": "wrkspc_01MZW3YzUeytZsFc9LHFxP78",
+      "Vary": "Accept-Encoding",
+      "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+      "Server": "cloudflare",
+      "Server-Timing": "x-originResponse;dur=33",
+      "Cf-Cache-Status": "DYNAMIC",
+      "X-Robots-Tag": "none",
+      "Cf-Ray": "<CF_RAY>"
+    },
+    "response_body": "{\"input_tokens\":14}"
+  }
+]

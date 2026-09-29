@@ -1,0 +1,42 @@
+[
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is 5 + 3?\"}]}],\"generationConfig\":{\"thinkingConfig\":{\"includeThoughts\":true,\"thinkingLevel\":\"low\"}}}",
+    "status": 200,
+    "response_headers": {
+      "X-Gemini-Service-Tier": "standard",
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:09:06 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=1686",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"**My Immediate Calculation**\\n\\nAlright, a straightforward request. The user needs the sum of 5 and 3. My primary function is to perform calculations, and this is a simple one. The necessary addition is 5 + 3. I've processed that: 5 plus 3 equals 8. Therefore, the answer is 8. I'll provide the answer directly; there's no need for any further elaboration in this instance.\\n\\n\\n\",\n            \"thought\": true\n          },\n          {\n            \"text\": \"5 + 3 = 8\",\n            \"thoughtSignature\": \"EsIBCr8BAWkUfROoG3Gk8jTm+lCLWDSyuviHtKALB/RQLLJY2lBGTk2/bf8572qBiAZtNI8/j11XPSmfuqYOR5tCZcFM4HL7SSyQzfgLb2r5CCOqApc1ioVhLQ2muunqkCkwKJckUsDp5N1qiUKXSf/B+SVWF4Nfo6XwQYyoejS8h3kFCw7a4g4LCc2rBjJDj0XzwAjYhyAZtfzYV4UQITbww6UaLW5gyLAAcAUnjprA+frvLPjTbgllnggArsOI8q5ZMeI=\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 9,\n    \"candidatesTokenCount\": 7,\n    \"totalTokenCount\": 48,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 9\n      }\n    ],\n    \"thoughtsTokenCount\": 32,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3-flash-preview\",\n  \"responseId\": \"AWWsauSQBo7ivdIPn_v7wAw\"\n}\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is 5 + 3?\"}]},{\"role\":\"model\",\"parts\":[{\"thought\":true,\"text\":\"**My Immediate Calculation**\\n\\nAlright, a straightforward request. The user needs the sum of 5 and 3. My primary function is to perform calculations, and this is a simple one. The necessary addition is 5 + 3. I've processed that: 5 plus 3 equals 8. Therefore, the answer is 8. I'll provide the answer directly; there's no need for any further elaboration in this instance.\\n\\n\\n\",\"thoughtSignature\":\"EsIBCr8BAWkUfROoG3Gk8jTm+lCLWDSyuviHtKALB/RQLLJY2lBGTk2/bf8572qBiAZtNI8/j11XPSmfuqYOR5tCZcFM4HL7SSyQzfgLb2r5CCOqApc1ioVhLQ2muunqkCkwKJckUsDp5N1qiUKXSf/B+SVWF4Nfo6XwQYyoejS8h3kFCw7a4g4LCc2rBjJDj0XzwAjYhyAZtfzYV4UQITbww6UaLW5gyLAAcAUnjprA+frvLPjTbgllnggArsOI8q5ZMeI=\"},{\"text\":\"5 + 3 = 8\"}]},{\"role\":\"user\",\"parts\":[{\"text\":\"Now multiply that by 2\"}]}],\"generationConfig\":{\"thinkingConfig\":{\"includeThoughts\":true,\"thinkingLevel\":\"low\"}}}",
+    "status": 200,
+    "response_headers": {
+      "X-Gemini-Service-Tier": "standard",
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:09:08 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=1768",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"**Multiplying the Previous Result**\\n\\nOkay, so I have a previous result here, which is 8. Now, my next step is to multiply that by 2. It's a straightforward operation; nothing fancy needed. Let's see... 8 multiplied by 2. Right, that's simple enough - 8 * 2 equals 16. Done. The result is 16.\\n\\n\\n\",\n            \"thought\": true\n          },\n          {\n            \"text\": \"8 × 2 = 16\",\n            \"thoughtSignature\": \"EvkBCvYBAWkUfRNa56BBAGOrcJh1ktK+4nZ8zWfHplT1FYebMiYhY9lOAS8Pz/upOc3O8z+57T8PJNM3Ukw1r/U3XSTdeE+KEKxknlqoZY5DP0+8Plh7HeklCWgiJ77BMU6wTray2S1HuoHcIu3LPQVhvFabBClLbwTzs4JBF5nrY+6fz5/rwBKwXB8M06jMn62jpZVIrQr19lYFA29GoFQlCXyiNKsxNh8+o7mJiYkBCGg8+57PNLP27Enpo2PewQwEc4CKu3FlPlf1bdKZtz8NLzCjRUQ+HIOQiGqO8C142T6+S3RCXhPfDPDo5ZsqOWYg9sepXeWPOms7\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 118,\n    \"candidatesTokenCount\": 8,\n    \"totalTokenCount\": 178,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 118\n      }\n    ],\n    \"thoughtsTokenCount\": 52,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3-flash-preview\",\n  \"responseId\": \"AmWsap6HNZbaxs0P37j1kQ0\"\n}\n"
+  }
+]

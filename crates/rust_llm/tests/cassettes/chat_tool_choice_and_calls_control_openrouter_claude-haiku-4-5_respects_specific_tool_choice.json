@@ -1,0 +1,46 @@
+[
+  {
+    "method": "post",
+    "uri": "https://openrouter.ai/api/v1/chat/completions",
+    "request_body": "{\"model\":\"anthropic/claude-haiku-4.5\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the fall of Rome?\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}],\"tool_choice\":{\"type\":\"function\",\"function\":{\"name\":\"weather\"}}}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:28:20 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+      "X-Generation-Id": "gen-1789684100-MRhu0UeO74y1ZrH3dulZ",
+      "Access-Control-Expose-Headers": "X-Generation-Id,X-Provider-Name,request-id,cf-ray",
+      "Set-Cookie": "<COOKIE>",
+      "Permissions-Policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "Referrer-Policy": "no-referrer, strict-origin-when-cross-origin",
+      "X-Content-Type-Options": "nosniff",
+      "Server": "cloudflare",
+      "Cf-Ray": "<CF_RAY>"
+    },
+    "response_body": "\n         \n{\"id\":\"gen-1789684100-MRhu0UeO74y1ZrH3dulZ\",\"object\":\"chat.completion\",\"created\":1789684100,\"model\":\"anthropic/claude-haiku-4.5\",\"provider\":\"Amazon Bedrock\",\"system_fingerprint\":null,\"service_tier\":\"default\",\"choices\":[{\"index\":0,\"logprobs\":null,\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"tool_use\",\"message\":{\"role\":\"assistant\",\"content\":null,\"refusal\":null,\"reasoning\":null,\"tool_calls\":[{\"type\":\"function\",\"index\":0,\"id\":\"toolu_bdrk_01L2YMYu1zHsykktwMaz7zWr\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\": \\\"<UNKNOWN>\\\", \\\"longitude\\\": \\\"<UNKNOWN>\\\"}\"}}]}}],\"usage\":{\"prompt_tokens\":716,\"completion_tokens\":52,\"total_tokens\":768,\"cost\":0.000976,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000976,\"upstream_inference_prompt_cost\":0.000716,\"upstream_inference_completions_cost\":0.00026},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}"
+  },
+  {
+    "method": "post",
+    "uri": "https://openrouter.ai/api/v1/chat/completions",
+    "request_body": "{\"model\":\"anthropic/claude-haiku-4.5\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the fall of Rome?\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"toolu_bdrk_01L2YMYu1zHsykktwMaz7zWr\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"<UNKNOWN>\\\",\\\"longitude\\\":\\\"<UNKNOWN>\\\"}\"}}]},{\"role\":\"tool\",\"content\":\"Current weather at <UNKNOWN>, <UNKNOWN>: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"toolu_bdrk_01L2YMYu1zHsykktwMaz7zWr\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:28:21 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+      "X-Generation-Id": "gen-1789684101-5FWqqwlQBjZrlp1rmhzj",
+      "Access-Control-Expose-Headers": "X-Generation-Id,X-Provider-Name,request-id,cf-ray",
+      "Set-Cookie": "<COOKIE>",
+      "Permissions-Policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "Referrer-Policy": "no-referrer, strict-origin-when-cross-origin",
+      "X-Content-Type-Options": "nosniff",
+      "Server": "cloudflare",
+      "Cf-Ray": "<CF_RAY>"
+    },
+    "response_body": "\n         \n\n         \n{\"id\":\"gen-1789684101-5FWqqwlQBjZrlp1rmhzj\",\"object\":\"chat.completion\",\"created\":1789684101,\"model\":\"anthropic/claude-haiku-4.5\",\"provider\":\"Amazon Bedrock\",\"system_fingerprint\":null,\"service_tier\":\"default\",\"choices\":[{\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"end_turn\",\"message\":{\"role\":\"assistant\",\"content\":\"I apologize for that—I made an error by trying to use the weather tool, which isn't relevant to your question. Let me answer you properly.\\n\\n**The Fall of Rome** refers to the gradual decline and collapse of the Western Roman Empire, which occurred over several centuries. Here are the key aspects:\\n\\n## Timeline and Process\\n- **Gradual decline**: Rather than a single event, Rome's fall was a prolonged process spanning roughly the 3rd to 5th centuries CE\\n- **Official end**: Usually dated to 476 CE, when the last Western Roman Emperor (Romulus Augustulus) was deposed by the Germanic king Odoacer\\n\\n## Major Contributing Factors\\n\\n1. **Political instability**: Civil wars, frequent leadership changes, and corruption weakened governance\\n\\n2. **Economic problems**: Inflation, tax burden, debasement of currency, and trade disruptions\\n\\n3. **Military pressures**: Invasions and migrations by Germanic tribes (Visigoths, Vandals, Goths, etc.) and other barbarian groups\\n\\n4. **Division of the Empire**: The empire split into Eastern and Western halves in 285 CE, weakening the Western portion\\n\\n5. **Administrative overextension**: The empire was too large to govern effectively\\n\\n6. **Social and cultural decline**: Loss of civic virtue, rise of Christianity, and cultural shift\\n\\n7. **Plague and disease**: Including the Plague of Cyprian in the 3rd century\\n\\n## Aftermath\\n- The **Eastern Roman (Byzantine) Empire** continued for another thousand years until 1453\\n- Western Europe fragmented into Germanic kingdoms\\n- Classical civilization declined, leading to the early Middle Ages\",\"refusal\":null,\"reasoning\":null}}],\"usage\":{\"prompt_tokens\":729,\"completion_tokens\":368,\"total_tokens\":1097,\"cost\":0.002569,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.002569,\"upstream_inference_prompt_cost\":0.000729,\"upstream_inference_completions_cost\":0.00184},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}"
+  }
+]

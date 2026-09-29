@@ -61,7 +61,102 @@ pub struct Request<'a> {
     pub max_output_tokens: Option<i64>,
     pub schema: Option<&'a Schema>,
     pub thinking: Option<&'a ThinkingConfig>,
+    /// `with_citations`.
+    pub citations: bool,
+    /// `with_caching`: `None` when not configured.
+    pub caching: Option<&'a Caching>,
     pub stream: bool,
+}
+
+/// `with_caching(options)` / `with_caching(false)`, the chat's `@caching`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Caching {
+    /// `with_caching(false)`: send no cache controls and render no cache boundaries.
+    Off,
+    /// `with_caching(key:, ttl:, mode:, id:, ...)`; empty for the provider's default behavior.
+    On(Map<String, Value>),
+}
+
+impl Caching {
+    /// `caching != false`: whether marked cache boundaries render.
+    pub(crate) fn boundaries(caching: Option<&Caching>) -> bool {
+        caching != Some(&Caching::Off)
+    }
+
+    /// The options of an enabled cache, or `None` when unset or off.
+    pub(crate) fn options(caching: Option<&Caching>) -> Option<&Map<String, Value>> {
+        match caching {
+            Some(Caching::On(options)) => Some(options),
+            _ => None,
+        }
+    }
+
+    /// `prompt_cache_options`: rejects keys outside `allowed`, naming them as Ruby symbols.
+    pub(crate) fn checked<'a>(caching: Option<&'a Caching>, allowed: &[&str], label: &str) -> Result<Option<&'a Map<String, Value>>> {
+        let Some(options) = Caching::options(caching) else { return Ok(None) };
+        let unsupported: Vec<String> = options.keys().filter(|k| !allowed.contains(&k.as_str())).map(|k| format!(":{k}")).collect();
+        if unsupported.is_empty() {
+            return Ok(Some(options));
+        }
+        Err(Error::Argument(format!("{label} prompt caching accepts {}, got {}", symbols(allowed), unsupported.join(", "))))
+    }
+}
+
+/// `:key, :ttl, and :mode` for the Responses/Chat Completions messages, `:ttl` for one key.
+fn symbols(keys: &[&str]) -> String {
+    let visible: Vec<String> = keys.iter().filter(|k| **k != "retention").map(|k| format!(":{k}")).collect();
+    match visible.len() {
+        0 | 1 => visible.join(""),
+        n => format!("{}, and {}", visible[..n - 1].join(", "), visible[n - 1]),
+    }
+}
+
+/// `apply_end_user`: each protocol's safety identifier field; the rest drop it.
+pub(crate) fn apply_end_user(protocol: ProtocolName, provider: Provider, payload: &mut Value, identifier: &str) {
+    let field = match (protocol, provider) {
+        (ProtocolName::Anthropic, _) => {
+            deep_merge(payload, &serde_json::json!({ "metadata": { "user_id": identifier } }));
+            return;
+        }
+        (ProtocolName::ChatCompletions | ProtocolName::Responses, Provider::OpenAI) => "safety_identifier",
+        (ProtocolName::ChatCompletions | ProtocolName::Responses, Provider::DeepSeek) => "user_id",
+        (ProtocolName::ChatCompletions, Provider::OpenRouter) => "user",
+        _ => {
+            tracing::debug!("{} has no safety identifier parameter, dropping {identifier}", provider.display());
+            return;
+        }
+    };
+    if let Some(p) = payload.as_object_mut() {
+        p.insert(field.into(), identifier.into());
+    }
+}
+
+/// `apply_compaction`: Anthropic's `context_management` edit, OpenAI's Responses
+/// `compact_threshold` entry, or OpenRouter's context-compression plugin; dropped elsewhere.
+pub(crate) fn apply_compaction(protocol: ProtocolName, provider: Provider, payload: &mut Value, compaction: &Map<String, Value>) {
+    match (protocol, provider) {
+        (ProtocolName::Anthropic, _) => anthropic::apply_compaction(payload, compaction),
+        (ProtocolName::Responses, Provider::OpenAI) => {
+            let mut entry = serde_json::json!({ "type": "compaction" });
+            if let Some(at) = compaction.get("at").filter(|v| !v.is_null() && **v != Value::Bool(false)) {
+                entry["compact_threshold"] = at.clone();
+            }
+            if let Some(p) = payload.as_object_mut() {
+                p.insert("context_management".into(), serde_json::json!([entry]));
+            }
+        }
+        (ProtocolName::ChatCompletions, Provider::OpenRouter) => {
+            if !compaction.is_empty() {
+                tracing::debug!("OpenRouter compresses context at the model's own limit, dropping {compaction:?}");
+            }
+            if let Some(p) = payload.as_object_mut() {
+                let mut plugins = p.get("plugins").and_then(Value::as_array).cloned().unwrap_or_default();
+                plugins.push(serde_json::json!({ "id": "context-compression" }));
+                p.insert("plugins".into(), Value::Array(plugins));
+            }
+        }
+        _ => tracing::debug!("{} has no context compaction parameter, dropping {compaction:?}", provider.display()),
+    }
 }
 
 /// Where and how to send a rendered request.
@@ -71,12 +166,25 @@ pub struct Endpoint {
 }
 
 pub fn render(protocol: ProtocolName, req: &Request) -> Result<Value> {
+    if req.citations && !req.model.supports("citations") {
+        warn_unsupported_citations(protocol, req.model);
+    }
     match protocol {
         ProtocolName::ChatCompletions => chat_completions::render_payload(req),
         ProtocolName::Responses => responses::render_payload(req),
         ProtocolName::Anthropic => anthropic::render_payload(req),
         ProtocolName::Gemini => gemini::render_payload(req),
     }
+}
+
+/// Each protocol's `warn_unsupported_citations`, called from `render_payload`.
+fn warn_unsupported_citations(protocol: ProtocolName, model: &Model) {
+    let hint = if protocol == ProtocolName::Gemini {
+        "Gemini citations come from Google Search grounding: with_provider_options(tools: [{ google_search: {} }])."
+    } else {
+        "with_citations may have no effect."
+    };
+    tracing::warn!("{} does not support citations according to the model registry. {hint}", model.id);
 }
 
 pub fn endpoint(protocol: ProtocolName, provider: Provider, model: &Model, stream: bool) -> Endpoint {
@@ -115,11 +223,20 @@ pub struct StreamState {
     pub anthropic: anthropic::StreamBlocks,
     pub gemini_parts: Vec<Value>,
     pub citation_lengths: Vec<((i64, i64), usize)>,
+    /// `OpenRouter::Streaming`'s `@raw_reasoning`: the reasoning_details merged so far.
+    pub openrouter_reasoning: Option<Vec<Value>>,
 }
 
 pub fn build_chunk(protocol: ProtocolName, provider: Provider, state: &mut StreamState, data: &Value) -> Result<Message> {
     match protocol {
-        ProtocolName::ChatCompletions => Ok(chat_completions::build_chunk(provider, data)),
+        ProtocolName::ChatCompletions => {
+            let mut chunk = chat_completions::build_chunk(provider, data);
+            if provider == Provider::OpenRouter {
+                let details = data.pointer("/choices/0/delta/reasoning_details");
+                chunk.raw_reasoning = chat_completions::accumulate_raw_reasoning(&mut state.openrouter_reasoning, details);
+            }
+            Ok(chunk)
+        }
         ProtocolName::Responses => responses::build_chunk(provider, state, data),
         ProtocolName::Anthropic => Ok(anthropic::build_chunk(&mut state.anthropic, data)),
         ProtocolName::Gemini => Ok(gemini::build_chunk(state, data)),

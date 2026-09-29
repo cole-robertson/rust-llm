@@ -1,0 +1,7 @@
+# frozen_string_literal: true
+
+source 'https://rubygems.org'
+
+# RubyLLM 2.0.0 exactly as ported (upstream 1e91b30), not a released gem.
+gem 'ruby_llm', path: '../../upstream'
+gem 'async', '~> 2.0'

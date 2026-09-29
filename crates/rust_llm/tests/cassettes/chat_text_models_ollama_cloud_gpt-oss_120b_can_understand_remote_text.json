@@ -1,0 +1,56 @@
+[
+  {
+    "method": "get",
+    "uri": "https://www.ruby-lang.org/en/about/license.txt",
+    "request_body": "",
+    "status": 200,
+    "response_headers": {
+      "Connection": "keep-alive",
+      "Content-Length": "2502",
+      "Server": "GitHub.com",
+      "Content-Type": "text/plain; charset=utf-8",
+      "X-Origin-Cache": "HIT",
+      "Last-Modified": "Tue, 15 Sep 2026 04:37:41 GMT",
+      "Access-Control-Allow-Origin": "*",
+      "Etag": "W/\"6aa8cb95-9c6\"",
+      "Expires": "Thu, 17 Sep 2026 22:16:13 GMT",
+      "Cache-Control": "max-age=600",
+      "X-Proxy-Cache": "MISS",
+      "X-Github-Request-Id": "4914:338B02:3C8A1F8:3CDCFDE:6AAC6454",
+      "X-Github-Edge-Region": "fra",
+      "Accept-Ranges": "bytes",
+      "Date": "Thu, 17 Sep 2026 22:07:36 GMT",
+      "Via": "1.1 varnish",
+      "Age": "47",
+      "X-Served-By": "cache-ber1080041-BER",
+      "X-Cache": "HIT",
+      "X-Cache-Hits": "1",
+      "X-Timer": "S1789682856.291204,VS0,VE1",
+      "Vary": "Accept-Encoding",
+      "X-Fastly-Request-Id": "07a736e65bc72ffb3f1a5ee63f6bab2deb32425f"
+    },
+    "response_body": "Ruby is copyrighted free software by Yukihiro Matsumoto <matz@netlab.jp>.\nYou can redistribute it and/or modify it under either the terms of the\n2-clause BSDL (see the file BSDL), or the conditions below:\n\n  1. You may make and give away verbatim copies of the source form of the\n     software without restriction, provided that you duplicate all of the\n     original copyright notices and associated disclaimers.\n\n  2. You may modify your copy of the software in any way, provided that\n     you do at least ONE of the following:\n\n       a) place your modifications in the Public Domain or otherwise\n          make them Freely Available, such as by posting said\n\t  modifications to Usenet or an equivalent medium, or by allowing\n\t  the author to include your modifications in the software.\n\n       b) use the modified software only within your corporation or\n          organization.\n\n       c) give non-standard binaries non-standard names, with\n          instructions on where to get the original software distribution.\n\n       d) make other distribution arrangements with the author.\n\n  3. You may distribute the software in object code or binary form,\n     provided that you do at least ONE of the following:\n\n       a) distribute the binaries and library files of the software,\n\t  together with instructions (in the manual page or equivalent)\n\t  on where to get the original distribution.\n\n       b) accompany the distribution with the machine-readable source of\n\t  the software.\n\n       c) give non-standard binaries non-standard names, with\n          instructions on where to get the original software distribution.\n\n       d) make other distribution arrangements with the author.\n\n  4. You may modify and include the part of the software into any other\n     software (possibly commercial).  But some files in the distribution\n     are not written by the author, so that they are not under these terms.\n\n     For the list of those files and their copying conditions, see the\n     file LEGAL.\n\n  5. The scripts and library files supplied as input to or produced as\n     output from the software do not automatically fall under the\n     copyright of the software, but belong to whomever generated them,\n     and may be sold commercially, and may be aggregated with this\n     software.\n\n  6. THIS SOFTWARE IS PROVIDED \"AS IS\" AND WITHOUT ANY EXPRESS OR\n     IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED\n     WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR\n     PURPOSE.\n"
+  },
+  {
+    "method": "post",
+    "uri": "https://ollama.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What's in this file?\"},{\"type\":\"text\",\"text\":\"<file name='license.txt' mime_type='text/plain'>Ruby is copyrighted free software by Yukihiro Matsumoto <matz@netlab.jp>.\\nYou can redistribute it and/or modify it under either the terms of the\\n2-clause BSDL (see the file BSDL), or the conditions below:\\n\\n  1. You may make and give away verbatim copies of the source form of the\\n     software without restriction, provided that you duplicate all of the\\n     original copyright notices and associated disclaimers.\\n\\n  2. You may modify your copy of the software in any way, provided that\\n     you do at least ONE of the following:\\n\\n       a) place your modifications in the Public Domain or otherwise\\n          make them Freely Available, such as by posting said\\n\\t  modifications to Usenet or an equivalent medium, or by allowing\\n\\t  the author to include your modifications in the software.\\n\\n       b) use the modified software only within your corporation or\\n          organization.\\n\\n       c) give non-standard binaries non-standard names, with\\n          instructions on where to get the original software distribution.\\n\\n       d) make other distribution arrangements with the author.\\n\\n  3. You may distribute the software in object code or binary form,\\n     provided that you do at least ONE of the following:\\n\\n       a) distribute the binaries and library files of the software,\\n\\t  together with instructions (in the manual page or equivalent)\\n\\t  on where to get the original distribution.\\n\\n       b) accompany the distribution with the machine-readable source of\\n\\t  the software.\\n\\n       c) give non-standard binaries non-standard names, with\\n          instructions on where to get the original software distribution.\\n\\n       d) make other distribution arrangements with the author.\\n\\n  4. You may modify and include the part of the software into any other\\n     software (possibly commercial).  But some files in the distribution\\n     are not written by the author, so that they are not under these terms.\\n\\n     For the list of those files and their copying conditions, see the\\n     file LEGAL.\\n\\n  5. The scripts and library files supplied as input to or produced as\\n     output from the software do not automatically fall under the\\n     copyright of the software, but belong to whomever generated them,\\n     and may be sold commercially, and may be aggregated with this\\n     software.\\n\\n  6. THIS SOFTWARE IS PROVIDED \\\"AS IS\\\" AND WITHOUT ANY EXPRESS OR\\n     IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED\\n     WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR\\n     PURPOSE.\\n</file>\"}]}],\"stream\":false}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Set-Cookie": "<COOKIE>",
+      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
+      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Frame-Options": "DENY",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Content-Length": "3890",
+      "Date": "Thu, 17 Sep 2026 22:07:39 GMT",
+      "Server": "Google Frontend",
+      "X-Cloud-Trace-Context": "a244971cee0960f7150587be6b9ea06f/12560024698434255452",
+      "Traceparent": "00-a244971cee0960f7150587be6b9ea06f-ae4e2bead84e7a5c-00",
+      "Via": "1.1 google",
+      "Alt-Svc": "h3=\":443\"; ma=2592000"
+    },
+    "response_body": "{\"id\":\"chatcmpl-572\",\"object\":\"chat.completion\",\"created\":1789682859,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The file **license.txt** is a plain‑text copy of the licensing notice that ships with the Ruby programming language. It consists of two parts:\\n\\n1. **Reference to the 2‑clause BSDL** – The notice says you may redistribute Ruby under the terms of the “2‑clause BSDL” (the file *BSDL* is assumed to be included elsewhere in the distribution).\\n\\n2. **Alternative (custom) licensing terms** – If you don’t use the BSDL, the file defines a set of six numbered conditions that govern how you may copy, modify, and distribute Ruby:\\n\\n| # | What the clause permits / requires |\\n|---|-------------------------------------|\\n| **1** | You can give away verbatim copies of the source as long as you keep all original copyright notices and disclaimers. |\\n| **2** | You may modify the source **provided you do *at least one* of the following**: \\u003cbr\\u003e a) Release your modifications into the public domain or otherwise make them freely available (e.g., via Usenet, a web site, or by allowing the author to incorporate them).\\u003cbr\\u003e b) Use the modified version only inside your own corporation/organization.\\u003cbr\\u003e c) Rename the binaries and give instructions on where to obtain the original distribution.\\u003cbr\\u003e d) Make other distribution arrangements with the author. |\\n| **3** | You may distribute binaries/object code **provided you do *at least one* of the following**: \\u003cbr\\u003e a) Ship the binaries together with instructions (e.g., in a man‑page) on where to get the original source.\\u003cbr\\u003e b) Include the machine‑readable source alongside the binaries.\\u003cbr\\u003e c) Rename the binaries and give instructions on where to get the original distribution.\\u003cbr\\u003e d) Make other distribution arrangements with the author. |\\n| **4** | You may incorporate Ruby (or parts of it) into other software—even commercial products—**but** some files in the Ruby distribution are not authored by Yukihiro Matsumoto, so they are excluded from these terms. The file *LEGAL* lists those exceptions. |\\n| **5** | Scripts or library files that are **produced** by the software (i.e., output generated by Ruby) are **not** automatically covered by Ruby’s copyright. The creators of those scripts own the copyright and can sell them commercially or bundle them with Ruby. |\\n| **6** | Disclaimer: “THIS SOFTWARE IS PROVIDED ‘AS IS’ …” – no express or implied warranties, including warranties of merchantability or fitness for a particular purpose. |\\n\\n**Overall summary**\\n\\n- The file declares Ruby as “copyrighted free software” (copyright © Yukihiro Matsumoto).  \\n- You may use either the standard 2‑clause BSDL license **or** the custom terms listed above.  \\n- The custom terms are permissive, but they impose a few “do at least one of the listed options” requirements when you modify or redistribute the software in source or binary form.  \\n- Certain third‑party files have separate licenses (see the *LEGAL* file).  \\n- The usual “as‑is” warranty disclaimer is included.\\n\\nIn short, **license.txt** is the Ruby license text that outlines how you may copy, modify, and distribute Ruby under either the BSDL or the alternate conditions described above.\",\"reasoning\":\"We need to answer \\\"What's in this file?\\\" Provide summary of contents. Probably describe that it's a Ruby license text, with terms. Provide key points. Also note it's a custom license with BSDL option. Provide bullet summary. Should not violate policy. Just summarize.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":601,\"prompt_tokens_details\":{\"cached_tokens\":48},\"completion_tokens\":771,\"total_tokens\":1372}}\n"
+  }
+]

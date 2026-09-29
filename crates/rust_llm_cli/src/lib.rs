@@ -1,21 +1,30 @@
 //! # rust_llm_cli
 //!
 //! RubyLLM's Rails generators (`lib/generators/ruby_llm/*`) as a `rust-llm` CLI for Loco + Inertia
-//! + React apps:
+//! \+ React apps.
+//!
+//! Install it from a checkout of the repository, then run it from the root of a Loco app:
+//!
+//! ```text
+//! cargo install --path crates/rust_llm_cli
+//! rust-llm generate install --path <rust-llm checkout>
+//! ```
 //!
 //! | RubyLLM | rust-llm |
 //! |---|---|
-//! | `bin/rails g ruby_llm:install` | `rust-llm generate install` |
+//! | `bin/rails g ruby_llm:install` | `rust-llm generate install [--path RUST_LLM_CHECKOUT]` |
 //! | `bin/rails g ruby_llm:tool Weather` | `rust-llm generate tool Weather` |
 //! | `bin/rails g ruby_llm:agent Support` | `rust-llm generate agent Support` |
 //! | `bin/rails g ruby_llm:schema Product` | `rust-llm generate schema Product` |
 //! | `bin/rails g ruby_llm:chat_ui` | `rust-llm generate chat_ui` |
-//! | `script/generate-provider NAME` (core mode) | `rust-llm generate provider NAME` |
+//! | `script/generate-provider NAME` (core mode) | `rust-llm generate provider NAME [--dialect D] [--api-base URL] [--dynamic-models] [--destination DIR]` |
 //! | `bin/rails g ruby_llm:upgrade` | `rust-llm generate upgrade` |
 //!
-//! Like Rails generators, existing files are skipped unless `--force`, injections are skipped when
-//! already present, and every path is printed with its action (`create`, `identical`, `skip`,
-//! `force`, `insert`). An injection whose anchor is missing is reported and fails the run.
+//! `g` is short for `generate`, and every generator takes `--force`. Like Rails generators,
+//! existing files are skipped unless `--force`, injections are skipped when already present, and
+//! every path is printed with its action (`create`, `identical`, `skip`, `force`, `insert`). An
+//! injection whose anchor is missing is reported and fails the run. See the
+//! [generators guide](https://github.com/cole-robertson/rust-llm/blob/main/docs/generators.md).
 
 pub mod agent;
 pub mod chat_ui;

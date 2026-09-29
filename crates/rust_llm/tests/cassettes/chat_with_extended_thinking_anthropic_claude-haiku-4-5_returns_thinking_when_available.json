@@ -1,0 +1,38 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.anthropic.com/v1/messages",
+    "request_body": "{\"model\":\"claude-haiku-4-5-20251001\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"If a magic mirror shows your future self, but only if you ask a question it cannot answer truthfully, what question do you ask to see your future, and what would the mirror reveal about the answer it gives?\"}]}],\"stream\":false,\"max_tokens\":64000,\"thinking\":{\"type\":\"enabled\",\"budget_tokens\":1024}}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:06:34 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Anthropic-Ratelimit-Input-Tokens-Limit": "10000000",
+      "Anthropic-Ratelimit-Input-Tokens-Remaining": "10000000",
+      "Anthropic-Ratelimit-Input-Tokens-Reset": "2026-09-17T22:06:28Z",
+      "Anthropic-Ratelimit-Output-Tokens-Limit": "2000000",
+      "Anthropic-Ratelimit-Output-Tokens-Remaining": "1999000",
+      "Anthropic-Ratelimit-Output-Tokens-Reset": "2026-09-17T22:06:34Z",
+      "Anthropic-Ratelimit-Requests-Limit": "10000",
+      "Anthropic-Ratelimit-Requests-Remaining": "9999",
+      "Anthropic-Ratelimit-Requests-Reset": "2026-09-17T22:06:28Z",
+      "Anthropic-Ratelimit-Tokens-Limit": "12000000",
+      "Anthropic-Ratelimit-Tokens-Remaining": "11999000",
+      "Anthropic-Ratelimit-Tokens-Reset": "2026-09-17T22:06:28Z",
+      "Server": "cloudflare",
+      "Request-Id": "<REQUEST_ID>",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "Anthropic-Organization-Id": "<ANTHROPIC_ORGANIZATION_ID>",
+      "Anthropic-Workspace-Id": "wrkspc_01MZW3YzUeytZsFc9LHFxP78",
+      "Traceresponse": "00-2c598ba1ffc65078b9b55f13413fd360-563b05a62fab7fa2-01",
+      "Vary": "Accept-Encoding",
+      "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+      "Cf-Cache-Status": "DYNAMIC",
+      "X-Robots-Tag": "none",
+      "Cf-Ray": "<CF_RAY>"
+    },
+    "response_body": "{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_011Cf9mi6W4ftP2Nar4npVA5\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"This is a fun logical puzzle that plays with self-reference and paradox - similar to classic paradoxes like the liar's paradox.\\n\\nLet me think through the setup:\\n- The mirror shows your future self only if you ask a question it cannot answer truthfully\\n- I need to find a question that creates a paradox or indeterminacy for the mirror\\n\\nA classic approach would be a self-referential question like:\\n\\\"Will you give a truthful answer to this question?\\\"\\n\\nIf the mirror answers \\\"yes,\\\" it claims it will answer truthfully - but then that answer itself should be examined for truthfulness\\nIf the mirror answers \\\"no,\\\" it claims it won't answer truthfully - which means the \\\"no\\\" answer might itself be false\\n\\nBut there's something interesting to explore here about the premise itself.\\n\\nThe really interesting part of this puzzle is examining what \\\"cannot answer truthfully\\\" means:\\n- Does it mean the question has no true answer?\\n- Does it mean the mirror is incapable of determining the truth?\\n- Does it mean answering would create a paradox?\\n\\nI think the most interesting response is to point out the tension in the setup and explore what would actually happen, rather than just give a clever answer.\",\"signature\":\"EqYLCpoBCBEYAipAgekJDM/zXAFRTxl8lSPyrL9DZKTMrYW+9LHy8GmtNiNReFSRT0mAi2laRl7a9WutzgRzDFuf5B7bcxvldTOv7TIZY2xhdWRlLWhhaWt1LTQtNS0yMDI1MTAwMTgAQgh0aGlua2luZ1okMDEzN2IxNWMtMTZiZi00OTBkLTlmOTAtOGNmZDdlMzI1ZWMwqAHnyLHVBhIMF/ZxBQ90Lo6Z5FdoGgwKJtuNX0HsnT2L7yYiMBv/fiTC4/dsLWV37/unAQqbFkpd/lvww35zSDkh+bqOegCiN8lZtjfe4FNMZxSH1Cq4CddiYO1cyq5MNfCcaBhxWQWTQN/CKJxvyn6D7/fX69IkNbSqJs/K0BdlCLECls7KiR/ASE/O6hahMIUmecmaPkHiRR/TxwhMLpDndNpl4pH07fZU5WHKJNxCliaM9TpuSJOgCNqwBMTPIMNhdmWGG/MxUh6IYSr5rH5EqzVDouuMjLAlYNsrp/gHU+WKFNy2BjzCwkvLeG3K415HSEd5xChPZtS04MoGhu6J0g14Iwizhf+XXqC2PLYHXIs3mUNlbUvTSBD3FFqZEPuw9Qmgo6v2gwTD+xAidkpvl3GaANwSQuZesg1djhOhhZDeUuhQ8b4Mj2H1x1Y0CvYzZsKBPOeI4BV9pELpAsxaJYDIwnTuHJ24pIdBlyk9Wv0K8NRBYdEUWnZhjshci/aWnHv1v9vadKxMeLFL0B95ik7ahxoeeJ6bS07TKe98G0KbO5FClX002Q9V6Lw/vmT3Chr4XigI+sPMVG18NbPSl3TAwHLgPfzMVeNEOIbyT4Tj7SKOvlTLweFt04h3o6LV3vrqxAHvn1BUl8Ytw+LZxkVJJc1vX4dpKkGvSk4j/tfsH2U3fEiVBWGbJwaXYdsYtJqok6HkVWsk7LsqptoRnyqxxSM5erdj63Fk9DFKk4YXS4LTsh/y96N1x5nf/bJZBRdV7hz6JgS7DEynVAmUUjEWYOs+yp83UFPG4H/uI2wbRUQUwpXQ6ypfV3pwNXsdU0h390ohKaCbMpfkNjz/NnUD0+nzloV1x2cbb5tAzgfrZezef4Qfc3Mo8YfxHl+HrFRE4qJq4YTeocZHyfm2tEWYHBxU9obKI+5IDVXjyaj8mtcsN5pN3ukkdWYuabRo1V8ZvhGLyidkB++Pomg/VeqKwkfvjgvuZ+tv5lvQeSlB4eD+j/eaAxcIUZ5PbpmKSzxNW0dc47jBHoyOxIom8Cbc7S87iFSXaLf3tsTpGTUZZIFcwwr8v3CCsO1lofKcMKcwNqNMWKvxrdo/WSbk9nwdT7iul0Q6kMxgYzzQwG5whhhFNe+dzJSCdL7gSZ+NXjZT6CXxf8m1KWyz5IzqFUVf4EuQ8K9BP+4iWsVE5sz8xee6l6PqDYxejsorVvIH4usFc6wbySk3ft+tHGFNzKg5Zq5LjJhtu4PtnEYGGvyyuywap2iOxk6PGAZGKmdo+QUPx3oL90klf6qUjL4tXZyHNnz0P4f2CSvcW1Er3cnnJAL3tvKnanZ9vhEFgqNCnLorWnF5CY0MUpg/4H8nzm3UMBwKliB/T+ay+akp/HSz8ia16lnvjRWtGO/6qEJbv1YZmZ2ShgX7yhldMhwqTgkbhhzVOL29F5oC3Q97qY7P6ggyNoQhEjU+jyy7bAMCTW/oHtIaPb5dkoMYiRmmFl91wWElmQyPH3gMwxNUrswJuznoBfpWqihkkfdEOoOu3DKonOnwfhTGbF5Jn2wgsukHnL0Lnr9eprdbYM+8iL7MIaAsThgoQ/CuzoqQYWCcMnOrOzYsxtiVa8xl3qSurnqClFr/bDyrvl6xmzRB0jIF33ln4BAssob83YEpjcPrAQTC8Bzu5wd15TFeujwx0NatNN8CHQ3YYEzC1Y27VCJMM8pFvdCSYpmcK2YJGAE=\"},{\"type\":\"text\",\"text\":\"I'd ask: **\\\"What answer to this question would you give if you could not answer it truthfully?\\\"**\\n\\nThis creates a productive paradox:\\n\\n- If the mirror gives *any* answer, it's demonstrating exactly what it would say *if constrained to lie* - which means it's answering what it cannot answer truthfully\\n- By answering, it shows you something about itself under an impossible condition\\n- The answer reveals not a future, but a kind of shadow-self—what it would become under different rules\\n\\n**What's interesting though:** This puzzle assumes the mirror has a *stable future self* to reveal. But a self that only manifests paradoxically might not have one. You might see:\\n\\n- Flickering/changing images (indeterminacy)\\n- Yourself, reflected back (the mirror can't escape its own paradox)\\n- Stillness (refusal to engage the trap)\\n\\nThe real answer the mirror reveals might be about **you**—that you've asked a question where seeing the answer matters more than getting one. The future it shows is the you who asked something impossible, which is already visible the moment you ask it.\\n\\nWhat draws you to this particular mirror?\"}],\"container\":null,\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":80,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":535,\"output_tokens_details\":{\"thinking_tokens\":270},\"service_tier\":\"standard\",\"inference_geo\":\"not_available\"}}"
+  }
+]

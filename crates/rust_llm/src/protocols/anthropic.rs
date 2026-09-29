@@ -2,7 +2,7 @@
 
 use serde_json::{Map, Value, json};
 
-use super::{Request, ToolCalls, ToolChoice, int, normalize_finish_reason, str_of, tool_call_map};
+use super::{Caching, Request, ToolCalls, ToolChoice, int, normalize_finish_reason, str_of, tool_call_map};
 use crate::attachment::{Attachment, AttachmentType};
 use crate::error::{Error, Result};
 use crate::message::{Citation, Message, RawResponse, Role, ServerToolCall, Thinking, ToolArguments, ToolCall};
@@ -11,6 +11,50 @@ use crate::thinking::ThinkingConfig;
 use crate::tool::{Tool, tool_schema};
 
 pub const DEFAULT_MAX_OUTPUT_TOKENS: i64 = 4096;
+
+/// How many times a turn that stops with `pause_turn` is continued before RubyLLM returns what
+/// it has.
+pub const MAX_PAUSE_TURN_CONTINUATIONS: usize = 8;
+
+/// `Anthropic#merge_turn_segments`: the segments of a paused and continued turn as one message.
+/// Text joins, citations, server tool calls, and tool calls accumulate, tokens sum, and the last
+/// segment supplies thinking, finish reason, model, and the raw response.
+pub fn merge_turn_segments(mut segments: Vec<Message>) -> Message {
+    if segments.len() <= 1 {
+        return segments.pop().unwrap_or_else(Message::chunk);
+    }
+    let raw_content = segments.iter().any(|s| s.raw_content.is_some()).then(|| {
+        let blocks: Vec<Value> = segments
+            .iter()
+            .flat_map(|s| match &s.raw_content {
+                Some(Value::Array(blocks)) => blocks.clone(),
+                Some(other) => vec![other.clone()],
+                None => format_message(s, false, None).ok().and_then(|m| m["content"].as_array().cloned()).unwrap_or_default(),
+            })
+            .collect();
+        Value::Array(blocks)
+    });
+    let mut tool_calls = crate::message::indexmap_lite::IndexMap::new();
+    for (id, call) in segments.iter().filter_map(|s| s.tool_calls.as_ref()).flat_map(|c| c.iter()) {
+        tool_calls.insert(id.clone(), call.clone());
+    }
+    let tokens = crate::tokens::Tokens::aggregate(segments.iter().map(|s| &s.tokens));
+    let content: String = segments.iter().filter_map(|s| s.content.as_deref()).collect();
+    let citations = segments.iter().flat_map(|s| s.citations.clone()).collect();
+    let server_tool_calls = segments.iter().flat_map(|s| s.server_tool_calls.clone()).collect();
+    let last = segments.pop().unwrap_or_else(Message::chunk);
+    let mut merged = Message::assistant(content);
+    merged.citations = citations;
+    merged.server_tool_calls = server_tool_calls;
+    merged.raw_content = raw_content;
+    merged.thinking = last.thinking;
+    merged.tool_calls = (!tool_calls.is_empty()).then_some(tool_calls);
+    merged.tokens = tokens;
+    merged.finish_reason = last.finish_reason;
+    merged.model = last.model;
+    merged.raw = last.raw;
+    merged
+}
 
 const FINISH_REASONS: &[(&str, &str)] = &[
     ("end_turn", "stop"),
@@ -25,11 +69,15 @@ const EFFORT_BUDGETS: &[(&str, i64)] = &[("low", 1024), ("medium", 40_000), ("hi
 
 pub fn render_payload(req: &Request) -> Result<Value> {
     let (system, chat): (Vec<&Message>, Vec<&Message>) = req.messages.iter().partition(|m| m.role == Role::System);
+    // `prompt_cache_control(caching)`, or `None` when `with_caching(false)` turns boundaries off.
+    let cache_options = Caching::checked(req.caching, PROMPT_CACHE_OPTIONS, "Anthropic")?;
+    let control = prompt_cache_control(cache_options);
+    let cache = Caching::boundaries(req.caching).then_some(&control);
     let mut system_content = Vec::new();
     for msg in &system {
         let mut blocks = format_content(msg.content.as_deref(), &msg.attachments)?;
-        if msg.cache_until_here {
-            inject_cache_control(&mut blocks);
+        if let Some(control) = cache.filter(|_| msg.cache_until_here) {
+            inject_cache_control(&mut blocks, control);
         }
         system_content.extend(blocks);
     }
@@ -37,7 +85,7 @@ pub fn render_payload(req: &Request) -> Result<Value> {
     let max_tokens = req.max_output_tokens.or(req.model.max_output_tokens).unwrap_or(DEFAULT_MAX_OUTPUT_TOKENS);
     let mut payload = Map::new();
     payload.insert("model".into(), req.model.id.clone().into());
-    payload.insert("messages".into(), Value::Array(format_messages(&chat)?));
+    payload.insert("messages".into(), Value::Array(format_messages(&chat, req.citations, cache)?));
     payload.insert("stream".into(), req.stream.into());
     payload.insert("max_tokens".into(), max_tokens.into());
     add_thinking_fields(&mut payload, req.thinking, req.model, max_tokens);
@@ -63,24 +111,81 @@ pub fn render_payload(req: &Request) -> Result<Value> {
         let output = payload.entry("output_config").or_insert_with(|| json!({}));
         output["format"] = json!({ "type": "json_schema", "schema": normalized });
     }
+    if cache_options.is_some() {
+        payload.insert("cache_control".into(), control);
+    }
     Ok(Value::Object(payload))
 }
 
-fn format_messages(messages: &[&Message]) -> Result<Vec<Value>> {
+const PROMPT_CACHE_OPTIONS: &[&str] = &["ttl"];
+
+/// `prompt_cache_control(caching)`: `{ type: "ephemeral" }` plus the `ttl:` option when given.
+fn prompt_cache_control(options: Option<&Map<String, Value>>) -> Value {
+    let mut control = json!({ "type": "ephemeral" });
+    if let Some(ttl) = options.and_then(|o| o.get("ttl")).filter(|t| !t.is_null()) {
+        control["ttl"] = ttl.clone();
+    }
+    control
+}
+
+const BETA_HEADER: &str = "anthropic-beta";
+const COMPACTION_BETA: &str = "compact-2026-01-12";
+
+/// `apply_compaction`: a `context_management` edit. Without `at:` the API applies its own
+/// trigger; an explicit one goes through unchecked.
+pub(crate) fn apply_compaction(payload: &mut Value, compaction: &Map<String, Value>) {
+    let mut edit = json!({ "type": "compact_20260112" });
+    if let Some(at) = compaction.get("at").filter(|v| truthy(v)) {
+        edit["trigger"] = json!({ "type": "input_tokens", "value": at });
+    }
+    if let Some(instructions) = compaction.get("instructions").filter(|v| truthy(v)) {
+        edit["instructions"] = instructions.clone();
+    }
+    if compaction.get("pause_after").is_some_and(truthy) {
+        edit["pause_after_compaction"] = true.into();
+    }
+    super::deep_merge(payload, &json!({ "context_management": { "edits": [edit] } }));
+}
+
+fn truthy(v: &Value) -> bool {
+    !matches!(v, Value::Null | Value::Bool(false))
+}
+
+/// `apply_compaction_headers`: adds the compaction beta, keeping betas already asked for.
+pub(crate) fn apply_compaction_headers(headers: &mut Vec<(String, String)>) {
+    let mut betas: Vec<String> = Vec::new();
+    headers.retain(|(k, v)| {
+        if !k.eq_ignore_ascii_case(BETA_HEADER) {
+            return true;
+        }
+        betas.extend(v.split(',').map(str::trim).filter(|b| !b.is_empty()).map(str::to_string));
+        false
+    });
+    betas.push(COMPACTION_BETA.to_string());
+    let mut unique: Vec<String> = Vec::new();
+    for b in betas {
+        if !unique.contains(&b) {
+            unique.push(b);
+        }
+    }
+    headers.push((BETA_HEADER.into(), unique.join(",")));
+}
+
+fn format_messages(messages: &[&Message], citations: bool, cache: Option<&Value>) -> Result<Vec<Value>> {
     let mut rendered = Vec::new();
     let mut tool_results: Vec<Value> = Vec::new();
     for msg in messages {
         if msg.is_tool_result() {
             tool_results.push(format_tool_result_block(msg)?);
-            if msg.cache_until_here {
-                inject_cache_control(&mut tool_results);
+            if let Some(control) = cache.filter(|_| msg.cache_until_here) {
+                inject_cache_control(&mut tool_results, control);
             }
             continue;
         }
         if !tool_results.is_empty() {
             rendered.push(json!({ "role": "user", "content": std::mem::take(&mut tool_results) }));
         }
-        let formatted = format_message(msg)?;
+        let formatted = format_message(msg, citations, cache.filter(|_| msg.cache_until_here))?;
         if formatted["content"].as_array().is_some_and(|c| !c.is_empty()) {
             rendered.push(formatted);
         }
@@ -91,12 +196,13 @@ fn format_messages(messages: &[&Message]) -> Result<Vec<Value>> {
     Ok(rendered)
 }
 
-fn format_message(msg: &Message) -> Result<Value> {
+/// `boundary` is the cache control to inject when this message is a cache boundary.
+fn format_message(msg: &Message, citations: bool, boundary: Option<&Value>) -> Result<Value> {
     if msg.role == Role::Assistant
         && let Some(raw) = &msg.raw_content {
             let mut blocks = raw.as_array().cloned().unwrap_or_default();
-            if msg.cache_until_here {
-                inject_cache_control(&mut blocks);
+            if let Some(control) = boundary {
+                inject_cache_control(&mut blocks, control);
             }
             return Ok(json!({ "role": "assistant", "content": blocks }));
         }
@@ -113,15 +219,15 @@ fn format_message(msg: &Message) -> Result<Value> {
                 "input": Value::Object(call.arguments()),
             }));
         }
-        if msg.cache_until_here {
-            inject_cache_control(&mut blocks);
+        if let Some(control) = boundary {
+            inject_cache_control(&mut blocks, control);
         }
         return Ok(json!({ "role": "assistant", "content": blocks }));
     }
     let mut blocks = if msg.role == Role::Assistant { format_thinking_blocks(msg) } else { Vec::new() };
-    blocks.extend(format_content(msg.content.as_deref(), &msg.attachments)?);
-    if msg.cache_until_here {
-        inject_cache_control(&mut blocks);
+    blocks.extend(format_content_with(msg.content.as_deref(), &msg.attachments, citations)?);
+    if let Some(control) = boundary {
+        inject_cache_control(&mut blocks, control);
     }
     let role = match msg.role {
         Role::Tool | Role::User => "user",
@@ -148,13 +254,18 @@ fn format_thinking_blocks(msg: &Message) -> Vec<Value> {
     }
 }
 
-fn inject_cache_control(blocks: &mut [Value]) {
+fn inject_cache_control(blocks: &mut [Value], control: &Value) {
     if let Some(Value::Object(last)) = blocks.last_mut() {
-        last.entry("cache_control").or_insert_with(|| json!({ "type": "ephemeral" }));
+        last.entry("cache_control").or_insert_with(|| control.clone());
     }
 }
 
 fn format_tool_result_block(msg: &Message) -> Result<Value> {
+    // `Tools.format_tool_result_content`: search results become citable `search_result` blocks.
+    if let Some(results) = crate::search_results::SearchResults::from_content(msg.content.as_deref()) {
+        let blocks: Vec<Value> = results.results.iter().map(search_result_block).collect();
+        return Ok(json!({ "type": "tool_result", "tool_use_id": msg.tool_call_id, "content": blocks }));
+    }
     let mut content = msg.content.clone().filter(|c| !c.is_empty());
     if content.is_none() && msg.attachments.is_empty() {
         content = Some("(no output)".into());
@@ -166,8 +277,25 @@ fn format_tool_result_block(msg: &Message) -> Result<Value> {
     }))
 }
 
+/// `Tools.search_result_block`.
+fn search_result_block(result: &Map<String, Value>) -> Value {
+    json!({
+        "type": "search_result",
+        "source": result.get("url").or_else(|| result.get("title")),
+        "title": result.get("title"),
+        "content": [{ "type": "text", "text": result.get("text") }],
+        "citations": { "enabled": true }
+    })
+}
+
 /// `Anthropic::Media.format_content`.
 pub fn format_content(content: Option<&str>, attachments: &[Attachment]) -> Result<Vec<Value>> {
+    format_content_with(content, attachments, false)
+}
+
+/// `Anthropic::Media.format_content(content, attachments, citations:)`: with citations on, PDFs,
+/// stored documents, and text files become citable documents titled by their filename.
+fn format_content_with(content: Option<&str>, attachments: &[Attachment], citations: bool) -> Result<Vec<Value>> {
     let mut parts = Vec::new();
     if let Some(text) = content.filter(|t| !t.is_empty()) {
         parts.push(json!({ "type": "text", "text": text }));
@@ -176,7 +304,11 @@ pub fn format_content(content: Option<&str>, attachments: &[Attachment]) -> Resu
         // `format_provider_file`: a stored file is referenced by id.
         if let Some(file_id) = a.provider_file_id() {
             let kind = if a.kind() == AttachmentType::Image { "image" } else { "document" };
-            parts.push(json!({ "type": kind, "source": { "type": "file", "file_id": file_id } }));
+            let mut part = json!({ "type": kind, "source": { "type": "file", "file_id": file_id } });
+            if citations && kind == "document" {
+                enable_citations(&mut part, a);
+            }
+            parts.push(part);
             continue;
         }
         let part = match a.kind() {
@@ -186,18 +318,39 @@ pub fn format_content(content: Option<&str>, attachments: &[Attachment]) -> Resu
                     "type": "base64", "media_type": a.mime_type, "data": a.encoded()?
                 }}),
             },
-            AttachmentType::Pdf => match a.url() {
-                Some(url) => json!({ "type": "document", "source": { "type": "url", "url": url } }),
-                None => json!({ "type": "document", "source": {
-                    "type": "base64", "media_type": a.mime_type, "data": a.encoded()?
-                }}),
-            },
+            AttachmentType::Pdf => {
+                let mut part = match a.url() {
+                    Some(url) => json!({ "type": "document", "source": { "type": "url", "url": url } }),
+                    None => json!({ "type": "document", "source": {
+                        "type": "base64", "media_type": a.mime_type, "data": a.encoded()?
+                    }}),
+                };
+                if citations {
+                    enable_citations(&mut part, a);
+                }
+                part
+            }
+            AttachmentType::Text if citations => {
+                let mut part = json!({ "type": "document", "source": {
+                    "type": "text", "media_type": "text/plain", "data": a.content_text()?
+                }});
+                enable_citations(&mut part, a);
+                part
+            }
             AttachmentType::Text => json!({ "type": "text", "text": a.for_llm()? }),
             _ => return Err(Error::UnsupportedAttachment(unsupported(&a.mime_type))),
         };
         parts.push(part);
     }
     Ok(parts)
+}
+
+/// `Media.enable_citations`.
+fn enable_citations(document: &mut Value, attachment: &Attachment) {
+    if let Some(filename) = &attachment.filename {
+        document["title"] = filename.clone().into();
+    }
+    document["citations"] = json!({ "enabled": true });
 }
 
 pub(crate) fn unsupported(mime: &str) -> String {

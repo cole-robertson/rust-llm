@@ -1,0 +1,22 @@
+[
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Call the object params tool with window start 2025-01-01 and end 2025-01-02 and include the result.\"}]}],\"generationConfig\":{},\"tools\":[{\"functionDeclarations\":[{\"name\":\"object_params\",\"description\":\"Uses params DSL object support\",\"parametersJsonSchema\":{\"type\":\"object\",\"properties\":{\"window\":{\"type\":\"object\",\"properties\":{\"start\":{\"type\":\"string\",\"description\":\"ISO start\"},\"end\":{\"type\":\"string\",\"description\":\"ISO end\"}},\"required\":[\"start\",\"end\"],\"additionalProperties\":false,\"description\":\"Time window to schedule\"}},\"required\":[\"window\"],\"additionalProperties\":false}}]}]}",
+    "status": 200,
+    "response_headers": {
+      "X-Gemini-Service-Tier": "standard",
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:19:06 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=1213",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"functionCall\": {\n              \"name\": \"object_params\",\n              \"args\": {\n                \"window\": {\n                  \"start\": \"2025-01-01\",\n                  \"end\": \"2025-01-02\"\n                }\n              }\n            },\n            \"thoughtSignature\": \"CsADAWkUfRMB9KimMFkPeKA/tU2bi4/3wrZb/lY2qRA1KJBIb1lYSV1vPC2YR8P6EqWrWU8eMkIBpVLy0m8ByBrgcx8owhB4FGAA3PKbNCVAkJILkpGoA3zwWH69o7wYiyKagNJOJ/Nkzq2NB2UaDZxBRUCzYsviME3+YaqDQqihWXlEHYQkc7WZqgiLugO/kV+UM5GRQ4xMz6ssHHlWWdd6uSKYeYjETgdfu13aNTyewlWtq9XNY5mcwOiyFjgcZlVExisDvhtYlNAni73BSIYEBG4qo/jT80KS31MOBo3592LjU5BK/Mmljcmcb/ZA4c+KOjouGOxGksOiR7LyqmYaTO3w9uc6+UiVLExZj823MFfDH+5ewJYs12+Iuv2botj82AGjberHM/HolCU4QG3oT8OmqEg9/5xnZUfx0q4O6mkQQUv37olAcz+wc5qpStW/UOsl6i80G6yY3VvDNUp2ioP4CZqjoKrRXYCuEReD+6SD5Nn5JTUR+zgSd69QI/RoEmQLuKZBZ5f85GblQoFW2vEKDe5mVee/JQgCCdaL7b6fwrnZNt54Y/3ax5dqDk8XjpglTyl0xfUQIMkgrtXRqw==\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0,\n      \"finishMessage\": \"Model generated function call(s).\"\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 136,\n    \"candidatesTokenCount\": 43,\n    \"totalTokenCount\": 325,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 136\n      }\n    ],\n    \"thoughtsTokenCount\": 146,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"WWesau6VIe-uvdIPp5HI-Ao\"\n}\n"
+  }
+]

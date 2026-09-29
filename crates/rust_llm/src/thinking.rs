@@ -87,11 +87,17 @@ impl ThinkingConfig {
         match resolved {
             Resolved::AlreadyOn => Ok(None),
             Resolved::Options(options) => Ok(Some(options)),
-            Resolved::Unsupported => Err(Error::Argument(format!(
-                "{} does not expose {} controls in the model registry",
-                model.id,
-                if intent == Intent::Enable { "thinking" } else { "thinking-off" }
-            ))),
+            // `resolution_error(model)`.
+            Resolved::Unsupported => {
+                let (verb, hint) = match intent {
+                    Intent::Enable => ("enable", "Pass effort:, budget:, or display:."),
+                    Intent::Disable => ("disable", "The model registry has no off control."),
+                };
+                Err(Error::Argument(format!(
+                    "RustLLM does not know how to {verb} thinking for {}/{}. {hint}",
+                    model.provider, model.id
+                )))
+            }
         }
     }
 }

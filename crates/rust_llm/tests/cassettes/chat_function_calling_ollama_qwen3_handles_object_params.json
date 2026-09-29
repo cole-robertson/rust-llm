@@ -1,0 +1,14 @@
+[
+  {
+    "method": "post",
+    "uri": "<OLLAMA_API_BASE>/chat/completions",
+    "request_body": "{\"model\":\"qwen3\",\"messages\":[{\"role\":\"user\",\"content\":\"Call the object params tool with window start 2025-01-01 and end 2025-01-02 and include the result.\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"object_params\",\"description\":\"Uses params DSL object support\",\"parameters\":{\"type\":\"object\",\"properties\":{\"window\":{\"type\":\"object\",\"properties\":{\"start\":{\"type\":\"string\",\"description\":\"ISO start\"},\"end\":{\"type\":\"string\",\"description\":\"ISO end\"}},\"required\":[\"start\",\"end\"],\"additionalProperties\":false,\"description\":\"Time window to schedule\"}},\"required\":[\"window\"],\"additionalProperties\":false}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json",
+      "Date": "Thu, 17 Sep 2026 22:20:25 GMT",
+      "Content-Length": "1053"
+    },
+    "response_body": "{\"id\":\"chatcmpl-600\",\"object\":\"chat.completion\",\"created\":1789683625,\"model\":\"qwen3\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning\":\"Okay, the user wants me to call the object params tool with a window starting on 2025-01-01 and ending on 2025-01-02. Let me check the function definition again. The function requires a window object with start and end in ISO format. The parameters are start and end, both required. So I need to structure the arguments as a JSON object with the window containing those dates. Let me make sure the dates are in the correct format, YYYY-MM-DD. Yes, 2025-01-01 and 2025-01-02 are valid. I'll format the tool call accordingly.\\n\",\"tool_calls\":[{\"id\":\"call_i647jrfz\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"object_params\",\"arguments\":\"{\\\"window\\\":{\\\"end\\\":\\\"2025-01-02\\\",\\\"start\\\":\\\"2025-01-01\\\"}}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":205,\"prompt_tokens_details\":{\"cached_tokens\":48},\"completion_tokens\":197,\"total_tokens\":402}}\n"
+  }
+]

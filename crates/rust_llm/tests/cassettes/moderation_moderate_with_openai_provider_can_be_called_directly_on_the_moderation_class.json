@@ -1,0 +1,29 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.openai.com/v1/moderations",
+    "request_body": "{\"model\":\"omni-moderation-latest\",\"input\":\"This is a safe message\"}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:15:46 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Server": "cloudflare",
+      "Openai-Version": "2020-10-01",
+      "Openai-Organization": "<OPENAI_ORGANIZATION>",
+      "Openai-Project": "<OPENAI_PROJECT>",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Openai-Processing-Ms": "59",
+      "X-Openai-Proxy-Wasm": "v0.1",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Access-Control-Expose-Headers": "CF-Ray",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "Set-Cookie": "<COOKIE>",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\n  \"id\": \"modr-236\",\n  \"model\": \"omni-moderation-latest\",\n  \"results\": [\n    {\n      \"flagged\": false,\n      \"categories\": {\n        \"harassment\": false,\n        \"harassment/threatening\": false,\n        \"sexual\": false,\n        \"hate\": false,\n        \"hate/threatening\": false,\n        \"illicit\": false,\n        \"illicit/violent\": false,\n        \"self-harm/intent\": false,\n        \"self-harm/instructions\": false,\n        \"self-harm\": false,\n        \"sexual/minors\": false,\n        \"violence\": false,\n        \"violence/graphic\": false\n      },\n      \"category_scores\": {\n        \"harassment\": 0.000011959857805023158,\n        \"harassment/threatening\": 3.7636447180974406e-6,\n        \"sexual\": 0.00006667023092435894,\n        \"hate\": 7.602479448313689e-6,\n        \"hate/threatening\": 3.2377619022355566e-7,\n        \"illicit\": 0.000015118199327273332,\n        \"illicit/violent\": 6.709224499600877e-6,\n        \"self-harm/intent\": 0.00021217710837818755,\n        \"self-harm/instructions\": 3.944258675190877e-6,\n        \"self-harm\": 0.0004544456121966584,\n        \"sexual/minors\": 5.307507822667365e-6,\n        \"violence\": 0.000493111798506495,\n        \"violence/graphic\": 2.931153855960119e-6\n      },\n      \"category_applied_input_types\": {\n        \"harassment\": [\n          \"text\"\n        ],\n        \"harassment/threatening\": [\n          \"text\"\n        ],\n        \"sexual\": [\n          \"text\"\n        ],\n        \"hate\": [\n          \"text\"\n        ],\n        \"hate/threatening\": [\n          \"text\"\n        ],\n        \"illicit\": [\n          \"text\"\n        ],\n        \"illicit/violent\": [\n          \"text\"\n        ],\n        \"self-harm/intent\": [\n          \"text\"\n        ],\n        \"self-harm/instructions\": [\n          \"text\"\n        ],\n        \"self-harm\": [\n          \"text\"\n        ],\n        \"sexual/minors\": [\n          \"text\"\n        ],\n        \"violence\": [\n          \"text\"\n        ],\n        \"violence/graphic\": [\n          \"text\"\n        ]\n      }\n    }\n  ]\n}"
+  }
+]

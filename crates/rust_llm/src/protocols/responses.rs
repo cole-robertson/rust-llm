@@ -4,7 +4,7 @@
 use serde_json::{Map, Value, json};
 
 use super::chat_completions::{empty_parameters_schema, parse_root_citations, parse_search_results, schema_strict};
-use super::{Request, StreamState, ToolCalls, ToolChoice, char_slice, deep_merge, int, normalize_finish_reason, str_of, tool_call_map};
+use super::{Caching, Request, StreamState, ToolCalls, ToolChoice, char_slice, deep_merge, int, normalize_finish_reason, str_of, tool_call_map};
 use crate::attachment::{Attachment, AttachmentType};
 use crate::error::{Error, Result};
 use crate::message::{Citation, Message, RawResponse, Role, ServerToolCall, Thinking, ToolCall};
@@ -20,10 +20,11 @@ const SONAR_PRESETS: &[(&str, &str)] =
     &[("sonar", "fast"), ("sonar-pro", "low"), ("sonar-reasoning-pro", "medium"), ("sonar-deep-research", "high")];
 
 pub fn render_payload(req: &Request) -> Result<Value> {
+    let boundaries = Caching::boundaries(req.caching);
     let mut payload = Map::new();
     payload.insert("model".into(), req.model.id.clone().into());
-    payload.insert("input".into(), Value::Array(format_input(req.messages)?));
-    if let Some(instructions) = format_instructions(req.messages) {
+    payload.insert("input".into(), Value::Array(format_input(req.provider, req.messages, boundaries)?));
+    if let Some(instructions) = format_instructions(req.messages, boundaries) {
         payload.insert("instructions".into(), instructions.into());
     }
     payload.insert("stream".into(), req.stream.into());
@@ -73,6 +74,9 @@ pub fn render_payload(req: &Request) -> Result<Value> {
             reasoning["summary"] = "auto".into();
         }
     }
+    if let Some(options) = Caching::checked(req.caching, PROMPT_CACHE_OPTIONS, "Responses")? {
+        payload.extend(prompt_cache_params(options));
+    }
     if req.provider == Provider::Perplexity {
         let id = req.model.id.as_str();
         let preset = PERPLEXITY_PRESETS
@@ -88,28 +92,107 @@ pub fn render_payload(req: &Request) -> Result<Value> {
     Ok(Value::Object(payload))
 }
 
-fn system_input_item(msg: &Message) -> bool {
-    msg.role == Role::System && (msg.cache_until_here || !msg.attachments.is_empty())
+pub(crate) const PROMPT_CACHE_OPTIONS: &[&str] = &["key", "ttl", "mode", "retention"];
+
+/// `prompt_cache_params`: `prompt_cache_key` from `key:`, and `prompt_cache_options` from `mode:`
+/// and `ttl:` (or the deprecated `retention:`).
+pub(crate) fn prompt_cache_params(options: &Map<String, Value>) -> Map<String, Value> {
+    let present = |k: &str| options.get(k).filter(|v| !v.is_null());
+    let mut params = Map::new();
+    if let Some(key) = present("key") {
+        params.insert("prompt_cache_key".into(), key.clone());
+    }
+    let mut cache_options = Map::new();
+    if let Some(mode) = present("mode") {
+        cache_options.insert("mode".into(), mode.clone());
+    }
+    let ttl = present("ttl").or_else(|| {
+        let retention = present("retention")?;
+        tracing::warn!(
+            "with_caching retention: is deprecated; OpenAI replaced prompt_cache_retention with prompt_cache_options. Use ttl: instead."
+        );
+        Some(retention)
+    });
+    if let Some(ttl) = ttl {
+        cache_options.insert("ttl".into(), ttl.clone());
+    }
+    if !cache_options.is_empty() {
+        params.insert("prompt_cache_options".into(), Value::Object(cache_options));
+    }
+    params
 }
 
-fn format_instructions(messages: &[Message]) -> Option<String> {
+/// `system_input_item?`: system messages marked as cache boundaries, or carrying attachments,
+/// ride along as input items, because `instructions` is a plain string.
+fn system_input_item(msg: &Message, boundaries: bool) -> bool {
+    msg.role == Role::System && ((boundaries && msg.cache_until_here) || !msg.attachments.is_empty())
+}
+
+fn format_instructions(messages: &[Message], boundaries: bool) -> Option<String> {
     let parts: Vec<String> = messages
         .iter()
-        .filter(|m| m.role == Role::System && !system_input_item(m))
+        .filter(|m| m.role == Role::System && !system_input_item(m, boundaries))
         .map(|m| m.content().to_string())
         .collect();
     (!parts.is_empty()).then(|| parts.join("\n\n"))
 }
 
-fn format_input(messages: &[Message]) -> Result<Vec<Value>> {
+/// `format_input`: a compaction result replaces everything before it except system items.
+fn format_input(provider: Provider, messages: &[Message], boundaries: bool) -> Result<Vec<Value>> {
     let mut input = Vec::new();
+    let mut system_items = Vec::new();
     for msg in messages {
-        if msg.role == Role::System && !system_input_item(msg) {
+        if msg.role == Role::System && !system_input_item(msg, boundaries) {
             continue;
         }
-        input.extend(format_item(msg)?);
+        if let Some(output) = compaction_output(msg) {
+            input = system_items.clone();
+            input.extend(output.iter().cloned());
+            continue;
+        }
+        let items = format_item(provider, msg, boundaries)?;
+        if msg.role == Role::System {
+            system_items.extend(items.iter().cloned());
+        }
+        input.extend(items);
     }
     Ok(input)
+}
+
+/// The `output` of a manual compaction result stored as the message's `raw_content`.
+fn compaction_output(msg: &Message) -> Option<&Vec<Value>> {
+    let raw = msg.raw_content.as_ref()?;
+    if raw.get("object").and_then(Value::as_str) != Some("response.compaction") {
+        return None;
+    }
+    raw.get("output").and_then(Value::as_array)
+}
+
+/// `Compaction#render_compaction_payload`: model, input, and instructions, with no cache boundaries.
+pub(crate) fn render_compaction_payload(provider: Provider, model: &str, messages: &[Message]) -> Result<Value> {
+    let mut payload = Map::new();
+    payload.insert("model".into(), model.into());
+    payload.insert("input".into(), Value::Array(format_input(provider, messages, false)?));
+    if let Some(instructions) = format_instructions(messages, false) {
+        payload.insert("instructions".into(), instructions.into());
+    }
+    Ok(Value::Object(payload))
+}
+
+/// `Compaction#parse_compaction_response`: an empty assistant message carrying the compacted
+/// context as `raw_content`, with the pass's usage.
+pub(crate) fn parse_compaction_response(provider: Provider, model: &str, raw: RawResponse) -> Result<Message> {
+    let body = raw.body.clone();
+    if body.get("object").and_then(Value::as_str) != Some("response.compaction") || !body.get("output").is_some_and(Value::is_array) {
+        return Err(Error::Api("The provider returned an invalid compaction response".into(), None));
+    }
+    let mut m = Message::assistant("");
+    m.model = Some(model.to_string());
+    m.finish_reason = Some(crate::message::FinishReason::Stop);
+    parse_usage(provider, &mut m, body.get("usage").unwrap_or(&json!({})));
+    m.raw_content = Some(body);
+    m.raw = Some(raw);
+    Ok(m)
 }
 
 fn with_cache_breakpoint(mut item: Value) -> Value {
@@ -126,12 +209,12 @@ fn with_cache_breakpoint(mut item: Value) -> Value {
     item
 }
 
-fn format_item(msg: &Message) -> Result<Vec<Value>> {
+fn format_item(provider: Provider, msg: &Message, boundaries: bool) -> Result<Vec<Value>> {
     Ok(match msg.role {
         Role::System | Role::User => {
             let role = msg.role.as_str();
             let item = json!({ "role": role, "content": format_content(msg.content.as_deref(), &msg.attachments)? });
-            vec![if msg.cache_until_here { with_cache_breakpoint(item) } else { item }]
+            vec![if boundaries && msg.cache_until_here { with_cache_breakpoint(item) } else { item }]
         }
         Role::Tool => {
             if let Some(Value::Array(raw)) = &msg.raw_content {
@@ -153,12 +236,28 @@ fn format_item(msg: &Message) -> Result<Vec<Value>> {
         }
         Role::Assistant => {
             if let Some(Value::Array(raw)) = &msg.raw_content {
+                // `Perplexity::Agent#format_assistant_items`: Perplexity rejects its own
+                // search_results and fetch_url_results items as input.
+                if provider == Provider::Perplexity {
+                    return Ok(raw
+                        .iter()
+                        .filter(|i| i.get("type").and_then(Value::as_str).is_none_or(|t| CLIENT_OUTPUT_ITEM_TYPES.contains(&t)))
+                        .cloned()
+                        .collect());
+                }
                 return Ok(raw.clone());
             }
             let mut items = Vec::new();
-            if let Some(t) = msg.thinking.as_ref().filter(|t| t.signature.is_some()) {
-                let summary = t.text.as_ref().map(|text| json!([{ "type": "summary_text", "text": text }])).unwrap_or_else(|| json!([]));
-                items.push(json!({ "type": "reasoning", "summary": summary, "encrypted_content": t.signature }));
+            // `DeepSeek::Responses#format_assistant_items`: DeepSeek reads its reasoning back as
+            // `reasoning_text` parts, signed or not; its `format_reasoning_item` overrides the base one.
+            let deepseek_text = provider == Provider::DeepSeek && msg.thinking.as_ref().is_some_and(|t| t.text.as_deref().is_some_and(|x| !x.is_empty()));
+            if let Some(t) = msg.thinking.as_ref().filter(|t| t.signature.is_some() || deepseek_text) {
+                if provider == Provider::DeepSeek {
+                    items.push(json!({ "type": "reasoning", "content": [{ "type": "reasoning_text", "text": t.text }] }));
+                } else {
+                    let summary = t.text.as_ref().map(|text| json!([{ "type": "summary_text", "text": text }])).unwrap_or_else(|| json!([]));
+                    items.push(json!({ "type": "reasoning", "summary": summary, "encrypted_content": t.signature }));
+                }
             }
             if !msg.content().trim().is_empty() {
                 items.push(json!({ "role": "assistant", "content": [{ "type": "output_text", "text": msg.content() }] }));
@@ -252,6 +351,12 @@ fn parse_usage(provider: Provider, message: &mut Message, usage: &Value) {
             message.tokens.reported_cost = usage.get("cost_in_usd_ticks").and_then(Value::as_f64).map(|t| t * 1e-10);
         }
         Provider::Perplexity => message.tokens.reported_cost = usage.pointer("/cost/total_cost").and_then(Value::as_f64),
+        // `OpenRouter::Responses#parse_usage`: the billed cost and the hosted tool counters.
+        Provider::OpenRouter => {
+            message.tokens.reported_cost = super::chat_completions::reported_cost(provider, &usage);
+            message.tokens.server_tool_use =
+                usage.get("server_tool_use").or_else(|| usage.get("server_tool_use_details")).and_then(Value::as_object).cloned();
+        }
         _ => {}
     }
 }
@@ -262,7 +367,6 @@ fn server_tool_items(output: &[Value]) -> Vec<ServerToolCall> {
     output
         .iter()
         .filter(|i| !CLIENT_OUTPUT_ITEM_TYPES.contains(&i.get("type").and_then(Value::as_str).unwrap_or("")))
-        .filter(|i| !(i.get("type").and_then(Value::as_str) == Some("search_results")))
         .map(|item| ServerToolCall {
             kind: str_of(item.get("type")).unwrap_or_default(),
             name: str_of(item.get("name")),
@@ -541,6 +645,17 @@ pub fn build_chunk(provider: Provider, state: &mut StreamState, data: &Value) ->
             chunk.server_tool_calls = server_calls;
             chunk.finish_reason = finish;
             parse_usage(provider, &mut chunk, response.get("usage").unwrap_or(&json!({})));
+        }
+        // `OpenRouter::Responses#build_chunk`: the finished arguments of a remote MCP call.
+        "response.mcp_call_arguments.done" if provider == Provider::OpenRouter => {
+            chunk.server_tool_calls = vec![ServerToolCall {
+                kind: "mcp_call".into(),
+                name: None,
+                id: str_of(data.get("item_id")),
+                input: data.get("arguments").cloned(),
+                result: None,
+                raw: data.clone(),
+            }];
         }
         "response.failed" => {
             return Err(Error::Api(

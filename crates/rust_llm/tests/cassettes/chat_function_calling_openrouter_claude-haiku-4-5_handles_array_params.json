@@ -1,0 +1,24 @@
+[
+  {
+    "method": "post",
+    "uri": "https://openrouter.ai/api/v1/chat/completions",
+    "request_body": "{\"model\":\"anthropic/claude-haiku-4.5\",\"messages\":[{\"role\":\"user\",\"content\":\"Call the array params tool with tags [\\\"red\\\",\\\"blue\\\"] and tell me the combined tags.\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"array_params\",\"description\":\"Uses params DSL array support\",\"parameters\":{\"type\":\"object\",\"properties\":{\"tags\":{\"type\":\"array\",\"description\":\"List of tags to combine\",\"items\":{\"type\":\"string\"}}},\"required\":[\"tags\"],\"additionalProperties\":false}}}]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:22:12 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+      "X-Generation-Id": "gen-1789683731-kkkF7FGpxOMtCmHOGggL",
+      "Access-Control-Expose-Headers": "X-Generation-Id,X-Provider-Name,request-id,cf-ray",
+      "Set-Cookie": "<COOKIE>",
+      "Permissions-Policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "Referrer-Policy": "no-referrer, strict-origin-when-cross-origin",
+      "X-Content-Type-Options": "nosniff",
+      "Server": "cloudflare",
+      "Cf-Ray": "<CF_RAY>"
+    },
+    "response_body": "\n         \n{\"id\":\"gen-1789683731-kkkF7FGpxOMtCmHOGggL\",\"object\":\"chat.completion\",\"created\":1789683731,\"model\":\"anthropic/claude-haiku-4.5\",\"provider\":\"Amazon Bedrock\",\"system_fingerprint\":null,\"service_tier\":\"default\",\"choices\":[{\"index\":0,\"logprobs\":null,\"finish_reason\":\"tool_calls\",\"native_finish_reason\":\"tool_use\",\"message\":{\"role\":\"assistant\",\"content\":null,\"refusal\":null,\"reasoning\":null,\"tool_calls\":[{\"type\":\"function\",\"index\":0,\"id\":\"toolu_bdrk_01Fgezvm9ucGqPKGE5PBKoGy\",\"function\":{\"name\":\"array_params\",\"arguments\":\"{\\\"tags\\\": [\\\"red\\\",\\\"blue\\\"]}\"}}]}}],\"usage\":{\"prompt_tokens\":603,\"completion_tokens\":59,\"total_tokens\":662,\"cost\":0.000898,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000898,\"upstream_inference_prompt_cost\":0.000603,\"upstream_inference_completions_cost\":0.000295},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}"
+  }
+]

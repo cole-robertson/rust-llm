@@ -12,14 +12,28 @@
 //! chat.messages.count # => user, assistant tool call, tool result, assistant
 //! ```
 //!
-//! ```ignore
-//! let record = ChatRecord::create(&db, "claude-haiku-4-5", None).await?;
-//! let mut chat = record.to_llm(&db).await?.with_tool(Weather);
-//! record.ask(&db, &mut chat, "What's the weather in Berlin?").await?;
+//! ```no_run
+//! # use rust_llm::{Tool, ToolCall, ToolError, ToolResult};
+//! # struct Weather;
+//! # #[async_trait::async_trait]
+//! # impl Tool for Weather {
+//! #     fn description(&self) -> String { "Gets the weather".into() }
+//! #     async fn execute(&self, _: serde_json::Map<String, serde_json::Value>, _: &ToolCall) -> Result<ToolResult, ToolError> { Ok("Sunny".into()) }
+//! # }
+//! use rust_llm_loco::ChatRecord;
+//!
+//! # async fn run(db: &sea_orm::DatabaseConnection) -> rust_llm_loco::Result<()> {
+//! let record = ChatRecord::create(db, "claude-haiku-4-5", None).await?;
+//! let mut chat = record.to_llm(db).await?.with_tool(Weather);
+//! record.ask(db, &mut chat, "What's the weather in Berlin?").await?;
+//! let rows = record.messages(db).await?; // user, assistant tool call, tool result, assistant
+//! # Ok(()) }
 //! ```
 //!
 //! Like RubyLLM, every message, tool call, and billed attempt is written as it happens, so a
-//! chat can be reloaded mid-round (e.g. parked on a tool approval) and continued later.
+//! chat can be reloaded mid-round (e.g. parked on a tool approval) and continued later. Add
+//! [`migrations()`] to your Loco migrator for the tables. See the
+//! [persistence guide](https://github.com/cole-robertson/rust-llm/blob/main/docs/persistence-loco.md).
 
 pub mod entities;
 pub mod migrations;

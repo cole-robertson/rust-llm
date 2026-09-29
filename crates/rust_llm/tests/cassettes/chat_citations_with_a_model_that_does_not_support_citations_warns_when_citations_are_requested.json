@@ -1,0 +1,34 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.openai.com/v1/responses",
+    "request_body": "{\"model\":\"gpt-5-nano\",\"input\":[{\"role\":\"user\",\"content\":\"Say hi\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Thu, 17 Sep 2026 22:12:00 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Cf-Ray": "<CF_RAY>",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Server": "cloudflare",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "Access-Control-Expose-Headers": "CF-Ray",
+      "Openai-Organization": "<OPENAI_ORGANIZATION>",
+      "Openai-Processing-Ms": "1217",
+      "Openai-Project": "<OPENAI_PROJECT>",
+      "Openai-Version": "2020-10-01",
+      "X-Ratelimit-Limit-Requests": "5000",
+      "X-Ratelimit-Limit-Tokens": "2000000",
+      "X-Ratelimit-Remaining-Requests": "4999",
+      "X-Ratelimit-Remaining-Tokens": "2000000",
+      "X-Ratelimit-Reset-Requests": "12ms",
+      "X-Ratelimit-Reset-Tokens": "0s",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Set-Cookie": "<COOKIE>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\n  \"id\": \"resp_0d1cce923f99580a016aac65aed5f087d288969baa77bcf05c\",\n  \"object\": \"response\",\n  \"created_at\": 1789683118,\n  \"status\": \"completed\",\n  \"background\": false,\n  \"billing\": {\n    \"payer\": \"developer\"\n  },\n  \"completed_at\": 1789683119,\n  \"error\": null,\n  \"frequency_penalty\": 0.0,\n  \"incomplete_details\": null,\n  \"instructions\": null,\n  \"max_output_tokens\": null,\n  \"max_tool_calls\": null,\n  \"model\": \"gpt-5-nano-2025-08-07\",\n  \"moderation\": null,\n  \"output\": [\n    {\n      \"id\": \"rs_0d1cce923f99580a016aac65af372087d29b3eb6f413a3434d\",\n      \"type\": \"reasoning\",\n      \"content\": [],\n      \"encrypted_content\": \"gAAAAABqrGWwDY5jHSRGXOwKL7jdnQYx4XFtc880StDfqN8usKwHIPavkSe47aT4MbfsrM5D2L0DMJszGKdLjx06Uc1reQmmcdVEJi2HIcB7oFJZYvt_5cjYfWhmdpnlGllBBUbH_CA5oKIFHPbC3_cw_X-XvwQ3S6AjhrKYo9nBRFW7ZqMsSxmDX5yxp9II6QQ-4udHHKWQEnOqw2QZQUpY_lxg9QvKynHhdwcAsLZk5Bfr-qu_BWM6dI_bIYEUjgWe_6C0smAj0U9np5BZvyTGk__gflzskTFaiiWmALZ0eeKYn8oVJExuRvhgOT-DZvwnwMRaj1-M3i2tKm_2WNJ7NvZGFROJT9AI_SwC0t4H4EDfxP6k273e91zeH-n1u0GbQrqP3ZyeT-ws4o5OQfDueOMFf4uqRqZeYDGImF3BzvGaRJCbJXH-mqqVR62veQ6VegMtp4F-L-qgwZF8li6HpD6yB1ZvFMGGy4EU0YFTxMYh42cftl2hbQx9fiziEQ17RLrsLltWxT5Gf1T04VygxTYjkX70JF4HIl_sh_y9MPBLP14ZqYLaL-8-NBuZDqg_aKvFZlQg4oTbeO0x0r_LNiTUVW9l4wE28piUw2XnsKrY5GixS9htasvdtsrD2s-oIht83pl-Xi6N2e9VCSzITQFQnAOgSgBYNBHB-I7p5wUEG6pMZ3WEWrs-Kv3miPpeX_ApijXxCw6dUpSzXok5rrLHpEEIOSooXZjOCB4LrAnFZUeJmNsVQr50HJrCvHopEm1dMgLrITyUNdgVWNkYUonLsgAjzjb9DEYgR3cuMIj6fwiCih9odZWMjQJ0KJUt5LuePy0GsZKDZ3BgzBuN2-YRyqauYructAxbG19ex2kWPJF2dBHQ3hR8rZ78R6PHzHUFKGUKLsdSQ43dNKsABkIe2tjBGkflow-OjCrb_qGJgTysXUP6uuYmJ_pVaDb_Rlr8TCWirhvDFmHTWhtzwP6X5QgZSRubnJpJKvbSXuvWelR2n-Dg31JCbYKFMqfsGiDVfWtHxHVEzs80jBn7XngfpcYvXKt4lOIT3QUs8tRenhqBjCN9Wmw6HyddZZlrKMXiO_WLjpOlzk6onraMsS7AVQ-ztbokDYYJmCd-zTXgT13BWBGu9qyvrqFlXI6KA_hQlVsjwq6kKeLWEG_5euiTj94Jdu9Kal5LvJQXdua4QKTKbqN2JSfIgAmeGvzo1d_I9rNURggP9i63s9J0zWLFA-clZhDDxK4sKDdUWzJBMj1eH8rTbEo8DfdkyS8wbe82Q0NISdGeC4VfyUupxx1DbjM5nz8gL0AxWdW8iWP3_BdPrHuCk7ZfQmGZ1OCfyx-PYzPBFKf6ueYyE1oDVVdBmugd3fqvbJr-yY6AY25nfxtp2mytO-NYpDOoNMtj7bKlGzCAI-kJrih5R_npPTSg1uB9Ydk54ATVFhNU68zlrPZs5WBXrSTM181rlPqGMixViA2C2BXOj3K7FP9DRGfMdpHmpgpcYeG5KsQgtHKU7McCK9uZXI_8PltrXkgphtLqMr9vhTfqGph_LoI7hakoF7RI8Mq4g_X8lRYg9hg78ypFO8_SnbWqRclNI8xZjPzUx5vZyVSXRZSGISkB1bjSOaDc4MmLXjiOU1RoVDqJq0CAJUM06DF-Dmrj_-f7cmyRNJQIKoytL9r4hNF7yX4M_PDO88brfNvfvhKQwdAWV7r9dhngB4AKFEnIRLbziUXTZqGqsy1z6kAsF4NkjtRH_1GrkViAXhHvGQUrOD1YJLMgepDeuiHhGE_KycHv2tWNQStrXqf9R6H25Ec3_FArqEHPOVOw6sJ2P8C8j0lnT0pbmdG1JhgHQI3Jz8Isl0jufhTY7gCClQOnly2uvSIsdPaw5Q==\",\n      \"summary\": []\n    },\n    {\n      \"id\": \"msg_0d1cce923f99580a016aac65afeab487d29c06f424b464bbcd\",\n      \"type\": \"message\",\n      \"status\": \"completed\",\n      \"content\": [\n        {\n          \"type\": \"output_text\",\n          \"annotations\": [],\n          \"logprobs\": [],\n          \"text\": \"Hi there! How can I help today?\"\n        }\n      ],\n      \"role\": \"assistant\"\n    }\n  ],\n  \"parallel_tool_calls\": true,\n  \"presence_penalty\": 0.0,\n  \"previous_response_id\": null,\n  \"prompt_cache_key\": null,\n  \"prompt_cache_retention\": \"in_memory\",\n  \"reasoning\": {\n    \"context\": \"current_turn\",\n    \"effort\": \"medium\",\n    \"mode\": \"standard\",\n    \"summary\": null\n  },\n  \"safety_identifier\": null,\n  \"service_tier\": \"default\",\n  \"store\": false,\n  \"temperature\": 1.0,\n  \"text\": {\n    \"format\": {\n      \"type\": \"text\"\n    },\n    \"verbosity\": \"medium\"\n  },\n  \"tool_choice\": \"auto\",\n  \"tool_usage\": {\n    \"image_gen\": {\n      \"input_tokens\": 0,\n      \"input_tokens_details\": {\n        \"image_tokens\": 0,\n        \"text_tokens\": 0\n      },\n      \"output_tokens\": 0,\n      \"output_tokens_details\": {\n        \"image_tokens\": 0,\n        \"text_tokens\": 0\n      },\n      \"total_tokens\": 0\n    },\n    \"web_search\": {\n      \"num_requests\": 0\n    }\n  },\n  \"tools\": [],\n  \"top_logprobs\": 0,\n  \"top_p\": 1.0,\n  \"truncation\": \"disabled\",\n  \"usage\": {\n    \"input_tokens\": 8,\n    \"input_tokens_details\": {\n      \"cache_write_tokens\": 0,\n      \"cached_tokens\": 0\n    },\n    \"output_tokens\": 136,\n    \"output_tokens_details\": {\n      \"reasoning_tokens\": 64\n    },\n    \"total_tokens\": 144\n  },\n  \"user\": null,\n  \"metadata\": {}\n}"
+  }
+]

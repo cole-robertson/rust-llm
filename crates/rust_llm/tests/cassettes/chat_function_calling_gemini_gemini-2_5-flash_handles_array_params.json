@@ -1,0 +1,22 @@
+[
+  {
+    "method": "post",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Call the array params tool with tags [\\\"red\\\",\\\"blue\\\"] and tell me the combined tags.\"}]}],\"generationConfig\":{},\"tools\":[{\"functionDeclarations\":[{\"name\":\"array_params\",\"description\":\"Uses params DSL array support\",\"parametersJsonSchema\":{\"type\":\"object\",\"properties\":{\"tags\":{\"type\":\"array\",\"description\":\"List of tags to combine\",\"items\":{\"type\":\"string\"}}},\"required\":[\"tags\"],\"additionalProperties\":false}}]}]}",
+    "status": 200,
+    "response_headers": {
+      "X-Gemini-Service-Tier": "standard",
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Thu, 17 Sep 2026 22:19:04 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=936",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"functionCall\": {\n              \"name\": \"array_params\",\n              \"args\": {\n                \"tags\": [\n                  \"red\",\n                  \"blue\"\n                ]\n              }\n            },\n            \"thoughtSignature\": \"Cv0CAWkUfRPs1gPxrUKyNK5ilK3qCiJ+0otxeZUu3gie0S26vGcKZ0a0pGXM8oTVxgjFoHX4jtm5yNxFHG8gjHWlfJiJXDcaGKW/NBE2x9hov5794FxmC8VQwsspNaJkbDKEzSuABytx/v/FYBIZ8IUPVcYmZJ6Re/6zViRaRRevxy9cvMNAhnJj8UUedAJwYHYtFTvFeJ2tKqnsUAgJAMGpBhwpAOidzcVYbnMTrnqYH0DrlimoET8cNvN2BYNwjZZ9ynttezLVZYrYacHYgRw1h0vAJ2kT6x4UOJtkS04YN+t65S/00dIfhEu1v5al2wV2E5gtUX3voK8IkMOdBXgP+uSpCi+Os4VXXeU9f528Kwh4EFn0WvVUGbe+kMgH15kBRtexZB3l7jkT779MkMNOjBpvWZoGj/ZU7pczxY5z/Q4gc2dNynbVmPGTK07emYhaChLlFF97fw2jBZ2yQhMBDRA4Jj/x6crVv1TDXWq8i1VnGuTpEAgUCnGxyc+a\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0,\n      \"finishMessage\": \"Model generated function call(s).\"\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 63,\n    \"candidatesTokenCount\": 18,\n    \"totalTokenCount\": 168,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 63\n      }\n    ],\n    \"thoughtsTokenCount\": 87,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"V2esatbJL5GCvdIPuPfe8QE\"\n}\n"
+  }
+]
