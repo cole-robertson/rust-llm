@@ -212,6 +212,7 @@ impl ChatRecord {
             }
             m.usage_entries = usages.iter().filter(|u| u.message_id == Some(row.id as i64)).map(usage_entry).collect();
             m.model = m.usage_entries.iter().rev().find(|e| e.status == UsageStatus::Succeeded).map(|e| e.model.clone());
+            m.record_id = Some(row.id as i64);
             restored.push(m);
         }
         chat.set_messages(restored);
@@ -227,8 +228,11 @@ impl ChatRecord {
             .filter(messages::Column::Role.eq("system"))
             .exec(db)
             .await?;
-        insert_message(db, self.record.id, &Message::system(instructions)).await?;
+        let row = insert_message(db, self.record.id, &Message::system(instructions)).await?;
         chat.set_instructions(Some(instructions.into()), false, false);
+        if let Some(m) = chat.messages_mut().iter_mut().rev().find(|m| m.role == Role::System) {
+            m.record_id = Some(row.id as i64);
+        }
         Ok(())
     }
 
@@ -239,34 +243,70 @@ impl ChatRecord {
     }
 
     /// `chat.complete`: continue a staged or parked (awaiting approval) chat.
+    ///
+    /// Like RubyLLM's `install_persistence_callbacks`, each message is written the moment it is
+    /// produced. The loop advances one `step` at a time and persists after every step, so a dropped
+    /// request or a crash loses at most the step in flight, never earlier tool results or usage.
     pub async fn complete(&self, db: &DatabaseConnection, chat: &mut Chat) -> Result<Message> {
-        let persisted = self.messages(db).await?.len();
         let pending_usages: Arc<Mutex<Vec<UsageEntry>>> = Arc::default();
         let sink = pending_usages.clone();
         chat.set_usage_recorder(Box::new(move |e| sink.lock().unwrap().push(e.clone())));
 
-        // Messages staged in memory (ask_later) but not yet written are persisted first.
-        let staged: Vec<Message> = chat.messages()[persisted.min(chat.messages().len())..].to_vec();
-        for m in &staged {
-            self.persist(db, m, &mut Vec::new()).await?;
-        }
-        let skip = chat.messages().len();
-
-        let result = chat.complete().await;
-
-        let produced: Vec<Message> = chat.messages()[skip..].to_vec();
-        let mut usages = std::mem::take(&mut *pending_usages.lock().unwrap());
-        for m in &produced {
-            self.persist(db, m, &mut usages).await?;
-        }
-        // Failed attempts that produced no message still land in the ledger, as RubyLLM keeps them.
-        for entry in usages {
+        // Anything not yet stored (ask_later, runtime instructions) is written first, in order.
+        self.persist_unsaved(db, chat, &pending_usages).await?;
+        let outcome = loop {
+            if chat.is_complete() || chat.is_awaiting_approval() {
+                break Ok(());
+            }
+            let step = chat.step().await;
+            self.persist_unsaved(db, chat, &pending_usages).await?;
+            match step {
+                Ok(Some(_)) => {}
+                Ok(None) => break Ok(()),
+                Err(e) => break Err(e),
+            }
+        };
+        // Attempts that produced no message still land in the ledger, as RubyLLM keeps them.
+        let orphans = std::mem::take(&mut *pending_usages.lock().unwrap());
+        for entry in orphans {
             insert_usage(db, self.record.id, None, &entry).await?;
         }
-        Ok(result?)
+        if let Err(e) = outcome {
+            self.cleanup_after_failure(db, chat).await?;
+            return Err(e.into());
+        }
+        Ok(chat
+            .messages()
+            .iter()
+            .rev()
+            .find(|m| m.role != Role::System)
+            .or(chat.messages().last())
+            .cloned()
+            .unwrap_or_else(|| Message::new(Role::Assistant, None)))
     }
 
-    async fn persist(&self, db: &DatabaseConnection, m: &Message, usages: &mut Vec<UsageEntry>) -> Result<()> {
+    /// Writes every message without a `record_id`, in history order, and stamps the new ids.
+    async fn persist_unsaved(&self, db: &DatabaseConnection, chat: &mut Chat, usages: &Arc<Mutex<Vec<UsageEntry>>>) -> Result<()> {
+        let unsaved: Vec<usize> =
+            chat.messages().iter().enumerate().filter(|(_, m)| m.record_id.is_none()).map(|(i, _)| i).collect();
+        for i in unsaved {
+            let message = chat.messages()[i].clone();
+            let mut linked: Vec<UsageEntry> = Vec::new();
+            {
+                let mut pending = usages.lock().unwrap();
+                for entry in &message.usage_entries {
+                    if let Some(p) = pending.iter().position(|u| u.id == entry.id) {
+                        linked.push(pending.remove(p));
+                    }
+                }
+            }
+            let id = self.persist(db, &message, &linked).await?;
+            chat.messages_mut()[i].record_id = Some(id);
+        }
+        Ok(())
+    }
+
+    async fn persist(&self, db: &DatabaseConnection, m: &Message, usages: &[UsageEntry]) -> Result<i64> {
         let txn = db.begin().await?;
         let row = insert_message(&txn, self.record.id, m).await?;
         if let Some(calls) = &m.tool_calls {
@@ -288,25 +328,81 @@ impl ChatRecord {
             }
         }
         if let Some(id) = &m.tool_call_id
-            && let Some(call) = ruby_llm_tool_calls::Entity::find().filter(ruby_llm_tool_calls::Column::ToolCallId.eq(id)).one(&txn).await? {
-                let mut call: ruby_llm_tool_calls::ActiveModel = call.into();
-                call.result_type = Set(Some(MESSAGE_TYPE.into()));
-                call.result_id = Set(Some(row.id as i64));
-                call.updated_at = Set(now());
-                call.update(&txn).await?;
-            }
-        // Link this message's billed attempt; unlinked entries before it are failed retries.
-        for entry in &m.usage_entries {
-            let preceding: Vec<UsageEntry> = match usages.iter().position(|u| u == entry) {
-                Some(p) => usages.drain(..=p).collect(),
-                None => vec![entry.clone()],
-            };
-            for u in preceding {
-                let link = (u == *entry).then_some(row.id);
-                insert_usage(&txn, self.record.id, link, &u).await?;
-            }
+            && let Some(call) = self.find_tool_call(&txn, id).await?
+        {
+            let mut call: ruby_llm_tool_calls::ActiveModel = call.into();
+            call.result_type = Set(Some(MESSAGE_TYPE.into()));
+            call.result_id = Set(Some(row.id as i64));
+            call.updated_at = Set(now());
+            call.update(&txn).await?;
+        }
+        // `link_usage_entries`: every attempt behind this message, retries included.
+        for entry in usages {
+            insert_usage(&txn, self.record.id, Some(row.id), entry).await?;
         }
         txn.commit().await?;
+        Ok(row.id as i64)
+    }
+
+    /// `find_tool_call`: only this chat's tool calls, never another chat's with the same id.
+    async fn find_tool_call(&self, db: &impl ConnectionTrait, tool_call_id: &str) -> Result<Option<ruby_llm_tool_calls::Model>> {
+        let ids: Vec<i64> = self.messages(db).await?.iter().map(|m| m.id as i64).collect();
+        Ok(ruby_llm_tool_calls::Entity::find()
+            .filter(ruby_llm_tool_calls::Column::ToolCallId.eq(tool_call_id))
+            .filter(ruby_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
+            .filter(ruby_llm_tool_calls::Column::MessageId.is_in(ids))
+            .one(db)
+            .await?)
+    }
+
+    /// `cleanup_after_failure` / `cleanup_orphaned_tool_results`: a round that failed mid-way is
+    /// rolled back, so the next `ask` starts clean instead of hitting `PendingToolCalls`.
+    async fn cleanup_after_failure(&self, db: &DatabaseConnection, chat: &mut Chat) -> Result<()> {
+        let rows = self.messages(db).await?;
+        let Some(last) = rows.last() else { return Ok(()) };
+        let own_calls = |message_id: i32| {
+            ruby_llm_tool_calls::Entity::find()
+                .filter(ruby_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
+                .filter(ruby_llm_tool_calls::Column::MessageId.eq(message_id as i64))
+                .all(db)
+        };
+        let mut doomed: Vec<i32> = Vec::new();
+        let calls = own_calls(last.id).await?;
+        if !calls.is_empty() {
+            doomed.push(last.id);
+        } else if let Some(parent) = ruby_llm_tool_calls::Entity::find()
+            .filter(ruby_llm_tool_calls::Column::ResultType.eq(MESSAGE_TYPE))
+            .filter(ruby_llm_tool_calls::Column::ResultId.eq(last.id as i64))
+            .one(db)
+            .await?
+        {
+            let siblings = own_calls(parent.message_id as i32).await?;
+            if siblings.iter().any(|c| c.result_id.is_none()) {
+                doomed.extend(siblings.iter().filter_map(|c| c.result_id.map(|r| r as i32)));
+                doomed.push(parent.message_id as i32);
+            }
+        }
+        if doomed.is_empty() {
+            return Ok(());
+        }
+        let txn = db.begin().await?;
+        for id in &doomed {
+            tracing::warn!("RubyLLM: API call failed, destroying message: {id}");
+            ruby_llm_tool_calls::Entity::delete_many()
+                .filter(ruby_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
+                .filter(ruby_llm_tool_calls::Column::MessageId.eq(*id as i64))
+                .exec(&txn)
+                .await?;
+            ruby_llm_usages::Entity::update_many()
+                .col_expr(ruby_llm_usages::Column::MessageId, sea_orm::sea_query::Expr::value(Option::<i64>::None))
+                .col_expr(ruby_llm_usages::Column::MessageType, sea_orm::sea_query::Expr::value(Option::<String>::None))
+                .filter(ruby_llm_usages::Column::MessageId.eq(*id as i64))
+                .exec(&txn)
+                .await?;
+            messages::Entity::delete_by_id(*id).exec(&txn).await?;
+        }
+        txn.commit().await?;
+        chat.messages_mut().retain(|m| !m.record_id.is_some_and(|r| doomed.contains(&(r as i32))));
         Ok(())
     }
 
@@ -325,9 +421,8 @@ impl ChatRecord {
     }
 
     async fn record_decision(&self, db: &DatabaseConnection, tool_call_id: &str, decision: &str) -> Result<()> {
-        let call = ruby_llm_tool_calls::Entity::find()
-            .filter(ruby_llm_tool_calls::Column::ToolCallId.eq(tool_call_id))
-            .one(db)
+        let call = self
+            .find_tool_call(db, tool_call_id)
             .await?
             .ok_or_else(|| Error::NotFound(format!("Unknown tool call: {tool_call_id:?}")))?;
         let mut call: ruby_llm_tool_calls::ActiveModel = call.into();
@@ -343,13 +438,16 @@ impl ChatRecord {
         Ok(ruby_llm::Tokens::aggregate(entries.iter().map(|e| &e.tokens)))
     }
 
-    /// `chat.cost.total` from the persisted ledger; `None` if any succeeded attempt was unpriced.
+    /// `chat.cost` from the persisted ledger, using the costs as recorded (never re-priced).
+    pub async fn cost(&self, db: &DatabaseConnection) -> Result<ruby_llm::Cost> {
+        let entries: Vec<UsageEntry> = self.usages(db).await?.iter().map(usage_entry).collect();
+        let complete = entries.iter().all(UsageEntry::cost_available);
+        Ok(ruby_llm::Cost::aggregate(entries.iter().map(|e| &e.cost), complete))
+    }
+
+    /// `chat.cost.total`: `None` when any attempt could not be priced, like the in-memory chat.
     pub async fn total_cost(&self, db: &DatabaseConnection) -> Result<Option<f64>> {
-        let usages = self.usages(db).await?;
-        if usages.iter().any(|u| u.total_cost.is_none() && u.status == "succeeded") {
-            return Ok(None);
-        }
-        Ok(Some(usages.iter().filter_map(|u| u.total_cost).sum()))
+        Ok(self.cost(db).await?.total())
     }
 }
 
@@ -406,7 +504,8 @@ async fn insert_usage(db: &impl ConnectionTrait, chat_id: i32, message_id: Optio
     Ok(())
 }
 
-/// `ruby_llm_usages` row -> `Accounting::Usage::Entry` (`Usage#to_entry`).
+/// `ruby_llm_usages` row -> `Accounting::Usage::Entry` (`Usage#to_entry`). The cost comes from
+/// the stored columns (`Cost.from_h`), so provider-reported costs survive a reload.
 fn usage_entry(u: &ruby_llm_usages::Model) -> UsageEntry {
     let status = match u.status.as_str() {
         "succeeded" => UsageStatus::Succeeded,
@@ -422,13 +521,18 @@ fn usage_entry(u: &ruby_llm_usages::Model) -> UsageEntry {
         thinking: u.thinking_tokens.map(i64::from),
         ..Default::default()
     };
-    let model = ruby_llm::models().find(&u.model, Some(&u.provider)).ok();
+    let cost = ruby_llm::Cost::from_recorded(
+        [u.input_cost, u.output_cost, u.cache_read_cost, u.cache_write_cost, u.thinking_cost],
+        u.total_cost,
+        &tokens,
+    );
     UsageEntry {
+        id: UsageEntry::next_id(),
         operation: ruby_llm::message::Operation::Chat,
         provider: u.provider.clone(),
         model: u.model.clone(),
         status,
-        cost: ruby_llm::Cost::new(&tokens, model.as_ref(), ruby_llm::cost::Tier::Standard),
+        cost,
         tokens,
     }
 }

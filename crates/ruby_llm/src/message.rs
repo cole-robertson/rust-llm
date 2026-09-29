@@ -186,6 +186,10 @@ pub struct ToolCall {
     pub thought_signature: Option<String>,
     #[serde(default)]
     pub remote: bool,
+    /// Streaming only: whether this piece carried an id field at all. RubyLLM starts a new call
+    /// for any non-nil id (an empty one gets a UUID) and treats a nil id as an argument fragment.
+    #[serde(skip)]
+    pub(crate) starts: bool,
 }
 
 impl ToolCall {
@@ -196,7 +200,29 @@ impl ToolCall {
             arguments: ToolArguments::Parsed(arguments),
             thought_signature: None,
             remote: false,
+            starts: true,
         }
+    }
+
+    /// A streamed piece that opens a call (`id` present, possibly empty).
+    pub(crate) fn opening(id: String, name: String, arguments: String) -> ToolCall {
+        ToolCall { id, name, arguments: ToolArguments::Partial(arguments), thought_signature: None, remote: false, starts: true }
+    }
+
+    /// A streamed argument fragment for a call opened earlier (`id: nil`).
+    pub(crate) fn fragment(arguments: String) -> ToolCall {
+        ToolCall {
+            id: String::new(),
+            name: String::new(),
+            arguments: ToolArguments::Partial(arguments),
+            thought_signature: None,
+            remote: false,
+            starts: false,
+        }
+    }
+
+    pub(crate) fn starts_call(&self) -> bool {
+        self.starts
     }
 
     pub fn arguments(&self) -> Map<String, Value> {
@@ -300,8 +326,11 @@ impl UsageStatus {
 }
 
 /// `Accounting::Usage::Entry`: one billed attempt. Retries and fallbacks each get their own.
+/// `id` gives each attempt the identity Ruby gets from object identity, so persistence links the
+/// exact entry even when two attempts carry identical numbers.
 #[derive(Debug, Clone, PartialEq)]
 pub struct UsageEntry {
+    pub id: u64,
     pub operation: Operation,
     pub provider: String,
     pub model: String,
@@ -310,7 +339,14 @@ pub struct UsageEntry {
     pub cost: Cost,
 }
 
+static NEXT_USAGE_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
 impl UsageEntry {
+    /// A fresh process-unique id for a new entry.
+    pub fn next_id() -> u64 {
+        NEXT_USAGE_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    }
+
     pub fn cost_available(&self) -> bool {
         self.cost.total().is_some()
     }
@@ -336,6 +372,9 @@ pub struct Message {
     pub raw: Option<RawResponse>,
     pub cache_until_here: bool,
     pub usage_entries: Vec<UsageEntry>,
+    /// Primary key of the row this message is stored as, set by a persistence layer
+    /// (`ruby_llm_loco`). `None` means not yet persisted.
+    pub record_id: Option<i64>,
     pub(crate) model_info: Option<Model>,
 }
 
@@ -360,6 +399,7 @@ impl Message {
             raw: None,
             cache_until_here: false,
             usage_entries: Vec::new(),
+            record_id: None,
             model_info: None,
         }
     }

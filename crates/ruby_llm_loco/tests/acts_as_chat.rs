@@ -170,3 +170,107 @@ async fn a_chat_parked_on_approval_resumes_from_the_database() {
     let roles: Vec<String> = record.messages(&db).await.unwrap().into_iter().map(|m| m.role).collect();
     assert_eq!(roles, ["user", "assistant", "tool", "assistant"]);
 }
+
+fn anthropic_text(text: &str) -> serde_json::Value {
+    serde_json::json!({
+        "model": "claude-haiku-4-5-20251001", "id": "m", "type": "message", "role": "assistant",
+        "content": [{ "type": "text", "text": text }], "stop_reason": "end_turn",
+        "usage": { "input_tokens": 3, "output_tokens": 1 }
+    })
+}
+
+// Review finding 2: history is keyed by row identity, not row counts, so runtime instruction
+// changes on a reloaded chat never skip or misplace messages.
+#[tokio::test]
+async fn instructions_on_a_reloaded_chat_keep_history_in_order() {
+    let db = db().await;
+    let server = MockServer::start().await;
+    Mock::given(matchers::method("POST")).respond_with(ResponseTemplate::new(200).set_body_json(anthropic_text("ok"))).mount(&server).await;
+    let record = ChatRecord::create(&db, "claude-haiku-4-5", Some("anthropic")).await.unwrap();
+
+    let mut chat = record.to_llm_with(&db, config(&server)).await.unwrap();
+    record.with_instructions(&db, &mut chat, "Be brief.").await.unwrap();
+    record.ask(&db, &mut chat, "first").await.unwrap();
+
+    // Next request: reload, drop the instructions in memory only, ask again.
+    let mut chat = record.to_llm_with(&db, config(&server)).await.unwrap();
+    chat.set_instructions(None, false, false);
+    record.ask(&db, &mut chat, "second").await.unwrap();
+
+    let rows: Vec<(String, Option<String>)> =
+        record.messages(&db).await.unwrap().into_iter().map(|m| (m.role, m.content)).collect();
+    let expected = [("system", "Be brief."), ("user", "first"), ("assistant", "ok"), ("user", "second"), ("assistant", "ok")];
+    assert_eq!(rows.len(), expected.len(), "{rows:?}");
+    for ((role, content), (er, ec)) in rows.iter().zip(expected) {
+        assert_eq!((role.as_str(), content.as_deref()), (er, Some(ec)));
+    }
+}
+
+// Review finding 6: decisions are scoped to the chat's own tool calls.
+#[tokio::test]
+async fn approving_another_chats_tool_call_is_rejected() {
+    let db = db().await;
+    let server = MockServer::start().await;
+    let tool_use = serde_json::json!({
+        "model": "claude-haiku-4-5-20251001", "id": "msg_1", "type": "message", "role": "assistant",
+        "content": [{ "type": "tool_use", "id": "toolu_other", "name": "delete_everything", "input": {} }],
+        "stop_reason": "tool_use", "usage": { "input_tokens": 10, "output_tokens": 5 }
+    });
+    Mock::given(matchers::method("POST")).respond_with(ResponseTemplate::new(200).set_body_json(tool_use)).mount(&server).await;
+    let victim = ChatRecord::create(&db, "claude-haiku-4-5", Some("anthropic")).await.unwrap();
+    let mut victim_chat = victim.to_llm_with(&db, config(&server)).await.unwrap().with_tool(DeleteEverything);
+    victim.ask(&db, &mut victim_chat, "Delete everything").await.unwrap();
+
+    let attacker = ChatRecord::create(&db, "claude-haiku-4-5", Some("anthropic")).await.unwrap();
+    let mut attacker_chat = attacker.to_llm_with(&db, config(&server)).await.unwrap();
+    assert!(attacker.approve(&db, &mut attacker_chat, "toolu_other").await.is_err());
+    let calls = ruby_llm_tool_calls::Entity::find().all(&db).await.unwrap();
+    assert_eq!(calls[0].approval, None);
+}
+
+struct Broken;
+
+#[async_trait]
+impl Tool for Broken {
+    fn description(&self) -> String {
+        "Always fails".into()
+    }
+    async fn execute(&self, _: Map<String, Value>, _: &ToolCall) -> Result<ToolResult, ToolError> {
+        Err("This tool is broken".into())
+    }
+}
+
+// Review findings 1 and 6: rows are written as the loop goes, and a round that fails mid-way is
+// rolled back (cleanup_after_failure) so the next ask starts clean.
+#[tokio::test]
+async fn a_failed_tool_round_is_rolled_back_and_the_chat_stays_usable() {
+    let db = db().await;
+    let server = MockServer::start().await;
+    let tool_use = serde_json::json!({
+        "model": "claude-haiku-4-5-20251001", "id": "msg_1", "type": "message", "role": "assistant",
+        "content": [{ "type": "tool_use", "id": "toolu_b", "name": "broken", "input": {} }],
+        "stop_reason": "tool_use", "usage": { "input_tokens": 10, "output_tokens": 5 }
+    });
+    Mock::given(matchers::method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(tool_use))
+        .up_to_n_times(1)
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    Mock::given(matchers::method("POST")).respond_with(ResponseTemplate::new(200).set_body_json(anthropic_text("fine"))).with_priority(2).mount(&server).await;
+    let record = ChatRecord::create(&db, "claude-haiku-4-5", Some("anthropic")).await.unwrap();
+    let mut chat = record.to_llm_with(&db, config(&server)).await.unwrap().with_tool(Broken);
+
+    let err = record.ask(&db, &mut chat, "use the tool").await.unwrap_err();
+    assert!(err.to_string().contains("This tool is broken"));
+    let roles: Vec<String> = record.messages(&db).await.unwrap().into_iter().map(|m| m.role).collect();
+    assert_eq!(roles, ["user"], "the dangling tool-call message was destroyed");
+    assert!(ruby_llm_tool_calls::Entity::find().all(&db).await.unwrap().is_empty());
+    // The billed attempt survives, unlinked, like RubyLLM's ledger.
+    let usages = ruby_llm_usages::Entity::find().all(&db).await.unwrap();
+    assert_eq!(usages.len(), 1);
+    assert_eq!(usages[0].message_id, None);
+
+    let answer = record.ask(&db, &mut chat, "try again without it").await.unwrap();
+    assert_eq!(answer.content(), "fine");
+}

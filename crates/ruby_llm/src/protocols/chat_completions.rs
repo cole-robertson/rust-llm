@@ -576,6 +576,7 @@ fn parse_tool_calls(calls: Option<&Value>, parse_arguments: bool, stream_keys: b
                     arguments,
                     thought_signature: str_of(tc.pointer("/extra_content/google/thought_signature")),
                     remote: false,
+                    starts: tc.get("id").is_some_and(|v| !v.is_null()),
                 },
             ))
         })

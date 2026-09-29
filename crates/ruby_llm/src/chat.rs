@@ -487,6 +487,16 @@ impl Chat {
         self.step_inner(None).await
     }
 
+    /// `step { |chunk| ... }`.
+    pub async fn step_stream(&mut self, mut on_chunk: impl FnMut(&Message) + Send) -> Result<Option<Message>> {
+        self.step_inner(Some(&mut on_chunk)).await
+    }
+
+    /// Mutable history, for persistence layers that stamp `record_id`s or drop rolled-back rows.
+    pub fn messages_mut(&mut self) -> &mut Vec<Message> {
+        &mut self.messages
+    }
+
     async fn step_inner(&mut self, on_chunk: Option<&mut (dyn FnMut(&Message) + Send)>) -> Result<Option<Message>> {
         if self.is_complete() {
             return Ok(None);
@@ -522,6 +532,7 @@ impl Chat {
             return self.generate_once(on_chunk, &mut false).await;
         }
         let original = (self.model.clone(), self.provider, self.protocol, self.connection.clone());
+        let usage_start = self.usage_entries.len();
         let mut queue: std::collections::VecDeque<Fallback> = self.fallbacks.iter().cloned().collect();
         let mut attempt = 0;
         let mut active: Option<FallbackAttempt> = None;
@@ -536,7 +547,15 @@ impl Chat {
                 }
             }
             match result {
-                Ok(message) => break Ok(message),
+                // `link_completion_usage(result, usage_start)`: attempts on models that failed
+                // before the fallback answered belong to the answer too.
+                Ok(mut message) => {
+                    message.usage_entries = self.usage_entries[usage_start..].to_vec();
+                    if let Some(last) = self.messages.last_mut() {
+                        last.usage_entries = message.usage_entries.clone();
+                    }
+                    break Ok(message);
+                }
                 Err(e) if self.fallback_errors.contains(&e.kind()) => {
                     let Some(next) = queue.pop_front() else { break Err(e) };
                     attempt += 1;
@@ -644,8 +663,16 @@ impl Chat {
         let mut headers = endpoint.headers;
         headers.extend(self.headers.iter().cloned());
 
+        // One entry per attempt: `retried` holds the tokens each retried attempt is billed.
         let mut attempts = 0usize;
-        let mut on_attempt = || attempts += 1;
+        let mut retried: Vec<Tokens> = Vec::new();
+        let mut on_attempt = |previous: Option<&Error>| {
+            attempts += 1;
+            if let Some(e) = previous {
+                retried.push(failure_tokens(e, None));
+            }
+        };
+        let mut observed = Tokens::default();
         let result = if let Some(on_chunk) = on_chunk {
             for cb in &mut self.callbacks.before_message {
                 cb();
@@ -665,7 +692,9 @@ impl Chat {
                 Ok(())
             };
             let status = protocols::streaming_error_status(protocol);
-            match self.connection.stream(&endpoint.path, &payload, &headers, &mut on_attempt, &mut on_event, status).await {
+            let streamed = self.connection.stream(&endpoint.path, &payload, &headers, &mut on_attempt, &mut on_event, status).await;
+            observed = acc.tokens().clone();
+            match streamed {
                 Ok(raw) => acc.into_message(raw),
                 Err(e) => Err(e),
             }
@@ -676,17 +705,22 @@ impl Chat {
             }
         };
 
-        // Usage ledger: one entry per HTTP attempt, like Accounting::Usage::Tracker.
-        let failed_attempts = attempts.saturating_sub(1);
-        for _ in 0..failed_attempts {
-            self.record_usage(self.entry(UsageStatus::Failed, Tokens::default(), None));
+        // Usage ledger: one entry per HTTP attempt, like Accounting::Usage::Tracker. A failed
+        // attempt keeps unknown tokens unless the provider refused it (4xx) or it was never sent,
+        // in which case it is billed as zero, as `failure_tokens` does.
+        let mut call_entries = Vec::new();
+        for tokens in retried {
+            let entry = self.entry(UsageStatus::Failed, tokens, None);
+            self.record_usage(entry.clone());
+            call_entries.push(entry);
         }
         let mut message = match result {
             Ok(m) => m,
             Err(e) => {
                 let status = if matches!(e, Error::Cancelled) { UsageStatus::Cancelled } else { UsageStatus::Failed };
                 if attempts > 0 {
-                    self.record_usage(self.entry(status, Tokens::default(), None));
+                    let observed = (!observed.is_empty()).then_some(observed);
+                    self.record_usage(self.entry(status, failure_tokens(&e, observed), None));
                 }
                 return Err(e);
             }
@@ -699,7 +733,9 @@ impl Chat {
             .unwrap_or_else(|| self.model.clone());
         let entry = self.entry(UsageStatus::Succeeded, message.tokens.clone(), Some(&billed_model));
         self.record_usage(entry.clone());
-        message.usage_entries = vec![entry];
+        // `link_completion_usage`: every attempt of this call is linked to the message it produced.
+        call_entries.push(entry);
+        message.usage_entries = call_entries;
         message.model_info = Some(billed_model);
         if !streaming {
             for cb in &mut self.callbacks.before_message {
@@ -716,7 +752,15 @@ impl Chat {
     fn entry(&self, status: UsageStatus, tokens: Tokens, model: Option<&Model>) -> UsageEntry {
         let model = model.unwrap_or(&self.model);
         let cost = Cost::new(&tokens, Some(model), Tier::Standard);
-        UsageEntry { operation: Operation::Chat, provider: self.provider.slug().into(), model: self.model.id.clone(), status, tokens, cost }
+        UsageEntry {
+            id: UsageEntry::next_id(),
+            operation: Operation::Chat,
+            provider: self.provider.slug().into(),
+            model: self.model.id.clone(),
+            status,
+            tokens,
+            cost,
+        }
     }
 
     // ---- tools -----------------------------------------------------------------------------
@@ -898,6 +942,18 @@ impl Chat {
         }
         Ok(())
     }
+}
+
+/// `Tracker#failure_tokens`: tokens a stream reported before failing are kept; a request the
+/// provider refused (4xx) or that never reached it is billed as zero; anything else is unknown,
+/// which keeps `cost.total` honest instead of silently low.
+fn failure_tokens(error: &Error, observed: Option<Tokens>) -> Tokens {
+    if let Some(tokens) = observed {
+        return tokens;
+    }
+    let refused = error.response().is_some_and(|r| (400..500).contains(&r.status));
+    let never_sent = error.kind() == ErrorKind::ConnectionFailed;
+    if refused || never_sent { Tokens { input: Some(0), output: Some(0), ..Default::default() } } else { Tokens::default() }
 }
 
 /// `Chat#normalize_schema_payload`.

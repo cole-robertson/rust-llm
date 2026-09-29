@@ -7,7 +7,7 @@ use super::chat_completions::{empty_parameters_schema, parse_root_citations, par
 use super::{Request, StreamState, ToolCalls, ToolChoice, char_slice, deep_merge, int, normalize_finish_reason, str_of, tool_call_map};
 use crate::attachment::{Attachment, AttachmentType};
 use crate::error::{Error, Result};
-use crate::message::{Citation, Message, RawResponse, Role, ServerToolCall, Thinking, ToolArguments, ToolCall};
+use crate::message::{Citation, Message, RawResponse, Role, ServerToolCall, Thinking, ToolCall};
 use crate::providers::Provider;
 use crate::thinking::Display;
 use crate::tool::{Tool, tool_schema};
@@ -487,7 +487,7 @@ pub fn build_chunk(provider: Provider, state: &mut StreamState, data: &Value) ->
             if item.get("type").and_then(Value::as_str) == Some("function_call") && provider != Provider::Perplexity {
                 let key = position.0.to_string();
                 chunk.tool_calls = Some(
-                    [(key, ToolCall { id: str_of(item.get("call_id")).unwrap_or_default(), name: str_of(item.get("name")).unwrap_or_default(), arguments: ToolArguments::Partial(String::new()), thought_signature: None, remote: false })]
+                    [(key, ToolCall::opening(str_of(item.get("call_id")).unwrap_or_default(), str_of(item.get("name")).unwrap_or_default(), String::new()))]
                         .into_iter()
                         .collect(),
                 );
@@ -496,7 +496,7 @@ pub fn build_chunk(provider: Provider, state: &mut StreamState, data: &Value) ->
         "response.function_call_arguments.delta" => {
             let key = position.0.to_string();
             chunk.tool_calls = Some(
-                [(key, ToolCall { id: String::new(), name: String::new(), arguments: ToolArguments::Partial(str_of(data.get("delta")).unwrap_or_default()), thought_signature: None, remote: false })]
+                [(key, ToolCall::fragment(str_of(data.get("delta")).unwrap_or_default()))]
                     .into_iter()
                     .collect(),
             );
@@ -512,7 +512,7 @@ pub fn build_chunk(provider: Provider, state: &mut StreamState, data: &Value) ->
                 Some("function_call") if provider == Provider::Perplexity => {
                     let key = position.0.to_string();
                     chunk.tool_calls = Some(
-                        [(key, ToolCall { id: str_of(item.get("call_id")).unwrap_or_default(), name: str_of(item.get("name")).unwrap_or_default(), arguments: ToolArguments::Partial(str_of(item.get("arguments")).unwrap_or_default()), thought_signature: None, remote: false })]
+                        [(key, ToolCall::opening(str_of(item.get("call_id")).unwrap_or_default(), str_of(item.get("name")).unwrap_or_default(), str_of(item.get("arguments")).unwrap_or_default()))]
                             .into_iter()
                             .collect(),
                     );

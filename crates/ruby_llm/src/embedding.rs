@@ -121,7 +121,7 @@ pub async fn embed(input: impl Into<EmbedInput>, options: EmbedOptions<'_>) -> R
         }
     };
 
-    let raw = connection.post(&path, &payload, &[], &mut || {}).await?;
+    let raw = connection.post(&path, &payload, &[], &mut |_| {}).await?;
     let body = raw.body;
     let (rows, input_tokens) = match provider {
         Provider::Gemini => (

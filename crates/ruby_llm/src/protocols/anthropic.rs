@@ -512,21 +512,15 @@ pub fn build_chunk(state: &mut StreamBlocks, data: &Value) -> Message {
     if delta_type == Some("input_json_delta") {
         let fragment = str_of(data.pointer("/delta/partial_json")).unwrap_or_default();
         chunk.tool_calls = Some(
-            [(index, ToolCall { id: String::new(), name: String::new(), arguments: ToolArguments::Partial(fragment), thought_signature: None, remote: false })]
+            [(index, ToolCall::fragment(fragment))]
                 .into_iter()
                 .collect(),
         );
     } else if let Some(block) = data.get("content_block").filter(|b| b.get("type").and_then(Value::as_str) == Some("tool_use")) {
-        let call = ToolCall {
-            id: str_of(block.get("id")).unwrap_or_default(),
-            name: str_of(block.get("name")).unwrap_or_default(),
-            arguments: match block.get("input").and_then(Value::as_object) {
-                Some(m) if !m.is_empty() => ToolArguments::Parsed(m.clone()),
-                _ => ToolArguments::Partial(String::new()),
-            },
-            thought_signature: None,
-            remote: false,
-        };
+        let mut call = ToolCall::opening(str_of(block.get("id")).unwrap_or_default(), str_of(block.get("name")).unwrap_or_default(), String::new());
+        if let Some(m) = block.get("input").and_then(Value::as_object).filter(|m| !m.is_empty()) {
+            call.arguments = ToolArguments::Parsed(m.clone());
+        }
         chunk.tool_calls = Some([(index, call)].into_iter().collect());
     }
 

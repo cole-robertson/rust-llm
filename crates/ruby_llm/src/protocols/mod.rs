@@ -176,16 +176,21 @@ pub struct StreamAccumulator {
 }
 
 impl StreamAccumulator {
+    /// Usage reported so far, for billing a stream that fails partway.
+    pub fn tokens(&self) -> &Tokens {
+        &self.tokens
+    }
+
     pub fn add(&mut self, chunk: &Message) {
         if self.model.as_deref().unwrap_or("").is_empty() {
             self.model = chunk.model.clone();
         }
         if let Some(calls) = &chunk.tool_calls {
             for (stream_key, call) in calls.iter() {
-                if call.id.is_empty() {
-                    self.append_fragment(stream_key, call);
-                } else {
+                if call.starts_call() {
                     self.start_tool_call(stream_key, call);
+                } else {
+                    self.append_fragment(stream_key, call);
                 }
             }
         }
@@ -229,6 +234,9 @@ impl StreamAccumulator {
             && m.is_empty() {
                 call.arguments = ToolArguments::Partial(String::new());
             }
+        if call.id.is_empty() {
+            call.id = uuid::Uuid::new_v4().to_string();
+        }
         let id = call.id.clone();
         self.tool_calls.insert(id.clone(), call);
         self.tool_call_ids_by_index.retain(|(k, _)| k != stream_key);
@@ -243,7 +251,8 @@ impl StreamAccumulator {
             .find(|(k, _)| k == stream_key)
             .map(|(_, id)| id.clone())
             .or_else(|| self.tool_calls.contains_key(stream_key).then(|| stream_key.to_string()))
-            .or_else(|| self.latest_tool_call_id.clone());
+            // A keyless fragment continues the latest call; an unknown key is dropped (find_tool_call).
+            .or_else(|| stream_key.is_empty().then(|| self.latest_tool_call_id.clone()).flatten());
         let Some(existing) = id.and_then(|id| self.tool_calls.get_mut(&id)) else { return };
         let fragment = match &call.arguments {
             ToolArguments::Partial(s) => s.clone(),

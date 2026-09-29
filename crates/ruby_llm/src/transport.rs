@@ -119,13 +119,25 @@ impl Connection {
         req
     }
 
-    fn backoff(&self, attempt: u32, retry_after: Option<f64>) -> Duration {
-        if let Some(secs) = retry_after {
-            return Duration::from_secs_f64(secs.min(self.config.retry_max_interval));
+    /// faraday-retry's `calculate_sleep_amount`: a `Retry-After` longer than `retry_max_interval`
+    /// means "don't retry" (`None`); otherwise wait the longer of it and the jittered backoff.
+    fn backoff(&self, attempt: u32, retry_after: Option<f64>) -> Option<Duration> {
+        let current = (self.config.retry_interval * self.config.retry_backoff_factor.powi(attempt as i32))
+            .min(self.config.retry_max_interval);
+        let interval = current + rand::random::<f64>() * self.config.retry_interval_randomness * self.config.retry_interval;
+        match retry_after {
+            Some(after) if after > self.config.retry_max_interval => None,
+            Some(after) if after >= interval => Some(Duration::from_secs_f64(after)),
+            _ => Some(Duration::from_secs_f64(interval)),
         }
-        let base = self.config.retry_interval * self.config.retry_backoff_factor.powi(attempt as i32);
-        let jitter = rand::random::<f64>() * self.config.retry_interval_randomness * base;
-        Duration::from_secs_f64((base + jitter).min(self.config.retry_max_interval))
+    }
+
+    /// Whether to retry after `error` on attempt `attempt`, and how long to wait first.
+    fn retry_delay(&self, error: &Error, attempt: u32, retry_after: Option<f64>) -> Option<Duration> {
+        if !error.retryable() || attempt >= self.config.max_retries {
+            return None;
+        }
+        self.backoff(attempt, retry_after)
     }
 
     async fn send_with_retry(
@@ -133,11 +145,12 @@ impl Connection {
         url: &str,
         payload: &Value,
         extra: &[(String, String)],
-        on_attempt: &mut (dyn FnMut() + Send),
+        on_attempt: &mut (dyn FnMut(Option<&Error>) + Send),
     ) -> Result<reqwest::Response> {
         let mut attempt = 0;
+        let mut previous: Option<Error> = None;
         loop {
-            on_attempt();
+            on_attempt(previous.as_ref());
             let result = self.request(url, payload, extra).send().await;
             let (error, retry_after) = match result {
                 Ok(resp) if resp.status().is_success() => return Ok(resp),
@@ -151,11 +164,10 @@ impl Connection {
                 Err(e) if e.is_timeout() => (Error::Timeout(e.to_string()), None),
                 Err(e) => (Error::ConnectionFailed(e.to_string()), None),
             };
-            if !error.retryable() || attempt >= self.config.max_retries {
-                return Err(error);
-            }
+            let Some(delay) = self.retry_delay(&error, attempt, retry_after) else { return Err(error) };
             tracing::debug!(provider = self.provider.slug(), attempt, "retrying after {error}");
-            tokio::time::sleep(self.backoff(attempt, retry_after)).await;
+            tokio::time::sleep(delay).await;
+            previous = Some(error);
             attempt += 1;
         }
     }
@@ -167,7 +179,7 @@ impl Connection {
         path: &str,
         payload: &Value,
         extra: &[(String, String)],
-        on_attempt: &mut (dyn FnMut() + Send),
+        on_attempt: &mut (dyn FnMut(Option<&Error>) + Send),
     ) -> Result<RawResponse> {
         let url = self.url(path)?;
         let resp = self.send_with_retry(&url, payload, extra, on_attempt).await?;
@@ -182,20 +194,49 @@ impl Connection {
     }
 
     /// POST JSON and feed each server-sent event to `on_event`. Errors inside the stream
-    /// (`event: error`, `{"error": ...}` data) are raised through the same status mapping.
+    /// (`event: error`, `{"error": ...}` data) are raised through the same status mapping, and are
+    /// retried like HTTP errors as long as no event has reached `on_event` yet. Once the caller has
+    /// seen a chunk, a failure is final: retrying would replay it into the same accumulator.
     pub async fn stream(
         &self,
         path: &str,
         payload: &Value,
         extra: &[(String, String)],
-        on_attempt: &mut (dyn FnMut() + Send),
+        on_attempt: &mut (dyn FnMut(Option<&Error>) + Send),
         on_event: &mut (dyn FnMut(SseEvent, Value) -> Result<()> + Send),
         streaming_error: fn(&str) -> Option<u16>,
     ) -> Result<RawResponse> {
         let url = self.url(path)?;
-        let resp = self.send_with_retry(&url, payload, extra, on_attempt).await?;
-        let status = resp.status().as_u16();
-        let headers = header_pairs(&resp);
+        let mut attempt = 0;
+        let mut stream_error: Option<Error> = None;
+        loop {
+            let mut first = stream_error.take();
+            let mut forward = |previous: Option<&Error>| on_attempt(previous.or(first.take().as_ref()));
+            let resp = self.send_with_retry(&url, payload, extra, &mut forward).await?;
+            let status = resp.status().as_u16();
+            let headers = header_pairs(&resp);
+            let mut delivered = false;
+            match self.read_stream(resp, on_event, streaming_error, &mut delivered).await {
+                Ok(()) => return Ok(RawResponse { status, headers, body: Value::Null, request_body: payload.clone() }),
+                Err(error) if delivered => return Err(error),
+                Err(error) => {
+                    let Some(delay) = self.retry_delay(&error, attempt, None) else { return Err(error) };
+                    tracing::debug!(provider = self.provider.slug(), attempt, "retrying stream after {error}");
+                    tokio::time::sleep(delay).await;
+                    stream_error = Some(error);
+                    attempt += 1;
+                }
+            }
+        }
+    }
+
+    async fn read_stream(
+        &self,
+        resp: reqwest::Response,
+        on_event: &mut (dyn FnMut(SseEvent, Value) -> Result<()> + Send),
+        streaming_error: fn(&str) -> Option<u16>,
+        delivered: &mut bool,
+    ) -> Result<()> {
         let mut parser = SseParser::default();
         let mut stream = resp.bytes_stream();
         let mut handle = |event: SseEvent| -> Result<()> {
@@ -213,6 +254,7 @@ impl Connection {
                 let code = streaming_error(&event.data).unwrap_or(500);
                 return Err(error_for_status(code, &event.data));
             }
+            *delivered = true;
             on_event(event, data)
         };
         while let Some(bytes) = stream.next().await {
@@ -224,7 +266,7 @@ impl Connection {
         for event in parser.finish() {
             handle(event)?;
         }
-        Ok(RawResponse { status, headers, body: Value::Null, request_body: payload.clone() })
+        Ok(())
     }
 }
 

@@ -83,6 +83,25 @@ impl Cost {
         out
     }
 
+    /// `Cost.from_h`: a cost as it was recorded (e.g. the stored usage columns), not re-priced.
+    /// Without a recorded total, a component with tokens but no amount makes the total unknown.
+    pub fn from_recorded(
+        amounts: [Option<f64>; 5],
+        total: Option<f64>,
+        tokens: &Tokens,
+    ) -> Cost {
+        let mut cost = Cost { complete: true, reported_total: total, ..Default::default() };
+        let counts = [tokens.input, tokens.output, tokens.cache_read, tokens.cache_write, tokens.thinking];
+        for (i, component) in COMPONENTS.into_iter().enumerate() {
+            cost.set(component, amounts[i]);
+            if total.is_none() && counts[i].unwrap_or(0) > 0 && amounts[i].is_none() {
+                cost.missing.push(component);
+            }
+        }
+        cost.reported = total.is_some() || counts.iter().any(Option::is_some);
+        cost
+    }
+
     pub fn get(&self, component: Component) -> Option<f64> {
         match component {
             Component::Input => self.input,
