@@ -136,6 +136,8 @@ These are listed so nothing is silently missing:
 - Bedrock, Vertex AI, Azure (cloud auth); Cohere; ElevenLabs; Deepgram.
 - Gemini's Interactions protocol for chat (only its transcription is ported); Mistral's
   Conversations API (so Mistral can't `paint`); WebSocket transcription streaming (xAI, Gemini Live).
-- `research` / `research_later` (Perplexity agents, Vertex research); `CachedContent`.
+- `research` / `research_later` (Perplexity agents, Vertex research).
 - MCP OAuth; Gemini embedding batches; multipart image edits for non-gpt-image models (dall-e-2).
-- Prompt templates (`RubyLLM::Prompt`, `app/prompts`); `workflow` and instrumentation events.
+- Prompt templates are Jinja, not ERB. Instrumentation covers chat, compaction, tool calls,
+  requests, usage, embeddings, images, judgments, batches, workflows, and model refreshes, not
+  the other one-shot operations.

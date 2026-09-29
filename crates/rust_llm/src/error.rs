@@ -43,6 +43,15 @@ pub enum Error {
     Configuration(String),
     #[error("{0}")]
     ModelNotFound(String),
+    /// `ModelRegistryError`: the registry could not be fetched, read, or saved.
+    #[error("{0}")]
+    ModelRegistry(String),
+    /// `PromptNotFoundError`: `render_prompt` found no template file.
+    #[error("{0}")]
+    PromptNotFound(String),
+    /// A prompt template failed to parse or render (Ruby raises the ERB error itself).
+    #[error("{0}")]
+    Prompt(String),
     #[error("{0}")]
     InvalidToolChoice(String),
     #[error("{0}")]
@@ -214,7 +223,14 @@ pub(crate) fn parse_error_message(body: &str) -> Option<String> {
         return Some(body.to_string());
     };
     fn part_message(part: &serde_json::Value) -> Option<String> {
-        let Some(obj) = part.as_object() else { return Some(part.to_string()) };
+        // `part.to_s`: `nil` is empty (and dropped), a string is itself, unquoted.
+        let Some(obj) = part.as_object() else {
+            return Some(match part {
+                serde_json::Value::Null => String::new(),
+                serde_json::Value::String(s) => s.clone(),
+                other => other.to_string(),
+            });
+        };
         if let Some(s) = obj.get("error").and_then(|e| e.as_str()) {
             return Some(s.to_string());
         }
@@ -231,13 +247,19 @@ pub(crate) fn parse_error_message(body: &str) -> Option<String> {
             (!messages.is_empty()).then(|| messages.join(". "))
         }
         serde_json::Value::Object(_) => part_message(&json),
+        // `else body`: a body that parses to a bare JSON string is that string, unquoted.
+        serde_json::Value::String(s) => Some(s.clone()),
         other => Some(other.to_string()),
     }
 }
 
 /// `ErrorMiddleware.parse_error`: map a failed HTTP status to the error class.
 pub(crate) fn error_for_status(status: u16, body: &str) -> Error {
-    let message = parse_error_message(body);
+    error_for_status_message(status, body, parse_error_message(body))
+}
+
+/// `ErrorMiddleware.parse_error` with the message a provider's `parse_error` already read.
+pub(crate) fn error_for_status_message(status: u16, body: &str, message: Option<String>) -> Error {
     let response = Some(ErrorResponse { status, body: body.to_string() });
     let text = message.clone().unwrap_or_default();
     let msg = |default: &str| message.clone().unwrap_or_else(|| default.to_string());

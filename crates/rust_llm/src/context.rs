@@ -66,6 +66,18 @@ impl Context {
         crate::embedding::embed(input, EmbedOptions { config: Some(self.config.clone()), ..options }).await
     }
 
+    /// `ctx.embed_later(text, model:, provider:, dimensions:)`: an embedding request staged for a
+    /// batch, carrying this context's configuration.
+    pub fn embed_later(&self, text: impl Into<EmbedInput>, options: EmbedOptions<'_>) -> Result<crate::batch::EmbeddingRequest> {
+        crate::batch::EmbeddingRequest::new(text, EmbedOptions { config: Some(self.config.clone()), ..options })
+    }
+
+    /// `ctx.mcp(url:, ...)`: `MCP.define(...).new(context: self)`, a builder that connects with
+    /// this context's configuration.
+    pub fn mcp(&self, builder: crate::mcp::McpBuilder) -> crate::mcp::McpBuilder {
+        builder.config(self.config.clone())
+    }
+
     /// `ctx.paint(prompt, ...)`.
     pub async fn paint(&self, prompt: &str, options: PaintOptions<'_>) -> Result<Images> {
         crate::image::paint(prompt, PaintOptions { config: Some(self.config.clone()), ..options }).await

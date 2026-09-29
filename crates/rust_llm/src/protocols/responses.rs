@@ -83,7 +83,14 @@ pub fn render_payload(req: &Request) -> Result<Value> {
             .iter()
             .find(|p| **p == id)
             .copied()
-            .or_else(|| SONAR_PRESETS.iter().find(|(k, _)| *k == id).map(|(_, v)| *v));
+            .or_else(|| {
+                let (_, preset) = SONAR_PRESETS.iter().find(|(k, _)| *k == id)?;
+                // `Perplexity::Agent#preset_for`: `RubyLLM.deprecator.warn`.
+                tracing::warn!(
+                    "Perplexity retires Sonar on September 27, 2026. {id} now runs the {preset} Agent API preset; use model: \"{preset}\" instead."
+                );
+                Some(*preset)
+            });
         if let Some(preset) = preset {
             payload.remove("model");
             payload.insert("preset".into(), preset.into());
@@ -213,10 +220,15 @@ fn format_item(provider: Provider, msg: &Message, boundaries: bool) -> Result<Ve
     Ok(match msg.role {
         Role::System | Role::User => {
             let role = msg.role.as_str();
-            let item = json!({ "role": role, "content": format_content(msg.content.as_deref(), &msg.attachments)? });
+            let item = json!({ "role": role, "content": format_content(provider, msg.content.as_deref(), &msg.attachments)? });
             vec![if boundaries && msg.cache_until_here { with_cache_breakpoint(item) } else { item }]
         }
         Role::Tool => {
+            // `DeepSeek::Responses#format_tool_items`: attachments ride inside the output itself.
+            if provider == Provider::DeepSeek {
+                let output = format_content(provider, msg.content.as_deref(), &msg.attachments)?;
+                return Ok(vec![json!({ "type": "function_call_output", "call_id": msg.tool_call_id, "output": output })]);
+            }
             if let Some(Value::Array(raw)) = &msg.raw_content {
                 return Ok(raw.clone());
             }
@@ -227,7 +239,7 @@ fn format_item(provider: Provider, msg: &Message, boundaries: bool) -> Result<Ve
             })];
             if !msg.attachments.is_empty() {
                 let mut parts = vec![json!({ "type": "input_text", "text": format!("Attachments from tool call {}:", msg.tool_call_id.as_deref().unwrap_or("")) })];
-                if let Value::Array(more) = format_content(None, &msg.attachments)? {
+                if let Value::Array(more) = format_content(provider, None, &msg.attachments)? {
                     parts.extend(more);
                 }
                 items.push(json!({ "role": "user", "content": parts }));
@@ -244,6 +256,9 @@ fn format_item(provider: Provider, msg: &Message, boundaries: bool) -> Result<Ve
                         .filter(|i| i.get("type").and_then(Value::as_str).is_none_or(|t| CLIENT_OUTPUT_ITEM_TYPES.contains(&t)))
                         .cloned()
                         .collect());
+                }
+                if provider == Provider::GPUStack {
+                    return Ok(raw.iter().flat_map(gpustack_server_tool_history).collect());
                 }
                 return Ok(raw.clone());
             }
@@ -275,8 +290,9 @@ fn format_item(provider: Provider, msg: &Message, boundaries: bool) -> Result<Ve
     })
 }
 
-/// `Responses::Media.format_content`.
-fn format_content(content: Option<&str>, attachments: &[Attachment]) -> Result<Value> {
+/// `Responses::Media.format_content`. DeepSeek (`providers/deepseek/responses.rb`) reads uploaded
+/// images as `input_image` references and rejects documents, inline or uploaded.
+fn format_content(provider: Provider, content: Option<&str>, attachments: &[Attachment]) -> Result<Value> {
     if attachments.is_empty() {
         return Ok(content.map(|c| Value::String(c.into())).unwrap_or(Value::Null));
     }
@@ -286,8 +302,15 @@ fn format_content(content: Option<&str>, attachments: &[Attachment]) -> Result<V
     }
     for a in attachments {
         // `format_provider_file`
+        let deepseek = provider == Provider::DeepSeek;
         if let Some(file_id) = a.provider_file_id() {
-            parts.push(json!({ "type": "input_file", "file_id": file_id }));
+            if !deepseek {
+                parts.push(json!({ "type": "input_file", "file_id": file_id }));
+            } else if a.kind() == AttachmentType::Image {
+                parts.push(json!({ "type": "input_image", "file_id": file_id }));
+            } else {
+                return Err(Error::UnsupportedAttachment(super::anthropic::unsupported(&a.mime_type)));
+            }
             continue;
         }
         parts.push(match a.kind() {
@@ -297,6 +320,10 @@ fn format_content(content: Option<&str>, attachments: &[Attachment]) -> Result<V
                     part["detail"] = if res == crate::attachment::Resolution::Low { "low" } else { "high" }.into();
                 }
                 part
+            }
+            // `Perplexity::Agent#format_document`: the Agent API takes no documents.
+            AttachmentType::Pdf | AttachmentType::Document if deepseek || provider == Provider::Perplexity => {
+                return Err(Error::UnsupportedAttachment(super::anthropic::unsupported(&a.mime_type)));
             }
             AttachmentType::Pdf | AttachmentType::Document => {
                 json!({ "type": "input_file", "filename": a.filename, "file_data": a.for_llm()? })
@@ -372,10 +399,35 @@ fn server_tool_items(output: &[Value]) -> Vec<ServerToolCall> {
             name: str_of(item.get("name")),
             id: str_of(item.get("id")),
             input: item.get("action").or_else(|| item.get("arguments")).or_else(|| item.get("code")).cloned(),
-            result: ["result", "results", "outputs", "output", "encrypted_content"].iter().find_map(|k| item.get(*k).cloned()),
+            // `server_tool_result`: the first key whose value is truthy (a `null` output is no result).
+            result: ["result", "results", "outputs", "output", "encrypted_content"]
+                .iter()
+                .find_map(|k| item.get(*k).filter(|v| !v.is_null() && **v != Value::Bool(false)).cloned()),
             raw: item.clone(),
         })
         .collect()
+}
+
+/// `GPUStack::Responses#format_server_tool_history`: vLLM takes no server tool items as input, so
+/// a finished MCP call replays as a function call and its output, and any other server tool item
+/// as assistant text holding the item's JSON. Client items pass through.
+fn gpustack_server_tool_history(item: &Value) -> Vec<Value> {
+    let kind = item.get("type").and_then(Value::as_str);
+    if kind.is_none_or(|t| CLIENT_OUTPUT_ITEM_TYPES.contains(&t)) {
+        return vec![item.clone()];
+    }
+    let (name, id, output) = (item.get("name"), item.get("id"), item.get("output"));
+    if kind == Some("mcp_call")
+        && let (Some(name), Some(id), Some(output)) =
+            (name.filter(|v| !v.is_null()), id.filter(|v| !v.is_null()), output.filter(|v| !v.is_null()))
+    {
+        let output = output.as_str().map(str::to_string).unwrap_or_else(|| output.to_string());
+        return vec![
+            json!({ "type": "function_call", "call_id": id, "name": name, "arguments": item.get("arguments") }),
+            json!({ "type": "function_call_output", "call_id": id, "output": output }),
+        ];
+    }
+    vec![json!({ "role": "assistant", "content": [{ "type": "output_text", "text": item.to_string() }] })]
 }
 
 fn text_key(part_type: &str) -> Option<&'static str> {
@@ -535,6 +587,18 @@ fn reasoning(output: &[Value], provider: Provider) -> Option<Thinking> {
             .flat_map(|i| i.get("summary").and_then(Value::as_array).cloned().unwrap_or_default())
             .filter_map(|p| str_of(p.get("text")))
             .collect();
+    }
+    // `GPUStack::Responses#parse_reasoning_summary`: vLLM's Harmony reasoning has no summary, so
+    // fall back to the reasoning content itself.
+    if texts.is_empty() && provider == Provider::GPUStack {
+        let text: String = items
+            .iter()
+            .flat_map(|i| i.get("content").and_then(Value::as_array).cloned().unwrap_or_default())
+            .filter_map(|p| str_of(p.get("text")))
+            .collect();
+        if !text.is_empty() {
+            texts.push(text);
+        }
     }
     let signature = items.first().and_then(|i| str_of(i.get("encrypted_content")));
     Thinking::build((!texts.is_empty()).then(|| texts.join("\n")), signature)

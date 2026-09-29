@@ -40,7 +40,10 @@
 //! [persistence guide](https://github.com/cole-robertson/rust-llm/blob/main/docs/persistence-loco.md).
 
 pub mod entities;
+mod mcp_credential;
 pub mod migrations;
+
+pub use mcp_credential::McpCredentialStore;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

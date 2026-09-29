@@ -74,7 +74,7 @@ impl Rerank {
 
 /// `Cost.new(category: :embeddings)`: input and output use the embeddings prices, each falling
 /// back to the text price.
-fn embeddings_cost(tokens: &Tokens, model: Option<&Model>) -> Cost {
+pub(crate) fn embeddings_cost(tokens: &Tokens, model: Option<&Model>) -> Cost {
     let Some(model) = model else { return Cost::new(tokens, None, Tier::Standard) };
     let Some(embeddings) = model.pricing.embeddings.as_ref() else { return Cost::new(tokens, Some(model), Tier::Standard) };
     let mut priced = model.clone();

@@ -108,6 +108,11 @@ fn sniff(bytes: &[u8]) -> Option<&'static str> {
     }
 }
 
+/// `Files::MimeType.for(StringIO.new(bytes))`: the type Marcel reads from the magic numbers.
+pub(crate) fn mime_type_for_bytes(bytes: &[u8]) -> String {
+    sniff(bytes).unwrap_or("application/octet-stream").to_string()
+}
+
 /// Text formats `mime_guess` maps to octet-stream but Marcel knows as text.
 const TEXT_EXTENSIONS: &[&str] = &["rb", "rs", "py", "go", "ts", "tsx", "jsx", "md", "yml", "yaml", "toml", "sh"];
 
@@ -308,7 +313,8 @@ impl Attachment {
     /// Fails for a provider-managed file, which has no local content.
     pub async fn content(&mut self) -> Result<Vec<u8>> {
         if !self.is_provider_file() {
-            self.load(&reqwest::Client::new()).await?;
+            // `Connection.basic(config)` with the global configuration's proxy and timeout.
+            self.load(&crate::transport::basic(&crate::config())?).await?;
         }
         self.bytes().map(<[u8]>::to_vec)
     }
@@ -383,6 +389,11 @@ impl Attachment {
         DOCUMENT_MIME_TYPES.contains(&m)
             || DOCUMENT_MIME_PREFIXES.iter().any(|p| m.starts_with(p))
             || ext.is_some_and(|e| DOCUMENT_EXTENSIONS.contains(&e.as_str()))
+    }
+
+    /// `Attachment#extension`: the filename's extension, downcased; `None` without one.
+    pub fn extension(&self) -> Option<String> {
+        self.filename.as_deref().and_then(|f| Path::new(f).extension()).and_then(|e| e.to_str()).filter(|e| !e.is_empty()).map(str::to_lowercase)
     }
 
     /// `Attachment#format`: the short audio format name providers expect.

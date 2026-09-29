@@ -187,6 +187,11 @@ Ruby idiom turns into Rust.
 | `RubyLLM.batch(chats)` | `rust_llm::batch(chats).await?` |
 | `RubyLLM::Batch.find(id, provider:)` | `Batch::find(id, Some(provider)).await?` |
 | `batch.refresh.complete?` | `batch.refresh().await?.is_complete()` |
+| `RubyLLM.render_prompt("support/instructions", product_name: "X")` | `rust_llm::render_prompt("support/instructions", json!({ "product_name": "X" }))?` (Jinja, see [Prompt Templates](prompts.md)) |
+| `RubyLLM.workflow(name, id:, metadata:) { \|w\| w.step("A") { ... } }` | `rust_llm::workflow(name, id, metadata, \|w\| async move { w.step("A", None, async { .. }).await }).await?` |
+| `config.instrumenter = ...`, `chat.ruby_llm` | `config.instrumenter = Some(Arc::new(\|name, payload, duration\| ..))`, `chat.rust_llm` (see [Instrumentation](instrumentation.md)) |
+| `RubyLLM.models.refresh(remote_only: true)`, `save_to_json(path)` | `rust_llm::models::refresh(true).await?`, `models().save_to_json(Some(path))?` |
+| `RubyLLM.cache(text, model:, ttl:)`, `CachedContent.find`, `cache.renew(ttl:)`, `cache.delete` | `rust_llm::cache(text, CacheOptions { .. }).await?`, `CachedContent::find`, `cache.renew(ttl).await?`, `cache.delete().await?` |
 | `batch.messages` / `results` / `statuses` / `cancel` | `messages().await?` / `results().await?` / `statuses()` / `cancel().await?` |
 | `RubyLLM.embed_later(text, ..)` | `rust_llm::embed_later(text, EmbedOptions { .. })?` |
 | `class X < RubyLLM::Judge; probability :a, "..."; end` | `Judge::new().probability("a", "...")?` |
@@ -268,10 +273,10 @@ async fn main() -> rust_llm::Result<()> {
 
 - Providers: Bedrock, Vertex AI, Azure, Cohere, ElevenLabs, Deepgram.
 - Operations: `animate`, `speak`, `transcribe`, `ocr`, `rerank`, `moderate`, `research`,
-  `count_tokens`, `tokenize`, `RubyLLM.cache`, `RubyLLM.render_prompt`, `RubyLLM.workflow`.
+  `count_tokens`, `tokenize`.
 - Chat options: `with_caching`, `with_citations`, `with_compaction` / `compact`, `with_end_user`,
   `with_context`, tool concurrency.
 - MCP OAuth; Gemini embedding batches; multipart image edits for non-gpt-image models.
-- Instrumentation events, `RUBYLLM_DEBUG` logging, `RubyLLM.models.refresh`.
+- `RUBYLLM_DEBUG` logging.
 - Rails-only pieces: Active Storage, persisted batches, persisted cancellation, Turbo streaming,
   agent `chat_model` mode, `rescue_from`.

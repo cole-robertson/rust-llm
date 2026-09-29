@@ -97,6 +97,9 @@ struct Callbacks {
 
 type ToolProgressCallback = Box<dyn FnMut(&ToolCall, &crate::progress::Progress) + Send + Sync>;
 
+/// `cancellation_checker=`: returns true when the chat should stop.
+pub type CancellationChecker = Arc<dyn Fn() -> bool + Send + Sync>;
+
 /// `RubyLLM::Chat`.
 pub struct Chat {
     config: Arc<Config>,
@@ -127,6 +130,8 @@ pub struct Chat {
     usage_recorder: Option<UsageRecorder>,
     tool_call_decisions: HashMap<String, bool>,
     cancelled: Arc<AtomicBool>,
+    /// `@cancellation_checker`: an outside signal (e.g. a persisted record) consulted with the flag.
+    cancellation_checker: Option<CancellationChecker>,
     mcp: crate::mcp::Collection,
     /// `@tool_call_inputs`: per tool call id, the paused state (`InputRequiredError#to_h`).
     tool_call_inputs: HashMap<String, Value>,
@@ -221,6 +226,7 @@ impl Chat {
             usage_recorder: None,
             tool_call_decisions: HashMap::new(),
             cancelled: Arc::new(AtomicBool::new(false)),
+            cancellation_checker: None,
             mcp: crate::mcp::Collection::default(),
             tool_call_inputs: HashMap::new(),
             provider_tools: Vec::new(),
@@ -393,18 +399,30 @@ impl Chat {
         Ok(self)
     }
 
-    /// `with_tool_options(calls: :one | :many)`.
-    pub fn with_tool_calls(mut self, calls: ToolCalls) -> Self {
-        self.tool_prefs.calls = Some(calls);
+    /// `with_tool_options(choice: nil)`: forget the tool choice.
+    pub fn clear_tool_choice(mut self) -> Self {
+        self.tool_prefs.choice = None;
         self
     }
 
-    /// `with_tool_options(concurrency: true | false)`: run the tool calls of one response at once
-    /// instead of one after another. Their results are added as each call finishes. The calls
-    /// share the chat's task, like RubyLLM's `:fibers` mode, so tools that block the thread should
-    /// move that work to `tokio::task::spawn_blocking`.
-    pub fn with_tool_concurrency(mut self, enabled: bool) -> Self {
-        self.concurrency = enabled;
+    /// `with_tool_options(calls: :one | :many | nil)`.
+    pub fn with_tool_calls(mut self, calls: impl Into<Option<ToolCalls>>) -> Self {
+        self.tool_prefs.calls = calls.into();
+        self
+    }
+
+    /// `tool_prefs`: what `with_tool_options(choice:, calls:)` recorded.
+    pub fn tool_prefs(&self) -> &protocols::ToolPrefs {
+        &self.tool_prefs
+    }
+
+    /// `with_tool_options(concurrency: true | false | nil)`: run the tool calls of one response at
+    /// once instead of one after another; `None` falls back to `config.tool_concurrency`. Their
+    /// results are added as each call finishes. The calls share the chat's task, like RubyLLM's
+    /// `:fibers` mode, so tools that block the thread should move that work to
+    /// `tokio::task::spawn_blocking`.
+    pub fn with_tool_concurrency(mut self, enabled: impl Into<Option<bool>>) -> Self {
+        self.concurrency = enabled.into().unwrap_or(self.config.tool_concurrency);
         self
     }
 
@@ -418,6 +436,12 @@ impl Chat {
         self.switch_model(model_id, provider, false)?;
         self.protocol = None;
         Ok(self)
+    }
+
+    /// `with_model(nil)`: back to `config.default_model`.
+    pub fn with_default_model(self) -> Result<Self> {
+        let default = self.config.default_model.clone();
+        self.with_model(&default, None)
     }
 
     /// `with_model(id, provider:, assume_model_exists: true)`.
@@ -441,14 +465,31 @@ impl Chat {
         self
     }
 
-    pub fn with_temperature(mut self, temperature: f64) -> Self {
-        self.temperature = Some(temperature);
+    /// `with_temperature(value)`; `None` clears it.
+    pub fn with_temperature(mut self, temperature: impl Into<Option<f64>>) -> Self {
+        self.temperature = temperature.into();
         self
     }
 
-    pub fn with_max_output_tokens(mut self, max: i64) -> Self {
-        self.max_output_tokens = Some(max);
+    /// `with_max_output_tokens(max)`; `None` removes the limit.
+    pub fn with_max_output_tokens(mut self, max: impl Into<Option<i64>>) -> Self {
+        self.max_output_tokens = max.into();
         self
+    }
+
+    /// `max_output_tokens`.
+    pub fn max_output_tokens(&self) -> Option<i64> {
+        self.max_output_tokens
+    }
+
+    /// `@protocol`: the protocol forced with `with_protocol`, if any.
+    pub fn protocol(&self) -> Option<ProtocolName> {
+        self.protocol
+    }
+
+    /// `@thinking`: what `with_thinking` set, before it is resolved against the model.
+    pub fn thinking(&self) -> Option<&ThinkingConfig> {
+        self.thinking.as_ref()
     }
 
     /// `with_thinking`, `with_thinking(false)`, `with_thinking(effort: :high)`, ...
@@ -556,10 +597,19 @@ impl Chat {
         self.with_schema(serde_json::json!({ "name": name, "schema": schema }))
     }
 
-    /// `with_provider_options(...)`: deep-merged into every rendered request.
+    /// `with_provider_options(...)`: deep-merged into every rendered request. Replaces options
+    /// set earlier (`@provider_options = provider_options.to_h`); `Value::Null` clears them.
     pub fn with_provider_options(mut self, options: Value) -> Self {
-        protocols::deep_merge(&mut self.provider_options, &options);
+        self.provider_options = match options {
+            Value::Null => Value::Object(Map::new()),
+            options => options,
+        };
         self
+    }
+
+    /// `provider_options`.
+    pub fn provider_options(&self) -> &Value {
+        &self.provider_options
     }
 
     /// Deprecated RubyLLM name kept for 1.x muscle memory.
@@ -567,9 +617,16 @@ impl Chat {
         self.with_provider_options(params)
     }
 
+    /// `with_headers(headers)`: replaces headers set earlier (`@headers = headers.to_h`); an
+    /// empty list clears them, like `with_headers(nil)`.
     pub fn with_headers(mut self, headers: impl IntoIterator<Item = (String, String)>) -> Self {
-        self.headers.extend(headers);
+        self.headers = headers.into_iter().collect();
         self
+    }
+
+    /// `headers`.
+    pub fn headers(&self) -> &[(String, String)] {
+        &self.headers
     }
 
     /// `with_fallbacks("gpt-4.1-mini", "claude-haiku-4-5")`.
@@ -875,6 +932,7 @@ impl Chat {
     }
 
     fn record_usage(&mut self, entry: UsageEntry) {
+        crate::instrumentation::usage(&self.config, &entry);
         if let Some(r) = &mut self.usage_recorder {
             r(&entry);
         }
@@ -940,6 +998,7 @@ impl Chat {
             crate::provider_tools::apply(&mut payload, &resolution);
         }
         self.apply_before_request_hooks(&mut payload);
+        protocols::finish_render(protocol, &mut payload)?;
         Ok((payload, protocol))
     }
 
@@ -977,12 +1036,71 @@ impl Chat {
         }
     }
 
+    /// `generate_once`: one completion inside a `chat.rust_llm` event.
     async fn generate_once(
+        &mut self,
+        on_chunk: Option<&mut (dyn FnMut(&Message) + Send)>,
+        chunks_yielded: &mut bool,
+    ) -> Result<Message> {
+        self.raise_if_cancelled()?;
+        let event = self.instrumentation_event("chat.rust_llm", on_chunk.is_some());
+        let result = tracing::Instrument::instrument(self.generate_once_inner(on_chunk, chunks_yielded), event.span()).await;
+        self.finish_completion_event(event, &result);
+        result
+    }
+
+    /// `instrumentation_payload(streaming:)`.
+    fn instrumentation_event(&self, name: &str, streaming: bool) -> crate::instrumentation::Event {
+        crate::instrumentation::Event::start(&self.config, name, || {
+            let empty = Tokens::default();
+            let choice = self.tool_prefs.choice.as_ref().map(|c| match c {
+                ToolChoice::Auto => "auto".to_string(),
+                ToolChoice::None => "none".into(),
+                ToolChoice::Required => "required".into(),
+                ToolChoice::Tool(name) => name.clone(),
+            });
+            let calls = self.tool_prefs.calls.map(|c| if c == ToolCalls::One { "one" } else { "many" });
+            crate::instrumentation::payload([
+                ("provider", self.provider.slug().into()),
+                ("provider_class", self.provider.display().into()),
+                ("model", self.model.id.clone().into()),
+                ("input_messages", Value::Array(self.messages.iter().map(Message::to_h).collect())),
+                ("message_count", self.messages.len().into()),
+                ("tools", Value::Array(self.tools.iter().map(|t| t.name().into()).collect())),
+                ("tool_choice", choice.into()),
+                ("tool_call_limit", calls.into()),
+                ("temperature", self.temperature.into()),
+                ("max_output_tokens", self.max_output_tokens.into()),
+                ("provider_options", self.provider_options.clone()),
+                ("schema", self.schema.as_ref().map(|s| s.schema.clone()).into()),
+                ("citations", self.citations.into()),
+                ("streaming", streaming.into()),
+                ("tokens", crate::instrumentation::tokens_h(&empty)),
+                ("cost", crate::instrumentation::cost_h(&Cost::new(&empty, Some(&self.model), Tier::Standard))),
+            ])
+        })
+    }
+
+    /// `record_completion_event`.
+    fn finish_completion_event(&self, mut event: crate::instrumentation::Event, result: &Result<Message>) {
+        if let Ok(message) = result {
+            event.set("response", || message.to_h());
+            event.set("messages_after", || Value::Array(self.messages.iter().map(Message::to_h).collect()));
+            event.set("response_role", || message.role.as_str().into());
+            event.set("tokens", || crate::instrumentation::tokens_h(&message.tokens()));
+            event.set("cost", || crate::instrumentation::cost_h(&message.cost(None)));
+            event.set("response_model", || message.model.clone().into());
+            event.set("tool_call", || message.is_tool_call().into());
+            event.set("tool_calls", || serde_json::to_value(&message.tool_calls).unwrap_or(Value::Null));
+        }
+        event.finish(result.as_ref().err());
+    }
+
+    async fn generate_once_inner(
         &mut self,
         mut on_chunk: Option<&mut (dyn FnMut(&Message) + Send)>,
         chunks_yielded: &mut bool,
     ) -> Result<Message> {
-        self.raise_if_cancelled()?;
         self.load_mcp_tools().await?;
         self.load_attachments(&mut []).await?;
         let mut messages = self.preprocessed_messages();
@@ -1041,7 +1159,15 @@ impl Chat {
     ) -> Result<(Message, Vec<UsageEntry>, Model, ProtocolName)> {
         let streaming = on_chunk.is_some();
         let (payload, protocol) = self.render_with(messages, streaming)?;
-        let endpoint = protocols::endpoint(protocol, self.provider, &self.model, streaming);
+        let mut endpoint = protocols::endpoint(protocol, self.provider, &self.model, streaming);
+        // `Perplexity::Agent#completion_url` is `@provider.agent_url`.
+        if protocol == ProtocolName::Responses && self.provider == Provider::Perplexity {
+            endpoint.path = self.provider.agent_url(&self.config)?;
+        }
+        // `Perplexity::Router#completion_url` is `@provider.router_url('chat/completions')`.
+        if protocol == ProtocolName::RouterChatCompletions {
+            endpoint.path = self.provider.router_url(&self.config, "chat/completions")?;
+        }
         let mut headers = endpoint.headers;
         // `resolution.headers.merge(headers)`: the chat's own headers win.
         if let Some(resolution) = crate::provider_tools::resolve(protocol, self.provider, &self.provider_tools)? {
@@ -1065,16 +1191,18 @@ impl Chat {
         let mut observed = Tokens::default();
         let result = if let Some(on_chunk) = on_chunk {
             let mut acc = StreamAccumulator::default();
-            let mut state = StreamState::default();
+            let mut state = StreamState::for_payload(protocol, self.provider, &self.model, &payload);
             let provider = self.provider;
             let cancelled = self.cancelled.clone();
+            let checker = self.cancellation_checker.clone();
             let mut on_event = |_event: crate::transport::SseEvent, data: Value| -> Result<()> {
                 let chunk = protocols::build_chunk(protocol, provider, &mut state, &data)?;
                 acc.add(&chunk);
                 *chunks_yielded = true;
                 on_chunk(&chunk);
                 // `raise_if_cancelled!` inside the streaming block: one-shot, so it clears the flag.
-                if cancelled.swap(false, Ordering::SeqCst) {
+                let external = checker.as_ref().is_some_and(|c| c());
+                if cancelled.swap(false, Ordering::SeqCst) || external {
                     return Err(Error::Cancelled);
                 }
                 Ok(())
@@ -1082,8 +1210,13 @@ impl Chat {
             let status = protocols::streaming_error_status(protocol);
             let streamed = self.connection.stream(&endpoint.path, &payload, &headers, &mut on_attempt, &mut on_event, status).await;
             observed = acc.tokens().clone();
-            match streamed {
-                Ok(raw) => acc.into_message(raw),
+            match streamed.and_then(|raw| protocols::finish_stream(protocol, &mut state, acc, raw)) {
+                // `MultiCompletion#stream_response` yields one more chunk with the whole message.
+                Ok((message, Some(last))) => {
+                    on_chunk(&last);
+                    Ok(message)
+                }
+                Ok((message, None)) => Ok(message),
                 Err(e) => Err(e),
             }
         } else {
@@ -1181,6 +1314,13 @@ impl Chat {
     pub async fn compact(&mut self) -> Result<Message> {
         self.raise_if_cancelled()?;
         self.raise_if_pending_tool_calls()?;
+        let event = self.instrumentation_event("compaction.rust_llm", false);
+        let result = tracing::Instrument::instrument(self.compact_inner(), event.span()).await;
+        self.finish_completion_event(event, &result);
+        result
+    }
+
+    async fn compact_inner(&mut self) -> Result<Message> {
         let protocol = self.provider.resolve_protocol(self.protocol, &self.model, &self.config)?;
         if !(protocol == ProtocolName::Responses && matches!(self.provider, Provider::OpenAI | Provider::XAI)) {
             return Err(Error::Api(format!("{} doesn't support manual compaction", self.provider.display()), None));
@@ -1407,6 +1547,43 @@ impl Chat {
         let input = self.tool_call_inputs.get(&call.id).cloned();
         let cancelled = self.cancelled.clone();
         let listener = self.progress_listener(&call);
+        // `tool_call.rust_llm` (Ruby skips it for an unavailable tool, as here).
+        let event = tool.as_ref().map(|tool| {
+            crate::instrumentation::Event::start(&self.config, "tool_call.rust_llm", || {
+                crate::instrumentation::payload([
+                    ("provider", self.provider.slug().into()),
+                    ("provider_class", self.provider.display().into()),
+                    ("model", self.model.id.clone().into()),
+                    ("tool_call", serde_json::to_value(&call).unwrap_or(Value::Null)),
+                    ("tool_name", tool.name().into()),
+                    ("tool_arguments", Value::Object(call.arguments())),
+                    ("tool_call_id", call.id.clone().into()),
+                ])
+            })
+        });
+        let run = self.run_tool(tool, call, input, cancelled, listener, unavailable);
+        async move {
+            let Some(mut event) = event else { return run.await };
+            let result = tracing::Instrument::instrument(run, event.span()).await;
+            if let Ok(r) = &result {
+                event.set("result", || r.content.clone().into());
+                event.set("result_content", || r.content.clone().into());
+                event.set("result_class", || "ToolResult".into());
+            }
+            event.finish(result.as_ref().err());
+            result
+        }
+    }
+
+    fn run_tool(
+        &self,
+        tool: Option<SharedTool>,
+        call: ToolCall,
+        input: Option<Value>,
+        cancelled: Arc<AtomicBool>,
+        listener: Option<crate::progress::Listener>,
+        unavailable: Option<String>,
+    ) -> impl Future<Output = Result<ToolResult>> + Send + 'static {
         async move {
             let Some(tool) = tool else { return Ok(ToolResult::error(unavailable.unwrap_or_default())) };
             let arguments = call.arguments();
@@ -1600,8 +1777,15 @@ impl Chat {
         self.cancelled.load(Ordering::SeqCst)
     }
 
+    /// `cancellation_checker=`: consulted at every checkpoint along with `cancel`.
+    pub fn set_cancellation_checker(&mut self, checker: Option<CancellationChecker>) {
+        self.cancellation_checker = checker;
+    }
+
+    /// `raise_if_cancelled!`: the flag is one-shot; the external checker is asked every time.
     fn raise_if_cancelled(&self) -> Result<()> {
-        if self.cancelled.swap(false, Ordering::SeqCst) {
+        let external = self.cancellation_checker.as_ref().is_some_and(|c| c());
+        if self.cancelled.swap(false, Ordering::SeqCst) || external {
             return Err(Error::Cancelled);
         }
         Ok(())

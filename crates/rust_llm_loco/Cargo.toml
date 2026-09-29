@@ -18,7 +18,9 @@ include = ["src/**/*.rs", "README.md", "LICENSE"]
 
 [dependencies]
 rust_llm = { path = "../rust_llm", version = "2.0.0" }
+aes-gcm = "0.10"
 async-trait.workspace = true
+base64.workspace = true
 chrono.workspace = true
 sea-orm.workspace = true
 sea-orm-migration.workspace = true

@@ -204,3 +204,27 @@ pub mod rust_llm_attachments {
 
     impl ActiveModelBehavior for ActiveModel {}
 }
+
+pub mod rust_llm_mcp_credentials {
+    use sea_orm::entity::prelude::*;
+
+    /// `RubyLLM::ActiveRecord::MCPCredential`: one owner's credentials for one MCP server (or a
+    /// client registration, with no owner). `data` is encrypted.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "rust_llm_mcp_credentials")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub id: i32,
+        pub owner_type: Option<String>,
+        pub owner_id: Option<i64>,
+        pub key: String,
+        pub data: Option<String>,
+        pub created_at: DateTimeWithTimeZone,
+        pub updated_at: DateTimeWithTimeZone,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}

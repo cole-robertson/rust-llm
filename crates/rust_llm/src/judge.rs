@@ -66,12 +66,22 @@ impl QuestionType {
         }
     }
 
-    fn parse(value: &str) -> Result<QuestionType> {
-        match value {
-            "probability" => Ok(QuestionType::Probability),
-            "choice" => Ok(QuestionType::Choice),
-            "score" => Ok(QuestionType::Score),
-            other => Err(Error::Argument(format!("Unknown judgment type: {other:?}"))),
+    /// `CRITERIA_KEYS.fetch(type) { raise ArgumentError, "Unknown judgment type: #{type.inspect}" }`
+    /// (`judge/question.rb`); the message spells the value as Ruby's `inspect` would (`nil`,
+    /// `:text`, `42`), since `from_h` turns a String type into a Symbol first.
+    fn parse(value: Option<&Value>) -> Result<QuestionType> {
+        match value.and_then(Value::as_str) {
+            Some("probability") => Ok(QuestionType::Probability),
+            Some("choice") => Ok(QuestionType::Choice),
+            Some("score") => Ok(QuestionType::Score),
+            _ => {
+                let inspected = match value {
+                    None | Some(Value::Null) => "nil".to_string(),
+                    Some(Value::String(s)) => format!(":{s}"),
+                    Some(other) => other.to_string(),
+                };
+                Err(Error::Argument(format!("Unknown judgment type: {inspected}")))
+            }
         }
     }
 }
@@ -175,7 +185,7 @@ impl Question {
         let Some(def) = definition.as_object() else {
             return Err(Error::Argument("Each question must be a Hash".into()));
         };
-        let kind = QuestionType::parse(def.get("type").and_then(Value::as_str).unwrap_or_default())?;
+        let kind = QuestionType::parse(def.get("type"))?;
         let key = kind.criteria_key();
         let extra: Vec<&str> =
             def.keys().map(String::as_str).filter(|k| !["type", "instructions", key].contains(k)).collect();
@@ -263,6 +273,9 @@ pub struct JudgeOptions {
     pub provider_options: Option<Value>,
     /// Values for the judge's declared `inputs`.
     pub inputs: Map<String, Value>,
+    /// `context:`: an isolated configuration for this call (its keys and default judgment model),
+    /// taking precedence over `with_config`.
+    pub config: Option<Arc<Config>>,
 }
 
 impl Judge {
@@ -403,7 +416,7 @@ impl Judge {
             options.provider.or_else(|| self.model.provider.clone()),
             options.assume_model_exists.unwrap_or(self.model.assume_model_exists),
             provider_options,
-            self.config.clone(),
+            options.config.or_else(|| self.config.clone()),
         )
         .await
     }
@@ -418,7 +431,8 @@ pub async fn judge(input: impl Into<Value>, questions: Value, options: JudgeOpti
     Judge::new().judge_with(input, options).await
 }
 
-/// `Judgment.judge` + `Provider#judge` + the System One protocol.
+/// `Judgment.judge` + `Provider#judge` + the System One protocol, inside a `judgment.rust_llm`
+/// event.
 async fn judge_request(
     input: Value,
     questions: &[Resolved],
@@ -429,6 +443,44 @@ async fn judge_request(
     config: Option<Arc<Config>>,
 ) -> Result<Judgment> {
     let config = config.unwrap_or_else(crate::config);
+    let model_id = model.clone().unwrap_or_else(|| config.default_judgment_model.clone());
+    let resolved = resolve_model(&model_id, provider.as_deref(), assume_model_exists).ok();
+    let mut event = crate::instrumentation::Event::start(&config, "judgment.rust_llm", || {
+        let empty = Tokens::default();
+        let (slug, display, id, cost) = match &resolved {
+            Some((m, p)) => (Some(p.slug()), Some(p.display()), Some(m.id.clone()), Cost::new(&empty, Some(m), Tier::Standard)),
+            None => (None, None, None, Cost::new(&empty, None, Tier::Standard)),
+        };
+        crate::instrumentation::payload([
+            ("provider", slug.into()),
+            ("provider_class", display.into()),
+            ("model", id.into()),
+            ("question_count", questions.len().into()),
+            ("provider_options", provider_options.clone()),
+            ("tokens", crate::instrumentation::tokens_h(&empty)),
+            ("cost", crate::instrumentation::cost_h(&cost)),
+        ])
+    });
+    let request = judge_request_inner(input, questions, model, provider, assume_model_exists, provider_options, config.clone());
+    let result = tracing::Instrument::instrument(request, event.span()).await;
+    if let Ok(j) = &result {
+        event.set("result", || serde_json::json!(j.answers.iter().map(|(k, _)| k.clone()).collect::<Vec<_>>()));
+        event.set("tokens", || crate::instrumentation::tokens_h(&j.tokens()));
+        event.set("cost", || crate::instrumentation::cost_h(&j.cost()));
+    }
+    event.finish(result.as_ref().err());
+    result
+}
+
+async fn judge_request_inner(
+    input: Value,
+    questions: &[Resolved],
+    model: Option<String>,
+    provider: Option<String>,
+    assume_model_exists: bool,
+    provider_options: Value,
+    config: Arc<Config>,
+) -> Result<Judgment> {
     let model_id = model.unwrap_or_else(|| config.default_judgment_model.clone());
     if model_id.is_empty() {
         return Err(Error::Argument("A judgment requires a model".into()));
@@ -614,6 +666,12 @@ pub struct Judgment {
 }
 
 impl Judgment {
+    /// `Judgment.new(answers:, model:, tokens:)` (`judgment.rb`): a judgment built from answers
+    /// you already have, with no usage entries or model info (so cost stays unknown).
+    pub fn new(answers: Vec<(String, Answer)>, model: impl Into<String>, tokens: Tokens) -> Judgment {
+        Judgment { answers, model: model.into(), raw: None, usage_entries: Vec::new(), tokens, model_info: None }
+    }
+
     /// `judgment[:urgent]`: `None` for an unknown name.
     pub fn get(&self, name: &str) -> Option<&Answer> {
         self.answers.iter().find(|(n, _)| n == name).map(|(_, a)| a)

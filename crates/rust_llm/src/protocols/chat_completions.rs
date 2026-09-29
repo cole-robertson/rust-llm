@@ -59,6 +59,7 @@ fn format_role(provider: Provider, role: Role, config: &crate::Config) -> &'stat
             | Provider::OllamaCloud
             | Provider::GPUStack
             | Provider::Hetzner
+            | Provider::Perplexity
     );
     match role {
         Role::System if !plain_roles && config.get("openai_use_system_role") != Some("true") => "developer",
@@ -106,6 +107,9 @@ pub fn render_payload(req: &Request) -> Result<Value> {
     match provider {
         Provider::DeepSeek => {
             if let Some(thinking) = req.thinking.filter(|t| t.is_enabled()) {
+                if let Some(budget) = thinking.budget {
+                    tracing::debug!("DeepSeek has no thinking budgets; ignoring budget {budget}");
+                }
                 if thinking.is_disabled() {
                     payload.remove("reasoning_effort");
                     payload.insert("thinking".into(), json!({ "type": "disabled" }));
@@ -125,7 +129,7 @@ pub fn render_payload(req: &Request) -> Result<Value> {
             payload.remove("stream_options");
             let single_tool = payload.get("tools").and_then(Value::as_array).filter(|t| t.len() == 1).cloned();
             if payload.get("tool_choice").and_then(Value::as_str) == Some("any")
-                && let Some(name) = single_tool.as_ref().and_then(|t| t[0].pointer("/function/name")).cloned() {
+                && let Some(name) = single_tool.as_ref().and_then(|t| t[0].pointer("/function/name")).filter(|n| !n.is_null()).cloned() {
                     payload.insert("tool_choice".into(), json!({ "type": "function", "function": { "name": name } }));
                 }
         }
@@ -157,6 +161,12 @@ pub fn render_payload(req: &Request) -> Result<Value> {
                     reasoning.insert("enabled".into(), true.into());
                 }
                 payload.insert("reasoning".into(), Value::Object(reasoning));
+            }
+        }
+        // `providers/ollama/chat.rb#render_payload`.
+        Provider::Ollama | Provider::OllamaCloud => {
+            if let Some(budget) = req.thinking.and_then(|t| t.budget) {
+                tracing::debug!("Ollama has no thinking budgets; ignoring budget {budget}");
             }
         }
         _ => {}
@@ -220,6 +230,10 @@ fn format_messages(req: &Request) -> Result<Vec<Value>> {
                     out.push(json!({ "role": "user", "content": parts }));
                 }
             }
+        } else if let Some(replayed) = (req.provider == Provider::Mistral).then(|| super::mistral::multi_messages_for_replay(ordered[i])).flatten() {
+            // `MultiCompletion#format_message_group`: a multi-completion answer replays its messages.
+            out.extend(replayed);
+            i += 1;
         } else {
             out.push(format_message(req, ordered[i])?);
             i += 1;
@@ -257,17 +271,10 @@ fn format_message(req: &Request, msg: &Message) -> Result<Value> {
         }
     let boundary = msg.cache_until_here && Caching::boundaries(req.caching);
     if boundary && provider == Provider::OpenRouter {
-        let mut blocks = match content {
-            Value::Array(parts) => parts,
-            Value::String(s) => vec![json!({ "type": "text", "text": s })],
-            _ => Vec::new(),
-        };
-        if let Some(Value::Object(last)) = blocks.last_mut() {
-            let control = openrouter_cache_control(Caching::checked(req.caching, &["ttl"], "OpenRouter")?);
-            last.entry("cache_control").or_insert(control);
-        }
-        content = Value::Array(blocks);
-    } else if boundary && matches!(provider, Provider::OpenAI) {
+        content = inject_cache_control(content, req.caching)?;
+    } else if boundary && provider != Provider::Mistral {
+        // `inject_cache_breakpoint` runs wherever `openai_prompt_caching?` holds: every Chat
+        // Completions provider but Mistral and OpenRouter (`protocols/chat_completions/chat.rb`).
         let parts = match &content {
             Value::Array(parts) => Some(parts.clone()),
             Value::String(s) if !s.is_empty() => Some(vec![json!({ "type": "text", "text": s })]),
@@ -309,6 +316,23 @@ fn format_message(req: &Request, msg: &Message) -> Result<Value> {
         format_thinking(provider, msg, &mut out);
     }
     Ok(Value::Object(out))
+}
+
+/// `OpenRouter::Chat#inject_cache_control` (`providers/openrouter/chat.rb`): marks the last block
+/// of a cache-boundary message with `cache_control`, wrapping non-array content in a text block.
+/// An empty list, a trailing non-object, or a block already carrying `cache_control` is left alone.
+#[doc(hidden)]
+pub fn inject_cache_control(content: Value, caching: Option<&Caching>) -> Result<Value> {
+    let mut blocks = match content {
+        Value::Array(parts) => parts,
+        other => vec![json!({ "type": "text", "text": other })],
+    };
+    if let Some(Value::Object(last)) = blocks.last_mut()
+        && last.get("cache_control").is_none_or(Value::is_null) {
+            let control = openrouter_cache_control(Caching::checked(caching, &["ttl"], "OpenRouter")?);
+            last.insert("cache_control".into(), control);
+        }
+    Ok(Value::Array(blocks))
 }
 
 fn format_thinking(provider: Provider, msg: &Message, out: &mut Map<String, Value>) {
@@ -392,11 +416,29 @@ pub(crate) fn format_content(provider: Provider, content: Option<&str>, attachme
             (Provider::Ollama | Provider::OllamaCloud | Provider::GPUStack, AttachmentType::Image) => {
                 json!({ "type": "image_url", "image_url": { "url": a.for_llm()?, "detail": "auto" } })
             }
-            (Provider::GPUStack, AttachmentType::Video) => json!({ "type": "video_url", "video_url": { "url": a.url_or_data_uri()? } }),
+            // `providers/gpustack/media.rb#format_video`: always inline, clusters often lack internet.
+            (Provider::GPUStack, AttachmentType::Video) => json!({ "type": "video_url", "video_url": { "url": a.for_llm()? } }),
             (Provider::Ollama | Provider::OllamaCloud | Provider::GPUStack, AttachmentType::Pdf | AttachmentType::Document) => {
                 return Err(unsupported(a));
             }
             (Provider::Hetzner, AttachmentType::Image) => json!({ "type": "image_url", "image_url": { "url": a.for_llm()? } }),
+            // `providers/perplexity/media.rb`: images without a detail, supported documents as
+            // `file_url` parts (the URL itself, or bare base64), text files as text, nothing else.
+            (Provider::Perplexity, AttachmentType::Image) => json!({ "type": "image_url", "image_url": { "url": a.url_or_data_uri()? } }),
+            (Provider::Perplexity, AttachmentType::Pdf | AttachmentType::Document) => {
+                const SUPPORTED_DOCUMENT_EXTENSIONS: [&str; 5] = ["pdf", "doc", "docx", "txt", "rtf"];
+                let supported = a.kind() == AttachmentType::Pdf
+                    || a.extension().is_some_and(|e| SUPPORTED_DOCUMENT_EXTENSIONS.contains(&e.as_str()));
+                if !supported {
+                    return Err(unsupported(a));
+                }
+                let url = match a.url() {
+                    Some(u) => u.to_string(),
+                    None => a.encoded()?,
+                };
+                json!({ "type": "file_url", "file_url": { "url": url } })
+            }
+            (Provider::Perplexity, AttachmentType::Audio) => return Err(unsupported(a)),
             (Provider::OpenRouter, AttachmentType::Video) => json!({ "type": "video_url", "video_url": { "url": a.url_or_data_uri()? } }),
             (Provider::DeepSeek | Provider::XAI | Provider::Hetzner, AttachmentType::Pdf | AttachmentType::Document) => {
                 return Err(unsupported(a));
@@ -638,16 +680,30 @@ pub fn parse_completion_body(provider: Provider, data: &Value, raw: RawResponse)
         if let Some(r) = data.pointer("/choices/0/finish_reason").and_then(Value::as_str) {
             message = format!("{message} (finish_reason: {r})");
         }
-        return Err(Error::Api(message, None));
+        // `Error.new(message, response: raw)`.
+        let response = crate::error::ErrorResponse { status: raw.status, body: raw.body.to_string() };
+        return Err(Error::Api(message, Some(response)));
     };
     let usage = data.get("usage").cloned().unwrap_or_else(|| json!({}));
     let finish_raw = data.pointer("/choices/0/finish_reason").and_then(Value::as_str);
     let finish = normalize_finish_reason(finish_raw, FINISH_REASONS);
     let (content, block_thinking) = extract_content_and_thinking(message_data.get("content"));
-    let thinking_text = block_thinking.or_else(|| {
-        ["reasoning_content", "reasoning", "thinking"].iter().find_map(|k| message_data.get(*k).and_then(Value::as_str).map(str::to_string))
-    });
-    let signature = ["reasoning_signature", "signature"].iter().find_map(|k| message_data.get(*k).and_then(Value::as_str).map(str::to_string));
+    let (thinking_text, signature) = if provider == Provider::OpenRouter {
+        (block_thinking.or_else(|| openrouter_thinking_text(message_data)), openrouter_thinking_signature(message_data))
+    } else {
+        // `extract_thinking_text`/`extract_thinking_signature`: the first truthy field wins
+        // (`a || b || c`), and only counts if it is a string.
+        let first_string = |keys: &[&str]| {
+            keys.iter()
+                .find_map(|k| message_data.get(*k).filter(|v| !v.is_null() && **v != Value::Bool(false)))
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        };
+        (
+            block_thinking.or_else(|| first_string(&["reasoning_content", "reasoning", "thinking"])),
+            first_string(&["reasoning_signature", "signature"]),
+        )
+    };
     let calls = parse_tool_calls(message_data.get("tool_calls"), true, false, finish.as_ref().map(|f| f.as_str()))?;
 
     let mut m = Message::chunk();
@@ -667,6 +723,40 @@ pub fn parse_completion_body(provider: Provider, data: &Value, raw: RawResponse)
     m.model = str_of(data.get("model"));
     m.raw = Some(raw);
     Ok(m.normalized())
+}
+
+/// `OpenRouter::Chat#extract_thinking_text` (`providers/openrouter/chat.rb`): the `reasoning`
+/// string, else the joined `reasoning.text` and `reasoning.summary` details; `None` when empty.
+fn openrouter_thinking_text(data: &Value) -> Option<String> {
+    if let Some(reasoning) = data.get("reasoning").and_then(Value::as_str) {
+        return Some(reasoning.to_string());
+    }
+    let details = data.get("reasoning_details")?.as_array()?;
+    let text: String = details
+        .iter()
+        .filter_map(|d| match d.get("type").and_then(Value::as_str) {
+            Some("reasoning.text") => d.get("text").and_then(Value::as_str),
+            Some("reasoning.summary") => d.get("summary").and_then(Value::as_str),
+            _ => None,
+        })
+        .collect();
+    (!text.is_empty()).then_some(text)
+}
+
+/// `OpenRouter::Chat#extract_thinking_signature`: the first explicit detail signature, else the
+/// first `reasoning.encrypted` detail's `data`.
+fn openrouter_thinking_signature(data: &Value) -> Option<String> {
+    let details = data.get("reasoning_details")?.as_array()?;
+    details
+        .iter()
+        .find_map(|d| d.get("signature").and_then(Value::as_str))
+        .or_else(|| {
+            details
+                .iter()
+                .find(|d| d.get("type").and_then(Value::as_str) == Some("reasoning.encrypted") && d.get("data").is_some_and(Value::is_string))
+                .and_then(|d| d.get("data").and_then(Value::as_str))
+        })
+        .map(str::to_string)
 }
 
 /// `OpenRouter::Streaming#accumulate_raw_reasoning` (`providers/openrouter/streaming.rb`): each
@@ -714,10 +804,15 @@ pub fn build_chunk(provider: Provider, data: &Value) -> Message {
         citations = parse_root_citations(data);
     }
     m.citations = citations;
-    let text = block_thinking
-        .or_else(|| str_of(delta.get("reasoning_content")))
-        .or_else(|| str_of(delta.get("reasoning")));
-    m.thinking = Thinking::build(text, str_of(delta.get("reasoning_signature")));
+    m.thinking = if provider == Provider::OpenRouter {
+        // `OpenRouter::Streaming#build_chunk` reads thinking from the delta's reasoning fields only.
+        Thinking::build(openrouter_thinking_text(&delta), openrouter_thinking_signature(&delta))
+    } else {
+        let text = block_thinking
+            .or_else(|| str_of(delta.get("reasoning_content")))
+            .or_else(|| str_of(delta.get("reasoning")));
+        Thinking::build(text, str_of(delta.get("reasoning_signature")))
+    };
     if let Ok(calls) = parse_tool_calls(delta.get("tool_calls"), false, true, None)
         && !calls.is_empty() {
             m.tool_calls = Some(calls.into_iter().collect());

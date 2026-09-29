@@ -29,7 +29,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use serde_json::{Map, Value, json};
-use tracing::Instrument as _;
 
 use crate::config::Config;
 use crate::cost::Cost;
@@ -123,13 +122,14 @@ impl Event {
         if let Some(e) = error {
             self.set("exception", || json!([format!("{:?}", e.kind()), e.to_string()]));
         }
-        self.emit(Some(self.started.elapsed()));
+        let elapsed = self.started.elapsed();
+        self.emit(Some(elapsed));
     }
 
     fn emit(self, duration: Option<Duration>) {
         tracing::debug!(parent: &self.span, event = %self.name, duration_ms = duration.map(|d| d.as_secs_f64() * 1000.0), "rust_llm event");
         if let (Some(instrumenter), Some(payload)) = (&self.config.instrumenter, &self.payload) {
-            instrumenter.instrument(&self.name, payload, duration);
+            Instrumenter::instrument(&**instrumenter, &self.name, payload, duration);
         }
     }
 }
@@ -143,7 +143,7 @@ pub async fn instrument<T>(
     future: impl Future<Output = crate::Result<T>>,
 ) -> crate::Result<T> {
     let event = Event::start(config, name, || payload);
-    let result = future.instrument(event.span()).await;
+    let result = tracing::Instrument::instrument(future, event.span()).await;
     event.finish(result.as_ref().err());
     result
 }

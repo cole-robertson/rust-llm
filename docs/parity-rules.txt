@@ -19,11 +19,7 @@ protocols/invoke_model*	N/A	provider not ported: Bedrock (InvokeModel protocol)
 protocols/invoke_model/**/*	N/A	provider not ported: Bedrock (InvokeModel protocol)
 protocols/vertexai/**/*	N/A	provider not ported: Vertex AI
 # ---- protocols of ported providers that the port does not have ----
-protocols/interactions_spec.rb	MISSING	feature absent: Gemini Interactions chat protocol (only its transcription is ported)
-protocols/interactions/tools_spec.rb	MISSING	feature absent: Gemini Interactions chat protocol
-protocols/mistral/conversations_spec.rb	MISSING	feature absent: Mistral Conversations protocol
-protocols/mistral/conversations_live_spec.rb	MISSING	feature absent: Mistral Conversations protocol
-protocols/mistral/multi_completion_spec.rb	MISSING	feature absent: Mistral multi-completion (hosted tools in Chat Completions)
+protocols/interactions_spec.rb:212	N/A	provider not ported: Vertex AI (file_search alias through Vertex AI Search)
 protocols/system_one_spec.rb	MISSING	System One judgments ported in judge.rs; these protocol-level cases have no unit tests
 protocols/system_one_spec.rb:34	PORTED	tests/judgments.rs::judges_all_three_question_types_through_the_compact_dsl (request body JSON-equal)
 protocols/system_one_spec.rb:42	PORTED	tests/judgments.rs::preserves_structured_descriptions_and_arbitrary_choice_names
@@ -627,7 +623,7 @@ chat_schema_spec.rb:132	MISSING	no test that name wins over title
 chat_schema_spec.rb:143	PORTED	tests/spec_chat_options.rs::with_schema_names_an_unnamed_schema
 chat_schema_spec.rb:150	PORTED	tests/spec_chat_options.rs::with_schema_falls_back_to_a_generic_name
 chat_schema_spec.rb:178	N/A	Rust type system: content is Option<String>, never auto-parsed; parsed() is on demand
-chat_schema_spec.rb:257	MISSING	no replay of complex nested schema structured output
+chat_schema_spec.rb:257	N/A	provider not ported: test_model is the first of openai/gemini/bedrock in CHAT_MODELS, which is Bedrock; no cassette recorded for any ported provider
 chat_spec.rb:17	PORTED	tests/cassette_replay.rs::basic_conversation
 chat_spec.rb:26	PORTED	tests/cassette_replay.rs::raw_responses
 chat_spec.rb:37	PORTED	tests/cassette_replay.rs::multi_turn_conversation
@@ -1122,8 +1118,6 @@ protocols/gemini/chat_spec.rb:353	MISSING	no test: SAFETY -> content_filter
 protocols/gemini/chat_spec.rb:372	MISSING	no test: thought-only parts excluded from content
 protocols/gemini/chat_spec.rb:396	MISSING	no test: mixed thought/text split
 protocols/gemini/chat_spec.rb:421	MISSING	no test: cachedContentTokenCount usage
-protocols/gemini/embedding_batches_spec.rb	MISSING	feature absent: Gemini embedding batches (batch.rs errors 'not supported yet')
-protocols/gemini/embedding_batches_spec.rb:140	OWNED	lane H: leftover cassette protocols_gemini_embeddingbatches_* (feature absent)
 protocols/gemini/embeddings_spec.rb:9	PORTED	crates/rust_llm/tests/cassette_replay_more.rs::embeds_multiple_texts
 protocols/gemini/embeddings_spec.rb:20	MISSING	feature absent: taskType/title
 protocols/gemini/embeddings_spec.rb:48	MISSING	no test: provider_options override Gemini embed requests
@@ -1232,7 +1226,6 @@ protocols/gpustack/tokenization_spec.rb:14	MISSING	no test: GPUStack /tokenize r
 protocols/gpustack/tokenization_spec.rb:29	PORTED	crates/rust_llm/src/tokenization.rs::tests::gpustack_needs_a_model_proxy_base
 protocols/gpustack/tokenization_spec.rb:37	MISSING	no test: tokenization ignores responses protocol
 protocols/gpustack/videos_spec.rb	OWNED	lane E: GPUStack video generation
-protocols/openrouter/batches_spec.rb	MISSING	feature absent: OpenRouter batches
 protocols/openrouter/responses_spec.rb:23	PORTED	crates/rust_llm/tests/protocols_replay.rs::openrouter_executes_a_hosted_shell
 protocols/openrouter/responses_spec.rb:37	MISSING	no test: OpenRouter chat stays on CC by default
 protocols/openrouter/responses_spec.rb:46	PORTED	crates/rust_llm/src/provider_tools.rs::tests::openrouter_mcp_must_opt_out_of_approval
@@ -1263,8 +1256,6 @@ protocols/perplexity/agent_spec.rb:209	MISSING	no test; Rust sends PDFs as input
 protocols/perplexity/files_spec.rb:12	MISSING	no test: generated file bound to response
 protocols/perplexity/files_spec.rb:19	MISSING	no test: find/download bound file
 protocols/perplexity/files_spec.rb:29	PORTED	crates/rust_llm/src/files.rs::tests::perplexity_ids_must_name_their_response (URL/traversal cases untested)
-protocols/perplexity/router_spec.rb	MISSING	feature absent: Perplexity Router protocol
-protocols/perplexity/router_spec.rb:122	OWNED	lane H: leftover cassette protocols_perplexity_router_* (feature absent)
 protocols/responses/approvals_spec.rb:19	PORTED	crates/rust_llm/tests/remote_mcp.rs::openai_executes_a_remote_read_only_tool_after_approval_using_stateless_continuation
 protocols/responses/approvals_spec.rb:28	MISSING	no test: object arguments on approval request
 protocols/responses/approvals_spec.rb:34	MISSING	no test: approval without server_label
@@ -1360,7 +1351,6 @@ providers/vertexai/embeddings_spec.rb	N/A	provider not ported: Vertex AI
 providers/vertexai/gemini/batches_spec.rb	N/A	provider not ported: Vertex AI
 providers/vertexai/videos_spec.rb	N/A	provider not ported: Vertex AI
 research_job_spec.rb	N/A	provider not ported: Vertex AI (ResearchJob drives the Vertex Research protocol only)
-protocols/mistral/conversations/images_spec.rb	MISSING	feature absent: Mistral Conversations protocol (image paint + file download)
 # ---- active_record/* vs crates/rust_llm_loco ----
 active_record/acts_as_action_text_spec.rb	N/A	Ruby-only: ActionText rich text / blob preloading internals
 active_record/attachment_helpers_spec.rb	N/A	Ruby-only: ActiveStorage/ActionText attachment helper internals
@@ -1412,7 +1402,7 @@ active_record/chat_methods_server_approval_spec.rb	OWNED	lane H: remote MCP appr
 active_record/chat_methods_thinking_replay_spec.rb:20	OWNED	lane H: multi-block Anthropic thinking replay after reload untested
 active_record/chat_methods_thinking_replay_spec.rb:36	N/A	provider not ported: Bedrock (Converse)
 active_record/chat_methods_thinking_replay_spec.rb:53	OWNED	lane H: persisted Gemini signature dropped on provider switch untested
-active_record/mcp_credential_spec.rb	MISSING	feature absent: MCP OAuth credential store
+active_record/mcp_credential_spec.rb	PORTED	crates/rust_llm_loco/tests/spec_mcp_credential.rs (each example cites its line)
 active_record/message_methods_spec.rb:17	MISSING	no test for tool_error_message (generated message_model.rs template)
 active_record/message_methods_spec.rb:22	MISSING	no test for tool_error_message on JSON string content
 active_record/message_methods_spec.rb:27	PORTED	crates/rust_llm/tests/spec_values.rs::message_parsed_reads_json
@@ -1756,7 +1746,7 @@ mcp_spec.rb:489	N/A	Ruby-only: class inheritance of the transport
 mcp_spec.rb:496	PORTED	crates/rust_llm/tests/mcp.rs::speaks_through_the_transport_it_is_given_and_closes_it
 mcp_spec.rb:504	N/A	Rust type system: Mcp::transport(name, transport) requires a name
 mcp_spec.rb:510	PORTED	crates/rust_llm/tests/mcp.rs::names_itself_after_its_server
-mcp_spec.rb:518	MISSING	feature absent: MCP OAuth settings (prefix alone is ported)
+mcp_spec.rb:518	PORTED	crates/rust_llm/tests/spec_mcp_oauth.rs::accepts_a_prefix_and_oauth_settings
 mcp_spec.rb:526	N/A	Rust type system: builder methods, no settings hash
 mcp_spec.rb:531	PORTED	crates/rust_llm/tests/mcp.rs::names_itself_after_its_server
 mcp/client_spec.rb:13	PORTED	crates/rust_llm/tests/mcp.rs::a_modern_server_is_discovered_and_gets_meta_with_every_request
@@ -1781,7 +1771,7 @@ mcp/http_spec.rb:125	PORTED	crates/rust_llm/tests/mcp.rs::http_closes_a_modern_s
 mcp/http_spec.rb:138	PORTED	crates/rust_llm/tests/mcp.rs::http_uses_a_result_sent_with_an_error_status_and_maps_401
 mcp/http_spec.rb:145	PORTED	crates/rust_llm/tests/mcp.rs::http_uses_a_result_sent_with_an_error_status_and_maps_401
 mcp/http_spec.rb:151	PORTED	crates/rust_llm/tests/mcp.rs::http_resolves_headers_on_every_request_and_mcp_inputs_reach_them
-mcp/oauth_spec.rb	MISSING	feature absent: MCP OAuth (PKCE, token refresh, credential stores)
+mcp/oauth_spec.rb	PORTED	crates/rust_llm/tests/spec_mcp_oauth.rs (each example cites its line)
 mcp/param_headers_spec.rb:10	PORTED	crates/rust_llm/src/mcp/param_headers.rs::tests::mirrors_marked_arguments_that_have_values
 mcp/param_headers_spec.rb:20	PORTED	crates/rust_llm/src/mcp/param_headers.rs::tests::rejects_tools_with_invalid_declarations
 mcp/resource_template_spec.rb	PORTED	crates/rust_llm/src/mcp/resource_template.rs::tests::expands_like_rubyllm
@@ -2045,7 +2035,6 @@ chat_pricing_spec.rb	MISSING	no test: a custom provider's own model prices, stre
 chat_request_options_spec.rb:25	MISSING	with_max_output_tokens takes i64; no clear
 chat_request_options_spec.rb:34	MISSING	with_provider_options has no clear (nil)
 chat_request_options_spec.rb:42	N/A	Rust type system: argument is required
-chat_spec.rb:84	MISSING	change model on the fly cassettes not replayed
 chat_spec.rb:157	MISSING	no Message#tool_results (conversation back-links)
 chat_tool_approval_spec.rb:100	N/A	Ruby-only: no bang aliases (respond_to?)
 configuration_spec.rb:23	N/A	Ruby-only: Configuration.options introspection

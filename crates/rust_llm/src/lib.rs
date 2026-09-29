@@ -46,9 +46,11 @@
 //! (`ask`, `ask_later`, `complete`, `step`, `with_tools`, `before_tool_call`, ...), with `?`-suffixed
 //! predicates spelled `is_*`.
 
+pub mod accounting;
 pub mod agent;
 pub mod attachment;
 pub mod batch;
+pub mod cached_content;
 pub mod chat;
 pub mod config;
 pub mod context;
@@ -57,6 +59,7 @@ pub mod embedding;
 pub mod error;
 pub mod files;
 pub mod image;
+pub mod instrumentation;
 pub mod judge;
 pub mod mcp;
 pub mod message;
@@ -65,6 +68,7 @@ pub mod models;
 pub mod moderation;
 pub mod ocr;
 pub mod progress;
+pub mod prompt;
 pub mod protocols;
 pub mod provider_tools;
 pub mod search_results;
@@ -78,9 +82,11 @@ pub mod tool;
 pub mod transcription;
 pub mod transport;
 pub mod video;
+pub mod workflow;
 
 pub use agent::Agent;
 pub use attachment::{Attachment, Resolution};
+pub use cached_content::{CacheOptions, CachedContent, Ttl, cache};
 pub use batch::{Batch, BatchResult, BatchStatus, EmbeddingRequest, batch, embed_later};
 pub use chat::{CancelHandle, Chat, Fallback, FallbackAttempt};
 pub use config::{Config, config, configure};
@@ -93,6 +99,9 @@ pub use judge::{Answer, Dynamic, Judge, JudgeOptions, Judgment, QuestionType, ju
 pub use image::{Image, Images, PaintOptions, paint};
 pub use mcp::{InputRequest, Mcp, McpResult, McpTool};
 pub use progress::Progress;
+pub use prompt::{Prompt, render_prompt};
+pub use instrumentation::{Instrumenter, instrument};
+pub use workflow::{Workflow, workflow};
 pub use provider_tools::ProviderTool;
 pub use search_results::SearchResults;
 pub use speech::{SpeakOptions, Speech, SpeechChunk, speak, speak_stream};

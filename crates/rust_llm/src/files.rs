@@ -609,6 +609,8 @@ fn auto_upload_rules(protocol: ProtocolName, provider: Provider) -> Option<AutoU
             purpose: Some("user_data"),
         }),
         ProtocolName::ChatCompletions => None,
+        // `Protocol#supports_provider_file_references?` is false for these.
+        ProtocolName::Interactions | ProtocolName::Conversations | ProtocolName::RouterChatCompletions => None,
     }
 }
 

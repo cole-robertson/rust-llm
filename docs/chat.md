@@ -239,7 +239,7 @@ chat.cache_until_here()?; // marks the last message as a cache boundary
 - `with_caching`, `with_citations`, `with_compaction`, `compact`, `with_end_user`, `count_tokens`.
   Citations that a provider returns anyway are still parsed into `message.citations`.
 - `with_context`: build the chat with `Chat::with_config` instead.
-- `with_model(nil)`, `with_temperature(nil)`: clear a setting by building a new chat.
+- `with_model(nil)` is `with_default_model()`; `with_temperature(None)`, `with_max_output_tokens(None)`, `with_provider_options(Value::Null)`, and `with_headers([])` clear a setting.
 - Prompt rendering from `app/prompts` (`RubyLLM.render_prompt`).
 - Perplexity's `router_chat_completions` protocol. `ProtocolName` has `ChatCompletions`,
   `Responses`, `Anthropic`, and `Gemini`.

@@ -37,6 +37,8 @@ Every Rust sample compiles: `docs/check` includes each guide as a doctest
 - [Agents](agents.md): reusable chat configurations.
 - [Batches](batches.md): provider batch APIs for chats and embeddings.
 - [Errors and Retries](errors-and-retries.md): error variants, fallbacks, automatic retries.
+- [Instrumentation and Workflows](instrumentation.md): `*.rust_llm` events and workflow context.
+- [Prompt Templates](prompts.md): prompts on disk, partials, and the ERB to Jinja mapping.
 
 ## Loco
 

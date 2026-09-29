@@ -7,6 +7,7 @@ use crate::chat::resolve_model;
 use crate::cost::{Cost, Tier};
 use crate::error::{Error, Result};
 use crate::model::Model;
+use crate::protocols::deep_merge;
 use crate::providers::Provider;
 use crate::tokens::Tokens;
 use crate::transport::Connection;
@@ -47,6 +48,18 @@ impl Embedding {
         Cost::new(&self.tokens(), self.model_info.as_ref(), Tier::Standard)
     }
 
+    /// `Embedding.new(vectors:, model:, input_tokens:)`, e.g. one Gemini batch embedding result.
+    pub(crate) fn new(vectors: Vectors, model: String, input_tokens: Option<i64>) -> Embedding {
+        Embedding {
+            model_info: crate::models::models().find(&model, None).ok(),
+            vectors,
+            model,
+            input_tokens,
+            reported_cost: None,
+            usage_entries: Vec::new(),
+        }
+    }
+
     /// `parse_embedding_response` for an OpenAI-compatible body, e.g. one line of a batch result.
     pub(crate) fn from_openai_body(body: &Value, single: bool) -> Embedding {
         let rows: Vec<Vec<f64>> =
@@ -64,6 +77,7 @@ impl Embedding {
 }
 
 /// Input for `embed`: one string or several, or `nil` when only `with:` attachments are embedded.
+#[derive(Debug, Clone, PartialEq)]
 pub enum EmbedInput {
     One(String),
     Many(Vec<String>),
@@ -105,6 +119,11 @@ pub struct EmbedOptions<'a> {
     /// `with:`: images, audio, video, or PDFs embedded together with the text, on providers
     /// whose embeddings accept media (Gemini, OpenRouter, GPUStack).
     pub with: Vec<Attachment>,
+    /// `task_type:`: the embedding task in the provider's vocabulary (Gemini's `taskType`,
+    /// OpenRouter's `input_type`); ignored by providers without one.
+    pub task_type: Option<&'a str>,
+    /// `provider_options:`: merged into the request as-is, overriding rendered fields.
+    pub provider_options: Value,
 }
 
 fn vectors_from(rows: Vec<Vec<f64>>, single: bool) -> Vectors {
@@ -130,14 +149,57 @@ fn floats(v: &Value) -> Vec<f64> {
     v.as_array().map(|a| a.iter().filter_map(Value::as_f64).collect()).unwrap_or_default()
 }
 
-/// `RubyLLM.embed(text, model:, provider:, dimensions:)`.
+/// `RubyLLM.embed(text, model:, provider:, dimensions:)`, inside an `embedding.rust_llm` event.
 pub async fn embed(input: impl Into<EmbedInput>, options: EmbedOptions<'_>) -> Result<Embedding> {
+    let input = input.into();
+    let config = options.config.clone().unwrap_or_else(crate::config);
+    let model_id = options.model.unwrap_or(&config.default_embedding_model).to_string();
+    let (model, provider) = resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let mut event = crate::instrumentation::Event::start(&config, "embedding.rust_llm", || {
+        let empty = Tokens::default();
+        crate::instrumentation::payload([
+            ("provider", provider.slug().into()),
+            ("provider_class", provider.display().into()),
+            ("model", model.id.clone().into()),
+            ("input", match &input {
+                EmbedInput::One(s) => s.clone().into(),
+                EmbedInput::Many(v) => serde_json::json!(v),
+                EmbedInput::Nil => Value::Null,
+            }),
+            ("dimensions", options.dimensions.into()),
+            ("task_type", options.task_type.into()),
+            ("attachment_count", options.with.len().into()),
+            ("provider_options", options.provider_options.clone()),
+            ("tokens", crate::instrumentation::tokens_h(&empty)),
+            ("cost", crate::instrumentation::cost_h(&Cost::new(&empty, Some(&model), Tier::Standard))),
+        ])
+    });
+    let result = tracing::Instrument::instrument(embed_inner(input, options), event.span()).await;
+    if let Ok(e) = &result {
+        event.set("result", || serde_json::json!({ "model": e.model, "vectors": match &e.vectors {
+            Vectors::Single(v) => serde_json::json!(v),
+            Vectors::Batch(v) => serde_json::json!(v),
+        } }));
+        event.set("response_model", || e.model.clone().into());
+        event.set("tokens", || crate::instrumentation::tokens_h(&e.tokens()));
+        event.set("cost", || crate::instrumentation::cost_h(&e.cost()));
+        let (dimensions, count) = match &e.vectors {
+            Vectors::Single(v) => (v.len(), 1),
+            Vectors::Batch(v) => (v.first().map_or(0, Vec::len), v.len()),
+        };
+        event.set("embedding_dimensions", || dimensions.into());
+        event.set("embedding_count", || count.into());
+    }
+    event.finish(result.as_ref().err());
+    result
+}
+
+async fn embed_inner(input: EmbedInput, options: EmbedOptions<'_>) -> Result<Embedding> {
     let config = options.config.clone().unwrap_or_else(crate::config);
     let model_id = options.model.unwrap_or(&config.default_embedding_model).to_string();
     let (model, provider) = resolve_model(&model_id, options.provider, options.assume_model_exists)?;
     provider.ensure_configured(&config)?;
     let connection = Connection::new(provider, config.clone())?;
-    let input = input.into();
     let single = !matches!(input, EmbedInput::Many(_));
     let text = match &input {
         EmbedInput::One(s) => Some(s.as_str()),
@@ -159,9 +221,13 @@ pub async fn embed(input: impl Into<EmbedInput>, options: EmbedOptions<'_>) -> R
             return Err(Error::Argument("embed one text at a time when embedding attachments".into()));
         }
         for a in &mut attachments {
-            a.load(connection.client()).await?;
+            // `OpenRouter::Embeddings` passes image URLs through untouched; everything else is inlined.
+            if !(provider == Provider::OpenRouter && a.is_url() && a.kind() == AttachmentType::Image) {
+                a.load(connection.client()).await?;
+            }
         }
     }
+    let provider_options = options.provider_options.as_object().cloned().unwrap_or_default();
 
     let (path, payload) = match provider {
         // `Gemini::Embeddings#media_embedding_payload`.
@@ -173,7 +239,12 @@ pub async fn embed(input: impl Into<EmbedInput>, options: EmbedOptions<'_>) -> R
             if let Some(d) = options.dimensions {
                 r["outputDimensionality"] = d.into();
             }
-            (format!("models/{}:batchEmbedContents", model.id), json!({ "requests": [r] }))
+            if let Some(t) = options.task_type {
+                r["taskType"] = t.into();
+            }
+            let mut payload = json!({ "requests": [r] });
+            deep_merge(&mut payload, &Value::Object(provider_options));
+            (format!("models/{}:batchEmbedContents", model.id), payload)
         }
         Provider::Gemini => {
             let requests: Vec<Value> = texts
@@ -183,10 +254,15 @@ pub async fn embed(input: impl Into<EmbedInput>, options: EmbedOptions<'_>) -> R
                     if let Some(d) = options.dimensions {
                         r["outputDimensionality"] = d.into();
                     }
+                    if let Some(t) = options.task_type {
+                        r["taskType"] = t.into();
+                    }
                     r
                 })
                 .collect();
-            (format!("models/{}:batchEmbedContents", model.id), json!({ "requests": requests }))
+            let mut payload = json!({ "requests": requests });
+            deep_merge(&mut payload, &Value::Object(provider_options));
+            (format!("models/{}:batchEmbedContents", model.id), payload)
         }
         Provider::Anthropic => return Err(Error::Api("Anthropic doesn't support embeddings".into(), None)),
         _ => {
@@ -203,13 +279,23 @@ pub async fn embed(input: impl Into<EmbedInput>, options: EmbedOptions<'_>) -> R
                 payload["input"] = input;
             }
             if let Some(d) = options.dimensions {
-                payload["dimensions"] = d.into();
+                // `Mistral::Embeddings#render_embedding_payload` names it `output_dimension`.
+                let key = if provider == Provider::Mistral { "output_dimension" } else { "dimensions" };
+                payload[key] = d.into();
+            }
+            // `OpenRouter::Embeddings`: the task type is OpenRouter's `input_type`.
+            if provider == Provider::OpenRouter && let Some(t) = options.task_type {
+                payload["input_type"] = t.into();
             }
             // `GPUStack::Embeddings`: media goes as a chat-style user message instead of `input`.
             if provider == Provider::GPUStack && !attachments.is_empty() {
                 payload.as_object_mut().map(|p| p.remove("input"));
                 let content = crate::protocols::chat_completions::format_content(provider, text, &attachments)?;
                 payload["messages"] = json!([{ "role": "user", "content": content }]);
+            }
+            // `.merge(provider_options)`: provider options replace top-level keys.
+            if let Some(p) = payload.as_object_mut() {
+                p.extend(provider_options);
             }
             // `Perplexity::Embeddings#embedding_url`: embeddings stay off the Agent API.
             let path = if provider == Provider::Perplexity { "v1/embeddings" } else { "embeddings" };

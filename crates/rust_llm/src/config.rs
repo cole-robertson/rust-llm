@@ -34,9 +34,27 @@ pub struct Config {
     pub retry_backoff_factor: f64,
     pub retry_interval_randomness: f64,
     pub retry_max_interval: f64,
+    /// `http_proxy`: proxy URL for every request (`Connection.basic` and provider connections).
+    pub http_proxy: Option<String>,
     pub tool_concurrency: bool,
     /// `auto_upload_large_files`: upload oversized local attachments to the provider's Files API.
     pub auto_upload_large_files: bool,
+    /// `instrumenter`: receives every `*.rust_llm` event (`rust_llm::instrumentation`).
+    pub instrumenter: Option<Arc<dyn crate::instrumentation::Instrumenter>>,
+    /// `model_registry_file`: where `Models::refresh` saves the registry and where the registry
+    /// loads from before falling back to the bundled copy. `None` keeps it in memory only.
+    pub model_registry_file: Option<std::path::PathBuf>,
+    /// `Prompt.roots`: the directories `render_prompt` searches after `app/prompts`, in order.
+    pub prompt_roots: Vec<std::path::PathBuf>,
+    /// `mcp_credential_store`: where MCP OAuth credentials live. `None` keeps them in memory;
+    /// `rust_llm_loco::McpCredentialStore` keeps them in `rust_llm_mcp_credentials`.
+    pub mcp_credential_store: Option<Arc<dyn crate::mcp::CredentialStore>>,
+    /// `mcp_client_name`: the client name given when registering with an MCP server's
+    /// authorization server. RubyLLM says `"RubyLLM"`; the port says `"RustLLM"`.
+    pub mcp_client_name: String,
+    /// `mcp_client_id`: the HTTPS URL of your OAuth client metadata document, used instead of
+    /// registering by authorization servers that support client ID metadata documents.
+    pub mcp_client_id: Option<String>,
     values: HashMap<String, String>,
 }
 
@@ -77,8 +95,15 @@ impl Default for Config {
             retry_backoff_factor: 2.0,
             retry_interval_randomness: 0.5,
             retry_max_interval: 30.0,
+            http_proxy: None,
             tool_concurrency: false,
             auto_upload_large_files: true,
+            instrumenter: None,
+            model_registry_file: crate::models::registry::cache_path(),
+            prompt_roots: Vec::new(),
+            mcp_credential_store: None,
+            mcp_client_name: "RustLLM".into(),
+            mcp_client_id: None,
             values: HashMap::new(),
         }
     }
@@ -143,4 +168,10 @@ pub fn configure(f: impl FnOnce(&mut Config)) {
 /// `RubyLLM.config`.
 pub fn config() -> Arc<Config> {
     CONFIG.read().unwrap().clone() // poisoned lock only
+}
+
+/// The configuration, or `None` while `configure` holds it (so loading the model registry from
+/// inside a `configure` closure falls back to the bundled copy instead of deadlocking).
+pub(crate) fn try_config() -> Option<Arc<Config>> {
+    CONFIG.try_read().ok().map(|c| c.clone())
 }

@@ -21,12 +21,23 @@ const LOOPBACK_HOSTS: &[&str] = &["localhost", "127.0.0.1", "[::1]", "::1"];
 /// Headers sent with every request, resolved per request (`headers: -> { ... }`).
 pub type HeaderSource = Arc<dyn Fn() -> Vec<(String, String)> + Send + Sync>;
 
+/// The OAuth side of `HTTP.new(headers:, unauthorized:)`: the `Authorization` header, resolved
+/// per request (refreshing an expiring token), and the `unauthorized` callback, which receives
+/// the `WWW-Authenticate` header and status of a 401 or 403 and returns whether a 401 is worth
+/// one retry.
+#[async_trait]
+pub trait Authorization: Send + Sync {
+    async fn authorization(&self) -> Result<Option<String>>;
+    async fn unauthorized(&self, www_authenticate: Option<&str>, status: u16) -> bool;
+}
+
 /// `RubyLLM::MCP::HTTP`.
 pub struct Http {
     url: reqwest::Url,
     headers: HeaderSource,
     client: reqwest::Client,
     session: Mutex<Option<String>>,
+    authorization: Option<Arc<dyn Authorization>>,
 }
 
 impl Http {
@@ -37,6 +48,11 @@ impl Http {
             return false;
         }
         url.scheme() == "https" || (url.scheme() == "http" && url.host_str().is_some_and(|h| LOOPBACK_HOSTS.contains(&h)))
+    }
+
+    /// `HTTP.loopback?`.
+    pub fn is_loopback(url: &str) -> bool {
+        reqwest::Url::parse(url).ok().is_some_and(|u| u.host_str().is_some_and(|h| LOOPBACK_HOSTS.contains(&h)))
     }
 
     /// Raises `Error::Argument` for insecure URLs, like `HTTP.new`.
@@ -50,7 +66,13 @@ impl Http {
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|e| Error::Configuration(e.to_string()))?;
-        Ok(Http { url, headers, client, session: Mutex::new(None) })
+        Ok(Http { url, headers, client, session: Mutex::new(None), authorization: None })
+    }
+
+    /// `unauthorized:`: OAuth for this server (see [`Authorization`]).
+    pub fn with_authorization(mut self, authorization: Arc<dyn Authorization>) -> Http {
+        self.authorization = Some(authorization);
+        self
     }
 
     fn host(&self) -> String {
@@ -67,6 +89,7 @@ impl Http {
         }
     }
 
+    /// `post(..., retried:)`: a 401 the `unauthorized` callback fixes is sent once more.
     async fn post(
         &self,
         message: &Value,
@@ -75,6 +98,39 @@ impl Http {
         params: &[(String, String)],
         on_notification: &mut OnNotification<'_>,
     ) -> Result<Vec<Value>> {
+        let mut retried = false;
+        loop {
+            match self.post_once(message, version, timeout, params, on_notification).await? {
+                Ok(replies) => return Ok(replies),
+                Err((status, challenge, error)) => {
+                    if !self.is_reauthorized(status, challenge.as_deref(), retried).await {
+                        return Err(error);
+                    }
+                    retried = true;
+                }
+            }
+        }
+    }
+
+    /// `reauthorized?`: a 403 only reports its challenge; a first 401 retries when refreshed.
+    async fn is_reauthorized(&self, status: u16, challenge: Option<&str>, retried: bool) -> bool {
+        let Some(authorization) = &self.authorization else { return false };
+        if !(status == 403 || (status == 401 && !retried)) {
+            return false;
+        }
+        authorization.unauthorized(challenge, status).await && status == 401
+    }
+
+    /// One POST: the replies, or the status, `WWW-Authenticate` header, and error of a failure.
+    #[allow(clippy::type_complexity)]
+    async fn post_once(
+        &self,
+        message: &Value,
+        version: Option<&str>,
+        timeout: Option<Duration>,
+        params: &[(String, String)],
+        on_notification: &mut OnNotification<'_>,
+    ) -> Result<std::result::Result<Vec<Value>, (u16, Option<String>, Error)>> {
         let method = message.get("method").and_then(Value::as_str).unwrap_or("");
         let mut request = self
             .client
@@ -96,6 +152,11 @@ impl Http {
         for (key, value) in (self.headers)() {
             request = request.header(key, value);
         }
+        if let Some(authorization) = &self.authorization
+            && let Some(value) = authorization.authorization().await?
+        {
+            request = request.header("Authorization", value);
+        }
         for (key, value) in params {
             if let Some(value) = header_value(value) {
                 request = request.header(format!("Mcp-Param-{key}"), value);
@@ -108,6 +169,7 @@ impl Http {
             if e.is_timeout() { Error::Timeout(e.to_string()) } else { Error::ConnectionFailed(e.to_string()) }
         })?;
         let status = response.status().as_u16();
+        let challenge = response.headers().get("www-authenticate").and_then(|v| v.to_str().ok()).map(str::to_string);
         if method == "initialize" {
             let session = response.headers().get("mcp-session-id").and_then(|v| v.to_str().ok()).map(str::to_string);
             self.set_session(session);
@@ -123,9 +185,9 @@ impl Http {
         }
         let replies = stream.replies(on_notification);
         if (200..300).contains(&status) || answered(&replies, message) {
-            return Ok(replies);
+            return Ok(Ok(replies));
         }
-        Err(self.failure(status, &stream.body, &replies))
+        Ok(Err((status, challenge, self.failure(status, &stream.body, &replies))))
     }
 
     fn failure(&self, status: u16, body: &str, replies: &[Value]) -> Error {

@@ -1,5 +1,11 @@
 //! Port of `lib/ruby_llm/models.rb`, `models/lookup.rb`, and `models/aliases.rb`: the bundled
-//! registry, alias resolution, and provider preference.
+//! registry, alias resolution, and provider preference. Refreshing lives in
+//! [`mod@refresh`], registry files in [`registry`].
+
+pub mod refresh;
+pub mod registry;
+
+pub use refresh::{ProviderFailure, last_provider_failures, list_models, refresh, refresh_from_providers};
 
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, RwLock};
@@ -18,10 +24,26 @@ pub const PROVIDER_PREFERENCE: &[&str] = &[
 static BUNDLED_MODELS: &str = include_str!("../data/models.json");
 static BUNDLED_ALIASES: &str = include_str!("../data/aliases.json");
 
-static REGISTRY: LazyLock<RwLock<Arc<Models>>> = LazyLock::new(|| {
-    let models: Vec<Model> = serde_json::from_str(BUNDLED_MODELS).expect("bundled models.json parses");
-    RwLock::new(Arc::new(Models::new(models)))
-});
+static REGISTRY: LazyLock<RwLock<Arc<Models>>> = LazyLock::new(|| RwLock::new(Arc::new(Models::new(load_models()))));
+
+/// `Models.load_models`: the configured `model_registry_file` when it holds models, else the
+/// bundled registry. An unreadable file is ignored with a warning, as Ruby does.
+pub fn load_models() -> Vec<Model> {
+    let file = crate::config::try_config().and_then(|c| c.model_registry_file.clone());
+    if let Some(file) = file {
+        match registry::read(&file) {
+            Ok(Some(models)) if !models.is_empty() => return models,
+            Ok(_) => {}
+            Err(e) => tracing::warn!("Ignoring invalid model registry file {}: {e}", file.display()),
+        }
+    }
+    bundled_models()
+}
+
+/// `Models.models_from_bundle`.
+pub fn bundled_models() -> Vec<Model> {
+    serde_json::from_str(BUNDLED_MODELS).expect("bundled models.json parses")
+}
 
 static ALIASES: LazyLock<HashMap<String, Map<String, Value>>> =
     LazyLock::new(|| serde_json::from_str(BUNDLED_ALIASES).expect("bundled aliases.json parses"));
@@ -50,6 +72,34 @@ impl Models {
     /// Replaces the process-wide registry, e.g. after refreshing from providers.
     pub fn install(models: Vec<Model>) {
         *REGISTRY.write().unwrap() = Arc::new(Models::new(models)); // poisoned lock only
+    }
+
+    /// `Models#load_from_json`: the models in `file` (the configured `model_registry_file` when
+    /// `None`), or the bundled registry when it is missing or invalid.
+    pub fn load_from_json(file: Option<&std::path::Path>) -> Models {
+        let configured = crate::config().model_registry_file.clone();
+        let models = file.or(configured.as_deref()).and_then(|f| match registry::read(f) {
+            Ok(models) => models.filter(|m| !m.is_empty()),
+            Err(e) => {
+                tracing::warn!("Ignoring invalid model registry file {}: {e}", f.display());
+                None
+            }
+        });
+        Models::new(models.unwrap_or_else(bundled_models))
+    }
+
+    /// `Models#save_to_json`: writes the listed models to `file` (the configured
+    /// `model_registry_file` when `None`) as pretty-printed JSON.
+    pub fn save_to_json(&self, file: Option<&std::path::Path>) -> Result<&Self> {
+        let configured = crate::config().model_registry_file.clone();
+        let path = file.or(configured.as_deref()).ok_or_else(|| Error::ModelRegistry("A model registry file path is required".into()))?;
+        registry::FileStore::new(path)?.write(&self.all(), None)?;
+        Ok(self)
+    }
+
+    /// Every model, including unlisted ones (`all_including_unlisted`).
+    pub fn all_including_unlisted(&self) -> &[Model] {
+        &self.models
     }
 
     /// Listed models (`Models#all`).
@@ -116,7 +166,7 @@ fn not_found(model_id: &str, provider: Option<&str>) -> Error {
         message = format!("{message} for provider: {p:?}");
     }
     Error::ModelNotFound(format!(
-        "{message}. If the model exists at the provider, refresh the registry with `rust_llm::models::refresh`."
+        "{message}. If the model exists at the provider, refresh the registry with `rust_llm::models::refresh(false).await`."
     ))
 }
 

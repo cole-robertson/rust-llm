@@ -151,6 +151,9 @@ pub(crate) fn resolve(protocol: ProtocolName, provider: Provider, entries: &[Pro
     if protocol == ProtocolName::Responses && provider == Provider::OpenRouter {
         check_openrouter_mcp(&resolution.tools)?;
     }
+    if protocol == ProtocolName::Responses && provider == Provider::GPUStack {
+        resolution.tools = gpustack_mcp_tools(std::mem::take(&mut resolution.tools))?;
+    }
     Ok(Some(resolution))
 }
 
@@ -193,6 +196,9 @@ fn aliases(protocol: ProtocolName, provider: Provider) -> Option<Table> {
         (ProtocolName::ChatCompletions, Provider::OpenRouter) => Some(openrouter_chat_completions),
         (ProtocolName::ChatCompletions, Provider::Mistral) => Some(mistral_multi_completion),
         (ProtocolName::ChatCompletions, _) => None,
+        (ProtocolName::Interactions, _) => Some(interactions),
+        (ProtocolName::Conversations, _) => Some(mistral_conversations),
+        (ProtocolName::RouterChatCompletions, _) => None,
     }
 }
 
@@ -348,9 +354,103 @@ fn gpustack_mcp_alias(options: &Map<String, Value>, label: &str, tools: Option<&
     Ok(Entry { tool: Some(definition), ..Default::default() })
 }
 
+const GPUSTACK_MCP_LABELS: &[&str] = &["web_search_preview", "code_interpreter", "container"];
+
+/// `Protocols::GPUStack::Responses#merge_server_tool_entries`: every MCP entry is validated
+/// against the servers vLLM has configured, then entries for the same server combine their
+/// `allowed_tools`, so vLLM cannot let one overwrite the other.
+fn gpustack_mcp_tools(tools: Vec<Value>) -> Result<Vec<Value>> {
+    let is_mcp = |t: &Value| t.get("type").and_then(Value::as_str) == Some("mcp");
+    for tool in tools.iter().filter(|t| is_mcp(t)) {
+        validate_gpustack_mcp(tool)?;
+    }
+    let mut merged: Vec<Value> = Vec::new();
+    for tool in tools {
+        let label = tool.get("server_label");
+        let existing = if is_mcp(&tool) { merged.iter_mut().find(|e| is_mcp(e) && e.get("server_label") == label) } else { None };
+        match existing {
+            None => merged.push(tool),
+            Some(existing) if *existing == tool => {}
+            Some(existing) => merge_gpustack_mcp_filter(existing, &tool)?,
+        }
+    }
+    Ok(merged)
+}
+
+/// `merge_mcp_filter`: only entries that differ in nothing but explicit tool-name lists combine.
+fn merge_gpustack_mcp_filter(existing: &mut Value, tool: &Value) -> Result<()> {
+    let without_filter = |t: &Value| {
+        let mut t = t.clone();
+        if let Some(o) = t.as_object_mut() {
+            o.remove("allowed_tools");
+        }
+        t
+    };
+    let explicit = |t: &Value| {
+        t.get("allowed_tools").and_then(Value::as_array).is_some_and(|names| !names.iter().any(|n| n.as_str() == Some("*")))
+    };
+    if without_filter(existing) != without_filter(tool) || !explicit(existing) || !explicit(tool) {
+        return Err(Error::Argument("Combine GPUStack MCP settings for each server in one entry with explicit tool names".into()));
+    }
+    if let (Some(Value::Array(names)), Some(Value::Array(more))) = (existing.get_mut("allowed_tools"), tool.get("allowed_tools")) {
+        for name in more {
+            if !names.contains(name) {
+                names.push(name.clone());
+            }
+        }
+    }
+    Ok(())
+}
+
+/// `validate_mcp_tool`.
+fn validate_gpustack_mcp(tool: &Value) -> Result<()> {
+    let present = |k: &str| tool.get(k).is_some_and(|v| !v.is_null() && *v != Value::Bool(false));
+    if tool.get("require_approval").and_then(Value::as_str) != Some("never") {
+        return Err(Error::Argument("GPUStack MCP requires explicit require_approval: 'never'; vLLM has no approval events".into()));
+    }
+    if present("server_url") || present("connector_id") || present("authorization") {
+        return Err(Error::Argument("GPUStack MCP uses servers configured on vLLM, not per-request URLs or connectors".into()));
+    }
+    if !tool.get("server_label").and_then(Value::as_str).is_some_and(|l| GPUSTACK_MCP_LABELS.contains(&l)) {
+        return Err(Error::Argument(format!(
+            "GPUStack MCP name must match a configured vLLM label: {}",
+            GPUSTACK_MCP_LABELS.join(", ")
+        )));
+    }
+    if tool.pointer("/allowed_tools/read_only").is_some_and(|v| !v.is_null() && *v != Value::Bool(false)) {
+        return Err(Error::Argument("vLLM filters MCP tools by name, not by read_only; use allowed_tools: [name]".into()));
+    }
+    Ok(())
+}
+
 /// `Protocols::Mistral::MultiCompletion::SERVER_TOOL_ALIASES`.
 fn mistral_multi_completion(name: &str) -> Option<Spec> {
     match name {
+        "image_generation" => tool(json!({ "type": "image_generation" })),
+        "mcp" => tool(json!({ "type": "connector" })),
+        _ => None,
+    }
+}
+
+/// `Protocols::Interactions::SERVER_TOOL_ALIASES`: options merge into the tool entry.
+fn interactions(name: &str) -> Option<Spec> {
+    match name {
+        "mcp" => tool(json!({ "type": "mcp_server" })),
+        "web_search" => tool(json!({ "type": "google_search" })),
+        "web_fetch" => tool(json!({ "type": "url_context" })),
+        "code_execution" => tool(json!({ "type": "code_execution" })),
+        "file_search" => tool(json!({ "type": "file_search" })),
+        "google_maps" => tool(json!({ "type": "google_maps" })),
+        _ => None,
+    }
+}
+
+/// `Protocols::Mistral::Conversations::SERVER_TOOL_ALIASES`.
+fn mistral_conversations(name: &str) -> Option<Spec> {
+    match name {
+        "web_search" | "web_fetch" => tool(json!({ "type": "web_search" })),
+        "code_execution" => tool(json!({ "type": "code_interpreter" })),
+        "file_search" => tool(json!({ "type": "document_library" })),
         "image_generation" => tool(json!({ "type": "image_generation" })),
         "mcp" => tool(json!({ "type": "connector" })),
         _ => None,

@@ -7,6 +7,8 @@
 pub mod anthropic;
 pub mod chat_completions;
 pub mod gemini;
+pub mod interactions;
+pub mod mistral;
 pub mod responses;
 
 use serde_json::{Map, Value};
@@ -174,6 +176,85 @@ pub fn render(protocol: ProtocolName, req: &Request) -> Result<Value> {
         ProtocolName::Responses => responses::render_payload(req),
         ProtocolName::Anthropic => anthropic::render_payload(req),
         ProtocolName::Gemini => gemini::render_payload(req),
+        ProtocolName::Interactions => interactions::render_payload(req),
+        ProtocolName::Conversations => mistral::render_payload(req),
+        ProtocolName::RouterChatCompletions => router_render_payload(req),
+    }
+}
+
+/// `Protocols::Perplexity::Router`: the base Chat Completions wire format (not Perplexity's
+/// Sonar dialect), which only accepts strict schemas and MP3 or WAV audio. OpenAI speaks the
+/// base format, so it stands in for the dialect; its one OpenAI-only field is renamed back.
+fn router_render_payload(req: &Request) -> Result<Value> {
+    if req.schema.is_some_and(|s| s.strict == Some(false)) {
+        return Err(Error::Argument("Perplexity Router requires strict structured output".into()));
+    }
+    for a in req.messages.iter().filter(|m| !m.is_tool_result()).flat_map(|m| m.attachments.iter()) {
+        if a.kind() == crate::attachment::AttachmentType::Audio && !["mp3", "wav"].contains(&a.format().as_str()) {
+            return Err(Error::UnsupportedAttachment(anthropic::unsupported(&a.mime_type)));
+        }
+    }
+    let strict = req.schema.map(|s| Schema { strict: Some(true), ..s.clone() });
+    let base = Request { provider: Provider::OpenAI, schema: strict.as_ref(), ..*req };
+    let mut payload = chat_completions::render_payload(&base)?;
+    if let Some(p) = payload.as_object_mut()
+        && let Some(max) = p.remove("max_completion_tokens")
+    {
+        p.insert("max_tokens".into(), max);
+    }
+    Ok(payload)
+}
+
+/// What a protocol's `render` does after `super` (provider options, provider tools, and
+/// `before_request` hooks applied): Mistral Conversations deduplicates its tools and refuses
+/// hosted confirmations; Perplexity Router rejects options and tools it does not accept.
+pub(crate) fn finish_render(protocol: ProtocolName, payload: &mut Value) -> Result<()> {
+    match protocol {
+        ProtocolName::Conversations => mistral::finish_render(payload),
+        ProtocolName::RouterChatCompletions => validate_router(payload),
+        _ => Ok(()),
+    }
+}
+
+/// `Router#validate_router_options` and `#validate_router_tools`.
+fn validate_router(payload: &Value) -> Result<()> {
+    const REJECTED: &[&str] = &[
+        "seed", "logit_bias", "top_logprobs", "functions", "function_call", "modalities", "audio", "prediction",
+        "web_search_options", "moderation", "verbosity",
+    ];
+    let defaults = [
+        ("n", serde_json::json!(1)),
+        ("logprobs", serde_json::json!(false)),
+        ("store", serde_json::json!(false)),
+        ("presence_penalty", serde_json::json!(0)),
+        ("frequency_penalty", serde_json::json!(0)),
+    ];
+    let Some(p) = payload.as_object() else { return Ok(()) };
+    let mut unsupported: Vec<&str> = p.keys().map(String::as_str).filter(|k| REJECTED.contains(k)).collect();
+    for (key, default) in &defaults {
+        if p.get(*key).is_some_and(|v| !json_eq(v, default)) {
+            unsupported.push(key);
+        }
+    }
+    if p.get("stream_options").and_then(|o| o.get("include_obfuscation")).is_some_and(|v| !v.is_null() && *v != Value::Bool(false)) {
+        unsupported.push("include_obfuscation");
+    }
+    if !unsupported.is_empty() {
+        return Err(Error::Argument(format!("Perplexity Router does not support these options: {}", unsupported.join(", "))));
+    }
+    // A Rust tool always has a description string; an empty one is the absent description here.
+    let described = |t: &Value| t.pointer("/function/description").and_then(Value::as_str).is_some_and(|d| !d.is_empty());
+    if !p.get("tools").and_then(Value::as_array).into_iter().flatten().all(described) {
+        return Err(Error::Argument("Perplexity Router function tools require a description".into()));
+    }
+    Ok(())
+}
+
+/// Ruby `==` on JSON values: `0 == 0.0`.
+fn json_eq(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Number(x), Value::Number(y)) => x.as_f64() == y.as_f64(),
+        _ => a == b,
     }
 }
 
@@ -189,6 +270,10 @@ fn warn_unsupported_citations(protocol: ProtocolName, model: &Model) {
 
 pub fn endpoint(protocol: ProtocolName, provider: Provider, model: &Model, stream: bool) -> Endpoint {
     let path = match protocol {
+        ProtocolName::Interactions => "interactions".to_string(),
+        ProtocolName::Conversations => "conversations".to_string(),
+        // The chat replaces it with `Provider::router_url`, which depends on the configured base.
+        ProtocolName::RouterChatCompletions => "router/v1/chat/completions".to_string(),
         ProtocolName::ChatCompletions => "chat/completions".to_string(),
         ProtocolName::Responses if provider == Provider::Perplexity => "v1/agent".to_string(),
         ProtocolName::Responses => "responses".to_string(),
@@ -210,10 +295,17 @@ pub fn parse_completion(protocol: ProtocolName, provider: Provider, model: &Mode
         return Err(Error::Api("Provider returned an empty response body".into(), None));
     }
     match protocol {
+        // `MultiCompletion#parse_completion_body`: Mistral returns every hosted-tool step.
+        ProtocolName::ChatCompletions if provider == Provider::Mistral && body.pointer("/choices/0/messages").is_some_and(Value::is_array) => {
+            mistral::parse_multi_message(&body, Some(raw))?.ok_or_else(|| Error::Api("Provider returned no completion message".into(), None))
+        }
         ProtocolName::ChatCompletions => chat_completions::parse_completion_body(provider, &body, raw),
         ProtocolName::Responses => responses::parse_completion_body(provider, &body, raw),
         ProtocolName::Anthropic => anthropic::parse_completion_body(&body, raw),
         ProtocolName::Gemini => gemini::parse_completion_body(model, &body, raw),
+        ProtocolName::Interactions => interactions::parse_completion_body(model, &body, Some(raw)),
+        ProtocolName::Conversations => mistral::parse_completion_body(&model.id, &body, Some(raw)),
+        ProtocolName::RouterChatCompletions => chat_completions::parse_completion_body(provider, &body, raw),
     }
 }
 
@@ -225,10 +317,55 @@ pub struct StreamState {
     pub citation_lengths: Vec<((i64, i64), usize)>,
     /// `OpenRouter::Streaming`'s `@raw_reasoning`: the reasoning_details merged so far.
     pub openrouter_reasoning: Option<Vec<Value>>,
+    /// `Interactions::Streaming`'s steps and response.
+    pub interactions: interactions::StreamState,
+    /// `Mistral::Conversations::Streaming`'s output entries.
+    pub conversation: mistral::ConversationStream,
+    /// `Mistral::MultiCompletion#stream_response`, when hosted tools were sent.
+    pub multi: Option<mistral::MultiStream>,
+    /// The model the stream answers for (Interactions and Conversations parse whole responses).
+    pub model: Option<Model>,
+}
+
+impl StreamState {
+    /// The state for a stream of `payload`: Mistral Chat Completions with hosted tools streams
+    /// several completions (`MultiCompletion#stream_response`).
+    pub fn for_payload(protocol: ProtocolName, provider: Provider, model: &Model, payload: &Value) -> StreamState {
+        let multi = mistral::is_multi_stream(protocol, provider, payload).then(mistral::MultiStream::default);
+        StreamState { multi, model: Some(model.clone()), ..Default::default() }
+    }
+
+    fn model_id(&self) -> &str {
+        self.model.as_ref().map_or("", |m| m.id.as_str())
+    }
+}
+
+/// The streamed message: most protocols fold their chunks; Interactions, Conversations, and
+/// Mistral multi-completion parse the response they accumulated (`stream_response`). The second
+/// value is a last chunk to yield after the stream ends (multi-completion's summary chunk).
+pub fn finish_stream(
+    protocol: ProtocolName,
+    state: &mut StreamState,
+    acc: StreamAccumulator,
+    raw: RawResponse,
+) -> Result<(Message, Option<Message>)> {
+    if let Some(multi) = &state.multi {
+        let message = mistral::finish_multi_stream(multi, raw)?;
+        let last = mistral::final_chunk(&message);
+        return Ok((message, Some(last)));
+    }
+    match protocol {
+        ProtocolName::Interactions => interactions::finish_stream(&mut state.interactions, raw).map(|m| (m, None)),
+        ProtocolName::Conversations => mistral::finish_conversation_stream(&mut state.conversation, raw).map(|m| (m, None)),
+        _ => acc.into_message(raw).map(|m| (m, None)),
+    }
 }
 
 pub fn build_chunk(protocol: ProtocolName, provider: Provider, state: &mut StreamState, data: &Value) -> Result<Message> {
     match protocol {
+        ProtocolName::ChatCompletions if state.multi.is_some() => {
+            Ok(state.multi.as_mut().map(|multi| mistral::build_multi_chunk(multi, data)).unwrap_or_else(Message::chunk))
+        }
         ProtocolName::ChatCompletions => {
             let mut chunk = chat_completions::build_chunk(provider, data);
             if provider == Provider::OpenRouter {
@@ -240,6 +377,15 @@ pub fn build_chunk(protocol: ProtocolName, provider: Provider, state: &mut Strea
         ProtocolName::Responses => responses::build_chunk(provider, state, data),
         ProtocolName::Anthropic => Ok(anthropic::build_chunk(&mut state.anthropic, data)),
         ProtocolName::Gemini => Ok(gemini::build_chunk(state, data)),
+        ProtocolName::Interactions => {
+            let model = state.model.clone().unwrap_or_else(|| Model::default_for("", provider.slug()));
+            interactions::build_chunk(&model, &mut state.interactions, data)
+        }
+        ProtocolName::Conversations => {
+            let model_id = state.model_id().to_string();
+            mistral::build_conversation_chunk(&model_id, &mut state.conversation, data)
+        }
+        ProtocolName::RouterChatCompletions => Ok(chat_completions::build_chunk(provider, data)),
     }
 }
 
@@ -248,6 +394,10 @@ pub fn streaming_error_status(protocol: ProtocolName) -> fn(&str) -> Option<u16>
     match protocol {
         ProtocolName::Anthropic => |data| {
             let v: Value = serde_json::from_str(data).ok()?;
+            // Only an `{"type": "error"}` event carries a status (anthropic/streaming.rb).
+            if v.get("type").and_then(Value::as_str) != Some("error") {
+                return None;
+            }
             match v.pointer("/error/type").and_then(Value::as_str) {
                 Some("overloaded_error") => Some(529),
                 _ => Some(500),
@@ -257,6 +407,16 @@ pub fn streaming_error_status(protocol: ProtocolName) -> fn(&str) -> Option<u16>
             let v: Value = serde_json::from_str(data).ok()?;
             let err = v.get("error").unwrap_or(&v);
             err.get("code").and_then(Value::as_u64).map(|c| c as u16)
+        },
+        // `ChatCompletions::Streaming#parse_streaming_error`: no status unless `error` is an object.
+        ProtocolName::ChatCompletions => |data| {
+            let v: Value = serde_json::from_str(data).ok()?;
+            let error = v.get("error")?.as_object()?;
+            Some(match error.get("type").and_then(Value::as_str) {
+                Some("server_error") => 500,
+                Some("rate_limit_exceeded" | "insufficient_quota") => 429,
+                _ => 400,
+            })
         },
         _ => |data| {
             let v: Value = serde_json::from_str(data).ok()?;

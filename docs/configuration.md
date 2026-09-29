@@ -154,9 +154,11 @@ rust_llm::embed("Hello", options).await?;
 - Azure, Bedrock, Vertex AI, Cohere, ElevenLabs, and Deepgram options.
 - `default_video_model`, `default_speech_model`, `default_transcription_model`,
   `default_ocr_model`, `default_moderation_model` (their operations are not ported).
-- `model_registry_file` / `model_registry_store`: the registry is the bundled `models.json`.
+- `model_registry_store`. `model_registry_file` is ported: `rust_llm::models::refresh` saves there
+  (default: the platform cache, `~/.cache/rust_llm/models.json` on Linux), and the registry loads
+  from it before falling back to the bundled `models.json`.
 - `http_proxy`, `faraday_adapter`, `logger`, `log_file`, `log_level`, `log_stream_debug`,
-  `instrumenter`, `deprecation_behavior`. Retries and parse failures are logged through the
+  `deprecation_behavior` (`instrumenter` is ported: see [Instrumentation](instrumentation.md)). Retries and parse failures are logged through the
   `tracing` crate at `debug` level.
 - `tool_concurrency` is a field on `Config`, but nothing reads it: tools always run one after
   another.

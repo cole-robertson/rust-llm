@@ -386,6 +386,8 @@ pub struct Message {
     /// (`rust_llm_loco`). `None` means not yet persisted.
     pub record_id: Option<i64>,
     pub(crate) model_info: Option<Model>,
+    /// `@supplied_cost`: an explicit `cost:` the message was built with (see [`Message::with_cost`]).
+    pub(crate) supplied_cost: Option<Cost>,
 }
 
 pub type Chunk = Message;
@@ -411,6 +413,7 @@ impl Message {
             usage_entries: Vec::new(),
             record_id: None,
             model_info: None,
+            supplied_cost: None,
         }
     }
 
@@ -495,11 +498,15 @@ impl Message {
         }
     }
 
-    /// `Message#cost`. Pass a model to price against it instead of the one that answered.
+    /// `Message#cost`: the recorded attempt costs, else an explicitly supplied `cost:`, else
+    /// pricing from `model_info`. Pass a model to price against it instead.
     pub fn cost(&self, model: Option<&Model>) -> Cost {
         if model.is_none() && !self.usage_entries.is_empty() {
             let complete = self.usage_entries.iter().all(UsageEntry::cost_available);
             return Cost::aggregate(self.usage_entries.iter().map(|e| &e.cost), complete);
+        }
+        if let (None, Some(supplied)) = (model, &self.supplied_cost) {
+            return supplied.clone();
         }
         let info = model.cloned().or_else(|| self.model_info());
         Cost::new(&self.tokens(), info.as_ref(), Tier::Standard)
@@ -542,6 +549,7 @@ impl Message {
             usage_entries: Vec::new(),
             record_id: self.record_id,
             model_info: None,
+            supplied_cost: None,
         }
     }
 
@@ -557,19 +565,113 @@ impl Message {
         m
     }
 
-    /// `Message#to_h`.
+    /// `Message.new(cost:)`: an explicitly supplied cost, kept through `to_h`/`from_h`.
+    /// Recorded attempt costs still win over it, and an explicit model reprices.
+    pub fn with_cost(mut self, cost: Cost) -> Message {
+        self.supplied_cost = Some(cost);
+        self
+    }
+
+    /// `Message#tool_results`: the tool result messages in `conversation` answering this
+    /// message's tool calls, or none when it made no calls. Ruby reads the chat through the
+    /// message's `conversation` back-link; pass the chat's messages (`chat.messages()`).
+    pub fn tool_results<'a>(&self, conversation: &'a [Message]) -> Vec<&'a Message> {
+        let Some(calls) = self.tool_calls.as_ref().filter(|c| !c.is_empty()) else { return Vec::new() };
+        conversation
+            .iter()
+            .filter(|m| m.is_tool_result() && m.tool_call_id.as_deref().is_some_and(|id| calls.contains_key(id)))
+            .collect()
+    }
+
+    /// `Message.new(message.to_h)`: rebuilds a message from its `to_h` attributes (string keys,
+    /// as after a JSON round-trip). Tool calls, thinking, citations, server tool calls, and the
+    /// supplied cost come back as value objects. Attachments are rebuilt from their `source`.
+    pub fn from_h(h: &Value) -> Result<Message> {
+        let str_of = |key: &str| h.get(key).and_then(Value::as_str).map(str::to_string);
+        let int_of = |key: &str| h.get(key).and_then(Value::as_i64);
+        let role = Role::parse(h.get("role").and_then(Value::as_str).unwrap_or_default())?;
+        let mut m = Message::new(role, str_of("content"));
+        m.model = str_of("model");
+        m.tool_call_id = str_of("tool_call_id");
+        if let Some(calls) = h.get("tool_calls").and_then(Value::as_object) {
+            m.tool_calls = Some(
+                calls
+                    .iter()
+                    .map(|(id, call)| {
+                        let mut tc = ToolCall::new(
+                            call.get("id").and_then(Value::as_str).unwrap_or(id.as_str()),
+                            call.get("name").and_then(Value::as_str).unwrap_or_default(),
+                            call.get("arguments").and_then(Value::as_object).cloned().unwrap_or_default(),
+                        );
+                        tc.thought_signature = call.get("thought_signature").and_then(Value::as_str).map(str::to_string);
+                        tc.remote = call.get("remote").and_then(Value::as_bool).unwrap_or(false);
+                        (id.clone(), tc)
+                    })
+                    .collect(),
+            );
+        }
+        m.thinking = match h.get("thinking") {
+            Some(Value::Object(t)) => Thinking::build(
+                t.get("text").and_then(Value::as_str).map(str::to_string),
+                t.get("signature").and_then(Value::as_str).map(str::to_string),
+            ),
+            Some(Value::String(text)) => Thinking::build(Some(text.clone()), str_of("thinking_signature")),
+            _ => None,
+        };
+        if let Some(citations) = h.get("citations") {
+            m.citations = serde_json::from_value(citations.clone())?;
+        }
+        for call in h.get("server_tool_calls").and_then(Value::as_array).into_iter().flatten() {
+            m.server_tool_calls.push(ServerToolCall {
+                kind: call.get("type").and_then(Value::as_str).unwrap_or_default().to_string(),
+                name: call.get("name").and_then(Value::as_str).map(str::to_string),
+                id: call.get("id").and_then(Value::as_str).map(str::to_string),
+                input: call.get("input").cloned(),
+                result: call.get("result").cloned(),
+                raw: call.get("raw").cloned().unwrap_or(Value::Null),
+            });
+        }
+        for a in h.get("attachments").and_then(Value::as_array).into_iter().flatten() {
+            let source = a.as_str().or_else(|| a.get("source").and_then(Value::as_str));
+            let source = source.ok_or_else(|| Error::Argument(format!("Cannot rebuild an attachment from {a}")))?;
+            m.attachments.push(Attachment::new(source));
+        }
+        m.raw_content = h.get("raw_content").cloned();
+        m.raw_reasoning = h.get("raw_reasoning").cloned();
+        m.finish_reason = h.get("finish_reason").and_then(Value::as_str).map(FinishReason::from_symbol);
+        m.cache_until_here = h.get("cache_until_here").and_then(Value::as_bool).unwrap_or(false);
+        m.supplied_cost = h.get("cost").map(|c| Cost::from_h(c, None));
+        m.tokens = Tokens {
+            input: int_of("input_tokens"),
+            output: int_of("output_tokens"),
+            cache_read: int_of("cache_read_tokens"),
+            cache_write: int_of("cache_write_tokens"),
+            thinking: int_of("thinking_tokens"),
+            server_tool_use: h.get("server_tool_use").and_then(Value::as_object).cloned(),
+            reported_cost: h.get("reported_cost").and_then(Value::as_f64),
+        };
+        Ok(m.normalized())
+    }
+
+    /// `Message#to_h`: `nil` values and empty attachment, citation, and server tool call lists
+    /// are omitted; `cost` appears only when one was supplied.
     pub fn to_h(&self) -> Value {
         let mut h = Map::new();
         h.insert("role".into(), self.role.as_str().into());
         if let Some(c) = &self.content {
             h.insert("content".into(), c.clone().into());
         }
+        if !self.attachments.is_empty() {
+            h.insert("attachments".into(), self.attachments.iter().map(attachment_h).collect());
+        }
         if let Some(m) = &self.model {
             h.insert("model".into(), m.clone().into());
         }
+        if self.supplied_cost.is_some() {
+            h.insert("cost".into(), crate::instrumentation::cost_h(&self.cost(None)));
+        }
         if let Some(calls) = &self.tool_calls {
-            let calls: Map<String, Value> =
-                calls.iter().map(|(k, v)| (k.clone(), serde_json::to_value(v).unwrap())).collect(); // ToolCall always serializes
+            let calls: Map<String, Value> = calls.iter().map(|(k, v)| (k.clone(), tool_call_h(v))).collect();
             h.insert("tool_calls".into(), calls.into());
         }
         if let Some(id) = &self.tool_call_id {
@@ -586,8 +688,20 @@ impl Message {
         if !self.citations.is_empty() {
             h.insert("citations".into(), serde_json::to_value(&self.citations).unwrap()); // Citation always serializes
         }
+        if !self.server_tool_calls.is_empty() {
+            h.insert("server_tool_calls".into(), self.server_tool_calls.iter().map(server_tool_call_h).collect());
+        }
+        if let Some(raw) = &self.raw_content {
+            h.insert("raw_content".into(), raw.clone());
+        }
+        if let Some(raw) = &self.raw_reasoning {
+            h.insert("raw_reasoning".into(), raw.clone());
+        }
         if let Some(r) = &self.finish_reason {
             h.insert("finish_reason".into(), r.as_str().into());
+        }
+        if self.cache_until_here {
+            h.insert("cache_until_here".into(), true.into());
         }
         let t = self.tokens();
         for (k, v) in [
@@ -601,6 +715,63 @@ impl Message {
                 h.insert(k.into(), v.into());
             }
         }
+        if let Some(s) = &t.server_tool_use {
+            h.insert("server_tool_use".into(), Value::Object(s.clone()));
+        }
         Value::Object(h)
     }
+}
+
+/// `ToolCall#to_h`: `remote` only when true, `thought_signature` only when present.
+fn tool_call_h(call: &ToolCall) -> Value {
+    let mut h = Map::new();
+    h.insert("id".into(), call.id.clone().into());
+    h.insert("name".into(), call.name.clone().into());
+    h.insert("arguments".into(), Value::Object(call.arguments()));
+    if call.remote {
+        h.insert("remote".into(), true.into());
+    }
+    if let Some(sig) = &call.thought_signature {
+        h.insert("thought_signature".into(), sig.clone().into());
+    }
+    Value::Object(h)
+}
+
+/// `ServerToolCall#to_h`, omitting `nil` values.
+fn server_tool_call_h(call: &ServerToolCall) -> Value {
+    let mut h = Map::new();
+    h.insert("type".into(), call.kind.clone().into());
+    for (key, value) in [
+        ("name", call.name.clone().map(Value::from)),
+        ("id", call.id.clone().map(Value::from)),
+        ("input", call.input.clone()),
+        ("result", call.result.clone()),
+        ("raw", Some(call.raw.clone()).filter(|r| !r.is_null())),
+    ] {
+        if let Some(v) = value {
+            h.insert(key.into(), v);
+        }
+    }
+    Value::Object(h)
+}
+
+/// `Attachment#to_h`: `{ type:, source: }`. In-memory bytes have no source to record (`null`).
+fn attachment_h(a: &Attachment) -> Value {
+    use crate::attachment::{AttachmentType, Source};
+    let kind = match a.kind() {
+        AttachmentType::Image => "image",
+        AttachmentType::Video => "video",
+        AttachmentType::Audio => "audio",
+        AttachmentType::Pdf => "pdf",
+        AttachmentType::Text => "text",
+        AttachmentType::Document => "document",
+        AttachmentType::Unknown => "unknown",
+    };
+    let source = match &a.source {
+        Source::Path(p) => Value::from(p.to_string_lossy().into_owned()),
+        Source::Url(u) => Value::from(u.clone()),
+        Source::ProviderFile(f) => Value::from(f.id.clone()),
+        Source::Bytes(_) => Value::Null,
+    };
+    serde_json::json!({ "type": kind, "source": source })
 }

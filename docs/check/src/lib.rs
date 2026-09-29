@@ -21,3 +21,5 @@
 #[doc = include_str!("../../errors-and-retries.md")] pub mod errors_and_retries {}
 #[doc = include_str!("../../cost-and-usage.md")] pub mod cost_and_usage {}
 #[doc = include_str!("../../migrating-from-rubyllm.md")] pub mod migrating_from_rubyllm {}
+#[doc = include_str!("../../instrumentation.md")] pub mod instrumentation {}
+#[doc = include_str!("../../prompts.md")] pub mod prompts {}

@@ -49,17 +49,19 @@ impl Video {
         Video { url, data: None, mime_type, model: None, duration: None, raw, config: None }
     }
 
+    /// `Video#config`: the configuration of the context that generated the video, whose
+    /// connection settings (`http_proxy`, `request_timeout`) the download uses; the global one otherwise.
+    pub fn config(&self) -> Arc<Config> {
+        self.config.clone().unwrap_or_else(crate::config)
+    }
+
     /// The video bytes: `data` when present, otherwise downloaded from `url`.
     pub async fn to_blob(&self) -> Result<Vec<u8>> {
         if let Some(data) = &self.data {
             return Ok(data.clone());
         }
         let url = self.url.as_deref().ok_or_else(|| Error::Argument("video has neither data nor a url".into()))?;
-        let config = self.config.clone().unwrap_or_else(crate::config);
-        let client = reqwest::Client::builder()
-            .timeout(config.request_timeout)
-            .build()
-            .map_err(|e| Error::Configuration(e.to_string()))?;
+        let client = crate::transport::basic(&self.config())?;
         let response = client.get(url).send().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
         let status = response.status();
         let bytes = response.bytes().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;

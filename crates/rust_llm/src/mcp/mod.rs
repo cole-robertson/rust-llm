@@ -33,6 +33,7 @@ mod content;
 mod error;
 mod http;
 mod input_request;
+mod oauth;
 mod param_headers;
 mod prompt;
 mod resource;
@@ -51,8 +52,9 @@ use serde_json::{Map, Value, json};
 pub use client::{Client, LEGACY_VERSION, VERSION, client_info};
 pub use collection::Collection;
 pub use error::McpError;
-pub use http::{HeaderSource, Http};
+pub use http::{Authorization, HeaderSource, Http};
 pub use input_request::{Field, InputRequest, InputRequiredError, InputState};
+pub use oauth::{Challenge, CredentialStore, MemoryStore, OAuth, OAuthSettings, OwnerSource};
 pub use prompt::{Prompt, PromptArgument};
 pub use resource::{Resource, ResourceContent};
 pub use resource_template::ResourceTemplate;
@@ -124,6 +126,7 @@ pub struct McpBuilder {
     approvals: Vec<(Vec<String>, Option<ApprovalCondition>)>,
     after_progress: Vec<ProgressCallback>,
     before_input_request: Vec<InputCallback>,
+    oauth: Option<OAuthSettings>,
     config: Option<Arc<Config>>,
 }
 
@@ -149,6 +152,7 @@ impl McpBuilder {
             approvals: Vec::new(),
             after_progress: Vec::new(),
             before_input_request: Vec::new(),
+            oauth: None,
             config: None,
         }
     }
@@ -268,7 +272,18 @@ impl McpBuilder {
         self
     }
 
-    /// `MCP.new(context:)`: connect with this configuration's `request_timeout`.
+    /// `oauth owner: :user, scopes:, client_id:, client_secret:` (or `RubyLLM.mcp(oauth:)`):
+    /// authorizes requests with OAuth, as the MCP authorization spec describes. RustLLM discovers
+    /// the server's authorization server and registers itself unless you pass the `client_id`
+    /// and `client_secret` of an app you registered. Send the user to [`Mcp::authorization_url`],
+    /// then pass the callback's parameters to [`Mcp::authorize`].
+    pub fn oauth(mut self, settings: OAuthSettings) -> Self {
+        self.oauth = Some(settings);
+        self
+    }
+
+    /// `MCP.new(context:)`: connect with this configuration's `request_timeout`, and keep OAuth
+    /// credentials in its `mcp_credential_store`.
     pub fn config(mut self, config: Arc<Config>) -> Self {
         self.config = Some(config);
         self
@@ -279,12 +294,19 @@ impl McpBuilder {
     pub fn build(self) -> Result<Mcp> {
         let config = self.config.clone().unwrap_or_else(crate::config);
         let timeout = self.timeout.unwrap_or(config.request_timeout);
+        let name = self.name.clone().unwrap_or_else(|| self.default_name());
+        let authorizer = match (&self.source, &self.oauth) {
+            (Source::Url(url), Some(settings)) => {
+                Some(Arc::new(oauth::Authorizer::new(name.clone(), url.clone(), settings.clone(), config.clone())))
+            }
+            _ => None,
+        };
         let transport: Arc<dyn Transport> = match &self.source {
             Source::Transport(t) => t.clone(),
             Source::Command(argv) => Arc::new(Stdio::new(argv.clone(), self.env.clone(), self.directory.clone(), timeout)),
             Source::Url(url) => {
                 let headers = self.headers.clone();
-                let token = self.bearer_token.clone();
+                let token = if authorizer.is_some() { None } else { self.bearer_token.clone() };
                 let source: HeaderSource = Arc::new(move || {
                     let mut out: Vec<(String, String)> =
                         headers.iter().filter_map(|(name, value)| value().map(|v| (name.clone(), v))).collect();
@@ -293,13 +315,16 @@ impl McpBuilder {
                     }
                     out
                 });
-                Arc::new(Http::new(url, source, timeout)?)
+                let http = Http::new(url, source, timeout)?;
+                match &authorizer {
+                    Some(authorizer) => Arc::new(http.with_authorization(authorizer.clone())),
+                    None => Arc::new(http),
+                }
             }
         };
-        let name = self.name.clone().unwrap_or_else(|| self.default_name());
         let capabilities = json!({ "elicitation": { "form": {}, "url": {} } });
         let client = Client::new(transport, capabilities);
-        Ok(Mcp(Arc::new(Inner { name, settings: self, client, server_tools: Mutex::new(None) })))
+        Ok(Mcp(Arc::new(Inner { name, settings: self, client, server_tools: Mutex::new(None), authorizer })))
     }
 
     /// `default_name_for(url:, command:)`.
@@ -325,6 +350,7 @@ struct Inner {
     settings: McpBuilder,
     client: Client,
     server_tools: Mutex<Option<Vec<Value>>>,
+    authorizer: Option<Arc<oauth::Authorizer>>,
 }
 
 /// `RubyLLM::MCP`: an MCP server, connected on the first request. Cheap to clone; clones share
@@ -509,6 +535,66 @@ impl Mcp {
         let server = self.0.client.server().await?;
         let info = server.get("serverInfo").or_else(|| server.pointer("/_meta/io.modelcontextprotocol~1serverInfo"));
         Ok(info.and_then(|i| i.get("version")).and_then(Value::as_str).map(str::to_string))
+    }
+
+    /// `prefix`: what `prefix` declared, or `None`.
+    pub fn prefix(&self) -> Option<&str> {
+        self.0.settings.prefix.as_deref()
+    }
+
+    /// `oauth_settings`: what `oauth` declared, or `None`.
+    pub fn oauth_settings(&self) -> Option<&OAuthSettings> {
+        self.0.settings.oauth.as_ref()
+    }
+
+    /// `MCP#oauth`: this server's OAuth for its owner. Fails with `Error::Configuration` for an
+    /// MCP declared without `oauth`, and `Error::Argument` when a declared owner is `None`.
+    pub fn oauth(&self) -> Result<Arc<OAuth>> {
+        let authorizer = self.0.authorizer.as_ref().ok_or_else(|| Error::Configuration(format!("{} does not use OAuth", self.name())))?;
+        authorizer.oauth()
+    }
+
+    /// `authorized?`: whether the owner has authorized this server.
+    pub async fn is_authorized(&self) -> Result<bool> {
+        self.oauth()?.is_authorized().await
+    }
+
+    /// `authorization_url(redirect_uri:)`: where to send the user so they can authorize this
+    /// server. The authorization server redirects back to `redirect_uri`, whose parameters go to
+    /// [`Mcp::authorize`]. Asks the server first, unless it already answered with a challenge,
+    /// so the challenge's metadata URL and scopes are used.
+    pub async fn authorization_url(&self, redirect_uri: &str) -> Result<String> {
+        let oauth = self.oauth()?;
+        let challenge = match self.0.authorizer.as_ref().and_then(|a| a.challenge()) {
+            Some(challenge) => Some(challenge),
+            None => self.challenge().await?,
+        };
+        oauth.authorization_url(redirect_uri, challenge).await
+    }
+
+    /// `authorize(params)`: completes an authorization with the parameters of the callback
+    /// request. Fails with `Error::Mcp` when the callback does not match the authorization that
+    /// `authorization_url` started.
+    pub async fn authorize<K: Into<String>, V: Into<String>>(&self, params: impl IntoIterator<Item = (K, V)>) -> Result<&Self> {
+        let params = params.into_iter().map(|(k, v)| (k.into(), v.into())).collect();
+        self.oauth()?.authorize(&params).await?;
+        Ok(self)
+    }
+
+    /// `deauthorize`: forgets the owner's credentials for this server.
+    pub async fn deauthorize(&self) -> Result<&Self> {
+        self.oauth()?.deauthorize().await?;
+        Ok(self)
+    }
+
+    /// `challenge`: `nil` when the server answers, the challenge it sent when it wants
+    /// credentials.
+    async fn challenge(&self) -> Result<Option<Challenge>> {
+        match self.0.client.server().await {
+            Ok(_) => Ok(None),
+            Err(Error::Unauthorized(..)) => Ok(self.0.authorizer.as_ref().and_then(|a| a.challenge())),
+            Err(e) => Err(e),
+        }
     }
 
     /// `close`: closes the connection, stopping a stdio server's process. The next request

@@ -91,6 +91,13 @@ pub fn render_payload(req: &Request) -> Result<Value> {
         let name = if id.contains('/') { id.to_string() } else { format!("cachedContents/{id}") };
         payload.insert("cachedContent".into(), name.into());
     }
+    // `maybe_log_implicit_caching_note` (`protocols/gemini/chat.rb`).
+    let cache_without_id = Caching::options(req.caching).is_some_and(|o| o.get("id").is_none_or(Value::is_null));
+    if Caching::boundaries(req.caching) && (cache_without_id || req.messages.iter().any(|m| m.cache_until_here)) {
+        tracing::debug!(
+            "Gemini caches repeated prompt prefixes automatically (implicit caching). For explicit caching, create a cache with RubyLLM.cache and attach it with chat.with_caching(id: cache)."
+        );
+    }
     Ok(Value::Object(payload))
 }
 
@@ -192,8 +199,12 @@ fn supports_multimodal_function_responses(model: &Model) -> bool {
     if id.ends_with("-latest") {
         return true;
     }
-    let version: String = rest.chars().take_while(|c| c.is_ascii_digit() || *c == '.').collect();
-    version.split('.').next().and_then(|m| m.parse::<u32>().ok()).is_some_and(|major| major >= 3)
+    // `id[/\Agemini-(\d+(?:\.\d+)?)(?:-|\z)/, 1]`: a generation followed by `-` or the end.
+    let generation = rest.split('-').next().unwrap_or("");
+    let mut numbers = generation.split('.');
+    let major = numbers.next().filter(|m| !m.is_empty() && m.bytes().all(|b| b.is_ascii_digit()));
+    let minor_ok = numbers.next().is_none_or(|m| !m.is_empty() && m.bytes().all(|b| b.is_ascii_digit()));
+    minor_ok && numbers.next().is_none() && major.and_then(|m| m.parse::<u32>().ok()).is_some_and(|major| major >= 3)
 }
 
 fn format_tool_result(model: &Model, msg: &Message, name: Option<String>) -> Result<Vec<Value>> {
@@ -381,23 +392,52 @@ fn usage(message: &mut Message, data: &Value, streaming: bool) {
     message.tokens.thinking = thought;
 }
 
-pub fn parse_completion_body(model: &Model, data: &Value, raw: RawResponse) -> Result<Message> {
-    let parts = data.pointer("/candidates/0/content/parts").and_then(Value::as_array).cloned().unwrap_or_default();
+/// `Gemini#build_response_content` (`protocols/gemini/media.rb`): joined text (`None` when there
+/// is none) and the `inlineData`/`fileData` parts as attachments. Other parts are ignored.
+fn build_response_content(parts: &[&Value]) -> (Option<String>, Vec<Attachment>) {
+    use base64::Engine;
     let mut text = String::new();
     let mut attachments = Vec::new();
-    for (i, p) in parts.iter().filter(|p| p.get("thought").and_then(Value::as_bool) != Some(true)).enumerate() {
-        if let Some(t) = p.get("text").and_then(Value::as_str) {
+    for (index, part) in parts.iter().enumerate() {
+        if let Some(t) = part.get("text").and_then(Value::as_str) {
             text.push_str(t);
-        } else if let Some(inline) = p.get("inlineData") {
-            use base64::Engine;
-            if let Some(bytes) = inline.get("data").and_then(Value::as_str).and_then(|d| base64::engine::general_purpose::STANDARD.decode(d).ok()) {
-                let mime = inline.get("mimeType").and_then(Value::as_str).unwrap_or("application/octet-stream");
-                let ext = mime.rsplit('/').next().unwrap_or("bin");
-                attachments.push(Attachment::from_bytes(bytes, format!("gemini_output_{i}.{ext}"), Some(mime)));
-            }
+        } else if let Some(inline) = part.get("inlineData") {
+            // `build_inline_attachment`: skipped without data.
+            let Some(bytes) =
+                inline.get("data").and_then(Value::as_str).and_then(|d| base64::engine::general_purpose::STANDARD.decode(d).ok())
+            else {
+                continue;
+            };
+            let mime = inline.get("mimeType").and_then(Value::as_str);
+            attachments.push(Attachment::from_bytes(bytes, attachment_filename(mime, index), mime));
+        } else if let Some(file) = part.get("fileData") {
+            // `build_file_attachment`: skipped without a URI; the response's filename wins.
+            let Some(uri) = file.get("fileUri").and_then(Value::as_str) else { continue };
+            let filename = str_of(file.get("filename"))
+                .unwrap_or_else(|| attachment_filename(file.get("mimeType").and_then(Value::as_str), index));
+            attachments.push(Attachment::new(uri).with_filename(&filename));
         }
     }
-    let content = if parts.is_empty() || text.is_empty() { Some(String::new()) } else { Some(text) };
+    ((!text.is_empty()).then_some(text), attachments)
+}
+
+/// `Gemini#attachment_filename`: `gemini_attachment_{n}` plus the MIME subtype, normalized.
+fn attachment_filename(mime_type: Option<&str>, index: usize) -> String {
+    let Some(mime) = mime_type else { return format!("gemini_attachment_{}", index + 1) };
+    let extension = match mime.rsplit('/').next().unwrap_or("") {
+        "jpeg" => "jpg".to_string(),
+        "plain" => "txt".to_string(),
+        other => other.replace('+', "."),
+    };
+    format!("gemini_attachment_{}.{extension}", index + 1)
+}
+
+pub fn parse_completion_body(model: &Model, data: &Value, raw: RawResponse) -> Result<Message> {
+    let parts = data.pointer("/candidates/0/content/parts").and_then(Value::as_array).cloned().unwrap_or_default();
+    // `parse_content`: `''` when there is nothing but thoughts, else `build_response_content`.
+    let non_thought: Vec<&Value> = parts.iter().filter(|p| p.get("thought").and_then(Value::as_bool) != Some(true)).collect();
+    let (content, attachments) =
+        if non_thought.is_empty() { (Some(String::new()), Vec::new()) } else { build_response_content(&non_thought) };
     let (thought_text, signature) = thoughts(&parts);
     let mut server_calls = part_server_calls(&parts);
     server_calls.extend(metadata_server_calls(data));

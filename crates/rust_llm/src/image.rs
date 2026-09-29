@@ -125,6 +125,12 @@ impl Image {
         self.data.is_some()
     }
 
+    /// `Image#config`: the configuration of the context that generated the image, whose
+    /// connection settings (`http_proxy`, `request_timeout`) the download uses; the global one otherwise.
+    pub fn config(&self) -> Arc<Config> {
+        self.config.clone().unwrap_or_else(crate::config)
+    }
+
     /// The raw image bytes, decoding `data` when present or downloading `url` otherwise.
     pub async fn to_blob(&self) -> Result<Vec<u8>> {
         if let Some(data) = &self.data {
@@ -133,11 +139,7 @@ impl Image {
                 .map_err(|e| Error::Argument(format!("image data is not valid Base64: {e}")));
         }
         let url = self.url.as_deref().ok_or_else(|| Error::Argument("image has neither data nor a url".into()))?;
-        let config = self.config.clone().unwrap_or_else(crate::config);
-        let client = reqwest::Client::builder()
-            .timeout(config.request_timeout)
-            .build()
-            .map_err(|e| Error::Configuration(e.to_string()))?;
+        let client = crate::transport::basic(&self.config())?;
         let response = client.get(url).send().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
         let status = response.status();
         let bytes = response.bytes().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
@@ -183,8 +185,45 @@ impl Image {
     }
 }
 
-/// `RubyLLM.paint(prompt, model:, provider:, size:, count:, with:, mask:, provider_options:)`.
+/// `RubyLLM.paint(prompt, model:, provider:, size:, count:, with:, mask:, provider_options:)`,
+/// inside an `image.rust_llm` event.
 pub async fn paint(prompt: &str, options: PaintOptions<'_>) -> Result<Images> {
+    let config = options.config.clone().unwrap_or_else(crate::config);
+    let model_id = options.model.unwrap_or(&config.default_image_model).to_string();
+    let (model, provider) = resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let mut event = crate::instrumentation::Event::start(&config, "image.rust_llm", || {
+        let empty = Tokens::default();
+        crate::instrumentation::payload([
+            ("provider", provider.slug().into()),
+            ("provider_class", provider.display().into()),
+            ("model", model.id.clone().into()),
+            ("prompt", prompt.into()),
+            ("size", options.size.into()),
+            ("count", options.count.into()),
+            ("provider_options", options.provider_options.clone()),
+            ("tokens", crate::instrumentation::tokens_h(&empty)),
+            ("cost", crate::instrumentation::cost_h(&Cost::images(&empty, Some(&model), None))),
+        ])
+    });
+    let result = tracing::Instrument::instrument(paint_inner(prompt, options), event.span()).await;
+    if let Ok(images) = &result {
+        let all: Vec<&Image> = match images {
+            Images::One(i) => vec![i],
+            Images::Many(v) => v.iter().collect(),
+        };
+        event.set("result", || serde_json::json!(all.iter().map(|i| serde_json::json!({ "url": i.url, "mime_type": i.mime_type, "model": i.model, "revised_prompt": i.revised_prompt })).collect::<Vec<_>>()));
+        event.set("response_model", || all.first().map(|i| i.model.clone()).into());
+        let tokens: Vec<Tokens> = all.iter().map(|i| i.tokens()).collect();
+        event.set("tokens", || crate::instrumentation::tokens_h(&Tokens::aggregate(tokens.iter())));
+        let costs: Vec<Cost> = all.iter().map(|i| i.cost()).collect();
+        let complete = costs.iter().all(|c| c.total().is_some());
+        event.set("cost", || crate::instrumentation::cost_h(&Cost::aggregate(costs.iter(), complete)));
+    }
+    event.finish(result.as_ref().err());
+    result
+}
+
+async fn paint_inner(prompt: &str, options: PaintOptions<'_>) -> Result<Images> {
     let config = options.config.clone().unwrap_or_else(crate::config);
     let model_id = options.model.unwrap_or(&config.default_image_model).to_string();
     let (model, provider) = resolve_model(&model_id, options.provider, options.assume_model_exists)?;
@@ -221,7 +260,10 @@ pub async fn paint(prompt: &str, options: PaintOptions<'_>) -> Result<Images> {
     let mut entries: Vec<UsageEntry> = retried.into_iter().map(|t| entry(UsageStatus::Failed, t, None)).collect();
     // A failed paint has no result to attach its entries to; Ruby only reports them to
     // instrumentation, which this port does not have.
-    let mut images = result.and_then(|raw| family.parse(&raw.body, &model.id))?;
+    let mut images = match family {
+        Family::Mistral => mistral_images(&connection, &result?.body, &model.id).await?,
+        _ => result.and_then(|raw| family.parse(&raw.body, &model.id))?,
+    };
     let billed = &images[0];
     entries.push(entry(UsageStatus::Succeeded, billed.tokens(), Some(billed.cost())));
     images[0].usage_entries = entries;
@@ -229,6 +271,21 @@ pub async fn paint(prompt: &str, options: PaintOptions<'_>) -> Result<Images> {
         image.config = Some(config.clone());
     }
     Ok(if images.len() == 1 { Images::One(images.remove(0)) } else { Images::Many(images) })
+}
+
+/// `Conversations::Images#parse_image_responses`: each generated file downloaded from Mistral's
+/// Files API, typed from its bytes; only the first image carries the usage.
+async fn mistral_images(connection: &Connection, data: &Value, model: &str) -> Result<Vec<Image>> {
+    let (files, usage) = crate::protocols::mistral::parse_image_files(data)?;
+    let mut images = Vec::new();
+    for (index, id) in files.iter().enumerate() {
+        let bytes = crate::files::download_file(connection, Provider::Mistral, id).await?;
+        let mut image = Image::new(model, if index == 0 { usage.clone() } else { json!({}) });
+        image.mime_type = Some(crate::attachment::mime_type_for_bytes(&bytes));
+        image.data = Some(base64::engine::general_purpose::STANDARD.encode(&bytes));
+        images.push(image);
+    }
+    Ok(images)
 }
 
 /// Which image seams a provider's protocol includes.
@@ -239,6 +296,8 @@ enum Family {
     XAI,
     OpenRouter,
     Gemini,
+    /// `Mistral::Conversations::Images`: `Mistral#protocol_for(operation: :paint)` is Conversations.
+    Mistral,
 }
 
 impl Family {
@@ -248,10 +307,7 @@ impl Family {
             Provider::OpenRouter => Ok(Family::OpenRouter),
             Provider::Gemini => Ok(Family::Gemini),
             Provider::Anthropic => Err(Error::Api("Anthropic doesn't support image generation".into(), None)),
-            Provider::Mistral => Err(Error::Api(
-                "Mistral paints through its Conversations API, which rust_llm has not ported yet".into(),
-                None,
-            )),
+            Provider::Mistral => Ok(Family::Mistral),
             _ => Ok(Family::OpenAI),
         }
     }
@@ -295,6 +351,10 @@ impl Family {
         let editing = !with.is_empty() || mask.is_some();
         let options = provider_options.as_object().cloned().unwrap_or_default();
         match self {
+            Family::Mistral => Ok((
+                "conversations".into(),
+                crate::protocols::mistral::render_image_payload(prompt, model, size, count, editing, provider_options)?,
+            )),
             Family::OpenAI if editing => {
                 if !(model.starts_with("gpt-image") || model.starts_with("chatgpt-image")) {
                     return Err(Error::Argument(format!(
@@ -483,6 +543,8 @@ impl Family {
                     })
                     .collect())
             }
+            // Mistral's images need a download per file, so `paint` parses them (`mistral_images`).
+            Family::Mistral => Err(Error::Api("Mistral images are parsed with their downloads".into(), None)),
         }
     }
 }

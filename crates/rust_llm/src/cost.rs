@@ -102,6 +102,33 @@ impl Cost {
         cost
     }
 
+    /// `Cost.from_h(hash, tokens:)` (`cost.rb`): rebuilds a cost from a stored `to_h` breakdown.
+    /// The components are the recorded amounts and `total` is the recorded `total`. Without a
+    /// recorded total, a component is missing when it has tokens but no amount (or, with no
+    /// tokens given, whenever it has no amount).
+    pub fn from_h(h: &serde_json::Value, tokens: Option<&Tokens>) -> Cost {
+        let amount = |c: Component| h.get(c.as_key()).and_then(serde_json::Value::as_f64);
+        let total_recorded = h.get("total").is_some();
+        let mut cost = Cost { complete: true, reported_total: h.get("total").and_then(serde_json::Value::as_f64), ..Default::default() };
+        for component in COMPONENTS {
+            cost.set(component, amount(component));
+            let missing = match tokens {
+                _ if total_recorded => false,
+                None => amount(component).is_none(),
+                Some(t) => Pricer::count(t, component).unwrap_or(0) > 0 && amount(component).is_none(),
+            };
+            if missing {
+                cost.missing.push(component);
+            }
+        }
+        cost.reported = total_recorded
+            || match tokens {
+                Some(t) => COMPONENTS.iter().any(|&c| Pricer::count(t, c).is_some()),
+                None => COMPONENTS.iter().any(|&c| amount(c).is_some()),
+            };
+        cost
+    }
+
     pub fn get(&self, component: Component) -> Option<f64> {
         match component {
             Component::Input => self.input,
@@ -211,7 +238,30 @@ struct Pricer<'a> {
     tier: Tier,
 }
 
+impl Component {
+    fn as_key(self) -> &'static str {
+        match self {
+            Component::Input => "input",
+            Component::Output => "output",
+            Component::CacheRead => "cache_read",
+            Component::CacheWrite => "cache_write",
+            Component::Thinking => "thinking",
+        }
+    }
+}
+
 impl Pricer<'_> {
+    /// `tokens.public_send(component)`: the raw count, whether or not it is priced separately.
+    fn count(tokens: &Tokens, component: Component) -> Option<i64> {
+        match component {
+            Component::Input => tokens.input,
+            Component::Output => tokens.output,
+            Component::CacheRead => tokens.cache_read,
+            Component::CacheWrite => tokens.cache_write,
+            Component::Thinking => tokens.thinking,
+        }
+    }
+
     fn applicable_tier(&self) -> Option<&PricingTier> {
         match self.tier {
             Tier::Batch => self.text.batch.as_ref(),

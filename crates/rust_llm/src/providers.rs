@@ -31,6 +31,12 @@ pub enum ProtocolName {
     Responses,
     Anthropic,
     Gemini,
+    /// `Protocols::Interactions`: Gemini's Interactions API, opted into with `protocol: :interactions`.
+    Interactions,
+    /// `Providers::Mistral::Conversations`: Mistral's Conversations API (`protocol: :conversations`).
+    Conversations,
+    /// `Protocols::Perplexity::Router`: Perplexity Router (`protocol: :router_chat_completions`).
+    RouterChatCompletions,
 }
 
 impl ProtocolName {
@@ -40,7 +46,23 @@ impl ProtocolName {
             "responses" => Ok(ProtocolName::Responses),
             "anthropic" => Ok(ProtocolName::Anthropic),
             "gemini" => Ok(ProtocolName::Gemini),
+            "interactions" => Ok(ProtocolName::Interactions),
+            "conversations" => Ok(ProtocolName::Conversations),
+            "router_chat_completions" => Ok(ProtocolName::RouterChatCompletions),
             other => Err(Error::Argument(format!("unknown protocol: {other}"))),
+        }
+    }
+
+    /// The name a provider registers the protocol under (`protocol :chat_completions, ...`).
+    pub fn name(&self) -> &'static str {
+        match self {
+            ProtocolName::ChatCompletions => "chat_completions",
+            ProtocolName::Responses => "responses",
+            ProtocolName::Anthropic => "anthropic",
+            ProtocolName::Gemini => "gemini",
+            ProtocolName::Interactions => "interactions",
+            ProtocolName::Conversations => "conversations",
+            ProtocolName::RouterChatCompletions => "router_chat_completions",
         }
     }
 }
@@ -198,6 +220,14 @@ impl Provider {
             .ok_or_else(|| Error::Configuration(format!("{key} is not set")))
     }
 
+    /// `Providers::Perplexity#agent_url`: the Agent endpoint under the configured base, which may
+    /// be a gateway path with or without its own `/v1`.
+    pub fn agent_url(&self, config: &Config) -> Result<String> {
+        let base = self.api_base(config)?;
+        let base = base.strip_suffix('/').unwrap_or(&base);
+        Ok(format!("{}/v1/agent", base.strip_suffix("/v1").unwrap_or(base)))
+    }
+
     /// `Provider#headers`.
     pub fn headers(&self, config: &Config) -> Vec<(String, String)> {
         let bearer = |key: &str| {
@@ -256,8 +286,11 @@ impl Provider {
                 matches!(protocol, ProtocolName::ChatCompletions | ProtocolName::Responses)
             }
             Provider::Anthropic => protocol == ProtocolName::Anthropic,
-            Provider::Gemini => protocol == ProtocolName::Gemini,
-            Provider::Perplexity => matches!(protocol, ProtocolName::ChatCompletions | ProtocolName::Responses),
+            Provider::Gemini => matches!(protocol, ProtocolName::Gemini | ProtocolName::Interactions),
+            Provider::Mistral => matches!(protocol, ProtocolName::ChatCompletions | ProtocolName::Conversations),
+            Provider::Perplexity => {
+                matches!(protocol, ProtocolName::ChatCompletions | ProtocolName::Responses | ProtocolName::RouterChatCompletions)
+            }
             // System One answers judgments only (`rust_llm::judge`); it has no chat protocol.
             Provider::TypeSafe => false,
             _ => protocol == ProtocolName::ChatCompletions,
@@ -267,7 +300,10 @@ impl Provider {
     /// `Provider#protocol_for` plus `resolve_protocol`: an explicit protocol wins, then the
     /// `<slug>_protocol` config option, then the provider's per-model rule.
     pub fn resolve_protocol(&self, explicit: Option<ProtocolName>, model: &Model, config: &Config) -> Result<ProtocolName> {
-        let configured = config.get(&format!("{}_protocol", self.slug())).map(ProtocolName::parse).transpose()?;
+        let configured = match config.get(&format!("{}_protocol", self.slug())) {
+            Some(name) => Some(ProtocolName::parse(name).map_err(|_| self.not_a_protocol(name))?),
+            None => None,
+        };
         let protocol = match explicit.or(configured) {
             Some(p) => p,
             None => match self {
@@ -285,20 +321,200 @@ impl Provider {
             return Err(Error::Api(format!("{} doesn't support chat", self.display()), None));
         }
         if !self.supports_protocol(protocol) {
-            return Err(Error::Api(format!("{protocol:?} is not a protocol of {}", self.display()), None));
+            return Err(self.not_a_protocol(protocol.name()));
         }
         Ok(protocol)
     }
 
-    /// `Provider#parse_error` overrides are folded into `error::parse_error_message`, except
-    /// Perplexity's HTML error pages.
+    /// `Provider.protocols.keys`: every protocol the Ruby provider registers, in order.
+    pub fn protocol_names(&self) -> &'static [&'static str] {
+        match self {
+            Provider::OpenAI => &["responses", "chat_completions", "embeddings", "files"],
+            Provider::Anthropic => &["anthropic", "files"],
+            Provider::Gemini => &["gemini", "interactions", "live_transcription", "files"],
+            Provider::DeepSeek => &["chat_completions", "responses", "files"],
+            Provider::Mistral => &["chat_completions", "conversations", "files"],
+            Provider::OpenRouter => &["chat_completions", "responses", "files"],
+            Provider::XAI => &["responses", "chat_completions", "files"],
+            Provider::Perplexity => &["chat_completions", "router_chat_completions", "files", "agent_responses"],
+            Provider::GPUStack => &["chat_completions", "responses"],
+            Provider::Ollama | Provider::OllamaCloud | Provider::Hetzner => &["chat_completions"],
+            Provider::TypeSafe => &["system_one"],
+        }
+    }
+
+    /// `Provider#fetch_protocol`'s error for a protocol the provider does not register.
+    fn not_a_protocol(&self, name: &str) -> Error {
+        Error::Api(
+            format!("{name} is not a protocol of {}. Available: {}", self.display(), self.protocol_names().join(", ")),
+            None,
+        )
+    }
+
+    /// `Provider#configuration_options`: every option the provider reads.
+    pub fn configuration_options(&self) -> &'static [&'static str] {
+        match self {
+            Provider::OpenAI => {
+                &["openai_api_key", "openai_api_base", "openai_organization_id", "openai_project_id", "openai_use_system_role"]
+            }
+            Provider::Anthropic => &["anthropic_api_key", "anthropic_api_base"],
+            Provider::Gemini => &["gemini_api_key", "gemini_api_base"],
+            Provider::DeepSeek => &["deepseek_api_key", "deepseek_api_base"],
+            Provider::Mistral => &["mistral_api_key", "mistral_api_base"],
+            Provider::OpenRouter => &["openrouter_api_key", "openrouter_api_base", "openrouter_app_url", "openrouter_app_name"],
+            Provider::XAI => &["xai_api_key", "xai_api_base"],
+            Provider::Perplexity => &["perplexity_api_key", "perplexity_api_base"],
+            Provider::Ollama => &["ollama_api_base", "ollama_api_key"],
+            Provider::OllamaCloud => &["ollama_cloud_api_key", "ollama_cloud_api_base"],
+            Provider::GPUStack => &["gpustack_api_base", "gpustack_api_key"],
+            Provider::Hetzner => &["hetzner_api_key", "hetzner_api_base"],
+            Provider::TypeSafe => &["typesafe_api_key", "typesafe_api_base"],
+        }
+    }
+
+    /// `Provider.remote?`.
+    pub fn is_remote(&self) -> bool {
+        !self.is_local()
+    }
+
+    /// `Provider#retry_delay`: seconds a rate-limited response asked us to wait, read from
+    /// provider-specific headers. Only OpenAI overrides the base `nil`: it reports each limit's
+    /// reset as a duration like `"6m0s"`, `"7.66s"`, or `"76ms"` (`providers/openai.rb`), and the
+    /// longer of the two waits wins.
+    pub fn retry_delay(&self, headers: &[(String, String)]) -> Option<f64> {
+        if *self != Provider::OpenAI {
+            return None;
+        }
+        ["x-ratelimit-reset-requests", "x-ratelimit-reset-tokens"]
+            .iter()
+            .filter_map(|name| headers.iter().find(|(k, _)| k.eq_ignore_ascii_case(name)))
+            .filter_map(|(_, v)| parse_reset_duration(v))
+            .reduce(f64::max)
+    }
+
+    /// `Provider#parse_error`, with the overrides: Perplexity's HTML error pages and
+    /// OpenRouter's `error.metadata.raw` upstream message. `None` for an empty body.
+    pub fn parse_error(&self, body: &str) -> Option<String> {
+        match self {
+            Provider::Perplexity => self.strip_html_error(body).or_else(|| crate::error::parse_error_message(body)),
+            Provider::OpenRouter => openrouter_parse_error(body),
+            _ => crate::error::parse_error_message(body),
+        }
+    }
+
+    /// `Perplexity#router_url(operation)`: the Router lives under `/router/v1` of the API base,
+    /// which may already end in it.
+    pub(crate) fn router_url(&self, config: &Config, operation: &str) -> Result<String> {
+        let base = self.api_base(config)?;
+        let base = base.strip_suffix('/').unwrap_or(&base);
+        let base = base.strip_suffix("/router/v1").unwrap_or(base);
+        Ok(format!("{base}/router/v1/{operation}"))
+    }
+
+    /// `Perplexity#parse_error`: the `<title>` of the HTML page Perplexity returns for auth
+    /// failures, minus the leading status code (`/<title>(.+?)<\/title>/`, `sub(/^\d+\s+/, '')`).
     pub(crate) fn strip_html_error(&self, body: &str) -> Option<String> {
-        if *self != Provider::Perplexity || !body.contains("<html>") {
+        if *self != Provider::Perplexity || !body.contains("<html>") || !body.contains("<title>") {
             return None;
         }
         let start = body.find("<title>")? + 7;
         let end = body[start..].find("</title>")? + start;
         let title = &body[start..end];
-        Some(title.trim_start_matches(|c: char| c.is_ascii_digit()).trim_start().to_string())
+        if title.is_empty() || title.contains('\n') {
+            return None;
+        }
+        let digits = title.len() - title.trim_start_matches(|c: char| c.is_ascii_digit()).len();
+        let rest = &title[digits..];
+        let trimmed = rest.trim_start();
+        Some(if digits > 0 && trimmed.len() < rest.len() { trimmed } else { title }.to_string())
     }
+}
+
+/// `Providers::OpenAI#parse_reset_duration`: `"1h2m3s"` style durations; `None` for anything
+/// that is not entirely made of `<number><unit>` parts.
+fn parse_reset_duration(value: &str) -> Option<f64> {
+    static PART: std::sync::LazyLock<regex::Regex> =
+        std::sync::LazyLock::new(|| regex::Regex::new(r"(\d+(?:\.\d+)?)(ms|h|m|s)").unwrap()); // constant pattern
+    let parts: Vec<(&str, &str)> = PART.captures_iter(value).map(|c| {
+        let (_, [amount, unit]) = c.extract();
+        (amount, unit)
+    }).collect();
+    if parts.is_empty() || parts.iter().map(|(a, u)| format!("{a}{u}")).collect::<String>() != value {
+        return None;
+    }
+    let seconds = |unit: &str| match unit {
+        "h" => 3600.0,
+        "m" => 60.0,
+        "s" => 1.0,
+        _ => 0.001,
+    };
+    Some(parts.iter().map(|(a, u)| a.parse::<f64>().unwrap_or(0.0) * seconds(u)).sum())
+}
+
+/// `Providers::OpenRouter#parse_error`: the shared body shapes, plus the upstream provider's own
+/// message from `error.metadata.raw` appended as `"<message> - <raw message>"`.
+fn openrouter_parse_error(body: &str) -> Option<String> {
+    use serde_json::Value;
+    if body.is_empty() {
+        return None;
+    }
+    let try_parse = |s: &str| serde_json::from_str::<Value>(s).unwrap_or_else(|_| Value::String(s.to_string()));
+    // `error_message`: a hash's `message`, a list's messages joined, a scalar as text.
+    fn error_message(value: Option<&Value>) -> Option<String> {
+        match value? {
+            Value::Object(o) => o.get("message").and_then(Value::as_str).map(str::to_string),
+            Value::Array(parts) => {
+                let messages: Vec<String> = parts.iter().filter_map(|p| error_message(Some(p))).collect();
+                (!messages.is_empty()).then(|| messages.join(". "))
+            }
+            Value::Null => None,
+            Value::String(s) => Some(s.clone()),
+            other => Some(other.to_string()),
+        }
+    }
+    let part_message = |part: &Value| -> Option<String> {
+        let Value::Object(part) = part else { return error_message(Some(part)) };
+        let error = part.get("error");
+        let message = error_message(error);
+        let Some(Value::Object(metadata)) = error.and_then(|e| e.get("metadata")) else { return message };
+        let raw = match metadata.get("raw") {
+            Some(Value::String(s)) => try_parse(s),
+            Some(other) => other.clone(),
+            None => Value::Null,
+        };
+        let Value::Object(raw) = raw else { return message };
+        match error_message(raw.get("error")) {
+            Some(raw_message) => Some(message.into_iter().chain([raw_message]).collect::<Vec<_>>().join(" - ")),
+            None => message,
+        }
+    };
+    match try_parse(body) {
+        Value::Object(o) => part_message(&Value::Object(o)),
+        Value::Array(parts) => {
+            let messages: Vec<String> = parts.iter().filter_map(part_message).filter(|m| !m.is_empty()).collect();
+            (!messages.is_empty()).then(|| messages.join(". "))
+        }
+        Value::String(s) => Some(s),
+        other => Some(other.to_string()),
+    }
+}
+
+/// `Provider.local_providers`.
+pub fn local_providers() -> Vec<Provider> {
+    ALL.iter().copied().filter(Provider::is_local).collect()
+}
+
+/// `Provider.remote_providers`.
+pub fn remote_providers() -> Vec<Provider> {
+    ALL.iter().copied().filter(Provider::is_remote).collect()
+}
+
+/// `Provider.configured_providers(config)`: the providers whose requirements `config` meets.
+pub fn configured_providers(config: &Config) -> Vec<Provider> {
+    ALL.iter().copied().filter(|p| p.is_configured(config)).collect()
+}
+
+/// `Provider.configured_remote_providers(config)`.
+pub fn configured_remote_providers(config: &Config) -> Vec<Provider> {
+    ALL.iter().copied().filter(|p| p.is_remote() && p.is_configured(config)).collect()
 }

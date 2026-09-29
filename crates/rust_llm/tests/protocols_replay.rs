@@ -196,8 +196,7 @@ async fn deepseek_uploads_and_retrieves_an_image_with_an_expiry() {
 }
 
 // providers/mistral/chat_completions/batches_spec.rb 'submits, reloads, and cancels an embedding
-// batch' is not replayed: it stages `embed_later(['Rails'])`, an array input, and
-// `EmbeddingRequest::text` is a single `String` in this port.
+// batch' is replayed in tests/spec_batches.rs.
 
 // ---- providers/xai/chat_completions/batches_live_spec.rb ----------------------------------------
 

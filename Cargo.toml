@@ -29,4 +29,5 @@ tokio = { version = "1.45", features = ["macros", "rt-multi-thread", "time", "sy
 tracing = "0.1"
 uuid = { version = "1", features = ["v4"] }
 unicode-normalization = "0.1"
+minijinja = { version = "2", default-features = false, features = ["builtins", "serde"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }

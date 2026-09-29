@@ -6,7 +6,13 @@ use sea_orm_migration::schema::*;
 
 /// All RubyLLM migrations, in order.
 pub fn all() -> Vec<Box<dyn MigrationTrait>> {
-    vec![Box::new(CreateRustLlmRecords), Box::new(CreateChats), Box::new(CreateMessages), Box::new(CreateRustLlmAttachments)]
+    vec![
+        Box::new(CreateRustLlmRecords),
+        Box::new(CreateChats),
+        Box::new(CreateMessages),
+        Box::new(CreateRustLlmAttachments),
+        Box::new(CreateRustLlmMcpCredentials),
+    ]
 }
 
 /// `create_rust_llm_records_migration.rb.tt`: models, tool calls, usages.
@@ -230,5 +236,40 @@ impl MigrationTrait for CreateRustLlmAttachments {
 
     async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
         m.drop_table(Table::drop().table("rust_llm_attachments").if_exists().to_owned()).await
+    }
+}
+
+/// The `ruby_llm_mcp_credentials` table of `create_ruby_llm_records_migration.rb.tt` (and of the
+/// 2.1 upgrade): MCP OAuth credentials, keyed by owner and server, with a polymorphic owner.
+/// `data` holds the encrypted JSON (see `McpCredentialStore`).
+#[derive(DeriveMigrationName)]
+pub struct CreateRustLlmMcpCredentials;
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateRustLlmMcpCredentials {
+    async fn up(&self, m: &SchemaManager) -> Result<(), DbErr> {
+        m.create_table(
+            Table::create()
+                .table("rust_llm_mcp_credentials")
+                .if_not_exists()
+                .col(pk_auto("id"))
+                .col(string_null("owner_type"))
+                .col(big_integer_null("owner_id"))
+                .col(string("key"))
+                .col(text_null("data"))
+                .col(timestamp_with_time_zone("created_at").default(Expr::current_timestamp()))
+                .col(timestamp_with_time_zone("updated_at").default(Expr::current_timestamp()))
+                .to_owned(),
+        )
+        .await?;
+        m.create_index(
+            Index::create().name("idx-rust_llm_mcp_credentials-owner").table("rust_llm_mcp_credentials").col("owner_type").col("owner_id").to_owned(),
+        )
+        .await?;
+        m.create_index(Index::create().name("idx-rust_llm_mcp_credentials-key").table("rust_llm_mcp_credentials").col("key").unique().to_owned()).await
+    }
+
+    async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
+        m.drop_table(Table::drop().table("rust_llm_mcp_credentials").if_exists().to_owned()).await
     }
 }

@@ -11,7 +11,7 @@ use futures::StreamExt;
 use serde_json::Value;
 
 use crate::config::Config;
-use crate::error::{Error, Result, error_for_status};
+use crate::error::{Error, Result, error_for_status_message};
 use crate::message::RawResponse;
 use crate::providers::Provider;
 
@@ -89,10 +89,7 @@ impl SseParser {
 
 impl Connection {
     pub fn new(provider: Provider, config: std::sync::Arc<Config>) -> Result<Connection> {
-        let client = reqwest::Client::builder()
-            .timeout(config.request_timeout)
-            .build()
-            .map_err(|e| Error::Configuration(e.to_string()))?;
+        let client = basic(&config)?;
         Ok(Connection { client, provider, config })
     }
 
@@ -169,6 +166,33 @@ impl Connection {
         retry: bool,
         on_attempt: &mut (dyn FnMut(Option<&Error>) + Send),
     ) -> Result<reqwest::Response> {
+        // `instrument_request`: one `request.rust_llm` around the call and its retries.
+        let mut event = crate::instrumentation::Event::start(&self.config, "request.rust_llm", || {
+            let request = build().build().ok();
+            crate::instrumentation::payload([
+                ("provider", self.provider.slug().into()),
+                ("method", request.as_ref().map(|r| r.method().as_str().to_lowercase()).into()),
+                ("url", request.as_ref().map(|r| r.url().to_string()).into()),
+            ])
+        });
+        let result = tracing::Instrument::instrument(self.send_attempts(build, retry, on_attempt), event.span()).await;
+        let status = match &result {
+            Ok(resp) => Some(resp.status().as_u16()),
+            Err(e) => e.response().map(|r| r.status),
+        };
+        if let Some(status) = status {
+            event.set("status", || status.into());
+        }
+        event.finish(result.as_ref().err());
+        result
+    }
+
+    async fn send_attempts(
+        &self,
+        build: &(dyn Fn() -> reqwest::RequestBuilder + Send + Sync),
+        retry: bool,
+        on_attempt: &mut (dyn FnMut(Option<&Error>) + Send),
+    ) -> Result<reqwest::Response> {
         let mut attempt = 0;
         let mut previous: Option<Error> = None;
         loop {
@@ -178,10 +202,11 @@ impl Connection {
                 Ok(resp) if resp.status().is_success() => return Ok(resp),
                 Ok(resp) => {
                     let status = resp.status().as_u16();
-                    let retry_after = retry_after_secs(&resp);
+                    let mut headers = header_pairs(&resp);
+                    apply_retry_delay(Some(self.provider), status, &mut headers);
                     let body = resp.text().await.unwrap_or_default();
-                    let body = self.provider.strip_html_error(&body).unwrap_or(body);
-                    (error_for_status(status, &body), retry_after)
+                    let message = self.provider.parse_error(&body);
+                    (error_for_status_message(status, &body, message), retry_after_secs(&headers))
                 }
                 Err(e) if e.is_timeout() => (Error::Timeout(e.to_string()), None),
                 Err(e) => (Error::ConnectionFailed(e.to_string()), None),
@@ -347,7 +372,7 @@ impl Connection {
                 || data.get("type").and_then(Value::as_str) == Some("error");
             if is_error {
                 let code = streaming_error(&event.data).unwrap_or(500);
-                return Err(error_for_status(code, &event.data));
+                return Err(error_for_status_message(code, &event.data, self.provider.parse_error(&event.data)));
             }
             *delivered = true;
             on_event(event, data)
@@ -385,13 +410,50 @@ fn header_pairs(resp: &reqwest::Response) -> Vec<(String, String)> {
         .collect()
 }
 
-fn retry_after_secs(resp: &reqwest::Response) -> Option<f64> {
-    let h = resp.headers();
-    if let Some(ms) = h.get("retry-after-ms").and_then(|v| v.to_str().ok()).and_then(|v| v.parse::<f64>().ok())
-        && ms.is_finite() && ms >= 0.0 {
-            return Some(ms / 1000.0);
-        }
-    h.get("retry-after").and_then(|v| v.to_str().ok()).and_then(|v| v.parse::<f64>().ok())
+/// `Transport::Connection.basic(config)`: a client with the configuration's `request_timeout` and
+/// `http_proxy`. Provider connections build on it, and so do downloads outside a provider
+/// (attachment URLs, hosted images and videos), each with the configuration it came from.
+pub fn basic(config: &Config) -> Result<reqwest::Client> {
+    let mut builder = reqwest::Client::builder().timeout(config.request_timeout);
+    if let Some(proxy) = config.http_proxy.as_deref().filter(|p| !p.trim().is_empty()) {
+        builder = builder.proxy(reqwest::Proxy::all(proxy).map_err(|e| Error::Configuration(e.to_string()))?);
+    }
+    builder.build().map_err(|e| Error::Configuration(e.to_string()))
+}
+
+fn header<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str> {
+    headers.iter().find(|(k, _)| k.eq_ignore_ascii_case(name)).map(|(_, v)| v.as_str())
+}
+
+/// `ErrorMiddleware#apply_retry_delay` (`transport/error_middleware.rb`): the retry loop only
+/// reads the standard `Retry-After`, so on a failed response (status >= 400) without one, a
+/// `retry-after-ms` delay (finite, not negative) or else, on a 429, the provider's own reset hint
+/// (`Provider#retry_delay`) is written into `Retry-After` as seconds (`Float#to_s`).
+pub fn apply_retry_delay(provider: Option<Provider>, status: u16, headers: &mut Vec<(String, String)>) {
+    if status < 400 || header(headers, "retry-after").is_some() {
+        return;
+    }
+    let millis = header(headers, "retry-after-ms")
+        .and_then(|v| v.trim().parse::<f64>().ok())
+        .filter(|ms| ms.is_finite() && *ms >= 0.0)
+        .map(|ms| ms / 1000.0);
+    let delay = millis.or_else(|| if status == 429 { provider.and_then(|p| p.retry_delay(headers)) } else { None });
+    if let Some(delay) = delay {
+        headers.push(("Retry-After".into(), format!("{delay:?}")));
+    }
+}
+
+/// faraday-retry's `calculate_retry_after` and `calculate_rate_limit_reset`: the longer of the
+/// `Retry-After` and `RateLimit-Reset` waits, each an HTTP date or a number of seconds.
+fn retry_after_secs(headers: &[(String, String)]) -> Option<f64> {
+    ["retry-after", "ratelimit-reset"]
+        .iter()
+        .filter_map(|name| header(headers, name))
+        .map(|v| match chrono::DateTime::parse_from_rfc2822(v.trim()) {
+            Ok(at) => (at.with_timezone(&chrono::Utc) - chrono::Utc::now()).num_milliseconds() as f64 / 1000.0,
+            Err(_) => v.trim().parse::<f64>().unwrap_or(0.0),
+        })
+        .reduce(f64::max)
 }
 
 #[cfg(test)]

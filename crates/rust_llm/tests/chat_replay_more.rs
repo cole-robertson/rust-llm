@@ -410,6 +410,16 @@ async fn citations_openai_search_model() {
 struct WarnCollector(Arc<Mutex<Vec<String>>>);
 
 impl tracing::Subscriber for WarnCollector {
+    // Tests run in parallel: a callsite first hit with no collector set is cached as "never",
+    // so ask on every event instead of caching the interest.
+    fn register_callsite(&self, _: &'static tracing::Metadata<'static>) -> tracing::subscriber::Interest {
+        tracing::subscriber::Interest::sometimes()
+    }
+    // Without this the global max level is recomputed from other threads' (absent) collectors and
+    // can drop WARN events before they reach this one.
+    fn max_level_hint(&self) -> Option<tracing::level_filters::LevelFilter> {
+        Some(tracing::level_filters::LevelFilter::TRACE)
+    }
     fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
         true
     }

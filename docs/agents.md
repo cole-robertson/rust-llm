@@ -144,10 +144,14 @@ impl Agent for Critic {
 
 ## Prompts on Disk
 
-RubyLLM loads `app/prompts/<agent>/instructions.txt.erb`. `rust-llm generate agent Support` writes
-`src/agents/support_agent.rs` and an empty `src/prompts/support_agent/instructions.txt` that the
-agent embeds with `include_str!`. There is no template language: build dynamic text with
-`format!` in `instructions`.
+RubyLLM loads `app/prompts/<agent>/instructions.txt.erb`. An agent that declares no
+`instructions` does the same with `app/prompts/<agent>/instructions.txt.jinja`, rendered with its
+`prompt_locals`; `name` (the type name by default) picks the directory, so `WorkAssistant` reads
+`app/prompts/work_assistant/`. An empty file means no instructions. `render_prompt` renders the
+agent's other prompts. See [Prompt Templates](prompts.md) for the template syntax.
+
+`rust-llm generate agent Support` still writes an empty `src/prompts/support_agent/instructions.txt`
+that the generated agent embeds with `include_str!`.
 
 ## Applying an Agent to an Existing Chat
 
@@ -175,4 +179,4 @@ record.ask(db, &mut chat, "Any update on my ticket?").await?;
 - `rescue_from`, `headers`, `end_user`, `caching`, `citations`, `compaction`, and fallback
   `on:` (call `with_fallback_errors` on the chat).
 - `tool_options calls:`/`concurrency:`: only `tool_choice` has an agent method.
-- ERB prompt templates with locals.
+- ERB itself: prompt templates are Jinja (see [Prompt Templates](prompts.md)).
