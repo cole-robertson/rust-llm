@@ -27,7 +27,9 @@ impl Tokens {
             _ => {}
         }
         fn sum(values: impl Iterator<Item = Option<i64>>) -> Option<i64> {
-            values.flatten().fold(None, |acc, v| Some(acc.unwrap_or(0) + v))
+            values
+                .flatten()
+                .fold(None, |acc, v| Some(acc.unwrap_or(0) + v))
         }
         let reported_cost = tokens
             .iter()
@@ -38,7 +40,10 @@ impl Tokens {
             let total = server_tool_use.get_or_insert_with(Map::new);
             for (tool, count) in counters {
                 let prev = total.get(tool).and_then(Value::as_i64).unwrap_or(0);
-                total.insert(tool.clone(), Value::from(prev + count.as_i64().unwrap_or(0)));
+                total.insert(
+                    tool.clone(),
+                    Value::from(prev + count.as_i64().unwrap_or(0)),
+                );
             }
         }
         Tokens {
@@ -93,8 +98,16 @@ mod tests {
 
     #[test]
     fn aggregating_keeps_unreported_components_as_none() {
-        let a = Tokens { input: Some(10), output: Some(5), ..Default::default() };
-        let b = Tokens { input: Some(7), cache_read: Some(3), ..Default::default() };
+        let a = Tokens {
+            input: Some(10),
+            output: Some(5),
+            ..Default::default()
+        };
+        let b = Tokens {
+            input: Some(7),
+            cache_read: Some(3),
+            ..Default::default()
+        };
         let total = Tokens::aggregate([&a, &b]);
         assert_eq!(total.input, Some(17));
         assert_eq!(total.output, Some(5));

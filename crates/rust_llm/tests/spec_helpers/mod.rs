@@ -40,18 +40,31 @@ pub struct Sequence(pub Mutex<VecDeque<ResponseTemplate>>);
 
 impl Respond for Sequence {
     fn respond(&self, _request: &Request) -> ResponseTemplate {
-        self.0.lock().unwrap().pop_front().unwrap_or_else(|| ResponseTemplate::new(599).set_body_string("no stub left"))
+        self.0
+            .lock()
+            .unwrap()
+            .pop_front()
+            .unwrap_or_else(|| ResponseTemplate::new(599).set_body_string("no stub left"))
     }
 }
 
 /// A server that answers every request with the next of `responses` (JSON bodies, status 200).
 pub async fn serve(responses: Vec<Value>) -> MockServer {
-    serve_templates(responses.into_iter().map(|r| ResponseTemplate::new(200).set_body_json(r)).collect()).await
+    serve_templates(
+        responses
+            .into_iter()
+            .map(|r| ResponseTemplate::new(200).set_body_json(r))
+            .collect(),
+    )
+    .await
 }
 
 pub async fn serve_templates(responses: Vec<ResponseTemplate>) -> MockServer {
     let server = MockServer::start().await;
-    Mock::given(wiremock::matchers::any()).respond_with(Sequence(Mutex::new(responses.into()))).mount(&server).await;
+    Mock::given(wiremock::matchers::any())
+        .respond_with(Sequence(Mutex::new(responses.into())))
+        .mount(&server)
+        .await;
     server
 }
 
@@ -62,8 +75,17 @@ pub async fn requests(server: &MockServer) -> usize {
 /// `include_context 'with configured RubyLLM'`: every provider pointed at `server`, no retries.
 pub fn config(server: &MockServer) -> Arc<Config> {
     let mut c = Config::default();
-    for (provider, path) in [("anthropic", ""), ("openai", "/v1"), ("deepseek", ""), ("gemini", "/v1beta"), ("openrouter", "/api/v1")] {
-        c.set(format!("{provider}_api_base"), format!("{}{path}", server.uri()));
+    for (provider, path) in [
+        ("anthropic", ""),
+        ("openai", "/v1"),
+        ("deepseek", ""),
+        ("gemini", "/v1beta"),
+        ("openrouter", "/api/v1"),
+    ] {
+        c.set(
+            format!("{provider}_api_base"),
+            format!("{}{path}", server.uri()),
+        );
         c.set(format!("{provider}_api_key"), "test");
     }
     c.max_retries = 0;
@@ -82,8 +104,10 @@ pub fn args(value: Value) -> Map<String, Value> {
 /// An assistant message calling `calls`, like the specs' `tool_call_message`.
 pub fn tool_call_message(calls: &[(&str, &str, Value)]) -> Message {
     let mut m = Message::new(Role::Assistant, Some(String::new()));
-    let calls: IndexMap<ToolCall> =
-        calls.iter().map(|(id, name, a)| (id.to_string(), ToolCall::new(*id, *name, args(a.clone())))).collect();
+    let calls: IndexMap<ToolCall> = calls
+        .iter()
+        .map(|(id, name, a)| (id.to_string(), ToolCall::new(*id, *name, args(a.clone()))))
+        .collect();
     m.tool_calls = Some(calls);
     m
 }

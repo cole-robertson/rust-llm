@@ -183,7 +183,11 @@ impl McpBuilder {
     }
 
     /// `header("X-Account") { user.account_id }`: evaluated on every request.
-    pub fn header_with(mut self, name: impl Into<String>, value: impl Fn() -> Option<String> + Send + Sync + 'static) -> Self {
+    pub fn header_with(
+        mut self,
+        name: impl Into<String>,
+        value: impl Fn() -> Option<String> + Send + Sync + 'static,
+    ) -> Self {
         let name = name.into();
         self.headers.retain(|(n, _)| *n != name);
         self.headers.push((name, Arc::new(value)));
@@ -197,7 +201,10 @@ impl McpBuilder {
     }
 
     /// `bearer_token { user.linear_token }`: evaluated on every request.
-    pub fn bearer_token_with(mut self, token: impl Fn() -> Option<String> + Send + Sync + 'static) -> Self {
+    pub fn bearer_token_with(
+        mut self,
+        token: impl Fn() -> Option<String> + Send + Sync + 'static,
+    ) -> Self {
         self.bearer_token = Some(Arc::new(token));
         self
     }
@@ -254,7 +261,8 @@ impl McpBuilder {
         names: &[S],
         condition: impl Fn(&McpTool) -> bool + Send + Sync + 'static,
     ) -> Self {
-        self.approvals.push((strings(names), Some(Arc::new(condition))));
+        self.approvals
+            .push((strings(names), Some(Arc::new(condition))));
         self
     }
 
@@ -267,7 +275,10 @@ impl McpBuilder {
 
     /// `before_input_request { |request| request.answer(...) }`: the server's requests for input
     /// from the user. In a chat, a request no callback answers pauses the tool call.
-    pub fn before_input_request(mut self, callback: impl Fn(&mut InputRequest) + Send + Sync + 'static) -> Self {
+    pub fn before_input_request(
+        mut self,
+        callback: impl Fn(&mut InputRequest) + Send + Sync + 'static,
+    ) -> Self {
         self.before_input_request.push(Arc::new(callback));
         self
     }
@@ -296,20 +307,34 @@ impl McpBuilder {
         let timeout = self.timeout.unwrap_or(config.request_timeout);
         let name = self.name.clone().unwrap_or_else(|| self.default_name());
         let authorizer = match (&self.source, &self.oauth) {
-            (Source::Url(url), Some(settings)) => {
-                Some(Arc::new(oauth::Authorizer::new(name.clone(), url.clone(), settings.clone(), config.clone())))
-            }
+            (Source::Url(url), Some(settings)) => Some(Arc::new(oauth::Authorizer::new(
+                name.clone(),
+                url.clone(),
+                settings.clone(),
+                config.clone(),
+            ))),
             _ => None,
         };
         let transport: Arc<dyn Transport> = match &self.source {
             Source::Transport(t) => t.clone(),
-            Source::Command(argv) => Arc::new(Stdio::new(argv.clone(), self.env.clone(), self.directory.clone(), timeout)),
+            Source::Command(argv) => Arc::new(Stdio::new(
+                argv.clone(),
+                self.env.clone(),
+                self.directory.clone(),
+                timeout,
+            )),
             Source::Url(url) => {
                 let headers = self.headers.clone();
-                let token = if authorizer.is_some() { None } else { self.bearer_token.clone() };
+                let token = if authorizer.is_some() {
+                    None
+                } else {
+                    self.bearer_token.clone()
+                };
                 let source: HeaderSource = Arc::new(move || {
-                    let mut out: Vec<(String, String)> =
-                        headers.iter().filter_map(|(name, value)| value().map(|v| (name.clone(), v))).collect();
+                    let mut out: Vec<(String, String)> = headers
+                        .iter()
+                        .filter_map(|(name, value)| value().map(|v| (name.clone(), v)))
+                        .collect();
                     if let Some(token) = token.as_ref().and_then(|t| t()) {
                         out.push(("Authorization".into(), format!("Bearer {token}")));
                     }
@@ -324,17 +349,31 @@ impl McpBuilder {
         };
         let capabilities = json!({ "elicitation": { "form": {}, "url": {} } });
         let client = Client::new(transport, capabilities);
-        Ok(Mcp(Arc::new(Inner { name, settings: self, client, server_tools: Mutex::new(None), authorizer })))
+        Ok(Mcp(Arc::new(Inner {
+            name,
+            settings: self,
+            client,
+            server_tools: Mutex::new(None),
+            authorizer,
+        })))
     }
 
     /// `default_name_for(url:, command:)`.
     fn default_name(&self) -> String {
         match &self.source {
             Source::Url(url) => {
-                let host = reqwest::Url::parse(url).ok().and_then(|u| u.host_str().map(str::to_string)).unwrap_or_default();
+                let host = reqwest::Url::parse(url)
+                    .ok()
+                    .and_then(|u| u.host_str().map(str::to_string))
+                    .unwrap_or_default();
                 let labels: Vec<&str> = host.split('.').collect();
                 let labels = &labels[..labels.len().saturating_sub(1)];
-                labels.iter().filter(|l| !["mcp", "api", "www"].contains(l)).copied().collect::<Vec<_>>().join("_")
+                labels
+                    .iter()
+                    .filter(|l| !["mcp", "api", "www"].contains(l))
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join("_")
             }
             Source::Command(argv) => {
                 let first = argv.first().map(String::as_str).unwrap_or("");
@@ -381,7 +420,9 @@ impl Mcp {
     /// `command "npx", "-y", ...` / `RubyLLM.mcp(command:)`: a local server over stdio. The
     /// process starts on the first request.
     pub fn command<S: AsRef<str>>(argv: impl IntoIterator<Item = S>) -> McpBuilder {
-        McpBuilder::new(Source::Command(argv.into_iter().map(|s| s.as_ref().to_string()).collect()))
+        McpBuilder::new(Source::Command(
+            argv.into_iter().map(|s| s.as_ref().to_string()).collect(),
+        ))
     }
 
     /// `transport { Tunnel.new(device) }` / `RubyLLM.mcp(transport:, name:)`: an MCP with a
@@ -421,58 +462,119 @@ impl Mcp {
         if let Err(e) = self.check_declared_tools(&definitions) {
             return Some(Err(e));
         }
-        let mut tools: Vec<SharedTool> = definitions.iter().filter_map(|d| self.shape(d)).map(|t| t as SharedTool).collect();
-        tools.extend(self.0.settings.added_tools.iter().map(|build| build(self.clone())));
+        let mut tools: Vec<SharedTool> = definitions
+            .iter()
+            .filter_map(|d| self.shape(d))
+            .map(|t| t as SharedTool)
+            .collect();
+        tools.extend(
+            self.0
+                .settings
+                .added_tools
+                .iter()
+                .map(|build| build(self.clone())),
+        );
         Some(Ok(tools))
     }
 
     /// `call(name, **arguments)` (and `mcp.<tool>(...)`): calls a server tool. A tool that fails
     /// returns a result whose `is_error` is true; a protocol error is `Error::Mcp`.
     pub async fn call(&self, name: &str, arguments: Value) -> Result<McpResult> {
-        let arguments = if arguments.is_object() { arguments } else { json!({}) };
+        let arguments = if arguments.is_object() {
+            arguments
+        } else {
+            json!({})
+        };
         let params = json!({ "name": name, "arguments": arguments });
-        Ok(McpResult::new(self.request("tools/call", params, None).await?))
+        Ok(McpResult::new(
+            self.request("tools/call", params, None).await?,
+        ))
     }
 
     /// `resources`: read when their content is first needed.
     pub async fn resources(&self) -> Result<Vec<Resource>> {
         let items = self.0.client.list("resources/list", "resources").await?;
-        Ok(items.into_iter().map(|data| Resource::new(self.clone(), data)).collect())
+        Ok(items
+            .into_iter()
+            .map(|data| Resource::new(self.clone(), data))
+            .collect())
     }
 
     /// `resource(uri)`: reads the resource at `uri`.
     pub async fn resource(&self, uri: &str) -> Result<Resource> {
-        let result = self.request("resources/read", json!({ "uri": uri }), None).await?;
-        let contents = result.get("contents").and_then(Value::as_array).cloned().unwrap_or_default();
-        let data = contents.iter().find(|c| c.get("uri").and_then(Value::as_str) == Some(uri)).or(contents.first());
-        let data = data.cloned().ok_or_else(|| McpError::new(format!("{} returned no content for {uri}", self.name())))?;
+        let result = self
+            .request("resources/read", json!({ "uri": uri }), None)
+            .await?;
+        let contents = result
+            .get("contents")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        let data = contents
+            .iter()
+            .find(|c| c.get("uri").and_then(Value::as_str) == Some(uri))
+            .or(contents.first());
+        let data = data.cloned().ok_or_else(|| {
+            McpError::new(format!("{} returned no content for {uri}", self.name()))
+        })?;
         Ok(Resource::new(self.clone(), data))
     }
 
     /// `resource(template, **variables)`: fills in a template from `resource_templates`.
-    pub async fn resource_from_template(&self, template: &str, variables: Value) -> Result<Resource> {
-        self.resource(&ResourceTemplate::expand(template, &variables)).await
+    pub async fn resource_from_template(
+        &self,
+        template: &str,
+        variables: Value,
+    ) -> Result<Resource> {
+        self.resource(&ResourceTemplate::expand(template, &variables))
+            .await
     }
 
     /// `resource_templates`.
     pub async fn resource_templates(&self) -> Result<Vec<ResourceTemplate>> {
-        let items = self.0.client.list("resources/templates/list", "resourceTemplates").await?;
-        Ok(items.iter().map(|data| ResourceTemplate::new(self.clone(), data)).collect())
+        let items = self
+            .0
+            .client
+            .list("resources/templates/list", "resourceTemplates")
+            .await?;
+        Ok(items
+            .iter()
+            .map(|data| ResourceTemplate::new(self.clone(), data))
+            .collect())
     }
 
     /// `prompts`: the prompts the server offers, without messages.
     pub async fn prompts(&self) -> Result<Vec<Prompt>> {
         let items = self.0.client.list("prompts/list", "prompts").await?;
-        Ok(items.iter().map(|data| Prompt::new(self.clone(), data, Vec::new())).collect())
+        Ok(items
+            .iter()
+            .map(|data| Prompt::new(self.clone(), data, Vec::new()))
+            .collect())
     }
 
     /// `prompt(name, **arguments)`: fills in a prompt; pass it to `Chat::ask_prompt`.
     pub async fn prompt(&self, name: &str, arguments: &[(&str, &str)]) -> Result<Prompt> {
-        let arguments: Map<String, Value> = arguments.iter().map(|(k, v)| (k.to_string(), Value::String(v.to_string()))).collect();
-        let result = self.request("prompts/get", json!({ "name": name, "arguments": arguments }), None).await?;
+        let arguments: Map<String, Value> = arguments
+            .iter()
+            .map(|(k, v)| (k.to_string(), Value::String(v.to_string())))
+            .collect();
+        let result = self
+            .request(
+                "prompts/get",
+                json!({ "name": name, "arguments": arguments }),
+                None,
+            )
+            .await?;
         let mut messages = Vec::new();
-        for message in result.get("messages").and_then(Value::as_array).into_iter().flatten() {
-            let (text, attachments) = content::read(std::slice::from_ref(message.get("content").unwrap_or(&Value::Null)));
+        for message in result
+            .get("messages")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let (text, attachments) = content::read(std::slice::from_ref(
+                message.get("content").unwrap_or(&Value::Null),
+            ));
             let role = Role::parse(message.get("role").and_then(Value::as_str).unwrap_or(""))?;
             messages.push(Message::new(role, Some(text)).with_attachments(attachments));
         }
@@ -481,16 +583,30 @@ impl Mcp {
     }
 
     /// `suggest(reference, values)`: completes the first value, with the rest as context.
-    pub(crate) async fn suggest(&self, reference: Value, values: &[(&str, &str)]) -> Result<Vec<String>> {
+    pub(crate) async fn suggest(
+        &self,
+        reference: Value,
+        values: &[(&str, &str)],
+    ) -> Result<Vec<String>> {
         let Some(((argument, value), filled)) = values.split_first() else {
-            return Err(Error::Argument("Pass the value to complete as a keyword".into()));
+            return Err(Error::Argument(
+                "Pass the value to complete as a keyword".into(),
+            ));
         };
-        let mut params = json!({ "ref": reference, "argument": { "name": argument, "value": value } });
+        let mut params =
+            json!({ "ref": reference, "argument": { "name": argument, "value": value } });
         if !filled.is_empty() {
-            let arguments: Map<String, Value> = filled.iter().map(|(k, v)| (k.to_string(), Value::String(v.to_string()))).collect();
+            let arguments: Map<String, Value> = filled
+                .iter()
+                .map(|(k, v)| (k.to_string(), Value::String(v.to_string())))
+                .collect();
             params["context"] = json!({ "arguments": arguments });
         }
-        let result = self.0.client.request("completion/complete", params, &[], &mut |_| {}).await?;
+        let result = self
+            .0
+            .client
+            .request("completion/complete", params, &[], &mut |_| {})
+            .await?;
         Ok(result
             .pointer("/completion/values")
             .and_then(Value::as_array)
@@ -503,12 +619,18 @@ impl Mcp {
     /// `requires_approval?(tool)`, according to `requires_approval`.
     pub(crate) fn requires_approval(&self, tool: &McpTool) -> bool {
         self.0.settings.approvals.iter().any(|(names, condition)| {
-            (names.is_empty() || names.contains(&tool.server_name)) && condition.as_ref().is_none_or(|c| c(tool))
+            (names.is_empty() || names.contains(&tool.server_name))
+                && condition.as_ref().is_none_or(|c| c(tool))
         })
     }
 
     /// `run(tool, arguments, input:)`: runs one of this MCP's tools with the model's arguments.
-    pub(crate) async fn run(&self, tool: &McpTool, arguments: Map<String, Value>, input: Option<InputState>) -> Result<ToolResult> {
+    pub(crate) async fn run(
+        &self,
+        tool: &McpTool,
+        arguments: Map<String, Value>,
+        input: Option<InputState>,
+    ) -> Result<ToolResult> {
         let mut sent = arguments.clone();
         for (name, value) in &tool.fixed_arguments {
             sent.insert(name.clone(), value());
@@ -527,14 +649,22 @@ impl Mcp {
     /// `instructions`: what the server says about using it.
     pub async fn instructions(&self) -> Result<Option<String>> {
         let server = self.0.client.server().await?;
-        Ok(server.get("instructions").and_then(Value::as_str).map(str::to_string))
+        Ok(server
+            .get("instructions")
+            .and_then(Value::as_str)
+            .map(str::to_string))
     }
 
     /// `version`: the version the server reports for itself.
     pub async fn version(&self) -> Result<Option<String>> {
         let server = self.0.client.server().await?;
-        let info = server.get("serverInfo").or_else(|| server.pointer("/_meta/io.modelcontextprotocol~1serverInfo"));
-        Ok(info.and_then(|i| i.get("version")).and_then(Value::as_str).map(str::to_string))
+        let info = server
+            .get("serverInfo")
+            .or_else(|| server.pointer("/_meta/io.modelcontextprotocol~1serverInfo"));
+        Ok(info
+            .and_then(|i| i.get("version"))
+            .and_then(Value::as_str)
+            .map(str::to_string))
     }
 
     /// `prefix`: what `prefix` declared, or `None`.
@@ -550,7 +680,10 @@ impl Mcp {
     /// `MCP#oauth`: this server's OAuth for its owner. Fails with `Error::Configuration` for an
     /// MCP declared without `oauth`, and `Error::Argument` when a declared owner is `None`.
     pub fn oauth(&self) -> Result<Arc<OAuth>> {
-        let authorizer = self.0.authorizer.as_ref().ok_or_else(|| Error::Configuration(format!("{} does not use OAuth", self.name())))?;
+        let authorizer =
+            self.0.authorizer.as_ref().ok_or_else(|| {
+                Error::Configuration(format!("{} does not use OAuth", self.name()))
+            })?;
         authorizer.oauth()
     }
 
@@ -575,8 +708,14 @@ impl Mcp {
     /// `authorize(params)`: completes an authorization with the parameters of the callback
     /// request. Fails with `Error::Mcp` when the callback does not match the authorization that
     /// `authorization_url` started.
-    pub async fn authorize<K: Into<String>, V: Into<String>>(&self, params: impl IntoIterator<Item = (K, V)>) -> Result<&Self> {
-        let params = params.into_iter().map(|(k, v)| (k.into(), v.into())).collect();
+    pub async fn authorize<K: Into<String>, V: Into<String>>(
+        &self,
+        params: impl IntoIterator<Item = (K, V)>,
+    ) -> Result<&Self> {
+        let params = params
+            .into_iter()
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect();
         self.oauth()?.authorize(&params).await?;
         Ok(self)
     }
@@ -592,7 +731,9 @@ impl Mcp {
     async fn challenge(&self) -> Result<Option<Challenge>> {
         match self.0.client.server().await {
             Ok(_) => Ok(None),
-            Err(Error::Unauthorized(..)) => Ok(self.0.authorizer.as_ref().and_then(|a| a.challenge())),
+            Err(Error::Unauthorized(..)) => {
+                Ok(self.0.authorizer.as_ref().and_then(|a| a.challenge()))
+            }
             Err(e) => Err(e),
         }
     }
@@ -605,7 +746,12 @@ impl Mcp {
 
     /// `request(method, params, input:)`: answers `input_required` results with the
     /// `before_input_request` callbacks, up to `INPUT_ROUNDS` times.
-    async fn request(&self, method: &str, params: Value, input: Option<InputState>) -> Result<Value> {
+    async fn request(
+        &self,
+        method: &str,
+        params: Value,
+        input: Option<InputState>,
+    ) -> Result<Value> {
         let mut result = match &input {
             Some(input) => self.send_answers(method, &params, input).await?,
             None => self.send_request(method, params.clone()).await?,
@@ -614,7 +760,10 @@ impl Mcp {
             if result.get("resultType").and_then(Value::as_str) != Some("input_required") {
                 return Ok(result);
             }
-            let input = InputState { requests: self.input_requests(&result), request_state: result.get("requestState").cloned() };
+            let input = InputState {
+                requests: self.input_requests(&result),
+                request_state: result.get("requestState").cloned(),
+            };
             if !input.requests.iter().all(InputRequest::is_answered) {
                 return Err(InputRequiredError::new(&self.name(), input).into());
             }
@@ -623,9 +772,17 @@ impl Mcp {
         Err(McpError::new(format!("{} kept asking for input", self.name())).into())
     }
 
-    async fn send_answers(&self, method: &str, params: &Value, input: &InputState) -> Result<Value> {
-        let responses: Map<String, Value> =
-            input.requests.iter().map(|r| (r.key.clone(), r.response.clone().unwrap_or(Value::Null))).collect();
+    async fn send_answers(
+        &self,
+        method: &str,
+        params: &Value,
+        input: &InputState,
+    ) -> Result<Value> {
+        let responses: Map<String, Value> = input
+            .requests
+            .iter()
+            .map(|r| (r.key.clone(), r.response.clone().unwrap_or(Value::Null)))
+            .collect();
         let mut params = params.clone();
         params["inputResponses"] = Value::Object(responses);
         if let Some(state) = &input.request_state {
@@ -635,12 +792,17 @@ impl Mcp {
     }
 
     fn input_requests(&self, result: &Value) -> Vec<InputRequest> {
-        let Some(requests) = result.get("inputRequests").and_then(Value::as_object) else { return Vec::new() };
+        let Some(requests) = result.get("inputRequests").and_then(Value::as_object) else {
+            return Vec::new();
+        };
         requests
             .iter()
             .filter(|(_, r)| r.get("method").and_then(Value::as_str) == Some("elicitation/create"))
             .map(|(key, r)| {
-                let mut request = InputRequest::new(key.clone(), r.get("params").cloned().unwrap_or_else(|| json!({})));
+                let mut request = InputRequest::new(
+                    key.clone(),
+                    r.get("params").cloned().unwrap_or_else(|| json!({})),
+                );
                 for callback in &self.0.settings.before_input_request {
                     if !request.is_answered() {
                         callback(&mut request);
@@ -653,37 +815,60 @@ impl Mcp {
 
     /// `send_request`: asks for progress (with a fresh `progressToken`) only when someone listens.
     async fn send_request(&self, method: &str, mut params: Value) -> Result<Value> {
-        let headers = if method == "tools/call" { self.mirrored_headers(&params).await? } else { Vec::new() };
+        let headers = if method == "tools/call" {
+            self.mirrored_headers(&params).await?
+        } else {
+            Vec::new()
+        };
         let mut listeners: Vec<ProgressCallback> = self.0.settings.after_progress.clone();
         listeners.extend(progress::listener());
         if listeners.is_empty() {
-            return self.0.client.request(method, params, &headers, &mut |_| {}).await;
+            return self
+                .0
+                .client
+                .request(method, params, &headers, &mut |_| {})
+                .await;
         }
         let token = uuid::Uuid::new_v4().to_string();
         params["_meta"] = json!({ "progressToken": token });
         let mut on_notification = |notification: &Value| {
-            let data = notification.get("params").cloned().unwrap_or_else(|| json!({}));
-            let is_progress = notification.get("method").and_then(Value::as_str) == Some("notifications/progress");
-            if !is_progress || data.get("progressToken").and_then(Value::as_str) != Some(token.as_str()) {
+            let data = notification
+                .get("params")
+                .cloned()
+                .unwrap_or_else(|| json!({}));
+            let is_progress = notification.get("method").and_then(Value::as_str)
+                == Some("notifications/progress");
+            if !is_progress
+                || data.get("progressToken").and_then(Value::as_str) != Some(token.as_str())
+            {
                 return;
             }
             let progress = Progress {
                 value: data.get("progress").and_then(Value::as_f64),
                 total: data.get("total").and_then(Value::as_f64),
-                message: data.get("message").and_then(Value::as_str).map(str::to_string),
+                message: data
+                    .get("message")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
             };
             for listener in &listeners {
                 listener(&progress);
             }
         };
-        self.0.client.request(method, params, &headers, &mut on_notification).await
+        self.0
+            .client
+            .request(method, params, &headers, &mut on_notification)
+            .await
     }
 
     async fn mirrored_headers(&self, params: &Value) -> Result<Vec<(String, String)>> {
         let definitions = self.server_tools().await?;
         let name = params.get("name").and_then(Value::as_str);
         let empty = Map::new();
-        let arguments = params.get("arguments").and_then(Value::as_object).unwrap_or(&empty);
+        let arguments = params
+            .get("arguments")
+            .and_then(Value::as_object)
+            .unwrap_or(&empty);
         Ok(definitions
             .iter()
             .find(|d| d.get("name").and_then(Value::as_str) == name)
@@ -694,11 +879,25 @@ impl Mcp {
     fn shape(&self, definition: &Value) -> Option<Arc<McpTool>> {
         let settings = &self.0.settings;
         let name = definition.get("name").and_then(Value::as_str).unwrap_or("");
-        if settings.only.as_ref().is_some_and(|only| !only.iter().any(|n| n == name)) || settings.except.iter().any(|n| n == name) {
+        if settings
+            .only
+            .as_ref()
+            .is_some_and(|only| !only.iter().any(|n| n == name))
+            || settings.except.iter().any(|n| n == name)
+        {
             return None;
         }
-        let shape = settings.shapes.iter().filter(|(n, _)| n == name).fold(ToolShape::default(), |acc, (_, s)| acc.merge(s));
-        Some(Arc::new(McpTool::new(self.clone(), definition, settings.prefix.as_deref(), shape)))
+        let shape = settings
+            .shapes
+            .iter()
+            .filter(|(n, _)| n == name)
+            .fold(ToolShape::default(), |acc, (_, s)| acc.merge(s));
+        Some(Arc::new(McpTool::new(
+            self.clone(),
+            definition,
+            settings.prefix.as_deref(),
+            shape,
+        )))
     }
 
     fn check_declared_tools(&self, definitions: &[Value]) -> Result<()> {
@@ -706,7 +905,10 @@ impl Mcp {
         let mut declared: Vec<&String> = settings.only.iter().flatten().collect();
         declared.extend(settings.approvals.iter().flat_map(|(names, _)| names));
         declared.extend(settings.shapes.iter().map(|(name, _)| name));
-        let offered: Vec<&str> = definitions.iter().filter_map(|d| d.get("name").and_then(Value::as_str)).collect();
+        let offered: Vec<&str> = definitions
+            .iter()
+            .filter_map(|d| d.get("name").and_then(Value::as_str))
+            .collect();
         let mut missing: Vec<&str> = Vec::new();
         for name in declared {
             if !offered.contains(&name.as_str()) && !missing.contains(&name.as_str()) {
@@ -716,15 +918,25 @@ impl Mcp {
         if missing.is_empty() {
             return Ok(());
         }
-        Err(Error::Configuration(format!("{} declares {}, which the server does not offer", self.name(), missing.join(", "))))
+        Err(Error::Configuration(format!(
+            "{} declares {}, which the server does not offer",
+            self.name(),
+            missing.join(", ")
+        )))
     }
 
     async fn server_tools(&self) -> Result<Vec<Value>> {
         if let Some(cached) = self.0.server_tools.lock().ok().and_then(|c| c.clone()) {
             return Ok(cached);
         }
-        let definitions: Vec<Value> =
-            self.0.client.list("tools/list", "tools").await?.into_iter().filter(param_headers::is_valid).collect();
+        let definitions: Vec<Value> = self
+            .0
+            .client
+            .list("tools/list", "tools")
+            .await?
+            .into_iter()
+            .filter(param_headers::is_valid)
+            .collect();
         if let Ok(mut cache) = self.0.server_tools.lock() {
             *cache = Some(definitions.clone());
         }

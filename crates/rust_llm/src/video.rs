@@ -46,7 +46,15 @@ pub struct Video {
 impl Video {
     /// `Video.new(url:, data:, mime_type:, model:, duration:, raw:)`.
     pub fn new(url: Option<String>, mime_type: Option<String>, raw: Value) -> Video {
-        Video { url, data: None, mime_type, model: None, duration: None, raw, config: None }
+        Video {
+            url,
+            data: None,
+            mime_type,
+            model: None,
+            duration: None,
+            raw,
+            config: None,
+        }
     }
 
     /// `Video#config`: the configuration of the context that generated the video, whose
@@ -60,13 +68,26 @@ impl Video {
         if let Some(data) = &self.data {
             return Ok(data.clone());
         }
-        let url = self.url.as_deref().ok_or_else(|| Error::Argument("video has neither data nor a url".into()))?;
+        let url = self
+            .url
+            .as_deref()
+            .ok_or_else(|| Error::Argument("video has neither data nor a url".into()))?;
         let client = crate::transport::basic(&self.config())?;
-        let response = client.get(url).send().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
+        let response = client
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| Error::ConnectionFailed(e.to_string()))?;
         let status = response.status();
-        let bytes = response.bytes().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| Error::ConnectionFailed(e.to_string()))?;
         if !status.is_success() {
-            return Err(error_for_status(status.as_u16(), &String::from_utf8_lossy(&bytes)));
+            return Err(error_for_status(
+                status.as_u16(),
+                &String::from_utf8_lossy(&bytes),
+            ));
         }
         Ok(bytes.to_vec())
     }
@@ -145,7 +166,11 @@ impl VideoJob {
     /// `wait(timeout:, interval:)`: poll until the job finishes. `None` uses the configured
     /// `video_generation_timeout` and `video_generation_poll_interval`. Never sleeps past the
     /// deadline. Fails when the job fails or the timeout elapses first.
-    pub async fn wait(&mut self, timeout: Option<Duration>, interval: Option<Duration>) -> Result<&mut Self> {
+    pub async fn wait(
+        &mut self,
+        timeout: Option<Duration>,
+        interval: Option<Duration>,
+    ) -> Result<&mut Self> {
         let config = self.connection.config().clone();
         let timeout = timeout.unwrap_or(config.video_generation_timeout);
         let interval = interval.unwrap_or(config.video_generation_poll_interval);
@@ -153,7 +178,13 @@ impl VideoJob {
         while !self.is_done() {
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
-                return Err(Error::Api(format!("Video generation timed out after {} seconds", seconds(timeout)), None));
+                return Err(Error::Api(
+                    format!(
+                        "Video generation timed out after {} seconds",
+                        seconds(timeout)
+                    ),
+                    None,
+                ));
             }
             tokio::time::sleep(interval.min(remaining)).await;
             self.refresh().await?;
@@ -179,7 +210,13 @@ impl VideoJob {
 
     fn raise_if_failed(&self) -> Result<()> {
         if self.is_failed() {
-            return Err(Error::Api(format!("Video generation failed: {}", self.error.as_deref().unwrap_or("")), None));
+            return Err(Error::Api(
+                format!(
+                    "Video generation failed: {}",
+                    self.error.as_deref().unwrap_or("")
+                ),
+                None,
+            ));
         }
         Ok(())
     }
@@ -187,7 +224,11 @@ impl VideoJob {
 
 /// Ruby prints a whole-second timeout as an Integer.
 fn seconds(d: Duration) -> String {
-    if d.subsec_nanos() == 0 { d.as_secs().to_string() } else { d.as_secs_f64().to_string() }
+    if d.subsec_nanos() == 0 {
+        d.as_secs().to_string()
+    } else {
+        d.as_secs_f64().to_string()
+    }
 }
 
 /// `extend:`: the video to continue.
@@ -238,23 +279,39 @@ pub struct AnimateOptions<'a> {
 pub async fn animate(prompt: Option<&str>, options: AnimateOptions<'_>) -> Result<Video> {
     let mut job = animate_later(prompt, options).await?;
     job.wait(None, None).await?;
-    job.video().await?.ok_or_else(|| Error::Api("Video generation finished without a video".into(), None))
+    job.video()
+        .await?
+        .ok_or_else(|| Error::Api("Video generation finished without a video".into(), None))
 }
 
 /// `RubyLLM.animate_later(prompt, ...)`: submit a job and return it without waiting.
 pub async fn animate_later(prompt: Option<&str>, options: AnimateOptions<'_>) -> Result<VideoJob> {
-    let AnimateOptions { model, provider, assume_model_exists, mut with, extend, provider_options, config } = options;
+    let AnimateOptions {
+        model,
+        provider,
+        assume_model_exists,
+        mut with,
+        extend,
+        provider_options,
+        config,
+    } = options;
     let config = config.unwrap_or_else(crate::config);
     let model_id = model.unwrap_or(&config.default_video_model).to_string();
     let (model, provider) = resolve_model(&model_id, provider, assume_model_exists)?;
     provider.ensure_configured(&config)?;
     let family = Family::for_provider(provider)?;
     if !with.is_empty() && extend.is_some() {
-        return Err(Error::Argument("with: and extend: cannot be combined".into()));
+        return Err(Error::Argument(
+            "with: and extend: cannot be combined".into(),
+        ));
     }
     let connection = Connection::new(provider, config.clone())?;
     let (path, payload) = match extend {
-        Some(source) => family.render_extension(prompt, &model.id, source, &provider_options, &connection).await?,
+        Some(source) => {
+            family
+                .render_extension(prompt, &model.id, source, &provider_options, &connection)
+                .await?
+        }
         None => {
             family.validate(&with)?;
             for a in with.iter_mut().filter(|a| family.loads(a)) {
@@ -264,10 +321,23 @@ pub async fn animate_later(prompt: Option<&str>, options: AnimateOptions<'_>) ->
         }
     };
     // `post_video`: submitting creates a job, so a lost response is never retried.
-    let resp = connection.send(reqwest::Method::POST, &path, &[], false, &|req| req.json(&payload)).await?;
+    let resp = connection
+        .send(reqwest::Method::POST, &path, &[], false, &|req| {
+            req.json(&payload)
+        })
+        .await?;
     let body = json_response(resp, payload.clone()).await?.body;
     let (id, status) = family.parse_job(&body)?;
-    Ok(VideoJob { id, status, model: model.id.clone(), error: None, raw: body, family, connection, video: None })
+    Ok(VideoJob {
+        id,
+        status,
+        model: model.id.clone(),
+        error: None,
+        raw: body,
+        family,
+        connection,
+        video: None,
+    })
 }
 
 /// Which video seams a provider's protocol includes.
@@ -286,7 +356,10 @@ impl Family {
             Provider::XAI => Ok(Family::XAI),
             Provider::OpenRouter => Ok(Family::OpenRouter),
             Provider::Gemini => Ok(Family::Gemini),
-            other => Err(Error::Api(format!("{} doesn't support video generation", other.display()), None)),
+            other => Err(Error::Api(
+                format!("{} doesn't support video generation", other.display()),
+                None,
+            )),
         }
     }
 
@@ -309,7 +382,10 @@ impl Family {
         match self {
             Family::XAI => {
                 if with.len() > 1 {
-                    return Err(Error::Api("xAI video generation takes a single reference image or video".into(), None));
+                    return Err(Error::Api(
+                        "xAI video generation takes a single reference image or video".into(),
+                        None,
+                    ));
                 }
                 for a in with.iter().filter(|a| !a.is_provider_file() && !a.is_url()) {
                     if !matches!(a.kind(), AttachmentType::Image | AttachmentType::Video) {
@@ -319,7 +395,11 @@ impl Family {
             }
             Family::OpenRouter => {
                 if with.len() > 2 {
-                    return Err(Error::Api("OpenRouter video generation takes at most first and last frame images".into(), None));
+                    return Err(Error::Api(
+                        "OpenRouter video generation takes at most first and last frame images"
+                            .into(),
+                        None,
+                    ));
                 }
                 for a in with.iter().filter(|a| !a.is_url()) {
                     if a.kind() != AttachmentType::Image {
@@ -329,7 +409,10 @@ impl Family {
             }
             Family::Gemini => {
                 if with.len() > 1 {
-                    return Err(Error::Api("Veo takes a single reference image".into(), None));
+                    return Err(Error::Api(
+                        "Veo takes a single reference image".into(),
+                        None,
+                    ));
                 }
                 for a in with {
                     if a.kind() != AttachmentType::Image {
@@ -342,16 +425,30 @@ impl Family {
     }
 
     /// `video_request_url` and `render_video_payload`.
-    fn render(self, prompt: Option<&str>, model: &str, with: &[Attachment], provider_options: &Value) -> Result<(String, Value)> {
+    fn render(
+        self,
+        prompt: Option<&str>,
+        model: &str,
+        with: &[Attachment],
+        provider_options: &Value,
+    ) -> Result<(String, Value)> {
         match self {
             Family::XAI => {
                 let mut payload = json!({ "model": model, "prompt": prompt });
                 if let Some(a) = with.first() {
-                    let key = if a.kind() == AttachmentType::Video { "video" } else { "image" };
+                    let key = if a.kind() == AttachmentType::Video {
+                        "video"
+                    } else {
+                        "image"
+                    };
                     payload[key] = xai_reference(a)?;
                 }
                 let payload = merge(payload, provider_options);
-                let path = if payload.get("video").is_some() { "videos/edits" } else { "videos/generations" };
+                let path = if payload.get("video").is_some() {
+                    "videos/edits"
+                } else {
+                    "videos/generations"
+                };
                 Ok((path.into(), payload))
             }
             Family::OpenRouter => {
@@ -393,12 +490,16 @@ impl Family {
                 if !video.is_url() && !video.is_provider_file() {
                     video.load(connection.client()).await?;
                 }
-                let payload = json!({ "model": model, "prompt": prompt, "video": xai_reference(&video)? });
+                let payload =
+                    json!({ "model": model, "prompt": prompt, "video": xai_reference(&video)? });
                 Ok(("videos/extensions".into(), merge(payload, provider_options)))
             }
             Family::Gemini => {
                 let uri = match &source {
-                    VideoSource::Video(v) => gemini_generated_video(&v.raw).and_then(|g| g.get("uri")).and_then(Value::as_str).map(str::to_string),
+                    VideoSource::Video(v) => gemini_generated_video(&v.raw)
+                        .and_then(|g| g.get("uri"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
                     VideoSource::Attachment(_) => None,
                 };
                 let uri = match uri {
@@ -416,11 +517,15 @@ impl Family {
                         }
                     }
                 };
-                let mut payload = json!({ "instances": [{ "prompt": prompt, "video": { "uri": uri } }] });
+                let mut payload =
+                    json!({ "instances": [{ "prompt": prompt, "video": { "uri": uri } }] });
                 deep_merge(&mut payload, provider_options);
                 Ok((format!("models/{model}:predictLongRunning"), payload))
             }
-            Family::OpenRouter => Err(Error::Api(format!("{} doesn't support video extension", self.name()), None)),
+            Family::OpenRouter => Err(Error::Api(
+                format!("{} doesn't support video extension", self.name()),
+                None,
+            )),
         }
     }
 
@@ -431,7 +536,10 @@ impl Family {
             Family::OpenRouter => ("id", "OpenRouter did not return a video job"),
             Family::Gemini => ("name", "Gemini did not return a video generation operation"),
         };
-        let id = body.get(key).and_then(Value::as_str).ok_or_else(|| Error::Api(message.into(), None))?;
+        let id = body
+            .get(key)
+            .and_then(Value::as_str)
+            .ok_or_else(|| Error::Api(message.into(), None))?;
         let status = match self {
             Family::OpenRouter => openrouter_status(body),
             _ => VideoStatus::Pending,
@@ -441,7 +549,15 @@ impl Family {
 
     /// `parse_video_job_status`: the job's state and, when failed, the provider's message.
     fn parse_status(self, body: &Value) -> (VideoStatus, Option<String>) {
-        let status_or_error = || Some(body.get("error").filter(|e| !e.is_null()).or_else(|| body.get("status")).map(display).unwrap_or_default());
+        let status_or_error = || {
+            Some(
+                body.get("error")
+                    .filter(|e| !e.is_null())
+                    .or_else(|| body.get("status"))
+                    .map(display)
+                    .unwrap_or_default(),
+            )
+        };
         match self {
             Family::XAI => match body.get("status").and_then(Value::as_str) {
                 Some("done") => (VideoStatus::Completed, None),
@@ -467,7 +583,11 @@ impl Family {
                     .and_then(Value::as_array)
                     .map(|r| r.iter().map(display).collect())
                     .unwrap_or_default();
-                let error = if reasons.is_empty() { "Gemini returned no video".to_string() } else { reasons.join(" ") };
+                let error = if reasons.is_empty() {
+                    "Gemini returned no video".to_string()
+                } else {
+                    reasons.join(" ")
+                };
                 (VideoStatus::Failed, Some(error))
             }
         }
@@ -482,14 +602,24 @@ impl Family {
                     url: video.get("url").and_then(Value::as_str).map(str::to_string),
                     data: None,
                     mime_type: Some("video/mp4".into()),
-                    model: Some(job.raw.get("model").and_then(Value::as_str).unwrap_or(&job.model).to_string()),
+                    model: Some(
+                        job.raw
+                            .get("model")
+                            .and_then(Value::as_str)
+                            .unwrap_or(&job.model)
+                            .to_string(),
+                    ),
                     duration: video.get("duration").and_then(Value::as_f64),
                     raw: job.raw.clone(),
                     config: None,
                 })
             }
             Family::OpenRouter => {
-                let (data, content_type) = fetch(&job.connection, &format!("videos/{}/content?index=0", job.id)).await?;
+                let (data, content_type) = fetch(
+                    &job.connection,
+                    &format!("videos/{}/content?index=0", job.id),
+                )
+                .await?;
                 Ok(Video {
                     url: None,
                     data: Some(data),
@@ -501,7 +631,9 @@ impl Family {
                 })
             }
             Family::Gemini => {
-                let generated = gemini_generated_video(&job.raw).cloned().unwrap_or_else(|| json!({}));
+                let generated = gemini_generated_video(&job.raw)
+                    .cloned()
+                    .unwrap_or_else(|| json!({}));
                 let uri = generated
                     .get("uri")
                     .and_then(Value::as_str)
@@ -511,7 +643,13 @@ impl Family {
                 Ok(Video {
                     url: None,
                     data: Some(data),
-                    mime_type: Some(generated.get("mimeType").and_then(Value::as_str).unwrap_or("video/mp4").to_string()),
+                    mime_type: Some(
+                        generated
+                            .get("mimeType")
+                            .and_then(Value::as_str)
+                            .unwrap_or("video/mp4")
+                            .to_string(),
+                    ),
                     model: Some(job.model.clone()),
                     duration: None,
                     raw: job.raw.clone(),
@@ -524,9 +662,18 @@ impl Family {
 
 /// An authenticated GET for a binary body, returning the bytes and the response content type.
 async fn fetch(connection: &Connection, path: &str) -> Result<(Vec<u8>, Option<String>)> {
-    let resp = connection.send(reqwest::Method::GET, path, &[], true, &|req| req).await?;
-    let content_type = resp.headers().get("content-type").and_then(|v| v.to_str().ok()).map(str::to_string);
-    let bytes = resp.bytes().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
+    let resp = connection
+        .send(reqwest::Method::GET, path, &[], true, &|req| req)
+        .await?;
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| Error::ConnectionFailed(e.to_string()))?;
     Ok((bytes.to_vec(), content_type))
 }
 
@@ -539,7 +686,8 @@ fn openrouter_status(body: &Value) -> VideoStatus {
 }
 
 fn gemini_generated_video(body: &Value) -> Option<&Value> {
-    body.pointer("/response/generateVideoResponse/generatedSamples/0/video").filter(|v| !v.is_null())
+    body.pointer("/response/generateVideoResponse/generatedSamples/0/video")
+        .filter(|v| !v.is_null())
 }
 
 /// Ruby string interpolation of a JSON value: strings bare, everything else as JSON.
@@ -562,7 +710,9 @@ fn extension_attachment(source: VideoSource) -> Result<Attachment> {
         },
     };
     if attachment.kind() != AttachmentType::Video {
-        return Err(Error::UnsupportedAttachment(unsupported(&attachment.mime_type)));
+        return Err(Error::UnsupportedAttachment(unsupported(
+            &attachment.mime_type,
+        )));
     }
     Ok(attachment)
 }
@@ -591,7 +741,12 @@ mod tests {
     #[test]
     fn xai_sends_model_prompt_and_provider_options() {
         let (path, payload) = Family::XAI
-            .render(Some("make the water crash down"), "grok-imagine-video", &[], &json!({ "duration": 1, "resolution": "480p" }))
+            .render(
+                Some("make the water crash down"),
+                "grok-imagine-video",
+                &[],
+                &json!({ "duration": 1, "resolution": "480p" }),
+            )
             .unwrap();
         assert_eq!(path, "videos/generations");
         assert_eq!(
@@ -604,21 +759,43 @@ mod tests {
     #[test]
     fn xai_edits_a_local_video_through_a_data_uri() {
         let video = Attachment::from_bytes(b"mp4 bytes".to_vec(), "clip.mp4", None);
-        let (path, payload) = Family::XAI.render(Some("Turn the background blue"), "grok-imagine-video", &[video], &Value::Null).unwrap();
+        let (path, payload) = Family::XAI
+            .render(
+                Some("Turn the background blue"),
+                "grok-imagine-video",
+                &[video],
+                &Value::Null,
+            )
+            .unwrap();
         assert_eq!(path, "videos/edits");
-        assert_eq!(payload["video"], json!({ "url": "data:video/mp4;base64,bXA0IGJ5dGVz" }));
+        assert_eq!(
+            payload["video"],
+            json!({ "url": "data:video/mp4;base64,bXA0IGJ5dGVz" })
+        );
     }
 
     #[test]
     fn gemini_reports_filtered_reasons_as_the_failure() {
         let body = json!({ "done": true, "response": { "generateVideoResponse": { "raiMediaFilteredReasons": ["unsafe", "content"] } } });
-        assert_eq!(Family::Gemini.parse_status(&body), (VideoStatus::Failed, Some("unsafe content".into())));
-        assert_eq!(Family::Gemini.parse_status(&json!({ "done": true })), (VideoStatus::Failed, Some("Gemini returned no video".into())));
-        assert_eq!(Family::Gemini.parse_status(&json!({ "name": "op" })).0, VideoStatus::Pending);
+        assert_eq!(
+            Family::Gemini.parse_status(&body),
+            (VideoStatus::Failed, Some("unsafe content".into()))
+        );
+        assert_eq!(
+            Family::Gemini.parse_status(&json!({ "done": true })),
+            (VideoStatus::Failed, Some("Gemini returned no video".into()))
+        );
+        assert_eq!(
+            Family::Gemini.parse_status(&json!({ "name": "op" })).0,
+            VideoStatus::Pending
+        );
     }
 
     #[test]
     fn xai_expired_jobs_fail_with_their_status() {
-        assert_eq!(Family::XAI.parse_status(&json!({ "status": "expired" })), (VideoStatus::Failed, Some("expired".into())));
+        assert_eq!(
+            Family::XAI.parse_status(&json!({ "status": "expired" })),
+            (VideoStatus::Failed, Some("expired".into()))
+        );
     }
 }

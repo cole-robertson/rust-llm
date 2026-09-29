@@ -4,7 +4,10 @@
 
 use serde_json::{Map, Value, json};
 
-use super::{Caching, Request, ToolCalls, ToolChoice, char_slice, deep_merge, int, normalize_finish_reason, str_of, tool_call_map};
+use super::{
+    Caching, Request, ToolCalls, ToolChoice, char_slice, deep_merge, int, normalize_finish_reason,
+    str_of, tool_call_map,
+};
 use crate::attachment::{Attachment, AttachmentType};
 use crate::error::{Error, Result};
 use crate::message::{Citation, Message, RawResponse, Role, Thinking, ToolArguments, ToolCall};
@@ -32,8 +35,11 @@ pub(crate) fn schema_strict(schema: &super::Schema) -> bool {
         match node {
             Value::Object(map) => {
                 if let Some(Value::Object(props)) = map.get("properties") {
-                    let required: Vec<&str> =
-                        map.get("required").and_then(Value::as_array).map(|r| r.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+                    let required: Vec<&str> = map
+                        .get("required")
+                        .and_then(Value::as_array)
+                        .map(|r| r.iter().filter_map(Value::as_str).collect())
+                        .unwrap_or_default();
                     if props.keys().any(|k| !required.contains(&k.as_str())) {
                         return false;
                     }
@@ -62,7 +68,9 @@ fn format_role(provider: Provider, role: Role, config: &crate::Config) -> &'stat
             | Provider::Perplexity
     );
     match role {
-        Role::System if !plain_roles && config.get("openai_use_system_role") != Some("true") => "developer",
+        Role::System if !plain_roles && config.get("openai_use_system_role") != Some("true") => {
+            "developer"
+        }
         r => r.as_str(),
     }
 }
@@ -77,16 +85,26 @@ pub fn render_payload(req: &Request) -> Result<Value> {
         payload.insert("temperature".into(), t.into());
     }
     if let Some(max) = req.max_output_tokens {
-        let field = if provider == Provider::OpenAI { "max_completion_tokens" } else { "max_tokens" };
+        let field = if provider == Provider::OpenAI {
+            "max_completion_tokens"
+        } else {
+            "max_tokens"
+        };
         payload.insert(field.into(), max.into());
     }
     if !req.tools.is_empty() {
-        payload.insert("tools".into(), Value::Array(req.tools.iter().map(|t| tool_for(t.as_ref())).collect()));
+        payload.insert(
+            "tools".into(),
+            Value::Array(req.tools.iter().map(|t| tool_for(t.as_ref())).collect()),
+        );
         if let Some(choice) = &req.tool_prefs.choice {
             payload.insert("tool_choice".into(), build_tool_choice(provider, choice));
         }
         if let Some(calls) = req.tool_prefs.calls {
-            payload.insert("parallel_tool_calls".into(), (calls == ToolCalls::Many).into());
+            payload.insert(
+                "parallel_tool_calls".into(),
+                (calls == ToolCalls::Many).into(),
+            );
         }
     }
     if let Some(schema) = req.schema {
@@ -127,11 +145,23 @@ pub fn render_payload(req: &Request) -> Result<Value> {
         }
         Provider::Mistral => {
             payload.remove("stream_options");
-            let single_tool = payload.get("tools").and_then(Value::as_array).filter(|t| t.len() == 1).cloned();
+            let single_tool = payload
+                .get("tools")
+                .and_then(Value::as_array)
+                .filter(|t| t.len() == 1)
+                .cloned();
             if payload.get("tool_choice").and_then(Value::as_str) == Some("any")
-                && let Some(name) = single_tool.as_ref().and_then(|t| t[0].pointer("/function/name")).filter(|n| !n.is_null()).cloned() {
-                    payload.insert("tool_choice".into(), json!({ "type": "function", "function": { "name": name } }));
-                }
+                && let Some(name) = single_tool
+                    .as_ref()
+                    .and_then(|t| t[0].pointer("/function/name"))
+                    .filter(|n| !n.is_null())
+                    .cloned()
+            {
+                payload.insert(
+                    "tool_choice".into(),
+                    json!({ "type": "function", "function": { "name": name } }),
+                );
+            }
         }
         Provider::OpenRouter => {
             payload.remove("reasoning_effort");
@@ -180,17 +210,27 @@ pub fn render_payload(req: &Request) -> Result<Value> {
 fn apply_prompt_cache_params(req: &Request, payload: &mut Map<String, Value>) -> Result<()> {
     match req.provider {
         Provider::Mistral => {
-            if let Some(key) = Caching::checked(req.caching, &["key"], "Mistral")?.and_then(|o| o.get("key")).filter(|k| !k.is_null()) {
+            if let Some(key) = Caching::checked(req.caching, &["key"], "Mistral")?
+                .and_then(|o| o.get("key"))
+                .filter(|k| !k.is_null())
+            {
                 payload.insert("prompt_cache_key".into(), key.clone());
             }
         }
         Provider::OpenRouter => {
             if let Some(options) = Caching::checked(req.caching, &["ttl"], "OpenRouter")? {
-                payload.insert("cache_control".into(), openrouter_cache_control(Some(options)));
+                payload.insert(
+                    "cache_control".into(),
+                    openrouter_cache_control(Some(options)),
+                );
             }
         }
         _ => {
-            if let Some(options) = Caching::checked(req.caching, super::responses::PROMPT_CACHE_OPTIONS, "Chat Completions")? {
+            if let Some(options) = Caching::checked(
+                req.caching,
+                super::responses::PROMPT_CACHE_OPTIONS,
+                "Chat Completions",
+            )? {
                 payload.extend(super::responses::prompt_cache_params(options));
             }
         }
@@ -208,7 +248,8 @@ fn openrouter_cache_control(options: Option<&Map<String, Value>>) -> Value {
 }
 
 fn format_messages(req: &Request) -> Result<Vec<Value>> {
-    let (system, other): (Vec<&Message>, Vec<&Message>) = req.messages.iter().partition(|m| m.role == Role::System);
+    let (system, other): (Vec<&Message>, Vec<&Message>) =
+        req.messages.iter().partition(|m| m.role == Role::System);
     let ordered: Vec<&Message> = system.into_iter().chain(other).collect();
     let mut out = Vec::new();
     let mut i = 0;
@@ -222,15 +263,21 @@ fn format_messages(req: &Request) -> Result<Vec<Value>> {
             }
             for msg in &ordered[start..i] {
                 if !msg.attachments.is_empty() {
-                    let mut parts =
-                        vec![json!({ "type": "text", "text": format!("Attachments from tool call {}:", msg.tool_call_id.as_deref().unwrap_or("")) })];
-                    if let Value::Array(more) = format_content(req.provider, None, &msg.attachments)? {
+                    let mut parts = vec![
+                        json!({ "type": "text", "text": format!("Attachments from tool call {}:", msg.tool_call_id.as_deref().unwrap_or("")) }),
+                    ];
+                    if let Value::Array(more) =
+                        format_content(req.provider, None, &msg.attachments)?
+                    {
                         parts.extend(more);
                     }
                     out.push(json!({ "role": "user", "content": parts }));
                 }
             }
-        } else if let Some(replayed) = (req.provider == Provider::Mistral).then(|| super::mistral::multi_messages_for_replay(ordered[i])).flatten() {
+        } else if let Some(replayed) = (req.provider == Provider::Mistral)
+            .then(|| super::mistral::multi_messages_for_replay(ordered[i]))
+            .flatten()
+        {
             // `MultiCompletion#format_message_group`: a multi-completion answer replays its messages.
             out.extend(replayed);
             i += 1;
@@ -244,31 +291,39 @@ fn format_messages(req: &Request) -> Result<Vec<Value>> {
 
 fn format_message(req: &Request, msg: &Message) -> Result<Value> {
     let provider = req.provider;
-    let attachments: &[Attachment] = if msg.is_tool_result() { &[] } else { &msg.attachments };
+    let attachments: &[Attachment] = if msg.is_tool_result() {
+        &[]
+    } else {
+        &msg.attachments
+    };
     let mut content = format_content(provider, msg.content.as_deref(), attachments)?;
-    let thinking_only = msg.role == Role::Assistant && msg.thinking.is_some() && !msg.is_tool_call();
+    let thinking_only =
+        msg.role == Role::Assistant && msg.thinking.is_some() && !msg.is_tool_call();
     if content.is_null() && thinking_only {
         content = Value::String(String::new());
     }
-    if provider == Provider::Mistral && msg.role == Role::Assistant
-        && let Some(thinking) = &msg.thinking {
-            let mut blocks = Vec::new();
-            if let Some(text) = &thinking.text {
-                let mut block = json!({ "type": "thinking", "thinking": [{ "type": "text", "text": text }] });
-                if let Some(sig) = &thinking.signature {
-                    block["signature"] = sig.clone().into();
-                }
-                blocks.push(block);
-            } else if let Some(sig) = &thinking.signature {
-                blocks.push(json!({ "type": "thinking", "signature": sig }));
+    if provider == Provider::Mistral
+        && msg.role == Role::Assistant
+        && let Some(thinking) = &msg.thinking
+    {
+        let mut blocks = Vec::new();
+        if let Some(text) = &thinking.text {
+            let mut block =
+                json!({ "type": "thinking", "thinking": [{ "type": "text", "text": text }] });
+            if let Some(sig) = &thinking.signature {
+                block["signature"] = sig.clone().into();
             }
-            match content {
-                Value::Array(parts) => blocks.extend(parts),
-                Value::String(s) if !s.is_empty() => blocks.push(json!({ "type": "text", "text": s })),
-                _ => {}
-            }
-            content = Value::Array(blocks);
+            blocks.push(block);
+        } else if let Some(sig) = &thinking.signature {
+            blocks.push(json!({ "type": "thinking", "signature": sig }));
         }
+        match content {
+            Value::Array(parts) => blocks.extend(parts),
+            Value::String(s) if !s.is_empty() => blocks.push(json!({ "type": "text", "text": s })),
+            _ => {}
+        }
+        content = Value::Array(blocks);
+    }
     let boundary = msg.cache_until_here && Caching::boundaries(req.caching);
     if boundary && provider == Provider::OpenRouter {
         content = inject_cache_control(content, req.caching)?;
@@ -281,14 +336,21 @@ fn format_message(req: &Request, msg: &Message) -> Result<Value> {
             _ => None,
         };
         if let Some(mut parts) = parts
-            && let Some(Value::Object(last)) = parts.last_mut() {
-                last.insert("prompt_cache_breakpoint".into(), json!({ "mode": "explicit" }));
-                content = Value::Array(parts);
-            }
+            && let Some(Value::Object(last)) = parts.last_mut()
+        {
+            last.insert(
+                "prompt_cache_breakpoint".into(),
+                json!({ "mode": "explicit" }),
+            );
+            content = Value::Array(parts);
+        }
     }
 
     let mut out = Map::new();
-    out.insert("role".into(), format_role(provider, msg.role, req.config).into());
+    out.insert(
+        "role".into(),
+        format_role(provider, msg.role, req.config).into(),
+    );
     if !content.is_null() {
         out.insert("content".into(), content);
     }
@@ -328,10 +390,11 @@ pub fn inject_cache_control(content: Value, caching: Option<&Caching>) -> Result
         other => vec![json!({ "type": "text", "text": other })],
     };
     if let Some(Value::Object(last)) = blocks.last_mut()
-        && last.get("cache_control").is_none_or(Value::is_null) {
-            let control = openrouter_cache_control(Caching::checked(caching, &["ttl"], "OpenRouter")?);
-            last.insert("cache_control".into(), control);
-        }
+        && last.get("cache_control").is_none_or(Value::is_null)
+    {
+        let control = openrouter_cache_control(Caching::checked(caching, &["ttl"], "OpenRouter")?);
+        last.insert("cache_control".into(), control);
+    }
     Ok(Value::Array(blocks))
 }
 
@@ -339,7 +402,11 @@ fn format_thinking(provider: Provider, msg: &Message, out: &mut Map<String, Valu
     match provider {
         Provider::Mistral => {}
         Provider::DeepSeek => {
-            let text = msg.thinking.as_ref().and_then(|t| t.text.clone()).unwrap_or_default();
+            let text = msg
+                .thinking
+                .as_ref()
+                .and_then(|t| t.text.clone())
+                .unwrap_or_default();
             out.insert("reasoning_content".into(), text.clone().into());
             if !text.is_empty() {
                 out.insert("reasoning".into(), text.into());
@@ -386,49 +453,81 @@ fn text_part(text: &str) -> Value {
 
 /// `ChatCompletions::Media.format_content` with each provider's attachment rules. Returns the
 /// bare string when there are no attachments.
-pub(crate) fn format_content(provider: Provider, content: Option<&str>, attachments: &[Attachment]) -> Result<Value> {
+pub(crate) fn format_content(
+    provider: Provider,
+    content: Option<&str>,
+    attachments: &[Attachment],
+) -> Result<Value> {
     if attachments.is_empty() {
-        return Ok(content.map(|c| Value::String(c.to_string())).unwrap_or(Value::Null));
+        return Ok(content
+            .map(|c| Value::String(c.to_string()))
+            .unwrap_or(Value::Null));
     }
     let mut parts = Vec::new();
     if let Some(c) = content {
         parts.push(text_part(c));
     }
-    let unsupported = |a: &Attachment| Error::UnsupportedAttachment(super::anthropic::unsupported(&a.mime_type));
+    let unsupported =
+        |a: &Attachment| Error::UnsupportedAttachment(super::anthropic::unsupported(&a.mime_type));
     for a in attachments {
         let kind = a.kind();
         // `Media.format_provider_file`, reached by the providers that use the shared
         // `format_attachment`; those with `document_attachments: :none` refuse it.
-        let own_media = matches!(provider, Provider::Mistral | Provider::Ollama | Provider::OllamaCloud | Provider::GPUStack | Provider::Perplexity)
-            || (provider == Provider::OpenRouter && kind == AttachmentType::Video);
+        let own_media = matches!(
+            provider,
+            Provider::Mistral
+                | Provider::Ollama
+                | Provider::OllamaCloud
+                | Provider::GPUStack
+                | Provider::Perplexity
+        ) || (provider == Provider::OpenRouter && kind == AttachmentType::Video);
         if let Some(file_id) = a.provider_file_id().filter(|_| !own_media) {
-            if matches!(provider, Provider::DeepSeek | Provider::XAI | Provider::Hetzner) {
+            if matches!(
+                provider,
+                Provider::DeepSeek | Provider::XAI | Provider::Hetzner
+            ) {
                 return Err(unsupported(a));
             }
             parts.push(json!({ "type": "file", "file": { "file_id": file_id } }));
             continue;
         }
         let part = match (provider, kind) {
-            (Provider::Mistral, AttachmentType::Image) => json!({ "type": "image_url", "image_url": a.url_or_data_uri()? }),
+            (Provider::Mistral, AttachmentType::Image) => {
+                json!({ "type": "image_url", "image_url": a.url_or_data_uri()? })
+            }
             (Provider::Mistral, AttachmentType::Pdf | AttachmentType::Document) => {
                 json!({ "type": "document_url", "document_url": a.url_or_data_uri()? })
             }
-            (Provider::Ollama | Provider::OllamaCloud | Provider::GPUStack, AttachmentType::Image) => {
+            (
+                Provider::Ollama | Provider::OllamaCloud | Provider::GPUStack,
+                AttachmentType::Image,
+            ) => {
                 json!({ "type": "image_url", "image_url": { "url": a.for_llm()?, "detail": "auto" } })
             }
             // `providers/gpustack/media.rb#format_video`: always inline, clusters often lack internet.
-            (Provider::GPUStack, AttachmentType::Video) => json!({ "type": "video_url", "video_url": { "url": a.for_llm()? } }),
-            (Provider::Ollama | Provider::OllamaCloud | Provider::GPUStack, AttachmentType::Pdf | AttachmentType::Document) => {
+            (Provider::GPUStack, AttachmentType::Video) => {
+                json!({ "type": "video_url", "video_url": { "url": a.for_llm()? } })
+            }
+            (
+                Provider::Ollama | Provider::OllamaCloud | Provider::GPUStack,
+                AttachmentType::Pdf | AttachmentType::Document,
+            ) => {
                 return Err(unsupported(a));
             }
-            (Provider::Hetzner, AttachmentType::Image) => json!({ "type": "image_url", "image_url": { "url": a.for_llm()? } }),
+            (Provider::Hetzner, AttachmentType::Image) => {
+                json!({ "type": "image_url", "image_url": { "url": a.for_llm()? } })
+            }
             // `providers/perplexity/media.rb`: images without a detail, supported documents as
             // `file_url` parts (the URL itself, or bare base64), text files as text, nothing else.
-            (Provider::Perplexity, AttachmentType::Image) => json!({ "type": "image_url", "image_url": { "url": a.url_or_data_uri()? } }),
+            (Provider::Perplexity, AttachmentType::Image) => {
+                json!({ "type": "image_url", "image_url": { "url": a.url_or_data_uri()? } })
+            }
             (Provider::Perplexity, AttachmentType::Pdf | AttachmentType::Document) => {
-                const SUPPORTED_DOCUMENT_EXTENSIONS: [&str; 5] = ["pdf", "doc", "docx", "txt", "rtf"];
+                const SUPPORTED_DOCUMENT_EXTENSIONS: [&str; 5] =
+                    ["pdf", "doc", "docx", "txt", "rtf"];
                 let supported = a.kind() == AttachmentType::Pdf
-                    || a.extension().is_some_and(|e| SUPPORTED_DOCUMENT_EXTENSIONS.contains(&e.as_str()));
+                    || a.extension()
+                        .is_some_and(|e| SUPPORTED_DOCUMENT_EXTENSIONS.contains(&e.as_str()));
                 if !supported {
                     return Err(unsupported(a));
                 }
@@ -439,20 +538,34 @@ pub(crate) fn format_content(provider: Provider, content: Option<&str>, attachme
                 json!({ "type": "file_url", "file_url": { "url": url } })
             }
             (Provider::Perplexity, AttachmentType::Audio) => return Err(unsupported(a)),
-            (Provider::OpenRouter, AttachmentType::Video) => json!({ "type": "video_url", "video_url": { "url": a.url_or_data_uri()? } }),
-            (Provider::DeepSeek | Provider::XAI | Provider::Hetzner, AttachmentType::Pdf | AttachmentType::Document) => {
+            (Provider::OpenRouter, AttachmentType::Video) => {
+                json!({ "type": "video_url", "video_url": { "url": a.url_or_data_uri()? } })
+            }
+            (
+                Provider::DeepSeek | Provider::XAI | Provider::Hetzner,
+                AttachmentType::Pdf | AttachmentType::Document,
+            ) => {
                 return Err(unsupported(a));
             }
-            (Provider::DeepSeek | Provider::XAI | Provider::Hetzner, AttachmentType::Audio) => return Err(unsupported(a)),
+            (Provider::DeepSeek | Provider::XAI | Provider::Hetzner, AttachmentType::Audio) => {
+                return Err(unsupported(a));
+            }
             (_, AttachmentType::Image) => {
-                let mut part = json!({ "type": "image_url", "image_url": { "url": a.url_or_data_uri()? } });
+                let mut part =
+                    json!({ "type": "image_url", "image_url": { "url": a.url_or_data_uri()? } });
                 if let Some(res) = a.resolution {
-                    part["image_url"]["detail"] =
-                        if res == crate::attachment::Resolution::Low { "low" } else { "high" }.into();
+                    part["image_url"]["detail"] = if res == crate::attachment::Resolution::Low {
+                        "low"
+                    } else {
+                        "high"
+                    }
+                    .into();
                 }
                 part
             }
-            (_, AttachmentType::Audio) => json!({ "type": "input_audio", "input_audio": { "data": a.encoded()?, "format": a.format() } }),
+            (_, AttachmentType::Audio) => {
+                json!({ "type": "input_audio", "input_audio": { "data": a.encoded()?, "format": a.format() } })
+            }
             (_, AttachmentType::Pdf) => {
                 json!({ "type": "file", "file": { "filename": a.filename, "file_data": a.for_llm()? } })
             }
@@ -495,12 +608,18 @@ fn input_tokens(usage: &Value) -> Option<i64> {
         return Some(miss);
     }
     let prompt = int(usage.get("prompt_tokens"))?;
-    Some((prompt - cache_read_tokens(usage).unwrap_or(0) - cache_write_tokens(usage).unwrap_or(0)).max(0))
+    Some(
+        (prompt - cache_read_tokens(usage).unwrap_or(0) - cache_write_tokens(usage).unwrap_or(0))
+            .max(0),
+    )
 }
 
 fn output_tokens(usage: &Value) -> Option<i64> {
     let completion = int(usage.get("completion_tokens"))?;
-    let generated = match (int(usage.get("prompt_tokens")), int(usage.get("total_tokens"))) {
+    let generated = match (
+        int(usage.get("prompt_tokens")),
+        int(usage.get("total_tokens")),
+    ) {
         (Some(p), Some(t)) => Some((t - p).max(0)),
         _ => None,
     };
@@ -511,7 +630,8 @@ fn output_tokens(usage: &Value) -> Option<i64> {
 }
 
 fn cache_read_tokens(usage: &Value) -> Option<i64> {
-    int(usage.pointer("/prompt_tokens_details/cached_tokens")).or_else(|| int(usage.get("prompt_cache_hit_tokens")))
+    int(usage.pointer("/prompt_tokens_details/cached_tokens"))
+        .or_else(|| int(usage.get("prompt_cache_hit_tokens")))
 }
 
 fn cache_write_tokens(usage: &Value) -> Option<i64> {
@@ -521,7 +641,8 @@ fn cache_write_tokens(usage: &Value) -> Option<i64> {
 }
 
 fn thinking_tokens(usage: &Value) -> Option<i64> {
-    int(usage.pointer("/completion_tokens_details/reasoning_tokens")).or_else(|| int(usage.get("reasoning_tokens")))
+    int(usage.pointer("/completion_tokens_details/reasoning_tokens"))
+        .or_else(|| int(usage.get("reasoning_tokens")))
 }
 
 pub(crate) fn reported_cost(provider: Provider, usage: &Value) -> Option<f64> {
@@ -529,11 +650,17 @@ pub(crate) fn reported_cost(provider: Provider, usage: &Value) -> Option<f64> {
         Provider::OpenRouter => {
             let mut cost = usage.get("cost")?.as_f64()?;
             if usage.get("is_byok").and_then(Value::as_bool) == Some(true) {
-                cost += usage.pointer("/cost_details/upstream_inference_cost").and_then(Value::as_f64).unwrap_or(0.0);
+                cost += usage
+                    .pointer("/cost_details/upstream_inference_cost")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0);
             }
             Some(cost)
         }
-        Provider::XAI => usage.get("cost_in_usd_ticks").and_then(Value::as_f64).map(|t| t * 1e-10),
+        Provider::XAI => usage
+            .get("cost_in_usd_ticks")
+            .and_then(Value::as_f64)
+            .map(|t| t * 1e-10),
         _ => None,
     }
 }
@@ -542,7 +669,11 @@ fn fill_usage(provider: Provider, message: &mut Message, usage: &Value) {
     message.tokens.input = input_tokens(usage);
     message.tokens.output = output_tokens(usage);
     message.tokens.cache_read = cache_read_tokens(usage);
-    message.tokens.cache_write = if usage.is_object() && !usage.as_object().unwrap().is_empty() { cache_write_tokens(usage) } else { None }; // is_object() checked first
+    message.tokens.cache_write = if usage.is_object() && !usage.as_object().unwrap().is_empty() {
+        cache_write_tokens(usage)
+    } else {
+        None
+    }; // is_object() checked first
     message.tokens.thinking = thinking_tokens(usage);
     message.tokens.server_tool_use = usage
         .get("server_tool_use")
@@ -575,7 +706,10 @@ fn extract_content_and_thinking(content: Option<&Value>) -> (Option<String>, Opt
                     _ => str_of(b.get("text")),
                 })
                 .collect();
-            ((!text.is_empty()).then_some(text), (!thinking.is_empty()).then_some(thinking))
+            (
+                (!text.is_empty()).then_some(text),
+                (!thinking.is_empty()).then_some(thinking),
+            )
         }
         Some(Value::String(s)) => (Some(s.clone()), None),
         _ => (None, None),
@@ -608,7 +742,11 @@ fn parse_annotations(annotations: Option<&Value>, content: Option<&str>) -> Vec<
 
 /// Perplexity and xAI return search citations at the root of the response.
 pub(crate) fn parse_root_citations(data: &Value) -> Vec<Citation> {
-    if let Some(results) = data.get("search_results").and_then(Value::as_array).filter(|r| !r.is_empty()) {
+    if let Some(results) = data
+        .get("search_results")
+        .and_then(Value::as_array)
+        .filter(|r| !r.is_empty())
+    {
         return parse_search_results(results);
     }
     data.get("citations")
@@ -616,7 +754,13 @@ pub(crate) fn parse_root_citations(data: &Value) -> Vec<Citation> {
         .into_iter()
         .flatten()
         .enumerate()
-        .filter_map(|(i, url)| url.as_str().map(|u| Citation { url: Some(u.into()), source_index: Some(i as i64), ..Default::default() }))
+        .filter_map(|(i, url)| {
+            url.as_str().map(|u| Citation {
+                url: Some(u.into()),
+                source_index: Some(i as i64),
+                ..Default::default()
+            })
+        })
         .collect()
 }
 
@@ -635,24 +779,39 @@ pub(crate) fn parse_search_results(results: &[Value]) -> Vec<Citation> {
         .collect()
 }
 
-fn parse_tool_calls(calls: Option<&Value>, parse_arguments: bool, stream_keys: bool, finish: Option<&str>) -> Result<Vec<(String, ToolCall)>> {
-    let Some(calls) = calls.and_then(Value::as_array).filter(|c| !c.is_empty()) else { return Ok(Vec::new()) };
+fn parse_tool_calls(
+    calls: Option<&Value>,
+    parse_arguments: bool,
+    stream_keys: bool,
+    finish: Option<&str>,
+) -> Result<Vec<(String, ToolCall)>> {
+    let Some(calls) = calls.and_then(Value::as_array).filter(|c| !c.is_empty()) else {
+        return Ok(Vec::new());
+    };
     calls
         .iter()
         .map(|tc| {
-            let raw_args = tc.pointer("/function/arguments").and_then(Value::as_str).unwrap_or("");
+            let raw_args = tc
+                .pointer("/function/arguments")
+                .and_then(Value::as_str)
+                .unwrap_or("");
             let arguments = if parse_arguments {
                 if raw_args.is_empty() {
                     ToolArguments::Parsed(Map::new())
                 } else {
-                    ToolArguments::Parsed(serde_json::from_str(raw_args).map_err(|_| Error::tool_call_parse(finish))?)
+                    ToolArguments::Parsed(
+                        serde_json::from_str(raw_args)
+                            .map_err(|_| Error::tool_call_parse(finish))?,
+                    )
                 }
             } else {
                 ToolArguments::Partial(raw_args.to_string())
             };
             let id = str_of(tc.get("id")).unwrap_or_default();
             let key = if stream_keys {
-                tc.get("index").map(|i| i.to_string()).unwrap_or_else(|| id.clone())
+                tc.get("index")
+                    .map(|i| i.to_string())
+                    .unwrap_or_else(|| id.clone())
             } else {
                 id.clone()
             };
@@ -662,7 +821,9 @@ fn parse_tool_calls(calls: Option<&Value>, parse_arguments: bool, stream_keys: b
                     id,
                     name: str_of(tc.pointer("/function/name")).unwrap_or_default(),
                     arguments,
-                    thought_signature: str_of(tc.pointer("/extra_content/google/thought_signature")),
+                    thought_signature: str_of(
+                        tc.pointer("/extra_content/google/thought_signature"),
+                    ),
                     remote: false,
                     starts: tc.get("id").is_some_and(|v| !v.is_null()),
                 },
@@ -671,40 +832,65 @@ fn parse_tool_calls(calls: Option<&Value>, parse_arguments: bool, stream_keys: b
         .collect()
 }
 
-pub fn parse_completion_body(provider: Provider, data: &Value, raw: RawResponse) -> Result<Message> {
+pub fn parse_completion_body(
+    provider: Provider,
+    data: &Value,
+    raw: RawResponse,
+) -> Result<Message> {
     if let Some(msg) = data.pointer("/error/message").and_then(Value::as_str) {
         return Err(Error::Api(msg.into(), None));
     }
     let Some(message_data) = data.pointer("/choices/0/message") else {
         let mut message = "Provider returned no completion message".to_string();
-        if let Some(r) = data.pointer("/choices/0/finish_reason").and_then(Value::as_str) {
+        if let Some(r) = data
+            .pointer("/choices/0/finish_reason")
+            .and_then(Value::as_str)
+        {
             message = format!("{message} (finish_reason: {r})");
         }
         // `Error.new(message, response: raw)`.
-        let response = crate::error::ErrorResponse { status: raw.status, body: raw.body.to_string() };
+        let response = crate::error::ErrorResponse {
+            status: raw.status,
+            body: raw.body.to_string(),
+        };
         return Err(Error::Api(message, Some(response)));
     };
     let usage = data.get("usage").cloned().unwrap_or_else(|| json!({}));
-    let finish_raw = data.pointer("/choices/0/finish_reason").and_then(Value::as_str);
+    let finish_raw = data
+        .pointer("/choices/0/finish_reason")
+        .and_then(Value::as_str);
     let finish = normalize_finish_reason(finish_raw, FINISH_REASONS);
     let (content, block_thinking) = extract_content_and_thinking(message_data.get("content"));
     let (thinking_text, signature) = if provider == Provider::OpenRouter {
-        (block_thinking.or_else(|| openrouter_thinking_text(message_data)), openrouter_thinking_signature(message_data))
+        (
+            block_thinking.or_else(|| openrouter_thinking_text(message_data)),
+            openrouter_thinking_signature(message_data),
+        )
     } else {
         // `extract_thinking_text`/`extract_thinking_signature`: the first truthy field wins
         // (`a || b || c`), and only counts if it is a string.
         let first_string = |keys: &[&str]| {
             keys.iter()
-                .find_map(|k| message_data.get(*k).filter(|v| !v.is_null() && **v != Value::Bool(false)))
+                .find_map(|k| {
+                    message_data
+                        .get(*k)
+                        .filter(|v| !v.is_null() && **v != Value::Bool(false))
+                })
                 .and_then(Value::as_str)
                 .map(str::to_string)
         };
         (
-            block_thinking.or_else(|| first_string(&["reasoning_content", "reasoning", "thinking"])),
+            block_thinking
+                .or_else(|| first_string(&["reasoning_content", "reasoning", "thinking"])),
             first_string(&["reasoning_signature", "signature"]),
         )
     };
-    let calls = parse_tool_calls(message_data.get("tool_calls"), true, false, finish.as_ref().map(|f| f.as_str()))?;
+    let calls = parse_tool_calls(
+        message_data.get("tool_calls"),
+        true,
+        false,
+        finish.as_ref().map(|f| f.as_str()),
+    )?;
 
     let mut m = Message::chunk();
     let mut citations = parse_annotations(message_data.get("annotations"), content.as_deref());
@@ -715,7 +901,10 @@ pub fn parse_completion_body(provider: Provider, data: &Value, raw: RawResponse)
     m.content = content;
     m.thinking = Thinking::build(thinking_text, signature);
     if provider == Provider::OpenRouter {
-        m.raw_reasoning = message_data.get("reasoning_details").filter(|d| d.as_array().is_some_and(|a| !a.is_empty())).cloned();
+        m.raw_reasoning = message_data
+            .get("reasoning_details")
+            .filter(|d| d.as_array().is_some_and(|a| !a.is_empty()))
+            .cloned();
     }
     m.tool_calls = tool_call_map(calls.into_iter().map(|(_, c)| c).collect());
     fill_usage(provider, &mut m, &usage);
@@ -753,7 +942,10 @@ fn openrouter_thinking_signature(data: &Value) -> Option<String> {
         .or_else(|| {
             details
                 .iter()
-                .find(|d| d.get("type").and_then(Value::as_str) == Some("reasoning.encrypted") && d.get("data").is_some_and(Value::is_string))
+                .find(|d| {
+                    d.get("type").and_then(Value::as_str) == Some("reasoning.encrypted")
+                        && d.get("data").is_some_and(Value::is_string)
+                })
                 .and_then(|d| d.get("data").and_then(Value::as_str))
         })
         .map(str::to_string)
@@ -763,21 +955,31 @@ fn openrouter_thinking_signature(data: &Value) -> Option<String> {
 /// delta's reasoning_details merge into the stream's list, matching an entry by `index` and `type`.
 /// `text`, `data`, and `summary` strings are appended; other keys are only filled when missing
 /// (the closing signature arrives in its own fragment). Every chunk carries the list so far.
-pub fn accumulate_raw_reasoning(acc: &mut Option<Vec<Value>>, details: Option<&Value>) -> Option<Value> {
+pub fn accumulate_raw_reasoning(
+    acc: &mut Option<Vec<Value>>,
+    details: Option<&Value>,
+) -> Option<Value> {
     const ACCUMULATED_REASONING_KEYS: [&str; 3] = ["text", "data", "summary"];
     if let Some(details) = details.and_then(Value::as_array).filter(|d| !d.is_empty()) {
         let entries = acc.get_or_insert_with(Vec::new);
         for detail in details {
-            let target = detail.get("index").filter(|i| !i.is_null()).and_then(|index| {
-                entries.iter_mut().find(|e| e.get("index") == Some(index) && e.get("type") == detail.get("type"))
-            });
+            let target = detail
+                .get("index")
+                .filter(|i| !i.is_null())
+                .and_then(|index| {
+                    entries.iter_mut().find(|e| {
+                        e.get("index") == Some(index) && e.get("type") == detail.get("type")
+                    })
+                });
             let (Some(target), Some(fields)) = (target, detail.as_object()) else {
                 entries.push(detail.clone());
                 continue;
             };
             for (key, value) in fields {
                 match (value, target.get_mut(key)) {
-                    (Value::String(more), Some(Value::String(existing))) if ACCUMULATED_REASONING_KEYS.contains(&key.as_str()) => {
+                    (Value::String(more), Some(Value::String(existing)))
+                        if ACCUMULATED_REASONING_KEYS.contains(&key.as_str()) =>
+                    {
                         existing.push_str(more)
                     }
                     (_, None | Some(Value::Null)) => {
@@ -793,8 +995,13 @@ pub fn accumulate_raw_reasoning(acc: &mut Option<Vec<Value>>, details: Option<&V
 
 pub fn build_chunk(provider: Provider, data: &Value) -> Message {
     let usage = data.get("usage").cloned().unwrap_or_else(|| json!({}));
-    let delta = data.pointer("/choices/0/delta").cloned().unwrap_or_else(|| json!({}));
-    let content_source = delta.get("content").or_else(|| data.pointer("/choices/0/message/content"));
+    let delta = data
+        .pointer("/choices/0/delta")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    let content_source = delta
+        .get("content")
+        .or_else(|| data.pointer("/choices/0/message/content"));
     let (content, block_thinking) = extract_content_and_thinking(content_source);
     let mut m = Message::chunk();
     m.model = str_of(data.get("model"));
@@ -806,7 +1013,10 @@ pub fn build_chunk(provider: Provider, data: &Value) -> Message {
     m.citations = citations;
     m.thinking = if provider == Provider::OpenRouter {
         // `OpenRouter::Streaming#build_chunk` reads thinking from the delta's reasoning fields only.
-        Thinking::build(openrouter_thinking_text(&delta), openrouter_thinking_signature(&delta))
+        Thinking::build(
+            openrouter_thinking_text(&delta),
+            openrouter_thinking_signature(&delta),
+        )
     } else {
         let text = block_thinking
             .or_else(|| str_of(delta.get("reasoning_content")))
@@ -814,12 +1024,17 @@ pub fn build_chunk(provider: Provider, data: &Value) -> Message {
         Thinking::build(text, str_of(delta.get("reasoning_signature")))
     };
     if let Ok(calls) = parse_tool_calls(delta.get("tool_calls"), false, true, None)
-        && !calls.is_empty() {
-            m.tool_calls = Some(calls.into_iter().collect());
-        }
+        && !calls.is_empty()
+    {
+        m.tool_calls = Some(calls.into_iter().collect());
+    }
     if usage.as_object().is_some_and(|u| !u.is_empty()) {
         fill_usage(provider, &mut m, &usage);
     }
-    m.finish_reason = normalize_finish_reason(data.pointer("/choices/0/finish_reason").and_then(Value::as_str), FINISH_REASONS);
+    m.finish_reason = normalize_finish_reason(
+        data.pointer("/choices/0/finish_reason")
+            .and_then(Value::as_str),
+        FINISH_REASONS,
+    );
     m
 }

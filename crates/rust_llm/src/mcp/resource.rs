@@ -48,7 +48,11 @@ pub struct Resource {
 
 impl std::fmt::Debug for Resource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Resource").field("uri", &self.uri).field("name", &self.name).field("mime_type", &self.mime_type).finish()
+        f.debug_struct("Resource")
+            .field("uri", &self.uri)
+            .field("name", &self.name)
+            .field("mime_type", &self.mime_type)
+            .finish()
     }
 }
 
@@ -73,11 +77,20 @@ impl Resource {
             return Ok(ResourceContent::Text(text.to_string()));
         }
         if let Some(blob) = self.data.get("blob").and_then(Value::as_str) {
-            return Ok(ResourceContent::Blob(base64::engine::general_purpose::STANDARD.decode(blob).unwrap_or_default()));
+            return Ok(ResourceContent::Blob(
+                base64::engine::general_purpose::STANDARD
+                    .decode(blob)
+                    .unwrap_or_default(),
+            ));
         }
         let read = self.mcp.resource(&self.uri).await?;
         if read.data.get("text").is_none() && read.data.get("blob").is_none() {
-            return Err(super::McpError::new(format!("{} returned no content for {}", self.mcp.name(), self.uri)).into());
+            return Err(super::McpError::new(format!(
+                "{} returned no content for {}",
+                self.mcp.name(),
+                self.uri
+            ))
+            .into());
         }
         Box::pin(read.content()).await
     }
@@ -96,7 +109,15 @@ impl Resource {
     /// `to_attachment`: how chats take a resource (`ask_with(msg, vec![resource.to_attachment()])`).
     pub async fn to_attachment(&self) -> Result<Attachment> {
         let filename = content::filename(&self.uri);
-        let filename = if filename.is_empty() { self.name.clone() } else { filename };
-        Ok(Attachment::from_bytes(self.to_blob().await?, filename, None))
+        let filename = if filename.is_empty() {
+            self.name.clone()
+        } else {
+            filename
+        };
+        Ok(Attachment::from_bytes(
+            self.to_blob().await?,
+            filename,
+            None,
+        ))
     }
 }

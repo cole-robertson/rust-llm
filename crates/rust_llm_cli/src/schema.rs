@@ -13,8 +13,18 @@ pub fn generate(g: &mut Generator, name: &str) -> Result<(), String> {
 
     // The same major version rust_llm uses, so `with_schema_for` accepts the derive.
     g.dependency("Cargo.toml", "schemars", "\"1.2\"");
-    g.module_dir("schemas", "//! Structured-output schemas (`rust-llm generate schema NAME`).\n");
-    g.file(&format!("src/schemas/{file}.rs"), &render(SCHEMA, &[("class_name", &class)]));
-    g.inject("src/schemas/mod.rs", &format!("pub mod {file};"), Anchor::Sorted("pub mod "));
+    g.module_dir(
+        "schemas",
+        "//! Structured-output schemas (`rust-llm generate schema NAME`).\n",
+    );
+    g.file(
+        &format!("src/schemas/{file}.rs"),
+        &render(SCHEMA, &[("class_name", &class)]),
+    );
+    g.inject(
+        "src/schemas/mod.rs",
+        &format!("pub mod {file};"),
+        Anchor::Sorted("pub mod "),
+    );
     Ok(())
 }

@@ -9,8 +9,9 @@ use std::sync::Arc;
 use base64::Engine;
 use rust_llm::files::UploadedFile;
 use rust_llm::{
-    AnimateOptions, Attachment, Config, EmbedOptions, Error, OcrOptions, PaintOptions, Resolution, SpeakOptions, TranscribeOptions,
-    Vectors, Video, VideoSource, VideoStatus, animate_later, embed, ocr, paint, speak_stream, transcribe_stream,
+    AnimateOptions, Attachment, Config, EmbedOptions, Error, OcrOptions, PaintOptions, Resolution,
+    SpeakOptions, TranscribeOptions, Vectors, Video, VideoSource, VideoStatus, animate_later,
+    embed, ocr, paint, speak_stream, transcribe_stream,
 };
 use serde_json::{Value, json};
 use wiremock::matchers::{any, header, method, path, query_param};
@@ -23,8 +24,16 @@ fn fixture(name: &str) -> String {
 /// Every provider in this file pointed at `server`, as `include_context 'with configured RubyLLM'`.
 fn config(server: &MockServer) -> Arc<Config> {
     let mut c = Config::default();
-    for (provider, prefix) in [("openrouter", "/api/v1"), ("xai", "/v1"), ("mistral", "/v1"), ("gpustack", "/v1")] {
-        c.set(format!("{provider}_api_base"), format!("{}{prefix}", server.uri()));
+    for (provider, prefix) in [
+        ("openrouter", "/api/v1"),
+        ("xai", "/v1"),
+        ("mistral", "/v1"),
+        ("gpustack", "/v1"),
+    ] {
+        c.set(
+            format!("{provider}_api_base"),
+            format!("{}{prefix}", server.uri()),
+        );
         c.set(format!("{provider}_api_key"), "test");
     }
     c.max_retries = 0;
@@ -34,14 +43,20 @@ fn config(server: &MockServer) -> Arc<Config> {
 /// A server answering every request with `body` as JSON.
 async fn json_server(body: Value) -> MockServer {
     let server = MockServer::start().await;
-    Mock::given(any()).respond_with(ResponseTemplate::new(200).set_body_json(body)).mount(&server).await;
+    Mock::given(any())
+        .respond_with(ResponseTemplate::new(200).set_body_json(body))
+        .mount(&server)
+        .await;
     server
 }
 
 /// A server answering every request with `body` under `content_type`.
 async fn raw_server(content_type: &str, body: impl Into<Vec<u8>>) -> MockServer {
     let server = MockServer::start().await;
-    Mock::given(any()).respond_with(ResponseTemplate::new(200).set_body_raw(body.into(), content_type)).mount(&server).await;
+    Mock::given(any())
+        .respond_with(ResponseTemplate::new(200).set_body_raw(body.into(), content_type))
+        .mount(&server)
+        .await;
     server
 }
 
@@ -72,7 +87,9 @@ fn form_field(body: &[u8], name: &str) -> Option<String> {
 
 fn unsupported_mentions(result: Result<impl std::fmt::Debug, Error>, needle: &str) {
     match result {
-        Err(Error::UnsupportedAttachment(message)) => assert!(message.contains(needle), "{message}"),
+        Err(Error::UnsupportedAttachment(message)) => {
+            assert!(message.contains(needle), "{message}")
+        }
         other => panic!("expected UnsupportedAttachmentError mentioning {needle}, got {other:?}"),
     }
 }
@@ -107,26 +124,48 @@ fn openrouter_image_body() -> Value {
 }
 
 fn openrouter_paint<'a>(server: &MockServer) -> PaintOptions<'a> {
-    PaintOptions { model: Some(OPENROUTER_IMAGE_MODEL), provider: Some("openrouter"), config: Some(config(server)), ..Default::default() }
+    PaintOptions {
+        model: Some(OPENROUTER_IMAGE_MODEL),
+        provider: Some("openrouter"),
+        config: Some(config(server)),
+        ..Default::default()
+    }
 }
 
 // spec: providers/openrouter/images_spec.rb:16 #render_image_payload > renders a generation payload
 #[tokio::test]
 async fn openrouter_image_payload_drops_the_size() {
     let server = json_server(openrouter_image_body()).await;
-    paint("a cute cat", PaintOptions { size: Some("1024x1024"), ..openrouter_paint(&server) }).await.unwrap();
+    paint(
+        "a cute cat",
+        PaintOptions {
+            size: Some("1024x1024"),
+            ..openrouter_paint(&server)
+        },
+    )
+    .await
+    .unwrap();
     let (path, body) = only_request(&server).await;
     assert_eq!(path, "/api/v1/images");
-    assert_eq!(body, json!({ "model": OPENROUTER_IMAGE_MODEL, "prompt": "a cute cat" }));
+    assert_eq!(
+        body,
+        json!({ "model": OPENROUTER_IMAGE_MODEL, "prompt": "a cute cat" })
+    );
 }
 
 // spec: providers/openrouter/images_spec.rb:23 #render_image_payload > merges provider options
 #[tokio::test]
 async fn openrouter_image_payload_merges_provider_options() {
     let server = json_server(openrouter_image_body()).await;
-    paint("a cute cat", PaintOptions { provider_options: json!({ "aspect_ratio": "16:9" }), ..openrouter_paint(&server) })
-        .await
-        .unwrap();
+    paint(
+        "a cute cat",
+        PaintOptions {
+            provider_options: json!({ "aspect_ratio": "16:9" }),
+            ..openrouter_paint(&server)
+        },
+    )
+    .await
+    .unwrap();
     let (_, body) = only_request(&server).await;
     assert_eq!(body["aspect_ratio"], "16:9");
 }
@@ -136,9 +175,20 @@ async fn openrouter_image_payload_merges_provider_options() {
 async fn openrouter_image_reference_urls_pass_through() {
     let server = json_server(openrouter_image_body()).await;
     let with = vec![Attachment::new("https://example.com/logo.png")];
-    paint("make it green", PaintOptions { with, ..openrouter_paint(&server) }).await.unwrap();
+    paint(
+        "make it green",
+        PaintOptions {
+            with,
+            ..openrouter_paint(&server)
+        },
+    )
+    .await
+    .unwrap();
     let (_, body) = only_request(&server).await;
-    assert_eq!(body["input_references"], json!([{ "type": "image_url", "image_url": { "url": "https://example.com/logo.png" } }]));
+    assert_eq!(
+        body["input_references"],
+        json!([{ "type": "image_url", "image_url": { "url": "https://example.com/logo.png" } }])
+    );
 }
 
 // spec: providers/openrouter/images_spec.rb:48 #render_image_payload > rejects non-image references
@@ -146,7 +196,17 @@ async fn openrouter_image_reference_urls_pass_through() {
 async fn openrouter_image_rejects_non_image_references() {
     let server = json_server(openrouter_image_body()).await;
     let with = vec![Attachment::new(fixture("ruby.wav"))];
-    unsupported_mentions(paint("make it green", PaintOptions { with, ..openrouter_paint(&server) }).await, "audio/wav");
+    unsupported_mentions(
+        paint(
+            "make it green",
+            PaintOptions {
+                with,
+                ..openrouter_paint(&server)
+            },
+        )
+        .await,
+        "audio/wav",
+    );
     assert!(received(&server).await.is_empty());
 }
 
@@ -167,9 +227,15 @@ async fn openrouter_image_rejects_masks() {
 #[tokio::test]
 async fn openrouter_image_defaults_the_mime_type() {
     let mut body = openrouter_image_body();
-    body["data"][0].as_object_mut().unwrap().remove("media_type");
+    body["data"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("media_type");
     let server = json_server(body).await;
-    let image = paint("a cute cat", openrouter_paint(&server)).await.unwrap().into_image();
+    let image = paint("a cute cat", openrouter_paint(&server))
+        .await
+        .unwrap()
+        .into_image();
     assert_eq!(image.mime_type.as_deref(), Some("image/png"));
 }
 
@@ -178,7 +244,9 @@ async fn openrouter_image_defaults_the_mime_type() {
 async fn openrouter_image_without_data_is_an_error() {
     let server = json_server(json!({ "data": [] })).await;
     match paint("a cute cat", openrouter_paint(&server)).await {
-        Err(Error::Api(message, _)) => assert!(message.contains("Unexpected response format"), "{message}"),
+        Err(Error::Api(message, _)) => {
+            assert!(message.contains("Unexpected response format"), "{message}")
+        }
         other => panic!("expected an Unexpected response format error, got {other:?}"),
     }
 }
@@ -190,26 +258,49 @@ fn xai_image_body() -> Value {
 }
 
 fn xai_paint<'a>(server: &MockServer, model: &'a str) -> PaintOptions<'a> {
-    PaintOptions { model: Some(model), provider: Some("xai"), config: Some(config(server)), ..Default::default() }
+    PaintOptions {
+        model: Some(model),
+        provider: Some("xai"),
+        config: Some(config(server)),
+        ..Default::default()
+    }
 }
 
 // spec: providers/xai/images_spec.rb:7 .render_image_payload > drops the size parameter xAI rejects
 #[tokio::test]
 async fn xai_image_payload_drops_the_size() {
     let server = json_server(xai_image_body()).await;
-    paint("a cute cat", PaintOptions { size: Some("1024x1024"), ..xai_paint(&server, "grok-imagine-image") }).await.unwrap();
+    paint(
+        "a cute cat",
+        PaintOptions {
+            size: Some("1024x1024"),
+            ..xai_paint(&server, "grok-imagine-image")
+        },
+    )
+    .await
+    .unwrap();
     let (path, body) = only_request(&server).await;
     assert_eq!(path, "/v1/images/generations");
-    assert_eq!(body, json!({ "model": "grok-imagine-image", "prompt": "a cute cat" }));
+    assert_eq!(
+        body,
+        json!({ "model": "grok-imagine-image", "prompt": "a cute cat" })
+    );
 }
 
 // spec: providers/xai/images_spec.rb:13 .render_image_payload > merges provider options
 #[tokio::test]
 async fn xai_image_payload_merges_provider_options() {
-    let server = json_server(json!({ "data": [{ "b64_json": "aGk=" }, { "b64_json": "aGk=" }] })).await;
-    paint("a cute cat", PaintOptions { provider_options: json!({ "n": 2 }), ..xai_paint(&server, "grok-imagine-image") })
-        .await
-        .unwrap();
+    let server =
+        json_server(json!({ "data": [{ "b64_json": "aGk=" }, { "b64_json": "aGk=" }] })).await;
+    paint(
+        "a cute cat",
+        PaintOptions {
+            provider_options: json!({ "n": 2 }),
+            ..xai_paint(&server, "grok-imagine-image")
+        },
+    )
+    .await
+    .unwrap();
     let (_, body) = only_request(&server).await;
     assert_eq!(body["n"], 2);
 }
@@ -219,10 +310,21 @@ async fn xai_image_payload_merges_provider_options() {
 async fn xai_image_remote_references_pass_through_as_urls() {
     let server = json_server(xai_image_body()).await;
     let with = vec![Attachment::new("https://example.com/logo.png")];
-    paint("combine the logos", PaintOptions { with, ..xai_paint(&server, "grok-imagine-image-quality") }).await.unwrap();
+    paint(
+        "combine the logos",
+        PaintOptions {
+            with,
+            ..xai_paint(&server, "grok-imagine-image-quality")
+        },
+    )
+    .await
+    .unwrap();
     let (path, body) = only_request(&server).await;
     assert_eq!(path, "/v1/images/edits");
-    assert_eq!(body["images"], json!([{ "type": "image_url", "url": "https://example.com/logo.png" }]));
+    assert_eq!(
+        body["images"],
+        json!([{ "type": "image_url", "url": "https://example.com/logo.png" }])
+    );
 }
 
 // ---- OpenRouter videos ------------------------------------------------------------------------
@@ -240,7 +342,10 @@ fn openrouter_animate<'a>(server: &MockServer, model: &'a str) -> AnimateOptions
 /// A server that accepts a job with `accepted` and answers `GET videos/abc123` with `status`.
 async fn video_job_server(accepted: Value, status: Value) -> MockServer {
     let server = MockServer::start().await;
-    Mock::given(method("POST")).respond_with(ResponseTemplate::new(200).set_body_json(accepted)).mount(&server).await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(accepted))
+        .mount(&server)
+        .await;
     Mock::given(method("GET"))
         .and(path("/api/v1/videos/abc123"))
         .respond_with(ResponseTemplate::new(200).set_body_json(status))
@@ -257,7 +362,9 @@ async fn openrouter_video_sends_model_prompt_and_provider_options() {
         provider_options: json!({ "duration": 1, "resolution": "480p" }),
         ..openrouter_animate(&server, "x-ai/grok-imagine-video")
     };
-    animate_later(Some("a calm ocean wave at sunset"), options).await.unwrap();
+    animate_later(Some("a calm ocean wave at sunset"), options)
+        .await
+        .unwrap();
     let (path, body) = only_request(&server).await;
     assert_eq!(path, "/api/v1/videos");
     assert_eq!(
@@ -271,10 +378,15 @@ async fn openrouter_video_sends_model_prompt_and_provider_options() {
 async fn openrouter_video_maps_references_to_first_and_last_frames() {
     let server = json_server(json!({ "id": "abc123", "status": "pending" })).await;
     let options = AnimateOptions {
-        with: vec![Attachment::new("https://example.com/first.jpg"), Attachment::new("https://example.com/last.jpg")],
+        with: vec![
+            Attachment::new("https://example.com/first.jpg"),
+            Attachment::new("https://example.com/last.jpg"),
+        ],
         ..openrouter_animate(&server, "google/veo-3.1-lite")
     };
-    animate_later(Some("the camera slowly pushes in"), options).await.unwrap();
+    animate_later(Some("the camera slowly pushes in"), options)
+        .await
+        .unwrap();
     let (_, body) = only_request(&server).await;
     assert_eq!(
         body["frame_images"],
@@ -288,10 +400,15 @@ async fn openrouter_video_maps_references_to_first_and_last_frames() {
 // spec: providers/openrouter/videos_spec.rb:47 #parse_video_job > reads the job id and status from the accepted job
 #[tokio::test]
 async fn openrouter_video_reads_the_job_id_and_status() {
-    let accepted =
-        json!({ "id": "abc123", "polling_url": "https://openrouter.ai/api/v1/videos/abc123", "status": "pending" });
-    let server = video_job_server(accepted, json!({ "id": "abc123", "status": "in_progress" })).await;
-    let mut job = animate_later(Some("a wave"), openrouter_animate(&server, "x-ai/grok-imagine-video")).await.unwrap();
+    let accepted = json!({ "id": "abc123", "polling_url": "https://openrouter.ai/api/v1/videos/abc123", "status": "pending" });
+    let server =
+        video_job_server(accepted, json!({ "id": "abc123", "status": "in_progress" })).await;
+    let mut job = animate_later(
+        Some("a wave"),
+        openrouter_animate(&server, "x-ai/grok-imagine-video"),
+    )
+    .await
+    .unwrap();
     assert_eq!(job.id, "abc123");
     assert!(job.is_pending());
     // `video_job_url(job)`: the poll goes to videos/abc123.
@@ -304,8 +421,17 @@ async fn openrouter_video_reads_the_job_id_and_status() {
 #[tokio::test]
 async fn openrouter_video_stays_pending_while_in_progress() {
     let status = json!({ "id": "abc123", "status": "in_progress" });
-    let server = video_job_server(json!({ "id": "abc123", "status": "pending" }), status.clone()).await;
-    let mut job = animate_later(Some("a wave"), openrouter_animate(&server, "x-ai/grok-imagine-video")).await.unwrap();
+    let server = video_job_server(
+        json!({ "id": "abc123", "status": "pending" }),
+        status.clone(),
+    )
+    .await;
+    let mut job = animate_later(
+        Some("a wave"),
+        openrouter_animate(&server, "x-ai/grok-imagine-video"),
+    )
+    .await
+    .unwrap();
     job.refresh().await.unwrap();
     assert_eq!(job.status, VideoStatus::Pending);
     assert_eq!(job.raw, status);
@@ -320,8 +446,17 @@ async fn openrouter_video_completes_when_reported_completed() {
         "unsigned_urls": ["https://openrouter.ai/api/v1/videos/abc123/content?index=0"],
         "usage": { "cost": 0.05 }
     });
-    let server = video_job_server(json!({ "id": "abc123", "status": "pending" }), status.clone()).await;
-    let mut job = animate_later(Some("a wave"), openrouter_animate(&server, "x-ai/grok-imagine-video")).await.unwrap();
+    let server = video_job_server(
+        json!({ "id": "abc123", "status": "pending" }),
+        status.clone(),
+    )
+    .await;
+    let mut job = animate_later(
+        Some("a wave"),
+        openrouter_animate(&server, "x-ai/grok-imagine-video"),
+    )
+    .await
+    .unwrap();
     job.refresh().await.unwrap();
     assert_eq!(job.status, VideoStatus::Completed);
     assert_eq!(job.raw, status);
@@ -332,7 +467,12 @@ async fn openrouter_video_completes_when_reported_completed() {
 async fn openrouter_video_fails_with_the_reported_error() {
     let status = json!({ "status": "failed", "error": "provider rejected" });
     let server = video_job_server(json!({ "id": "abc123", "status": "pending" }), status).await;
-    let mut job = animate_later(Some("a wave"), openrouter_animate(&server, "x-ai/grok-imagine-video")).await.unwrap();
+    let mut job = animate_later(
+        Some("a wave"),
+        openrouter_animate(&server, "x-ai/grok-imagine-video"),
+    )
+    .await
+    .unwrap();
     job.refresh().await.unwrap();
     assert_eq!(job.status, VideoStatus::Failed);
     assert_eq!(job.error.as_deref(), Some("provider rejected"));
@@ -343,7 +483,10 @@ async fn openrouter_video_fails_with_the_reported_error() {
 async fn openrouter_video_downloads_content_with_the_api_connection() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "id": "abc123", "status": "completed" })))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "id": "abc123", "status": "completed" })),
+        )
         .mount(&server)
         .await;
     Mock::given(method("GET"))
@@ -354,8 +497,17 @@ async fn openrouter_video_downloads_content_with_the_api_connection() {
         .expect(1)
         .mount(&server)
         .await;
-    let mut job = animate_later(Some("a wave"), openrouter_animate(&server, "x-ai/grok-imagine-video")).await.unwrap();
-    let video = job.video().await.unwrap().expect("completed job has a video");
+    let mut job = animate_later(
+        Some("a wave"),
+        openrouter_animate(&server, "x-ai/grok-imagine-video"),
+    )
+    .await
+    .unwrap();
+    let video = job
+        .video()
+        .await
+        .unwrap()
+        .expect("completed job has a video");
     assert_eq!(video.data.as_deref(), Some(&b"mp4 bytes"[..]));
     assert_eq!(video.mime_type.as_deref(), Some("video/mp4"));
     assert_eq!(video.model.as_deref(), Some("x-ai/grok-imagine-video"));
@@ -364,7 +516,12 @@ async fn openrouter_video_downloads_content_with_the_api_connection() {
 // ---- xAI videos -------------------------------------------------------------------------------
 
 fn xai_animate<'a>(server: &MockServer) -> AnimateOptions<'a> {
-    AnimateOptions { model: Some("grok-imagine-video"), provider: Some("xai"), config: Some(config(server)), ..Default::default() }
+    AnimateOptions {
+        model: Some("grok-imagine-video"),
+        provider: Some("xai"),
+        config: Some(config(server)),
+        ..Default::default()
+    }
 }
 
 fn xai_job() -> Value {
@@ -375,21 +532,39 @@ fn xai_job() -> Value {
 #[tokio::test]
 async fn xai_video_references_a_remote_image_by_url() {
     let server = json_server(xai_job()).await;
-    let options = AnimateOptions { with: vec![Attachment::new("https://example.com/waterfall.png")], ..xai_animate(&server) };
-    animate_later(Some("make the water crash down"), options).await.unwrap();
+    let options = AnimateOptions {
+        with: vec![Attachment::new("https://example.com/waterfall.png")],
+        ..xai_animate(&server)
+    };
+    animate_later(Some("make the water crash down"), options)
+        .await
+        .unwrap();
     let (path, body) = only_request(&server).await;
     assert_eq!(path, "/v1/videos/generations");
-    assert_eq!(body["image"], json!({ "url": "https://example.com/waterfall.png" }));
+    assert_eq!(
+        body["image"],
+        json!({ "url": "https://example.com/waterfall.png" })
+    );
 }
 
 // spec: providers/xai/videos_spec.rb:42 #render_video_payload > inlines a local image as a data URI
 #[tokio::test]
 async fn xai_video_inlines_a_local_image_as_a_data_uri() {
     let server = json_server(xai_job()).await;
-    let options = AnimateOptions { with: vec![Attachment::new(fixture("ruby.png"))], ..xai_animate(&server) };
-    animate_later(Some("bring the logo to life"), options).await.unwrap();
+    let options = AnimateOptions {
+        with: vec![Attachment::new(fixture("ruby.png"))],
+        ..xai_animate(&server)
+    };
+    animate_later(Some("bring the logo to life"), options)
+        .await
+        .unwrap();
     let (_, body) = only_request(&server).await;
-    assert!(body["image"]["url"].as_str().unwrap().starts_with("data:image/png;base64,"));
+    assert!(
+        body["image"]["url"]
+            .as_str()
+            .unwrap()
+            .starts_with("data:image/png;base64,")
+    );
 }
 
 // spec: providers/xai/videos_spec.rb:76 video editing and extension > references uploaded images and videos using file_id fields
@@ -397,9 +572,17 @@ async fn xai_video_inlines_a_local_image_as_a_data_uri() {
 async fn xai_video_references_uploaded_files_by_file_id() {
     let file = uploaded("file_video", "xai", "clip.mp4", "video/mp4");
     let server = json_server(xai_job()).await;
-    let options = AnimateOptions { with: vec![Attachment::from_uploaded(file.clone())], ..xai_animate(&server) };
-    animate_later(Some("Turn the background blue"), options).await.unwrap();
-    let options = AnimateOptions { extend: Some(VideoSource::Attachment(Attachment::from_uploaded(file))), ..xai_animate(&server) };
+    let options = AnimateOptions {
+        with: vec![Attachment::from_uploaded(file.clone())],
+        ..xai_animate(&server)
+    };
+    animate_later(Some("Turn the background blue"), options)
+        .await
+        .unwrap();
+    let options = AnimateOptions {
+        extend: Some(VideoSource::Attachment(Attachment::from_uploaded(file))),
+        ..xai_animate(&server)
+    };
     animate_later(Some("Continue"), options).await.unwrap();
 
     let requests = received(&server).await;
@@ -417,22 +600,54 @@ async fn xai_video_references_uploaded_files_by_file_id() {
 #[tokio::test]
 async fn xai_video_rejects_conflicting_and_invalid_extension_sources() {
     let server = json_server(xai_job()).await;
-    let video = || VideoSource::Attachment(Attachment::from_bytes(b"mp4 bytes".to_vec(), "clip.mp4", None));
+    let video = || {
+        VideoSource::Attachment(Attachment::from_bytes(
+            b"mp4 bytes".to_vec(),
+            "clip.mp4",
+            None,
+        ))
+    };
 
-    let conflicting = AnimateOptions { with: vec![Attachment::new(fixture("ruby.png"))], extend: Some(video()), ..xai_animate(&server) };
+    let conflicting = AnimateOptions {
+        with: vec![Attachment::new(fixture("ruby.png"))],
+        extend: Some(video()),
+        ..xai_animate(&server)
+    };
     match animate_later(Some("Continue"), conflicting).await {
-        Err(Error::Argument(message)) => assert!(message.contains("cannot be combined"), "{message}"),
+        Err(Error::Argument(message)) => {
+            assert!(message.contains("cannot be combined"), "{message}")
+        }
         other => panic!("expected ArgumentError, got {other:?}"),
     }
 
     let empty = VideoSource::Video(Video::new(None, Some("video/mp4".into()), Value::Null));
-    match animate_later(Some("Continue"), AnimateOptions { extend: Some(empty), ..xai_animate(&server) }).await {
-        Err(Error::Argument(message)) => assert!(message.contains("exactly one video"), "{message}"),
+    match animate_later(
+        Some("Continue"),
+        AnimateOptions {
+            extend: Some(empty),
+            ..xai_animate(&server)
+        },
+    )
+    .await
+    {
+        Err(Error::Argument(message)) => {
+            assert!(message.contains("exactly one video"), "{message}")
+        }
         other => panic!("expected ArgumentError, got {other:?}"),
     }
 
     let image = VideoSource::from(fixture("ruby.png").as_str());
-    unsupported_mentions(animate_later(Some("Continue"), AnimateOptions { extend: Some(image), ..xai_animate(&server) }).await, "image/png");
+    unsupported_mentions(
+        animate_later(
+            Some("Continue"),
+            AnimateOptions {
+                extend: Some(image),
+                ..xai_animate(&server)
+            },
+        )
+        .await,
+        "image/png",
+    );
     assert!(received(&server).await.is_empty());
 }
 
@@ -449,7 +664,12 @@ fn gpustack_image_part() -> Value {
 }
 
 fn gpustack_embed<'a>(server: &MockServer) -> EmbedOptions<'a> {
-    EmbedOptions { model: Some(GPUSTACK_MODEL), provider: Some("gpustack"), config: Some(config(server)), ..Default::default() }
+    EmbedOptions {
+        model: Some(GPUSTACK_MODEL),
+        provider: Some("gpustack"),
+        config: Some(config(server)),
+        ..Default::default()
+    }
 }
 
 fn one_vector() -> Value {
@@ -460,7 +680,16 @@ fn one_vector() -> Value {
 #[tokio::test]
 async fn gpustack_embeds_text_and_an_image_as_messages() {
     let server = json_server(one_vector()).await;
-    embed("The Ruby logo", EmbedOptions { dimensions: Some(256), with: vec![png_image()], ..gpustack_embed(&server) }).await.unwrap();
+    embed(
+        "The Ruby logo",
+        EmbedOptions {
+            dimensions: Some(256),
+            with: vec![png_image()],
+            ..gpustack_embed(&server)
+        },
+    )
+    .await
+    .unwrap();
     let (path, body) = only_request(&server).await;
     assert_eq!(path, "/v1/embeddings");
     assert_eq!(
@@ -477,7 +706,16 @@ async fn gpustack_embeds_text_and_an_image_as_messages() {
 #[tokio::test]
 async fn gpustack_embeds_an_image_without_text() {
     let server = json_server(one_vector()).await;
-    embed(None::<String>, EmbedOptions { dimensions: Some(256), with: vec![png_image()], ..gpustack_embed(&server) }).await.unwrap();
+    embed(
+        None::<String>,
+        EmbedOptions {
+            dimensions: Some(256),
+            with: vec![png_image()],
+            ..gpustack_embed(&server)
+        },
+    )
+    .await
+    .unwrap();
     let (_, body) = only_request(&server).await;
     assert_eq!(
         body,
@@ -488,15 +726,21 @@ async fn gpustack_embeds_an_image_without_text() {
 // spec: providers/gpustack/embeddings_spec.rb:31 preserves text batches and provider options
 #[tokio::test]
 async fn gpustack_preserves_text_batches_and_provider_options() {
-    let server = json_server(json!({ "data": [{ "embedding": [0.1] }, { "embedding": [0.2] }] })).await;
+    let server =
+        json_server(json!({ "data": [{ "embedding": [0.1] }, { "embedding": [0.2] }] })).await;
     let options = EmbedOptions {
         dimensions: Some(256),
         provider_options: json!({ "dimensions": 128, "encoding_format": "float" }),
         ..gpustack_embed(&server)
     };
-    embed(vec!["Ruby".to_string(), "Rails".into()], options).await.unwrap();
+    embed(vec!["Ruby".to_string(), "Rails".into()], options)
+        .await
+        .unwrap();
     let (_, body) = only_request(&server).await;
-    assert_eq!(body, json!({ "model": GPUSTACK_MODEL, "input": ["Ruby", "Rails"], "dimensions": 128, "encoding_format": "float" }));
+    assert_eq!(
+        body,
+        json!({ "model": GPUSTACK_MODEL, "input": ["Ruby", "Rails"], "dimensions": 128, "encoding_format": "float" })
+    );
 }
 
 // spec: providers/gpustack/embeddings_spec.rb:41 rejects attachments the backend cannot render
@@ -504,8 +748,19 @@ async fn gpustack_preserves_text_batches_and_provider_options() {
 async fn gpustack_rejects_attachments_it_cannot_render() {
     let server = json_server(one_vector()).await;
     let document = Attachment::from_bytes(b"docx bytes".to_vec(), "report.docx", None);
-    let result = embed("The report", EmbedOptions { dimensions: Some(256), with: vec![document], ..gpustack_embed(&server) }).await;
-    assert!(matches!(result, Err(Error::UnsupportedAttachment(_))), "{result:?}");
+    let result = embed(
+        "The report",
+        EmbedOptions {
+            dimensions: Some(256),
+            with: vec![document],
+            ..gpustack_embed(&server)
+        },
+    )
+    .await;
+    assert!(
+        matches!(result, Err(Error::UnsupportedAttachment(_))),
+        "{result:?}"
+    );
     assert!(received(&server).await.is_empty());
 }
 
@@ -513,9 +768,20 @@ async fn gpustack_rejects_attachments_it_cannot_render() {
 #[tokio::test]
 async fn gpustack_embeds_an_image_through_the_public_api() {
     let server = json_server(one_vector()).await;
-    let result = embed(None::<String>, EmbedOptions { with: vec![png_image()], ..gpustack_embed(&server) }).await.unwrap();
+    let result = embed(
+        None::<String>,
+        EmbedOptions {
+            with: vec![png_image()],
+            ..gpustack_embed(&server)
+        },
+    )
+    .await
+    .unwrap();
     let (_, body) = only_request(&server).await;
-    assert_eq!(body, json!({ "model": GPUSTACK_MODEL, "messages": [{ "role": "user", "content": [gpustack_image_part()] }] }));
+    assert_eq!(
+        body,
+        json!({ "model": GPUSTACK_MODEL, "messages": [{ "role": "user", "content": [gpustack_image_part()] }] })
+    );
     assert_eq!(result.vectors, Vectors::Single(vec![0.1, 0.2]));
     assert_eq!(result.tokens().input, Some(12));
 }
@@ -538,39 +804,87 @@ fn openrouter_embed<'a>(server: &MockServer) -> EmbedOptions<'a> {
 async fn openrouter_embeds_an_image_without_text() {
     let server = json_server(one_vector()).await;
     let with = vec![Attachment::new("https://example.com/logo.png")];
-    embed(None::<String>, EmbedOptions { with, ..openrouter_embed(&server) }).await.unwrap();
+    embed(
+        None::<String>,
+        EmbedOptions {
+            with,
+            ..openrouter_embed(&server)
+        },
+    )
+    .await
+    .unwrap();
     let (_, body) = only_request(&server).await;
-    assert_eq!(body["input"], json!([{ "content": [{ "type": "image_url", "image_url": { "url": "https://example.com/logo.png" } }] }]));
+    assert_eq!(
+        body["input"],
+        json!([{ "content": [{ "type": "image_url", "image_url": { "url": "https://example.com/logo.png" } }] }])
+    );
 }
 
 // spec: providers/openrouter/embeddings_spec.rb:30 leaves image detail out of embedding inputs
 #[tokio::test]
 async fn openrouter_leaves_image_detail_out_of_embeddings() {
     let server = json_server(one_vector()).await;
-    let with = vec![Attachment::new("https://example.com/logo.png").with_resolution(Resolution::High)];
-    embed(None::<String>, EmbedOptions { with, ..openrouter_embed(&server) }).await.unwrap();
+    let with =
+        vec![Attachment::new("https://example.com/logo.png").with_resolution(Resolution::High)];
+    embed(
+        None::<String>,
+        EmbedOptions {
+            with,
+            ..openrouter_embed(&server)
+        },
+    )
+    .await
+    .unwrap();
     let (_, body) = only_request(&server).await;
-    assert_eq!(body["input"][0]["content"][0], json!({ "type": "image_url", "image_url": { "url": "https://example.com/logo.png" } }));
+    assert_eq!(
+        body["input"][0]["content"][0],
+        json!({ "type": "image_url", "image_url": { "url": "https://example.com/logo.png" } })
+    );
 }
 
 // spec: providers/openrouter/embeddings_spec.rb:45 preserves batched text inputs and maps the task type
 #[tokio::test]
 async fn openrouter_preserves_batches_and_maps_the_task_type() {
-    let server = json_server(json!({ "data": [{ "embedding": [0.1] }, { "embedding": [0.2] }] })).await;
-    embed(vec!["Ruby".to_string(), "Rails".into()], EmbedOptions { task_type: Some("search_document"), ..openrouter_embed(&server) })
-        .await
-        .unwrap();
+    let server =
+        json_server(json!({ "data": [{ "embedding": [0.1] }, { "embedding": [0.2] }] })).await;
+    embed(
+        vec!["Ruby".to_string(), "Rails".into()],
+        EmbedOptions {
+            task_type: Some("search_document"),
+            ..openrouter_embed(&server)
+        },
+    )
+    .await
+    .unwrap();
     let (_, body) = only_request(&server).await;
-    assert_eq!(body, json!({ "model": OPENROUTER_EMBEDDING_MODEL, "input": ["Ruby", "Rails"], "input_type": "search_document" }));
+    assert_eq!(
+        body,
+        json!({ "model": OPENROUTER_EMBEDDING_MODEL, "input": ["Ruby", "Rails"], "input_type": "search_document" })
+    );
 }
 
 // spec: providers/openrouter/embeddings_spec.rb:61 rejects provider-managed references without inline content
 #[tokio::test]
 async fn openrouter_embedding_rejects_provider_managed_files() {
     let server = json_server(one_vector()).await;
-    let with = vec![Attachment::from_uploaded(uploaded("file_123", "openrouter", "report.pdf", "application/pdf"))];
-    let result = embed(None::<String>, EmbedOptions { with, ..openrouter_embed(&server) }).await;
-    assert!(matches!(result, Err(Error::UnsupportedAttachment(_))), "{result:?}");
+    let with = vec![Attachment::from_uploaded(uploaded(
+        "file_123",
+        "openrouter",
+        "report.pdf",
+        "application/pdf",
+    ))];
+    let result = embed(
+        None::<String>,
+        EmbedOptions {
+            with,
+            ..openrouter_embed(&server)
+        },
+    )
+    .await;
+    assert!(
+        matches!(result, Err(Error::UnsupportedAttachment(_))),
+        "{result:?}"
+    );
     assert!(received(&server).await.is_empty());
 }
 
@@ -585,7 +899,10 @@ async fn openrouter_embedding_provider_options_override_rendered_fields() {
     };
     embed("Ruby", options).await.unwrap();
     let (_, body) = only_request(&server).await;
-    assert_eq!(body, json!({ "model": OPENROUTER_EMBEDDING_MODEL, "input": "Ruby", "input_type": "search_query", "dimensions": 256 }));
+    assert_eq!(
+        body,
+        json!({ "model": OPENROUTER_EMBEDDING_MODEL, "input": "Ruby", "input_type": "search_query", "dimensions": 256 })
+    );
 }
 
 // ---- GPUStack speech and transcription --------------------------------------------------------
@@ -602,16 +919,33 @@ async fn gpustack_streams_pcm_speech_by_default() {
         ..Default::default()
     };
     let mut chunks = Vec::new();
-    let speech = speak_stream("Hello", options, |chunk| chunks.push(chunk.clone())).await.unwrap();
+    let speech = speak_stream("Hello", options, |chunk| chunks.push(chunk.clone()))
+        .await
+        .unwrap();
     let (path, body) = only_request(&server).await;
     assert_eq!(path, "/v1/audio/speech");
-    assert_eq!(body, json!({ "model": GPUSTACK_MODEL, "input": "Hello", "voice": "Vivian", "stream": true, "response_format": "pcm" }));
+    assert_eq!(
+        body,
+        json!({ "model": GPUSTACK_MODEL, "input": "Hello", "voice": "Vivian", "stream": true, "response_format": "pcm" })
+    );
     assert_eq!(speech.format, "pcm");
     assert_eq!(chunks[0].format, "pcm");
-    assert_eq!(chunks.iter().flat_map(|c| c.data.clone()).collect::<Vec<u8>>(), speech.data);
+    assert_eq!(
+        chunks
+            .iter()
+            .flat_map(|c| c.data.clone())
+            .collect::<Vec<u8>>(),
+        speech.data
+    );
 }
 
-async fn gpustack_transcribe(events: &[Value]) -> (MockServer, rust_llm::Transcription, Vec<rust_llm::TranscriptionChunk>) {
+async fn gpustack_transcribe(
+    events: &[Value],
+) -> (
+    MockServer,
+    rust_llm::Transcription,
+    Vec<rust_llm::TranscriptionChunk>,
+) {
     let server = raw_server("text/event-stream", sse(events)).await;
     let options = TranscribeOptions {
         model: Some(GPUSTACK_MODEL),
@@ -620,14 +954,27 @@ async fn gpustack_transcribe(events: &[Value]) -> (MockServer, rust_llm::Transcr
         ..Default::default()
     };
     let mut chunks = Vec::new();
-    let result = transcribe_stream(Attachment::new(fixture("ruby.wav")), options, |c| chunks.push(c.clone())).await.unwrap();
+    let result = transcribe_stream(Attachment::new(fixture("ruby.wav")), options, |c| {
+        chunks.push(c.clone())
+    })
+    .await
+    .unwrap();
     // `{ model:, stream: 'true', stream_include_usage: 'true' }` on audio/transcriptions.
     let requests = received(&server).await;
     assert_eq!(requests.len(), 1);
     assert_eq!(requests[0].url.path(), "/v1/audio/transcriptions");
-    assert_eq!(form_field(&requests[0].body, "model").as_deref(), Some(GPUSTACK_MODEL));
-    assert_eq!(form_field(&requests[0].body, "stream").as_deref(), Some("true"));
-    assert_eq!(form_field(&requests[0].body, "stream_include_usage").as_deref(), Some("true"));
+    assert_eq!(
+        form_field(&requests[0].body, "model").as_deref(),
+        Some(GPUSTACK_MODEL)
+    );
+    assert_eq!(
+        form_field(&requests[0].body, "stream").as_deref(),
+        Some("true")
+    );
+    assert_eq!(
+        form_field(&requests[0].body, "stream_include_usage").as_deref(),
+        Some("true")
+    );
     (server, result, chunks)
 }
 
@@ -641,7 +988,13 @@ async fn gpustack_streams_text_and_keeps_the_final_usage_event() {
         json!({ "choices": [], "usage": { "prompt_tokens": 20, "completion_tokens": 4 } }),
     ];
     let (_, result, chunks) = gpustack_transcribe(&events).await;
-    assert_eq!(chunks.iter().filter_map(|c| c.delta.as_deref()).collect::<String>(), "Hello, Ruby.");
+    assert_eq!(
+        chunks
+            .iter()
+            .filter_map(|c| c.delta.as_deref())
+            .collect::<String>(),
+        "Hello, Ruby."
+    );
     let last = chunks.last().unwrap();
     assert!(last.is_done());
     assert_eq!(last.raw, events[3]);
@@ -675,18 +1028,31 @@ async fn gpustack_preserves_typed_transcript_and_speaker_events() {
     assert!(chunks[0].is_segment());
     assert_eq!(chunks[0].raw, segment);
     assert_eq!(result.text.as_deref(), Some("Hello."));
-    assert_eq!(result.segments, Some(vec![json!({ "text": "Hello.", "speaker": "S01", "start": 0, "end": 1 })]));
+    assert_eq!(
+        result.segments,
+        Some(vec![
+            json!({ "text": "Hello.", "speaker": "S01", "start": 0, "end": 1 })
+        ])
+    );
     assert_eq!(result.tokens().input, Some(10));
 }
 
 // ---- Mistral speech, transcription, and OCR ---------------------------------------------------
 
 fn mistral_speak<'a>(server: &MockServer) -> SpeakOptions<'a> {
-    SpeakOptions { model: Some("voxtral-mini-tts-latest"), provider: Some("mistral"), config: Some(config(server)), ..Default::default() }
+    SpeakOptions {
+        model: Some("voxtral-mini-tts-latest"),
+        provider: Some("mistral"),
+        config: Some(config(server)),
+        ..Default::default()
+    }
 }
 
 fn speech_events(events: &[Value]) -> String {
-    events.iter().map(|e| format!("event: {}\ndata: {e}\n\n", e["type"].as_str().unwrap_or(""))).collect()
+    events
+        .iter()
+        .map(|e| format!("event: {}\ndata: {e}\n\n", e["type"].as_str().unwrap_or("")))
+        .collect()
 }
 
 // spec: providers/mistral/speech_spec.rb:35 #stream_speech > rejects an audio stream that ends before completion
@@ -703,8 +1069,11 @@ async fn mistral_speech_stream_ending_before_completion_is_an_error() {
 // spec: providers/mistral/speech_spec.rb:43 #stream_speech > raises streaming provider errors without delivering them as speech
 #[tokio::test]
 async fn mistral_speech_stream_errors_are_raised_not_spoken() {
-    let server =
-        raw_server("text/event-stream", "event: error\ndata: {\"error\":{\"message\":\"Generation failed\"}}\n\n".to_string()).await;
+    let server = raw_server(
+        "text/event-stream",
+        "event: error\ndata: {\"error\":{\"message\":\"Generation failed\"}}\n\n".to_string(),
+    )
+    .await;
     let mut chunks = 0;
     match speak_stream("Hello", mistral_speak(&server), |_| chunks += 1).await {
         Err(e) => assert!(e.to_string().contains("Generation failed"), "{e}"),
@@ -713,7 +1082,9 @@ async fn mistral_speech_stream_errors_are_raised_not_spoken() {
     assert_eq!(chunks, 0);
 }
 
-async fn mistral_transcribe(events: &[Value]) -> (rust_llm::Transcription, Vec<rust_llm::TranscriptionChunk>) {
+async fn mistral_transcribe(
+    events: &[Value],
+) -> (rust_llm::Transcription, Vec<rust_llm::TranscriptionChunk>) {
     let server = raw_server("text/event-stream", sse(events)).await;
     let options = TranscribeOptions {
         model: Some("voxtral-mini-latest"),
@@ -722,13 +1093,23 @@ async fn mistral_transcribe(events: &[Value]) -> (rust_llm::Transcription, Vec<r
         ..Default::default()
     };
     let mut chunks = Vec::new();
-    let result = transcribe_stream(Attachment::new(fixture("ruby.wav")), options, |c| chunks.push(c.clone())).await.unwrap();
+    let result = transcribe_stream(Attachment::new(fixture("ruby.wav")), options, |c| {
+        chunks.push(c.clone())
+    })
+    .await
+    .unwrap();
     // `{ model:, stream: 'true' }` on audio/transcriptions.
     let requests = received(&server).await;
     assert_eq!(requests.len(), 1);
     assert_eq!(requests[0].url.path(), "/v1/audio/transcriptions");
-    assert_eq!(form_field(&requests[0].body, "model").as_deref(), Some("voxtral-mini-latest"));
-    assert_eq!(form_field(&requests[0].body, "stream").as_deref(), Some("true"));
+    assert_eq!(
+        form_field(&requests[0].body, "model").as_deref(),
+        Some("voxtral-mini-latest")
+    );
+    assert_eq!(
+        form_field(&requests[0].body, "stream").as_deref(),
+        Some("true")
+    );
     assert_eq!(form_field(&requests[0].body, "stream_include_usage"), None);
     (result, chunks)
 }
@@ -744,7 +1125,13 @@ async fn mistral_streams_text_and_keeps_language_duration_and_usage() {
                 "usage": { "prompt_tokens": 8, "completion_tokens": 4, "prompt_audio_seconds": 3 } }),
     ];
     let (result, chunks) = mistral_transcribe(&events).await;
-    assert_eq!(chunks.iter().filter_map(|c| c.delta.as_deref()).collect::<String>(), "Hello, Ruby.");
+    assert_eq!(
+        chunks
+            .iter()
+            .filter_map(|c| c.delta.as_deref())
+            .collect::<String>(),
+        "Hello, Ruby."
+    );
     let last = chunks.last().unwrap();
     assert!(last.is_done());
     assert_eq!(last.raw, events[3]);
@@ -759,13 +1146,20 @@ async fn mistral_streams_text_and_keeps_language_duration_and_usage() {
 #[tokio::test]
 async fn mistral_keeps_segments_reported_only_by_the_final_event() {
     let segment = json!({ "text": "Hello.", "start": 0.0, "end": 1.0 });
-    let events = [json!({ "type": "transcription.done", "text": "Hello.", "segments": [segment], "usage": {} })];
+    let events = [
+        json!({ "type": "transcription.done", "text": "Hello.", "segments": [segment], "usage": {} }),
+    ];
     let (result, _) = mistral_transcribe(&events).await;
     assert_eq!(result.segments, Some(vec![segment]));
 }
 
 fn mistral_ocr<'a>(server: &MockServer) -> OcrOptions<'a> {
-    OcrOptions { model: Some("mistral-ocr-latest"), provider: Some("mistral"), config: Some(config(server)), ..Default::default() }
+    OcrOptions {
+        model: Some("mistral-ocr-latest"),
+        provider: Some("mistral"),
+        config: Some(config(server)),
+        ..Default::default()
+    }
 }
 
 fn ocr_body() -> Value {
@@ -776,7 +1170,9 @@ fn ocr_body() -> Value {
 #[tokio::test]
 async fn mistral_ocr_sends_remote_documents_as_document_urls() {
     let server = json_server(ocr_body()).await;
-    ocr("https://example.com/report.pdf", mistral_ocr(&server)).await.unwrap();
+    ocr("https://example.com/report.pdf", mistral_ocr(&server))
+        .await
+        .unwrap();
     let (path, body) = only_request(&server).await;
     assert_eq!(path, "/v1/ocr");
     assert_eq!(
@@ -789,20 +1185,34 @@ async fn mistral_ocr_sends_remote_documents_as_document_urls() {
 #[tokio::test]
 async fn mistral_ocr_sends_images_as_image_urls() {
     let server = json_server(ocr_body()).await;
-    ocr(Attachment::new(fixture("ruby.png")), mistral_ocr(&server)).await.unwrap();
+    ocr(Attachment::new(fixture("ruby.png")), mistral_ocr(&server))
+        .await
+        .unwrap();
     let (_, body) = only_request(&server).await;
     assert_eq!(body["document"]["type"], "image_url");
-    assert!(body["document"]["image_url"].as_str().unwrap().starts_with("data:image/png;base64,"));
+    assert!(
+        body["document"]["image_url"]
+            .as_str()
+            .unwrap()
+            .starts_with("data:image/png;base64,")
+    );
 }
 
 // spec: providers/mistral/ocr_spec.rb:43 .render_ocr_payload > inlines XML documents as base64 data URIs
 #[tokio::test]
 async fn mistral_ocr_inlines_xml_as_a_data_uri() {
     let server = json_server(ocr_body()).await;
-    ocr(Attachment::new(fixture("ruby.xml")), mistral_ocr(&server)).await.unwrap();
+    ocr(Attachment::new(fixture("ruby.xml")), mistral_ocr(&server))
+        .await
+        .unwrap();
     let (_, body) = only_request(&server).await;
     assert_eq!(body["document"]["type"], "document_url");
-    assert!(body["document"]["document_url"].as_str().unwrap().starts_with("data:application/xml;base64,"));
+    assert!(
+        body["document"]["document_url"]
+            .as_str()
+            .unwrap()
+            .starts_with("data:application/xml;base64,")
+    );
 }
 
 // spec: providers/mistral/ocr_spec.rb:67 .parse_ocr_response > builds an OCR result from pages, model, and usage_info
@@ -817,12 +1227,20 @@ async fn mistral_ocr_builds_a_result_from_pages_model_and_usage() {
         "usage_info": { "pages_processed": 2, "doc_size_bytes": 123 }
     });
     let server = json_server(body.clone()).await;
-    let result = ocr("https://example.com/report.pdf", mistral_ocr(&server)).await.unwrap();
-    assert_eq!(result.pages.iter().map(|p| p.index).collect::<Vec<_>>(), vec![0, 1]);
+    let result = ocr("https://example.com/report.pdf", mistral_ocr(&server))
+        .await
+        .unwrap();
+    assert_eq!(
+        result.pages.iter().map(|p| p.index).collect::<Vec<_>>(),
+        vec![0, 1]
+    );
     assert_eq!(result.pages[0].markdown.as_deref(), Some("# Hello"));
     assert_eq!(result.markdown(), "# Hello\n\nWorld");
     assert_eq!(result.model, "mistral-ocr-latest");
-    assert_eq!(result.usage, Some(json!({ "pages_processed": 2, "doc_size_bytes": 123 })));
+    assert_eq!(
+        result.usage,
+        Some(json!({ "pages_processed": 2, "doc_size_bytes": 123 }))
+    );
     assert_eq!(result.raw, body);
 }
 
@@ -842,7 +1260,10 @@ async fn xai_streaming_speech_rejects_with_timestamps() {
         ..Default::default()
     };
     match speak_stream("Hello", options, |chunk| panic!("Unexpected: {chunk:?}")).await {
-        Err(Error::Argument(message)) => assert!(message.contains("does not accept with_timestamps"), "{message}"),
+        Err(Error::Argument(message)) => assert!(
+            message.contains("does not accept with_timestamps"),
+            "{message}"
+        ),
         other => panic!("expected ArgumentError, got {other:?}"),
     }
     assert!(received(&server).await.is_empty());

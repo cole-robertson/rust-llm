@@ -30,7 +30,10 @@ pub struct Prompt {
 
 impl std::fmt::Debug for Prompt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Prompt").field("name", &self.name).field("messages", &self.messages.len()).finish()
+        f.debug_struct("Prompt")
+            .field("name", &self.name)
+            .field("messages", &self.messages.len())
+            .finish()
     }
 }
 
@@ -43,17 +46,36 @@ impl Prompt {
             .into_iter()
             .flatten()
             .map(|a| PromptArgument {
-                name: a.get("name").and_then(Value::as_str).unwrap_or("").to_string(),
-                description: a.get("description").and_then(Value::as_str).map(str::to_string),
+                name: a
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string(),
+                description: a
+                    .get("description")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
                 required: a.get("required") == Some(&Value::Bool(true)),
             })
             .collect();
-        Prompt { name: s("name").unwrap_or_default(), title: s("title"), description: s("description"), arguments, messages, mcp }
+        Prompt {
+            name: s("name").unwrap_or_default(),
+            title: s("title"),
+            description: s("description"),
+            arguments,
+            messages,
+            mcp,
+        }
     }
 
     /// `suggest(**arguments)`: asks the server to complete the first argument's partial value,
     /// with the rest as context.
     pub async fn suggest(&self, arguments: &[(&str, &str)]) -> Result<Vec<String>> {
-        self.mcp.suggest(json!({ "type": "ref/prompt", "name": self.name }), arguments).await
+        self.mcp
+            .suggest(
+                json!({ "type": "ref/prompt", "name": self.name }),
+                arguments,
+            )
+            .await
     }
 }

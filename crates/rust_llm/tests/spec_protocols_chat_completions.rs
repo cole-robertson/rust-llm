@@ -11,7 +11,10 @@ use std::sync::Arc;
 
 use rust_llm::message::RawResponse;
 use rust_llm::protocols::chat_completions;
-use rust_llm::{Attachment, Chat, Config, Error, FinishReason, Message, ProtocolName, Provider, Resolution, Thinking, ToolCall};
+use rust_llm::{
+    Attachment, Chat, Config, Error, FinishReason, Message, ProtocolName, Provider, Resolution,
+    Thinking, ToolCall,
+};
 use serde_json::{Value, json};
 use spec_helpers::{serve, serve_templates, sse, tool_call_message};
 use wiremock::{MockServer, ResponseTemplate};
@@ -19,8 +22,16 @@ use wiremock::{MockServer, ResponseTemplate};
 /// `include_context 'with configured RubyLLM'`, plus the Chat Completions providers this file uses.
 fn config(server: &MockServer) -> Arc<Config> {
     let mut c = Config::default();
-    for (provider, path) in [("openai", "/v1"), ("deepseek", ""), ("xai", "/v1"), ("perplexity", "")] {
-        c.set(format!("{provider}_api_base"), format!("{}{path}", server.uri()));
+    for (provider, path) in [
+        ("openai", "/v1"),
+        ("deepseek", ""),
+        ("xai", "/v1"),
+        ("perplexity", ""),
+    ] {
+        c.set(
+            format!("{provider}_api_base"),
+            format!("{}{path}", server.uri()),
+        );
         c.set(format!("{provider}_api_key"), "test");
     }
     c.max_retries = 0;
@@ -29,7 +40,9 @@ fn config(server: &MockServer) -> Arc<Config> {
 
 /// `<Provider>::ChatCompletions` for `model`.
 fn cc_chat(server: &MockServer, provider: &str, model: &str) -> Chat {
-    Chat::with_config(config(server), Some(model), Some(provider), true).unwrap().with_protocol(ProtocolName::ChatCompletions)
+    Chat::with_config(config(server), Some(model), Some(provider), true)
+        .unwrap()
+        .with_protocol(ProtocolName::ChatCompletions)
 }
 
 fn openai(server: &MockServer) -> Chat {
@@ -42,7 +55,8 @@ fn parse(provider: Provider, data: Value) -> Message {
 }
 
 fn parse_err(data: Value) -> Error {
-    chat_completions::parse_completion_body(Provider::OpenAI, &data, RawResponse::default()).unwrap_err()
+    chat_completions::parse_completion_body(Provider::OpenAI, &data, RawResponse::default())
+        .unwrap_err()
 }
 
 /// A completion body whose single message carries `message` and whose usage is `usage`.
@@ -51,12 +65,27 @@ fn body(model: &str, message: Value, usage: Value) -> Value {
 }
 
 fn hello(model: &str, usage: Value) -> Message {
-    let provider = if model.starts_with("deepseek") { Provider::DeepSeek } else { Provider::OpenAI };
-    parse(provider, body(model, json!({ "role": "assistant", "content": "Hello!" }), usage))
+    let provider = if model.starts_with("deepseek") {
+        Provider::DeepSeek
+    } else {
+        Provider::OpenAI
+    };
+    parse(
+        provider,
+        body(
+            model,
+            json!({ "role": "assistant", "content": "Hello!" }),
+            usage,
+        ),
+    )
 }
 
 /// The first rendered message for a user turn carrying `attachments`.
-fn render_attachments(mut chat: Chat, text: &str, attachments: Vec<Attachment>) -> rust_llm::Result<Value> {
+fn render_attachments(
+    mut chat: Chat,
+    text: &str,
+    attachments: Vec<Attachment>,
+) -> rust_llm::Result<Value> {
     chat.ask_later_with(text, attachments).unwrap();
     chat.render().map(|p| p["messages"][0].clone())
 }
@@ -65,8 +94,7 @@ fn docx() -> Attachment {
     Attachment::from_bytes(b"docx bytes".to_vec(), "proposal.docx", None)
 }
 
-const DOCX_UNSUPPORTED: &str =
-    "Unsupported attachment type: application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const DOCX_UNSUPPORTED: &str = "Unsupported attachment type: application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 fn assert_unsupported(result: rust_llm::Result<Value>, needle: &str) {
     match result {
@@ -80,7 +108,10 @@ fn assert_unsupported(result: rust_llm::Result<Value>, needle: &str) {
 // spec: protocols/chat_completions/chat_spec.rb:7 .parse_completion_body > captures cached token information when present
 #[test]
 fn cached_tokens_are_split_out_of_the_prompt() {
-    let m = hello("gpt-4.1-nano", json!({ "prompt_tokens": 8, "completion_tokens": 4, "prompt_tokens_details": { "cached_tokens": 6 } }));
+    let m = hello(
+        "gpt-4.1-nano",
+        json!({ "prompt_tokens": 8, "completion_tokens": 4, "prompt_tokens_details": { "cached_tokens": 6 } }),
+    );
     assert_eq!(m.tokens.cache_read, Some(6));
     assert_eq!(m.tokens.input, Some(2));
     assert_eq!(m.tokens.output, Some(4));
@@ -111,7 +142,10 @@ fn finish_reasons_are_normalized() {
             ] }
         }]
     });
-    assert_eq!(parse(Provider::OpenAI, data).finish_reason, Some(FinishReason::ToolCalls));
+    assert_eq!(
+        parse(Provider::OpenAI, data).finish_reason,
+        Some(FinishReason::ToolCalls)
+    );
 }
 
 // spec: protocols/chat_completions/chat_spec.rb:94 .parse_completion_body > normalizes DeepSeek cache hit and miss usage fields
@@ -167,7 +201,10 @@ fn top_level_reasoning_tokens_are_captured() {
 #[tokio::test]
 async fn openai_chat_completions_rejects_docx() {
     let server = serve(vec![]).await;
-    assert_unsupported(render_attachments(openai(&server), "Summarize this file", vec![docx()]), DOCX_UNSUPPORTED);
+    assert_unsupported(
+        render_attachments(openai(&server), "Summarize this file", vec![docx()]),
+        DOCX_UNSUPPORTED,
+    );
 }
 
 // spec: protocols/chat_completions/chat_spec.rb:251 .format_messages > keeps unsupported files disabled for DeepSeek
@@ -175,7 +212,10 @@ async fn openai_chat_completions_rejects_docx() {
 async fn deepseek_rejects_docx() {
     let server = serve(vec![]).await;
     let chat = cc_chat(&server, "deepseek", "deepseek-v4-flash");
-    assert_unsupported(render_attachments(chat, "Summarize this file", vec![docx()]), DOCX_UNSUPPORTED);
+    assert_unsupported(
+        render_attachments(chat, "Summarize this file", vec![docx()]),
+        DOCX_UNSUPPORTED,
+    );
 }
 
 // spec: protocols/chat_completions/chat_spec.rb:287 .format_messages > uses Perplexity file_url parts for supported file attachments
@@ -184,7 +224,10 @@ async fn perplexity_sends_supported_files_as_file_url_parts() {
     let server = serve(vec![]).await;
     let chat = cc_chat(&server, "perplexity", "openai/gpt-5-mini");
     let message = render_attachments(chat, "Summarize this file", vec![docx()]).unwrap();
-    assert_eq!(message["content"][1], json!({ "type": "file_url", "file_url": { "url": "ZG9jeCBieXRlcw==" } }));
+    assert_eq!(
+        message["content"][1],
+        json!({ "type": "file_url", "file_url": { "url": "ZG9jeCBieXRlcw==" } })
+    );
 }
 
 // spec: protocols/chat_completions/chat_spec.rb:298 .format_messages > keeps Perplexity text file attachments as text parts
@@ -192,10 +235,16 @@ async fn perplexity_sends_supported_files_as_file_url_parts() {
 async fn perplexity_keeps_text_files_as_text_parts() {
     let server = serve(vec![]).await;
     for extension in ["csv", "txt", "md", "html", "json"] {
-        let attachment = Attachment::from_bytes(b"notes".to_vec(), format!("notes.{extension}"), None);
+        let attachment =
+            Attachment::from_bytes(b"notes".to_vec(), format!("notes.{extension}"), None);
         let chat = cc_chat(&server, "perplexity", "openai/gpt-5-mini");
-        let message = render_attachments(chat, "Summarize this file", vec![attachment.clone()]).unwrap();
-        assert_eq!(message["content"][1], json!({ "type": "text", "text": attachment.for_llm().unwrap() }), "{extension}");
+        let message =
+            render_attachments(chat, "Summarize this file", vec![attachment.clone()]).unwrap();
+        assert_eq!(
+            message["content"][1],
+            json!({ "type": "text", "text": attachment.for_llm().unwrap() }),
+            "{extension}"
+        );
     }
 }
 
@@ -204,7 +253,10 @@ async fn perplexity_keeps_text_files_as_text_parts() {
 async fn xai_rejects_docx() {
     let server = serve(vec![]).await;
     let chat = cc_chat(&server, "xai", "grok-4-1-fast-non-reasoning");
-    assert_unsupported(render_attachments(chat, "Summarize this file", vec![docx()]), DOCX_UNSUPPORTED);
+    assert_unsupported(
+        render_attachments(chat, "Summarize this file", vec![docx()]),
+        DOCX_UNSUPPORTED,
+    );
 }
 
 // spec: protocols/chat_completions/chat_spec.rb:325 .format_messages > keeps PDF file parts disabled for xAI chat completions
@@ -213,7 +265,10 @@ async fn xai_chat_completions_rejects_pdf() {
     let server = serve(vec![]).await;
     let chat = cc_chat(&server, "xai", "grok-4-1-fast-non-reasoning");
     let pdf = Attachment::from_bytes(b"pdf bytes".to_vec(), "proposal.pdf", None);
-    assert_unsupported(render_attachments(chat, "Summarize this file", vec![pdf]), "Unsupported attachment type: application/pdf");
+    assert_unsupported(
+        render_attachments(chat, "Summarize this file", vec![pdf]),
+        "Unsupported attachment type: application/pdf",
+    );
 }
 
 // ---- chat_spec.rb: .render_payload --------------------------------------------------------------
@@ -228,8 +283,14 @@ fn render_hello(chat: Chat) -> Value {
 #[tokio::test]
 async fn prompt_cache_params_render_for_any_chat_completions_provider() {
     let server = serve(vec![]).await;
-    for chat in [cc_chat(&server, "openai", "gpt-4o"), cc_chat(&server, "deepseek", "deepseek-v4-flash")] {
-        let payload = render_hello(chat.with_caching(json!({ "key": "repo:ruby_llm", "ttl": "30m" })).unwrap());
+    for chat in [
+        cc_chat(&server, "openai", "gpt-4o"),
+        cc_chat(&server, "deepseek", "deepseek-v4-flash"),
+    ] {
+        let payload = render_hello(
+            chat.with_caching(json!({ "key": "repo:ruby_llm", "ttl": "30m" }))
+                .unwrap(),
+        );
         assert_eq!(payload["prompt_cache_key"], json!("repo:ruby_llm"));
         assert_eq!(payload["prompt_cache_options"], json!({ "ttl": "30m" }));
     }
@@ -249,21 +310,35 @@ async fn a_custom_schema_name_is_used() {
     let server = serve(vec![]).await;
     let schema = person_schema(true);
     let payload = render_hello(cc_chat(&server, "openai", "gpt-4o").with_schema(schema.clone()));
-    assert_eq!(payload["response_format"]["json_schema"]["name"], json!("PersonSchema"));
-    assert_eq!(payload["response_format"]["json_schema"]["schema"], schema["schema"]);
-    assert_eq!(payload["response_format"]["json_schema"]["strict"], json!(true));
+    assert_eq!(
+        payload["response_format"]["json_schema"]["name"],
+        json!("PersonSchema")
+    );
+    assert_eq!(
+        payload["response_format"]["json_schema"]["schema"],
+        schema["schema"]
+    );
+    assert_eq!(
+        payload["response_format"]["json_schema"]["strict"],
+        json!(true)
+    );
 }
 
 // spec: protocols/chat_completions/chat_spec.rb:418 .render_payload > with schema > respects explicit strict: false
 #[tokio::test]
 async fn an_explicit_strict_false_is_respected() {
     let server = serve(vec![]).await;
-    let payload = render_hello(cc_chat(&server, "openai", "gpt-4o").with_schema(person_schema(false)));
-    assert_eq!(payload["response_format"]["json_schema"]["strict"], json!(false));
+    let payload =
+        render_hello(cc_chat(&server, "openai", "gpt-4o").with_schema(person_schema(false)));
+    assert_eq!(
+        payload["response_format"]["json_schema"]["strict"],
+        json!(false)
+    );
 }
 
 fn strict_for(server: &MockServer, schema: Value) -> Value {
-    render_hello(openai(server).with_schema(schema))["response_format"]["json_schema"]["strict"].clone()
+    render_hello(openai(server).with_schema(schema))["response_format"]["json_schema"]["strict"]
+        .clone()
 }
 
 // spec: protocols/chat_completions/chat_spec.rb:728 .render_payload with a schema > sends non-strict when a property is optional, since strict mode would reject it
@@ -310,7 +385,11 @@ fn a_url_citation_without_offsets_has_no_text() {
 }
 
 fn root_citations(root: Value) -> Vec<rust_llm::Citation> {
-    let mut data = body("sonar", json!({ "role": "assistant", "content": null }), json!({}));
+    let mut data = body(
+        "sonar",
+        json!({ "role": "assistant", "content": null }),
+        json!({}),
+    );
     for (k, v) in root.as_object().unwrap() {
         data[k] = v.clone();
     }
@@ -356,7 +435,11 @@ fn the_reported_error_is_raised() {
 #[test]
 fn a_response_without_a_message_is_an_error() {
     let err = parse_err(json!({ "choices": [] }));
-    assert!(err.to_string().contains("Provider returned no completion message"), "{err}");
+    assert!(
+        err.to_string()
+            .contains("Provider returned no completion message"),
+        "{err}"
+    );
 }
 
 // spec: protocols/chat_completions/chat_spec.rb:514 .parse_completion_body error and usage handling > derives generated tokens from the total when the provider omits them
@@ -388,23 +471,52 @@ fn thinking_signature(message: Value) -> Option<String> {
 // spec: protocols/chat_completions/chat_spec.rb:528 thinking round-trips > reads reasoning out of the alternate field names
 #[test]
 fn reasoning_is_read_from_the_alternate_field_names() {
-    assert_eq!(thinking_text(json!({ "content": "a", "reasoning": "why" })).as_deref(), Some("why"));
-    assert_eq!(thinking_text(json!({ "content": "a", "thinking": "why" })).as_deref(), Some("why"));
-    assert_eq!(thinking_text(json!({ "content": "a", "reasoning_content": 42 })), None);
+    assert_eq!(
+        thinking_text(json!({ "content": "a", "reasoning": "why" })).as_deref(),
+        Some("why")
+    );
+    assert_eq!(
+        thinking_text(json!({ "content": "a", "thinking": "why" })).as_deref(),
+        Some("why")
+    );
+    assert_eq!(
+        thinking_text(json!({ "content": "a", "reasoning_content": 42 })),
+        None
+    );
     // `reasoning_content || reasoning || thinking`: a non-string earlier field still wins, then fails the String check.
-    assert_eq!(thinking_text(json!({ "content": "a", "reasoning_content": 42, "reasoning": "why" })), None);
-    assert_eq!(thinking_signature(json!({ "content": "a", "signature": "sig" })).as_deref(), Some("sig"));
-    assert_eq!(thinking_signature(json!({ "content": "a", "reasoning_signature": 42 })), None);
-    assert_eq!(thinking_signature(json!({ "content": "a", "reasoning_signature": 42, "signature": "sig" })), None);
+    assert_eq!(
+        thinking_text(json!({ "content": "a", "reasoning_content": 42, "reasoning": "why" })),
+        None
+    );
+    assert_eq!(
+        thinking_signature(json!({ "content": "a", "signature": "sig" })).as_deref(),
+        Some("sig")
+    );
+    assert_eq!(
+        thinking_signature(json!({ "content": "a", "reasoning_signature": 42 })),
+        None
+    );
+    assert_eq!(
+        thinking_signature(
+            json!({ "content": "a", "reasoning_signature": 42, "signature": "sig" })
+        ),
+        None
+    );
 }
 
 // spec: protocols/chat_completions/chat_spec.rb:536 thinking round-trips > hands string content back untouched, markup and all
 #[test]
 fn string_content_is_returned_untouched() {
     let plain = reply(json!({ "content": "plain" }));
-    assert_eq!((plain.content.as_deref(), plain.thinking), (Some("plain"), None));
+    assert_eq!(
+        (plain.content.as_deref(), plain.thinking),
+        (Some("plain"), None)
+    );
     let marked = reply(json!({ "content": "<think>why</think>answer" }));
-    assert_eq!((marked.content.as_deref(), marked.thinking), (Some("<think>why</think>answer"), None));
+    assert_eq!(
+        (marked.content.as_deref(), marked.thinking),
+        (Some("<think>why</think>answer"), None)
+    );
 }
 
 // spec: protocols/chat_completions/chat_spec.rb:542 thinking round-trips > leaves a content shape it does not understand alone
@@ -420,10 +532,16 @@ async fn a_signature_only_thinking_sends_only_the_signature() {
     let server = serve(vec![]).await;
     let mut chat = openai(&server);
     let mut answer = Message::assistant("done");
-    answer.thinking = Some(Thinking { text: None, signature: Some("sig".into()) });
+    answer.thinking = Some(Thinking {
+        text: None,
+        signature: Some("sig".into()),
+    });
     chat.set_messages(vec![Message::user("hi"), answer]);
     let rendered = chat.render().unwrap()["messages"][1].clone();
-    assert_eq!(rendered, json!({ "role": "assistant", "content": "done", "reasoning_signature": "sig" }));
+    assert_eq!(
+        rendered,
+        json!({ "role": "assistant", "content": "done", "reasoning_signature": "sig" })
+    );
 }
 
 // ---- chat_spec.rb: prompt caching and max tokens ------------------------------------------------
@@ -447,18 +565,26 @@ async fn cache_boundaries_are_marked_without_cache_options() {
     assert!(payload.get("prompt_cache_options").is_none());
     // `openai_prompt_caching?` is true for the whole wire format, not just OpenAI.
     let payload = long_context_boundary(&mut cc_chat(&server, "deepseek", "deepseek-v4-flash"));
-    assert_eq!(payload["messages"][0]["content"][0]["prompt_cache_breakpoint"], json!({ "mode": "explicit" }));
+    assert_eq!(
+        payload["messages"][0]["content"][0]["prompt_cache_breakpoint"],
+        json!({ "mode": "explicit" })
+    );
 }
 
 // spec: protocols/chat_completions/chat_spec.rb:616 prompt caching > preserves cache options alongside explicit boundaries
 #[tokio::test]
 async fn cache_options_survive_alongside_boundaries() {
     let server = serve(vec![]).await;
-    let mut chat = openai(&server).with_caching(json!({ "ttl": "30m" })).unwrap();
+    let mut chat = openai(&server)
+        .with_caching(json!({ "ttl": "30m" }))
+        .unwrap();
     let payload = long_context_boundary(&mut chat);
     assert_eq!(payload["prompt_cache_options"], json!({ "ttl": "30m" }));
     let content = payload["messages"][0]["content"].as_array().unwrap();
-    assert_eq!(content.last().unwrap()["prompt_cache_breakpoint"], json!({ "mode": "explicit" }));
+    assert_eq!(
+        content.last().unwrap()["prompt_cache_breakpoint"],
+        json!({ "mode": "explicit" })
+    );
 }
 
 // spec: protocols/chat_completions/chat_spec.rb:662 #max_output_tokens_field > always sends max_completion_tokens to OpenAI and Azure
@@ -466,9 +592,21 @@ async fn cache_options_survive_alongside_boundaries() {
 #[tokio::test]
 async fn openai_always_gets_max_completion_tokens() {
     let server = serve(vec![]).await;
-    for id in ["gpt-3.5-turbo", "gpt-4o-mini", "gpt-5.1", "o4-mini", "ft:gpt-5.1:acme::abc123", "prod-reasoner"] {
+    for id in [
+        "gpt-3.5-turbo",
+        "gpt-4o-mini",
+        "gpt-5.1",
+        "o4-mini",
+        "ft:gpt-5.1:acme::abc123",
+        "prod-reasoner",
+    ] {
         let payload = render_hello(cc_chat(&server, "openai", id).with_max_output_tokens(1000));
-        let fields: Vec<&String> = payload.as_object().unwrap().keys().filter(|k| k.starts_with("max_")).collect();
+        let fields: Vec<&String> = payload
+            .as_object()
+            .unwrap()
+            .keys()
+            .filter(|k| k.starts_with("max_"))
+            .collect();
         assert_eq!(fields, vec!["max_completion_tokens"], "{id}");
     }
 }
@@ -476,7 +614,11 @@ async fn openai_always_gets_max_completion_tokens() {
 // ---- media_spec.rb -------------------------------------------------------------------------------
 
 async fn png(resolution: Resolution) -> Attachment {
-    let mut image = Attachment::new(format!("{}/tests/fixtures/ruby.png", env!("CARGO_MANIFEST_DIR"))).with_resolution(resolution);
+    let mut image = Attachment::new(format!(
+        "{}/tests/fixtures/ruby.png",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .with_resolution(resolution);
     image.content().await.unwrap();
     image
 }
@@ -485,7 +627,12 @@ async fn png(resolution: Resolution) -> Attachment {
 #[tokio::test]
 async fn low_resolution_maps_to_low_detail() {
     let server = serve(vec![]).await;
-    let message = render_attachments(openai(&server), "Describe this", vec![png(Resolution::Low).await]).unwrap();
+    let message = render_attachments(
+        openai(&server),
+        "Describe this",
+        vec![png(Resolution::Low).await],
+    )
+    .unwrap();
     assert_eq!(message["content"][1]["image_url"]["detail"], json!("low"));
 }
 
@@ -493,7 +640,12 @@ async fn low_resolution_maps_to_low_detail() {
 #[tokio::test]
 async fn higher_resolutions_map_to_high_detail() {
     let server = serve(vec![]).await;
-    let message = render_attachments(openai(&server), "Describe this", vec![png(Resolution::Medium).await]).unwrap();
+    let message = render_attachments(
+        openai(&server),
+        "Describe this",
+        vec![png(Resolution::Medium).await],
+    )
+    .unwrap();
     assert_eq!(message["content"][1]["image_url"]["detail"], json!("high"));
 }
 
@@ -525,7 +677,10 @@ async fn typed_rate_limit_stream_errors_are_429s() {
     let data = r#"{"error":{"type":"rate_limit_exceeded","message":"Slow down"}}"#;
     assert_eq!(stream_status(data), Some(429));
     let err = stream_error(format!("data: {data}\n\n")).await;
-    assert!(matches!(&err, Error::RateLimit(m, Some(r)) if m == "Slow down" && r.status == 429), "{err:?}");
+    assert!(
+        matches!(&err, Error::RateLimit(m, Some(r)) if m == "Slow down" && r.status == 429),
+        "{err:?}"
+    );
 }
 
 // spec: protocols/chat_completions/streaming_spec.rb:69 #parse_streaming_error > reports a 500 for server errors
@@ -534,7 +689,10 @@ async fn server_stream_errors_are_500s() {
     let data = r#"{"error":{"type":"server_error","message":"Internal error"}}"#;
     assert_eq!(stream_status(data), Some(500));
     let err = stream_error(format!("data: {data}\n\n")).await;
-    assert!(matches!(&err, Error::Server(m, Some(r)) if m == "Internal error" && r.status == 500), "{err:?}");
+    assert!(
+        matches!(&err, Error::Server(m, Some(r)) if m == "Internal error" && r.status == 500),
+        "{err:?}"
+    );
 }
 
 // spec: protocols/chat_completions/streaming_spec.rb:79 #parse_streaming_error > falls back to a 400 for other typed error objects
@@ -543,7 +701,10 @@ async fn other_typed_stream_errors_are_400s() {
     let data = r#"{"error":{"type":"invalid_request_error","message":"Bad request"}}"#;
     assert_eq!(stream_status(data), Some(400));
     let err = stream_error(format!("data: {data}\n\n")).await;
-    assert!(matches!(&err, Error::BadRequest(m, Some(r)) if m == "Bad request" && r.status == 400), "{err:?}");
+    assert!(
+        matches!(&err, Error::BadRequest(m, Some(r)) if m == "Bad request" && r.status == 400),
+        "{err:?}"
+    );
 }
 
 // spec: protocols/chat_completions/streaming_spec.rb:89 #parse_streaming_error > handles a body that parses to a bare JSON string
@@ -574,12 +735,16 @@ async fn a_string_error_value_has_no_status() {
 // spec: protocols/chat_completions/streaming_spec.rb:110 surfaces the provider message for a failed streaming response with a string error value
 #[tokio::test]
 async fn a_failed_stream_with_a_string_error_surfaces_the_message() {
-    let server = serve_templates(vec![
-        ResponseTemplate::new(404).set_body_string(r#"{"error": "The model foo is not available in your region."}"#),
-    ])
-    .await;
+    let server =
+        serve_templates(vec![ResponseTemplate::new(404).set_body_string(
+            r#"{"error": "The model foo is not available in your region."}"#,
+        )])
+        .await;
     let err = openai(&server).ask_stream("hi", |_| {}).await.unwrap_err();
-    assert!(err.to_string().contains("not available in your region"), "{err:?}");
+    assert!(
+        err.to_string().contains("not available in your region"),
+        "{err:?}"
+    );
 }
 
 // ---- tools_spec.rb -------------------------------------------------------------------------------
@@ -590,7 +755,9 @@ fn parsed_calls(tool_calls: Value) -> Option<Vec<ToolCall>> {
     if !tool_calls.is_null() {
         message["tool_calls"] = tool_calls;
     }
-    parse(Provider::OpenAI, body("gpt-4.1-nano", message, json!({}))).tool_calls.map(|c| c.values().cloned().collect())
+    parse(Provider::OpenAI, body("gpt-4.1-nano", message, json!({})))
+        .tool_calls
+        .map(|c| c.values().cloned().collect())
 }
 
 /// `extract_tool_call_thought_signature(tool_call)` for a call carrying `extra`.
@@ -599,7 +766,9 @@ fn signature_of(extra: Value) -> Option<String> {
     if !extra.is_null() {
         call["extra_content"] = extra;
     }
-    parsed_calls(json!([call])).unwrap()[0].thought_signature.clone()
+    parsed_calls(json!([call])).unwrap()[0]
+        .thought_signature
+        .clone()
 }
 
 // spec: protocols/chat_completions/tools_spec.rb:27 .parse_tool_calls > extracts thought signatures from extra_content.google.thought_signature
@@ -623,8 +792,14 @@ fn each_parsed_call_keeps_its_own_signature() {
         { "id": "call_2", "function": { "name": "tool_b", "arguments": "{}" } }
     ]))
     .unwrap();
-    assert_eq!((calls[0].id.as_str(), calls[0].thought_signature.as_deref()), ("call_1", Some("sig_first")));
-    assert_eq!((calls[1].id.as_str(), calls[1].thought_signature.as_deref()), ("call_2", None));
+    assert_eq!(
+        (calls[0].id.as_str(), calls[0].thought_signature.as_deref()),
+        ("call_1", Some("sig_first"))
+    );
+    assert_eq!(
+        (calls[1].id.as_str(), calls[1].thought_signature.as_deref()),
+        ("call_2", None)
+    );
 }
 
 // spec: protocols/chat_completions/tools_spec.rb:67 .parse_tool_calls > returns nil for empty or nil input
@@ -653,7 +828,13 @@ fn signed_call(id: &str, name: &str, arguments: Value, signature: Option<&str>) 
 // spec: protocols/chat_completions/tools_spec.rb:122 .format_tool_calls > includes extra_content.google.thought_signature when present
 #[tokio::test]
 async fn formatted_calls_carry_their_thought_signature() {
-    let calls = formatted_calls(vec![signed_call("call_456", "weather", json!({ "location": "Paris" }), Some("sig_xyz789"))]).await;
+    let calls = formatted_calls(vec![signed_call(
+        "call_456",
+        "weather",
+        json!({ "location": "Paris" }),
+        Some("sig_xyz789"),
+    )])
+    .await;
     assert_eq!(
         calls,
         json!([{
@@ -673,15 +854,29 @@ async fn each_formatted_call_keeps_its_own_signature() {
         signed_call("call_2", "tool_b", json!({}), None),
     ])
     .await;
-    let find = |id: &str| calls.as_array().unwrap().iter().find(|c| c["id"] == id).unwrap().clone();
-    assert_eq!(find("call_1")["extra_content"], json!({ "google": { "thought_signature": "sig_first" } }));
+    let find = |id: &str| {
+        calls
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["id"] == id)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(
+        find("call_1")["extra_content"],
+        json!({ "google": { "thought_signature": "sig_first" } })
+    );
     assert!(find("call_2").get("extra_content").is_none());
 }
 
 // spec: protocols/chat_completions/tools_spec.rb:178 .extract_tool_call_thought_signature > extracts signature from nested structure
 #[test]
 fn the_nested_thought_signature_is_extracted() {
-    assert_eq!(signature_of(json!({ "google": { "thought_signature": "test_sig" } })).as_deref(), Some("test_sig"));
+    assert_eq!(
+        signature_of(json!({ "google": { "thought_signature": "test_sig" } })).as_deref(),
+        Some("test_sig")
+    );
 }
 
 // spec: protocols/chat_completions/tools_spec.rb:191 .extract_tool_call_thought_signature > returns nil when extra_content is missing

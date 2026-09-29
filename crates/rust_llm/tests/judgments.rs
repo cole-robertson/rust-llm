@@ -7,7 +7,9 @@ mod support;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use rust_llm::{Answer, Dynamic, ErrorKind, Judge, JudgeOptions, UsageStatus, list_judgment_models};
+use rust_llm::{
+    Answer, Dynamic, ErrorKind, Judge, JudgeOptions, UsageStatus, list_judgment_models,
+};
 use serde_json::{Value, json};
 use support::Cassette;
 use wiremock::{Mock, MockServer, Request, ResponseTemplate, matchers};
@@ -52,17 +54,35 @@ async fn judges_all_three_question_types_through_the_compact_dsl() {
         )
         .unwrap();
 
-    let result = triage.judge(json!({ "message": "I was charged twice. Please refund the duplicate charge today." })).await.unwrap();
+    let result = triage
+        .judge(
+            json!({ "message": "I was charged twice. Please refund the duplicate charge today." }),
+        )
+        .await
+        .unwrap();
 
     let urgent = result.probability("urgent").unwrap();
     assert!((0.0..=1.0).contains(&urgent));
     assert!(["billing", "technical", "other"].contains(&result.choice("department").unwrap()));
-    let Answer::Choice { probabilities, .. } = result.get("department").unwrap() else { panic!() };
-    assert_eq!(probabilities.iter().map(|(k, _)| k.as_str()).collect::<Vec<_>>(), ["billing", "technical", "other"]);
+    let Answer::Choice { probabilities, .. } = result.get("department").unwrap() else {
+        panic!()
+    };
+    assert_eq!(
+        probabilities
+            .iter()
+            .map(|(k, _)| k.as_str())
+            .collect::<Vec<_>>(),
+        ["billing", "technical", "other"]
+    );
     let score = result.score("frustration").unwrap();
     assert!((0.0..=2.0).contains(&score));
-    let Answer::Score { probabilities, .. } = result.get("frustration").unwrap() else { panic!() };
-    assert_eq!(probabilities.iter().map(|(k, _)| *k).collect::<Vec<_>>(), [0, 1, 2]);
+    let Answer::Score { probabilities, .. } = result.get("frustration").unwrap() else {
+        panic!()
+    };
+    assert_eq!(
+        probabilities.iter().map(|(k, _)| *k).collect::<Vec<_>>(),
+        [0, 1, 2]
+    );
     assert!(result.tokens().input.unwrap() > 0);
     assert!(result.tokens().output.unwrap() > 0);
     assert!(result.model.starts_with("jev-"));
@@ -82,16 +102,28 @@ async fn preserves_structured_descriptions_and_arbitrary_choice_names() {
     });
     let result = opts(config_at(&cassette.server.uri(), 0))
         .model("jev-latest")
-        .judge_with(json!(["Please refund the duplicate charge today."]), JudgeOptions {
-            questions: questions.as_object().unwrap().clone(),
-            ..Default::default()
-        })
+        .judge_with(
+            json!(["Please refund the duplicate charge today."]),
+            JudgeOptions {
+                questions: questions.as_object().unwrap().clone(),
+                ..Default::default()
+            },
+        )
         .await
         .unwrap();
 
     assert!(["Billing & payments", "Other"].contains(&result.choice("department").unwrap()));
-    let Answer::Score { levels, .. } = result.get("frustration").unwrap() else { panic!() };
-    assert_eq!(levels, &vec![json!({ "description": "Calm and polite" }), json!(["Frustrated", "Still civil"]), json!("Angry or hostile")]);
+    let Answer::Score { levels, .. } = result.get("frustration").unwrap() else {
+        panic!()
+    };
+    assert_eq!(
+        levels,
+        &vec![
+            json!({ "description": "Calm and polite" }),
+            json!(["Frustrated", "Still civil"]),
+            json!("Angry or hostile")
+        ]
+    );
     cassette.assert_all_matched().await;
 }
 
@@ -121,10 +153,20 @@ async fn accepts_omitted_instructions_when_criteria_describe_the_judgment() {
 
 #[tokio::test]
 async fn lists_the_available_judgment_models() {
-    let cassette = Cassette::start("providers_typesafe_with_the_typesafe_api_lists_the_available_judgment_models").await.unwrap();
-    let models = list_judgment_models(Some(config_at(&cassette.server.uri(), 0))).await.unwrap();
+    let cassette = Cassette::start(
+        "providers_typesafe_with_the_typesafe_api_lists_the_available_judgment_models",
+    )
+    .await
+    .unwrap();
+    let models = list_judgment_models(Some(config_at(&cassette.server.uri(), 0)))
+        .await
+        .unwrap();
     assert!(models.iter().any(|m| m.id == "jev-latest"));
-    assert!(models.iter().all(|m| m.model_type() == rust_llm::model::ModelType::Judgment));
+    assert!(
+        models
+            .iter()
+            .all(|m| m.model_type() == rust_llm::model::ModelType::Judgment)
+    );
     cassette.assert_all_matched().await;
 }
 
@@ -140,7 +182,10 @@ fn urgent() -> Value {
 }
 
 fn questions(v: Value) -> JudgeOptions {
-    JudgeOptions { questions: v.as_object().unwrap().clone(), ..Default::default() }
+    JudgeOptions {
+        questions: v.as_object().unwrap().clone(),
+        ..Default::default()
+    }
 }
 
 #[test]
@@ -149,8 +194,16 @@ fn the_bundled_catalog_resolves_jev_without_an_explicit_provider() {
     assert_eq!(model.provider, "typesafe");
     assert_eq!(model.model_type(), rust_llm::model::ModelType::Judgment);
     assert!(model.supports("judgment"));
-    assert!(!rust_llm::models().chat_models().iter().any(|m| m.id == "jev-latest"));
-    assert_eq!(rust_llm::Config::default().default_judgment_model, "jev-latest");
+    assert!(
+        !rust_llm::models()
+            .chat_models()
+            .iter()
+            .any(|m| m.id == "jev-latest")
+    );
+    assert_eq!(
+        rust_llm::Config::default().default_judgment_model,
+        "jev-latest"
+    );
 }
 
 #[tokio::test]
@@ -185,9 +238,21 @@ async fn judges_an_unlisted_local_model_on_a_jev_compatible_server() {
 
     assert_eq!(result.probability("urgent"), Some(0.9));
     assert_eq!(result.model, "english");
-    assert_eq!((result.tokens().input, result.tokens().output), (Some(40), Some(0)));
-    assert_eq!(result.cost().total(), None, "the catalog has no pricing, so cost stays unknown");
-    assert_eq!(rust_llm::Provider::TypeSafe.api_base(&rust_llm::Config::default()).unwrap(), "https://api.typesafe.ai");
+    assert_eq!(
+        (result.tokens().input, result.tokens().output),
+        (Some(40), Some(0))
+    );
+    assert_eq!(
+        result.cost().total(),
+        None,
+        "the catalog has no pricing, so cost stays unknown"
+    );
+    assert_eq!(
+        rust_llm::Provider::TypeSafe
+            .api_base(&rust_llm::Config::default())
+            .unwrap(),
+        "https://api.typesafe.ai"
+    );
 }
 
 #[tokio::test]
@@ -220,19 +285,28 @@ async fn retries_overloads_and_accounts_for_both_attempts() {
         .await
         .unwrap();
 
-    assert_eq!(calls.load(Ordering::SeqCst), 1, "dynamic values resolve once, before retries");
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        1,
+        "dynamic values resolve once, before retries"
+    );
     let statuses: Vec<UsageStatus> = result.usage_entries.iter().map(|e| e.status).collect();
     assert_eq!(statuses, [UsageStatus::Failed, UsageStatus::Succeeded]);
     assert_eq!(result.tokens().input, Some(100));
     assert_eq!(result.cost().total(), None);
-    assert_eq!(result.usage_entries[1].operation, rust_llm::message::Operation::Judgment);
+    assert_eq!(
+        result.usage_entries[1].operation,
+        rust_llm::message::Operation::Judgment
+    );
 }
 
 #[tokio::test]
 async fn reports_normalized_errors_with_the_detail_message() {
     let server = MockServer::start().await;
     Mock::given(matchers::method("POST"))
-        .respond_with(ResponseTemplate::new(401).set_body_json(json!({ "detail": "Invalid API key" })))
+        .respond_with(
+            ResponseTemplate::new(401).set_body_json(json!({ "detail": "Invalid API key" })),
+        )
         .up_to_n_times(1)
         .mount(&server)
         .await;
@@ -245,10 +319,16 @@ async fn reports_normalized_errors_with_the_detail_message() {
     let j = opts(config_at(&server.uri(), 0)).model("jev-latest");
 
     let err = j.judge_with("Help", questions(urgent())).await.unwrap_err();
-    assert_eq!((err.kind(), err.to_string().as_str()), (ErrorKind::Unauthorized, "Invalid API key"));
+    assert_eq!(
+        (err.kind(), err.to_string().as_str()),
+        (ErrorKind::Unauthorized, "Invalid API key")
+    );
     let err = j.judge_with("Help", questions(urgent())).await.unwrap_err();
     assert_eq!(err.kind(), ErrorKind::PaymentRequired);
-    assert_eq!(err.to_string(), "Your organization has no available TypeSafe API credits");
+    assert_eq!(
+        err.to_string(),
+        "Your organization has no available TypeSafe API credits"
+    );
 }
 
 async fn capture() -> (MockServer, Arc<std::sync::Mutex<Vec<Value>>>) {
@@ -279,7 +359,9 @@ async fn resolves_declared_inputs_into_questions_and_criteria() {
         .inputs(["ticket"])
         .probability_with(
             "urgent",
-            Some(Dynamic::from_fn(|i| json!({ "question": "Is this urgent?", "deadline": i["ticket"] }))),
+            Some(Dynamic::from_fn(
+                |i| json!({ "question": "Is this urgent?", "deadline": i["ticket"] }),
+            )),
             Dynamic::from_fn(|i| json!(format!("Due {}", i["ticket"].as_str().unwrap()))),
             "No deadline",
         )
@@ -287,14 +369,29 @@ async fn resolves_declared_inputs_into_questions_and_criteria() {
     let mut inputs = serde_json::Map::new();
     inputs.insert("ticket".into(), json!("today"));
     configured
-        .judge_with(json!({ "message": "Please help today" }), JudgeOptions { inputs, ..Default::default() })
+        .judge_with(
+            json!({ "message": "Please help today" }),
+            JudgeOptions {
+                inputs,
+                ..Default::default()
+            },
+        )
         .await
         .unwrap();
 
     let body = &seen.lock().unwrap()[0];
-    assert_eq!(body["questions"]["urgent"]["instructions"], json!({ "question": "Is this urgent?", "deadline": "today" }));
-    assert_eq!(body["questions"]["urgent"]["criteria"], json!({ "true": "Due today", "false": "No deadline" }));
-    assert!(body.get("ticket").is_none(), "inputs are not sent unless used");
+    assert_eq!(
+        body["questions"]["urgent"]["instructions"],
+        json!({ "question": "Is this urgent?", "deadline": "today" })
+    );
+    assert_eq!(
+        body["questions"]["urgent"]["criteria"],
+        json!({ "true": "Due today", "false": "No deadline" })
+    );
+    assert!(
+        body.get("ticket").is_none(),
+        "inputs are not sent unless used"
+    );
 }
 
 #[tokio::test]
@@ -302,15 +399,53 @@ async fn validates_before_sending_anything() {
     let (server, seen) = capture().await;
     let j = opts(config_at(&server.uri(), 0)).model("jev-latest");
 
-    let missing = j.clone().inputs(["ticket"]).probability("urgent", "?").unwrap().judge("Help").await.unwrap_err();
+    let missing = j
+        .clone()
+        .inputs(["ticket"])
+        .probability("urgent", "?")
+        .unwrap()
+        .judge("Help")
+        .await
+        .unwrap_err();
     assert!(missing.to_string().contains("Missing judge inputs: ticket"));
-    assert!(j.clone().judge("Help").await.unwrap_err().to_string().contains("at least one question"));
-    let dup = j.clone().probability("urgent", "?").unwrap().probability("urgent", "again");
+    assert!(
+        j.clone()
+            .judge("Help")
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("at least one question")
+    );
+    let dup = j
+        .clone()
+        .probability("urgent", "?")
+        .unwrap()
+        .probability("urgent", "again");
     assert!(dup.unwrap_err().to_string().contains("Duplicate question"));
-    let non_input = j.clone().probability("urgent", "?").unwrap().judge(json!(42)).await.unwrap_err();
-    assert!(non_input.to_string().contains("Judgment input must be text"));
-    let bad_score = j.clone().score("s", None, json!(["only one"])).unwrap().judge("x").await.unwrap_err();
-    assert!(bad_score.to_string().contains("at least two non-nil levels"));
+    let non_input = j
+        .clone()
+        .probability("urgent", "?")
+        .unwrap()
+        .judge(json!(42))
+        .await
+        .unwrap_err();
+    assert!(
+        non_input
+            .to_string()
+            .contains("Judgment input must be text")
+    );
+    let bad_score = j
+        .clone()
+        .score("s", None, json!(["only one"]))
+        .unwrap()
+        .judge("x")
+        .await
+        .unwrap_err();
+    assert!(
+        bad_score
+            .to_string()
+            .contains("at least two non-nil levels")
+    );
     let reserved = j
         .clone()
         .provider_options(json!({ "state": "sneaky" }))
@@ -319,7 +454,11 @@ async fn validates_before_sending_anything() {
         .judge("x")
         .await
         .unwrap_err();
-    assert!(reserved.to_string().contains("instead of provider_options for state"));
+    assert!(
+        reserved
+            .to_string()
+            .contains("instead of provider_options for state")
+    );
     assert!(seen.lock().unwrap().is_empty(), "nothing was sent");
 }
 
@@ -333,9 +472,21 @@ async fn chat_models_are_rejected_for_judgments_and_jev_for_chat() {
         .judge("x")
         .await
         .unwrap_err();
-    assert!(err.to_string().contains("doesn't support judgments"), "{err}");
+    assert!(
+        err.to_string().contains("doesn't support judgments"),
+        "{err}"
+    );
 
-    let mut chat = rust_llm::Chat::with_config(config_at("http://127.0.0.1:9", 0), Some("jev-latest"), None, false).unwrap();
+    let mut chat = rust_llm::Chat::with_config(
+        config_at("http://127.0.0.1:9", 0),
+        Some("jev-latest"),
+        None,
+        false,
+    )
+    .unwrap();
     let err = chat.ask("hi").await.unwrap_err();
-    assert!(err.to_string().contains("TypeSafe doesn't support chat"), "{err}");
+    assert!(
+        err.to_string().contains("TypeSafe doesn't support chat"),
+        "{err}"
+    );
 }

@@ -20,16 +20,35 @@ pub fn generate(g: &mut Generator, name: &str) -> Result<(), String> {
     if tool_name == "default" {
         return Err("`default` is the fallback component name; pick another tool name".into());
     }
-    let vars = [("class_name", class.as_str()), ("tool_name", tool_name.as_str()), ("display_name", display.as_str())];
+    let vars = [
+        ("class_name", class.as_str()),
+        ("tool_name", tool_name.as_str()),
+        ("display_name", display.as_str()),
+    ];
 
-    g.module_dir("tools", "//! RustLLM tools (`rust-llm generate tool NAME`).\n");
+    g.module_dir(
+        "tools",
+        "//! RustLLM tools (`rust-llm generate tool NAME`).\n",
+    );
     g.file(&format!("src/tools/{file}.rs"), &render(TOOL, &vars));
-    g.inject("src/tools/mod.rs", &format!("pub mod {file};"), Anchor::Sorted("pub mod "));
-    g.file(&format!("{MESSAGE_COMPONENTS}/tool_calls/{tool_name}.tsx"), &render(TOOL_CALL, &vars));
-    g.file(&format!("{MESSAGE_COMPONENTS}/tool_results/{tool_name}.tsx"), &render(TOOL_RESULT, &vars));
+    g.inject(
+        "src/tools/mod.rs",
+        &format!("pub mod {file};"),
+        Anchor::Sorted("pub mod "),
+    );
+    g.file(
+        &format!("{MESSAGE_COMPONENTS}/tool_calls/{tool_name}.tsx"),
+        &render(TOOL_CALL, &vars),
+    );
+    g.file(
+        &format!("{MESSAGE_COMPONENTS}/tool_results/{tool_name}.tsx"),
+        &render(TOOL_RESULT, &vars),
+    );
     if !g.exists(&format!("{MESSAGE_COMPONENTS}/types.ts")) {
         g.note("\n  The tool components import from frontend/components/messages/; run `rust-llm generate chat_ui` to create it.");
     }
-    g.note(format!("\n  Use it: chat.with_tool(crate::tools::{file}::{class})"));
+    g.note(format!(
+        "\n  Use it: chat.with_tool(crate::tools::{file}::{class})"
+    ));
     Ok(())
 }

@@ -21,9 +21,18 @@ pub struct McpResult {
 
 impl McpResult {
     pub fn new(data: Value) -> McpResult {
-        let blocks = data.get("content").and_then(Value::as_array).cloned().unwrap_or_default();
+        let blocks = data
+            .get("content")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
         let (text, attachments) = content::read(&blocks);
-        McpResult { text, attachments, structured: data.get("structuredContent").cloned(), data }
+        McpResult {
+            text,
+            attachments,
+            structured: data.get("structuredContent").cloned(),
+            data,
+        }
     }
 
     /// `error?`: whether the tool reported a failure.

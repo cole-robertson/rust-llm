@@ -33,7 +33,9 @@ impl SearchResults {
     /// is missing `title` or `text`.
     pub fn new(results: Vec<Value>) -> Result<SearchResults> {
         if results.is_empty() {
-            return Err(Error::Argument("SearchResults requires at least one result".into()));
+            return Err(Error::Argument(
+                "SearchResults requires at least one result".into(),
+            ));
         }
         let results = results.iter().map(normalize).collect::<Result<Vec<_>>>()?;
         Ok(SearchResults { results })
@@ -62,9 +64,14 @@ impl SearchResults {
 fn normalize(entry: &Value) -> Result<Map<String, Value>> {
     let has = |k: &str| entry.get(k).is_some_and(|v| !v.is_null());
     if !has("title") || !has("text") {
-        return Err(Error::Argument("Search results require :title and :text".into()));
+        return Err(Error::Argument(
+            "Search results require :title and :text".into(),
+        ));
     }
-    Ok(["title", "url", "text"].iter().filter_map(|k| entry.get(*k).map(|v| (k.to_string(), v.clone()))).collect())
+    Ok(["title", "url", "text"]
+        .iter()
+        .filter_map(|k| entry.get(*k).map(|v| (k.to_string(), v.clone())))
+        .collect())
 }
 
 /// `Tool#result_content`: search results go to the model as their JSON.
@@ -80,7 +87,8 @@ mod tests {
 
     #[test]
     fn round_trips_through_tool_result_content() {
-        let results = SearchResults::new(vec![json!({ "title": "A", "text": "x", "extra": 1 })]).unwrap();
+        let results =
+            SearchResults::new(vec![json!({ "title": "A", "text": "x", "extra": 1 })]).unwrap();
         let content = ToolResult::from(results.clone()).content;
         assert_eq!(content, r#"{"search_results":[{"title":"A","text":"x"}]}"#);
         assert_eq!(SearchResults::from_content(Some(&content)), Some(results));

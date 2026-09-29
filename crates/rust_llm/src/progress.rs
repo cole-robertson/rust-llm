@@ -61,7 +61,9 @@ pub async fn watch<F: Future>(flag: Arc<AtomicBool>, future: F) -> F::Output {
 /// `Cancellation.check`: whether the surrounding chat has been cancelled. Long waits (an MCP
 /// server that has not answered yet) poll this and stop with `Error::Cancelled`.
 pub fn is_cancelled() -> bool {
-    CANCELLATION.try_with(|flag| flag.load(Ordering::SeqCst)).unwrap_or(false)
+    CANCELLATION
+        .try_with(|flag| flag.load(Ordering::SeqCst))
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -70,7 +72,11 @@ mod tests {
 
     #[test]
     fn fraction_needs_a_positive_total() {
-        let progress = |value, total| Progress { value, total, message: None };
+        let progress = |value, total| Progress {
+            value,
+            total,
+            message: None,
+        };
         assert_eq!(progress(Some(1.0), Some(2.0)).fraction(), Some(0.5));
         assert_eq!(progress(Some(1.0), Some(0.0)).fraction(), None);
         assert_eq!(progress(None, Some(2.0)).fraction(), None);

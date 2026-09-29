@@ -94,7 +94,9 @@ impl Role {
             "user" => Ok(Role::User),
             "assistant" => Ok(Role::Assistant),
             "tool" => Ok(Role::Tool),
-            _ => Err(Error::Argument("Expected role to be one of: system, user, assistant, tool".into())),
+            _ => Err(Error::Argument(
+                "Expected role to be one of: system, user, assistant, tool".into(),
+            )),
         }
     }
 }
@@ -193,7 +195,11 @@ pub struct ToolCall {
 }
 
 impl ToolCall {
-    pub fn new(id: impl Into<String>, name: impl Into<String>, arguments: Map<String, Value>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        arguments: Map<String, Value>,
+    ) -> Self {
         ToolCall {
             id: id.into(),
             name: name.into(),
@@ -206,7 +212,14 @@ impl ToolCall {
 
     /// A streamed piece that opens a call (`id` present, possibly empty).
     pub(crate) fn opening(id: String, name: String, arguments: String) -> ToolCall {
-        ToolCall { id, name, arguments: ToolArguments::Partial(arguments), thought_signature: None, remote: false, starts: true }
+        ToolCall {
+            id,
+            name,
+            arguments: ToolArguments::Partial(arguments),
+            thought_signature: None,
+            remote: false,
+            starts: true,
+        }
     }
 
     /// A streamed argument fragment for a call opened earlier (`id: nil`).
@@ -518,10 +531,17 @@ impl Message {
             return Some(m.clone());
         }
         let registry = crate::models::models();
-        let entry = self.usage_entries.iter().rev().find(|e| e.status == UsageStatus::Succeeded);
+        let entry = self
+            .usage_entries
+            .iter()
+            .rev()
+            .find(|e| e.status == UsageStatus::Succeeded);
         match entry {
             Some(e) => registry.find(&e.model, Some(&e.provider)).ok(),
-            None => self.model.as_deref().and_then(|m| registry.find(m, None).ok()),
+            None => self
+                .model
+                .as_deref()
+                .and_then(|m| registry.find(m, None).ok()),
         }
     }
 
@@ -576,10 +596,17 @@ impl Message {
     /// message's tool calls, or none when it made no calls. Ruby reads the chat through the
     /// message's `conversation` back-link; pass the chat's messages (`chat.messages()`).
     pub fn tool_results<'a>(&self, conversation: &'a [Message]) -> Vec<&'a Message> {
-        let Some(calls) = self.tool_calls.as_ref().filter(|c| !c.is_empty()) else { return Vec::new() };
+        let Some(calls) = self.tool_calls.as_ref().filter(|c| !c.is_empty()) else {
+            return Vec::new();
+        };
         conversation
             .iter()
-            .filter(|m| m.is_tool_result() && m.tool_call_id.as_deref().is_some_and(|id| calls.contains_key(id)))
+            .filter(|m| {
+                m.is_tool_result()
+                    && m.tool_call_id
+                        .as_deref()
+                        .is_some_and(|id| calls.contains_key(id))
+            })
             .collect()
     }
 
@@ -599,11 +626,19 @@ impl Message {
                     .iter()
                     .map(|(id, call)| {
                         let mut tc = ToolCall::new(
-                            call.get("id").and_then(Value::as_str).unwrap_or(id.as_str()),
+                            call.get("id")
+                                .and_then(Value::as_str)
+                                .unwrap_or(id.as_str()),
                             call.get("name").and_then(Value::as_str).unwrap_or_default(),
-                            call.get("arguments").and_then(Value::as_object).cloned().unwrap_or_default(),
+                            call.get("arguments")
+                                .and_then(Value::as_object)
+                                .cloned()
+                                .unwrap_or_default(),
                         );
-                        tc.thought_signature = call.get("thought_signature").and_then(Value::as_str).map(str::to_string);
+                        tc.thought_signature = call
+                            .get("thought_signature")
+                            .and_then(Value::as_str)
+                            .map(str::to_string);
                         tc.remote = call.get("remote").and_then(Value::as_bool).unwrap_or(false);
                         (id.clone(), tc)
                     })
@@ -613,17 +648,30 @@ impl Message {
         m.thinking = match h.get("thinking") {
             Some(Value::Object(t)) => Thinking::build(
                 t.get("text").and_then(Value::as_str).map(str::to_string),
-                t.get("signature").and_then(Value::as_str).map(str::to_string),
+                t.get("signature")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
             ),
-            Some(Value::String(text)) => Thinking::build(Some(text.clone()), str_of("thinking_signature")),
+            Some(Value::String(text)) => {
+                Thinking::build(Some(text.clone()), str_of("thinking_signature"))
+            }
             _ => None,
         };
         if let Some(citations) = h.get("citations") {
             m.citations = serde_json::from_value(citations.clone())?;
         }
-        for call in h.get("server_tool_calls").and_then(Value::as_array).into_iter().flatten() {
+        for call in h
+            .get("server_tool_calls")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
             m.server_tool_calls.push(ServerToolCall {
-                kind: call.get("type").and_then(Value::as_str).unwrap_or_default().to_string(),
+                kind: call
+                    .get("type")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
                 name: call.get("name").and_then(Value::as_str).map(str::to_string),
                 id: call.get("id").and_then(Value::as_str).map(str::to_string),
                 input: call.get("input").cloned(),
@@ -631,15 +679,29 @@ impl Message {
                 raw: call.get("raw").cloned().unwrap_or(Value::Null),
             });
         }
-        for a in h.get("attachments").and_then(Value::as_array).into_iter().flatten() {
-            let source = a.as_str().or_else(|| a.get("source").and_then(Value::as_str));
-            let source = source.ok_or_else(|| Error::Argument(format!("Cannot rebuild an attachment from {a}")))?;
+        for a in h
+            .get("attachments")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let source = a
+                .as_str()
+                .or_else(|| a.get("source").and_then(Value::as_str));
+            let source = source
+                .ok_or_else(|| Error::Argument(format!("Cannot rebuild an attachment from {a}")))?;
             m.attachments.push(Attachment::new(source));
         }
         m.raw_content = h.get("raw_content").cloned();
         m.raw_reasoning = h.get("raw_reasoning").cloned();
-        m.finish_reason = h.get("finish_reason").and_then(Value::as_str).map(FinishReason::from_symbol);
-        m.cache_until_here = h.get("cache_until_here").and_then(Value::as_bool).unwrap_or(false);
+        m.finish_reason = h
+            .get("finish_reason")
+            .and_then(Value::as_str)
+            .map(FinishReason::from_symbol);
+        m.cache_until_here = h
+            .get("cache_until_here")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
         m.supplied_cost = h.get("cost").map(|c| Cost::from_h(c, None));
         m.tokens = Tokens {
             input: int_of("input_tokens"),
@@ -662,16 +724,25 @@ impl Message {
             h.insert("content".into(), c.clone().into());
         }
         if !self.attachments.is_empty() {
-            h.insert("attachments".into(), self.attachments.iter().map(attachment_h).collect());
+            h.insert(
+                "attachments".into(),
+                self.attachments.iter().map(attachment_h).collect(),
+            );
         }
         if let Some(m) = &self.model {
             h.insert("model".into(), m.clone().into());
         }
         if self.supplied_cost.is_some() {
-            h.insert("cost".into(), crate::instrumentation::cost_h(&self.cost(None)));
+            h.insert(
+                "cost".into(),
+                crate::instrumentation::cost_h(&self.cost(None)),
+            );
         }
         if let Some(calls) = &self.tool_calls {
-            let calls: Map<String, Value> = calls.iter().map(|(k, v)| (k.clone(), tool_call_h(v))).collect();
+            let calls: Map<String, Value> = calls
+                .iter()
+                .map(|(k, v)| (k.clone(), tool_call_h(v)))
+                .collect();
             h.insert("tool_calls".into(), calls.into());
         }
         if let Some(id) = &self.tool_call_id {
@@ -686,10 +757,19 @@ impl Message {
             }
         }
         if !self.citations.is_empty() {
-            h.insert("citations".into(), serde_json::to_value(&self.citations).unwrap()); // Citation always serializes
+            h.insert(
+                "citations".into(),
+                serde_json::to_value(&self.citations).unwrap(),
+            ); // Citation always serializes
         }
         if !self.server_tool_calls.is_empty() {
-            h.insert("server_tool_calls".into(), self.server_tool_calls.iter().map(server_tool_call_h).collect());
+            h.insert(
+                "server_tool_calls".into(),
+                self.server_tool_calls
+                    .iter()
+                    .map(server_tool_call_h)
+                    .collect(),
+            );
         }
         if let Some(raw) = &self.raw_content {
             h.insert("raw_content".into(), raw.clone());

@@ -126,21 +126,37 @@ pub fn generate(g: &mut Generator) -> Result<(), String> {
         g.file(path, content);
     }
     for controller in ["chats", "messages", "models"] {
-        g.inject("src/controllers/mod.rs", &format!("pub mod {controller};"), Anchor::Sorted("pub mod "));
+        g.inject(
+            "src/controllers/mod.rs",
+            &format!("pub mod {controller};"),
+            Anchor::Sorted("pub mod "),
+        );
         g.inject(
             "src/app.rs",
             &format!("            .add_route(controllers::{controller}::routes())"),
             Anchor::After("AppRoutes::empty()"),
         );
     }
-    g.inject("src/workers/mod.rs", "pub mod chat_response;", Anchor::Sorted("pub mod "));
+    g.inject(
+        "src/workers/mod.rs",
+        "pub mod chat_response;",
+        Anchor::Sorted("pub mod "),
+    );
     g.inject(
         "src/app.rs",
         "        queue\n            .register(crate::workers::chat_response::ChatResponseWorker::build(\n                ctx,\n            ))\n            .await?;",
         Anchor::After("fn connect_workers"),
     );
-    g.inject("src/route_table.rs", PATHS, Anchor::Before("// scaffold:paths"));
-    g.inject("src/route_table.rs", ROUTES, Anchor::Before("// scaffold:routes"));
+    g.inject(
+        "src/route_table.rs",
+        PATHS,
+        Anchor::Before("// scaffold:paths"),
+    );
+    g.inject(
+        "src/route_table.rs",
+        ROUTES,
+        Anchor::Before("// scaffold:routes"),
+    );
     link_sidebar(g);
 
     g.note("\n  Chat UI installed!");
@@ -156,7 +172,9 @@ pub fn generate(g: &mut Generator) -> Result<(), String> {
 fn link_sidebar(g: &mut Generator) {
     const SIDEBAR: &str = "frontend/components/app-sidebar.tsx";
     if !g.exists(SIDEBAR) {
-        return g.note(format!("  {SIDEBAR} not found; link /chats from your navigation yourself."));
+        return g.note(format!(
+            "  {SIDEBAR} not found; link /chats from your navigation yourself."
+        ));
     }
     g.inject(SIDEBAR, NAV_ITEM, Anchor::Before("// scaffold:nav"));
     g.named_import(SIDEBAR, "@/routes", "chats");

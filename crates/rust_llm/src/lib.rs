@@ -46,6 +46,9 @@
 //! (`ask`, `ask_later`, `complete`, `step`, `with_tools`, `before_tool_call`, ...), with `?`-suffixed
 //! predicates spelled `is_*`.
 
+// `XAI` mirrors RubyLLM's provider name and is public API.
+#![allow(clippy::upper_case_acronyms)]
+
 pub mod accounting;
 pub mod agent;
 pub mod attachment;
@@ -71,10 +74,10 @@ pub mod progress;
 pub mod prompt;
 pub mod protocols;
 pub mod provider_tools;
-pub mod search_results;
-pub mod speech;
 pub mod providers;
 pub mod rerank;
+pub mod search_results;
+pub mod speech;
 pub mod thinking;
 pub mod tokenization;
 pub mod tokens;
@@ -86,8 +89,8 @@ pub mod workflow;
 
 pub use agent::Agent;
 pub use attachment::{Attachment, Resolution};
-pub use cached_content::{CacheOptions, CachedContent, Ttl, cache};
 pub use batch::{Batch, BatchResult, BatchStatus, EmbeddingRequest, batch, embed_later};
+pub use cached_content::{CacheOptions, CachedContent, Ttl, cache};
 pub use chat::{CancelHandle, Chat, Fallback, FallbackAttempt};
 pub use config::{Config, config, configure};
 pub use context::{Context, context};
@@ -95,30 +98,38 @@ pub use cost::Cost;
 pub use embedding::{EmbedOptions, Embedding, Vectors, embed};
 pub use error::{Error, ErrorKind, Result};
 pub use files::{DownloadedFile, FileOptions, UploadOptions, UploadedFile, download, upload};
-pub use judge::{Answer, Dynamic, Judge, JudgeOptions, Judgment, QuestionType, judge, list_judgment_models};
 pub use image::{Image, Images, PaintOptions, paint};
-pub use mcp::{InputRequest, Mcp, McpResult, McpTool};
-pub use progress::Progress;
-pub use prompt::{Prompt, render_prompt};
 pub use instrumentation::{Instrumenter, instrument};
-pub use workflow::{Workflow, workflow};
-pub use provider_tools::ProviderTool;
-pub use search_results::SearchResults;
-pub use speech::{SpeakOptions, Speech, SpeechChunk, speak, speak_stream};
-pub use message::{Chunk, Citation, FinishReason, Message, Role, Thinking, ToolCall, UsageEntry, UsageStatus};
+pub use judge::{
+    Answer, Dynamic, Judge, JudgeOptions, Judgment, QuestionType, judge, list_judgment_models,
+};
+pub use mcp::{InputRequest, Mcp, McpResult, McpTool};
+pub use message::{
+    Chunk, Citation, FinishReason, Message, Role, Thinking, ToolCall, UsageEntry, UsageStatus,
+};
 pub use model::Model;
 pub use models::models;
 pub use moderation::{ModerateOptions, Moderation, ModerationInput, ModerationResult, moderate};
 pub use ocr::{Ocr, OcrOptions, Page as OcrPage, ocr};
-pub use rerank::{Rerank, RerankOptions, RerankResult, rerank};
-pub use tokenization::{TokenizeOptions, Tokenization, tokenize};
-pub use video::{AnimateOptions, Video, VideoJob, VideoSource, VideoStatus, animate, animate_later};
+pub use progress::Progress;
+pub use prompt::{Prompt, render_prompt};
 pub use protocols::{Caching, ToolCalls, ToolChoice};
+pub use provider_tools::ProviderTool;
 pub use providers::{ProtocolName, Provider};
+pub use rerank::{Rerank, RerankOptions, RerankResult, rerank};
+pub use search_results::SearchResults;
+pub use speech::{SpeakOptions, Speech, SpeechChunk, speak, speak_stream};
 pub use thinking::{Display as ThinkingDisplay, ThinkingConfig};
+pub use tokenization::{Tokenization, TokenizeOptions, tokenize};
 pub use tokens::Tokens;
 pub use tool::{FnTool, Parameter, SharedTool, Tool, ToolError, ToolResult, schema_for};
-pub use transcription::{TranscribeOptions, Transcription, TranscriptionChunk, transcribe, transcribe_stream};
+pub use transcription::{
+    TranscribeOptions, Transcription, TranscriptionChunk, transcribe, transcribe_stream,
+};
+pub use video::{
+    AnimateOptions, Video, VideoJob, VideoSource, VideoStatus, animate, animate_later,
+};
+pub use workflow::{Workflow, workflow};
 
 /// `RubyLLM.chat` with the configured default model.
 pub fn chat() -> Result<Chat> {

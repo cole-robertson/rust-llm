@@ -46,11 +46,18 @@ async fn stub() -> (MockServer, Seen) {
 }
 
 fn bodies(seen: &Seen) -> Vec<Value> {
-    seen.lock().unwrap().iter().map(|(b, _)| b.clone()).collect()
+    seen.lock()
+        .unwrap()
+        .iter()
+        .map(|(b, _)| b.clone())
+        .collect()
 }
 
 fn field(seen: &Seen, path: &[&str]) -> Vec<Value> {
-    bodies(seen).iter().map(|b| path.iter().fold(b, |v, k| &v[*k]).clone()).collect()
+    bodies(seen)
+        .iter()
+        .map(|b| path.iter().fold(b, |v, k| &v[*k]).clone())
+        .collect()
 }
 
 /// `include_context 'with configured RubyLLM'`: TypeSafe pointed at the stub, no retries.
@@ -76,7 +83,9 @@ fn judge_class(config: Config) -> Judge {
 
 /// The `with a default judgment model` context's judge: no model declaration.
 fn undeclared_judge() -> Judge {
-    Judge::new().probability("urgent", "Does this need attention today?").unwrap()
+    Judge::new()
+        .probability("urgent", "Does this need attention today?")
+        .unwrap()
 }
 
 fn one_off() -> Value {
@@ -117,7 +126,10 @@ async fn a_derived_judge_replaces_an_inherited_question_and_keeps_the_model() {
 
     assert_eq!(
         field(&seen, &["questions", "urgent", "instructions"]),
-        [json!("Does this require an immediate response?"), json!("Does this need attention today?")]
+        [
+            json!("Does this require an immediate response?"),
+            json!("Does this need attention today?")
+        ]
     );
     // `child.model == judge_class.model`: both send the declared model, not the configured default.
     assert_eq!(field(&seen, &["model"]), [json!(MODEL), json!(MODEL)]);
@@ -136,13 +148,17 @@ async fn an_isolated_context_uses_its_own_key_and_forwards_provider_options() {
     let context = rust_llm::Context::new(tenant);
 
     context
-        .judge("Help", one_off(), JudgeOptions {
-            model: Some(Some(MODEL.into())),
-            provider: Some("typesafe".into()),
-            assume_model_exists: Some(true),
-            provider_options: Some(json!({ "extension": { "enabled": true } })),
-            ..Default::default()
-        })
+        .judge(
+            "Help",
+            one_off(),
+            JudgeOptions {
+                model: Some(Some(MODEL.into())),
+                provider: Some("typesafe".into()),
+                assume_model_exists: Some(true),
+                provider_options: Some(json!({ "extension": { "enabled": true } })),
+                ..Default::default()
+            },
+        )
         .await
         .unwrap();
 
@@ -160,12 +176,27 @@ async fn rejects_missing_or_unknown_runtime_inputs() {
 
     let missing = configured_judge.judge("Help").await.unwrap_err();
     assert!(matches!(missing, Error::Argument(_)));
-    assert!(missing.to_string().contains("Missing judge inputs: ticket"), "{missing}");
+    assert!(
+        missing.to_string().contains("Missing judge inputs: ticket"),
+        "{missing}"
+    );
 
     let inputs = questions(json!({ "ticket": "Help", "extra": true }));
-    let extra = configured_judge.judge_with("Help", JudgeOptions { inputs, ..Default::default() }).await.unwrap_err();
+    let extra = configured_judge
+        .judge_with(
+            "Help",
+            JudgeOptions {
+                inputs,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap_err();
     assert!(matches!(extra, Error::Argument(_)));
-    assert!(extra.to_string().contains("Unknown judge inputs: extra"), "{extra}");
+    assert!(
+        extra.to_string().contains("Unknown judge inputs: extra"),
+        "{extra}"
+    );
     assert!(bodies(&seen).is_empty());
 }
 
@@ -185,7 +216,10 @@ async fn resolves_the_global_default_at_each_call_including_derived_judges() {
 
     first.unwrap();
     second.unwrap();
-    assert_eq!(field(&seen, &["model"]), [json!(MODEL), json!("jev-preview")]);
+    assert_eq!(
+        field(&seen, &["model"]),
+        [json!(MODEL), json!("jev-preview")]
+    );
 }
 
 // spec: judge_spec.rb:241 with a default judgment model > uses an isolated context default for classes and one-off questions
@@ -198,15 +232,26 @@ async fn uses_an_isolated_context_default_for_judges_and_one_off_questions() {
     let context = rust_llm::context(|c| c.default_judgment_model = "jev-preview".into());
 
     let class_call = undeclared_judge()
-        .judge_with("Help", JudgeOptions { config: Some(context.config().clone()), ..Default::default() })
+        .judge_with(
+            "Help",
+            JudgeOptions {
+                config: Some(context.config().clone()),
+                ..Default::default()
+            },
+        )
         .await;
-    let one_off_call = context.judge("Help", one_off(), JudgeOptions::default()).await;
+    let one_off_call = context
+        .judge("Help", one_off(), JudgeOptions::default())
+        .await;
     let global_default = rust_llm::config().default_judgment_model.clone();
     rust_llm::configure(|c| *c = (*previous).clone());
 
     class_call.unwrap();
     one_off_call.unwrap();
-    assert_eq!(field(&seen, &["model"]), [json!("jev-preview"), json!("jev-preview")]);
+    assert_eq!(
+        field(&seen, &["model"]),
+        [json!("jev-preview"), json!("jev-preview")]
+    );
     assert_eq!(global_default, MODEL);
 }
 
@@ -214,22 +259,44 @@ async fn uses_an_isolated_context_default_for_judges_and_one_off_questions() {
 #[tokio::test]
 async fn prefers_a_judge_model_over_the_default_and_a_call_model_over_both() {
     let (server, seen) = stub().await;
-    let judge = undeclared_judge().with_config(Arc::new(configured(&server, "jev-preview"))).model(MODEL);
+    let judge = undeclared_judge()
+        .with_config(Arc::new(configured(&server, "jev-preview")))
+        .model(MODEL);
     judge.judge("First").await.unwrap();
     judge
-        .judge_with("Second", JudgeOptions { model: Some(Some("jev-preview".into())), ..Default::default() })
+        .judge_with(
+            "Second",
+            JudgeOptions {
+                model: Some(Some("jev-preview".into())),
+                ..Default::default()
+            },
+        )
         .await
         .unwrap();
 
-    assert_eq!(field(&seen, &["model"]), [json!(MODEL), json!("jev-preview")]);
+    assert_eq!(
+        field(&seen, &["model"]),
+        [json!(MODEL), json!("jev-preview")]
+    );
 }
 
 // spec: judge_spec.rb:261 with a default judgment model > uses the default when a call explicitly resets the model to nil
 #[tokio::test]
 async fn uses_the_default_when_a_call_explicitly_resets_the_model() {
     let (server, seen) = stub().await;
-    let judge = undeclared_judge().with_config(Arc::new(configured(&server, "jev-preview"))).model(MODEL);
-    judge.judge_with("Help", JudgeOptions { model: Some(None), ..Default::default() }).await.unwrap();
+    let judge = undeclared_judge()
+        .with_config(Arc::new(configured(&server, "jev-preview")))
+        .model(MODEL);
+    judge
+        .judge_with(
+            "Help",
+            JudgeOptions {
+                model: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
 
     assert_eq!(field(&seen, &["model"]), [json!("jev-preview")]);
 }
@@ -245,7 +312,13 @@ async fn requires_a_model_when_the_default_is_unset() {
     assert!(err.to_string().contains("model"), "{err}");
     assert!(bodies(&seen).is_empty());
     let result = judge
-        .judge_with("Help", JudgeOptions { model: Some(Some(MODEL.into())), ..Default::default() })
+        .judge_with(
+            "Help",
+            JudgeOptions {
+                model: Some(Some(MODEL.into())),
+                ..Default::default()
+            },
+        )
         .await
         .unwrap();
     assert_eq!(result.probability("urgent"), Some(0.9));
@@ -263,9 +336,16 @@ fn serializes_answers_without_discarding_their_uncertainty() {
         confidence: 1.0,
     };
     let result = Judgment::new(
-        vec![("urgent".into(), probability), ("department".into(), choice)],
+        vec![
+            ("urgent".into(), probability),
+            ("department".into(), choice),
+        ],
         MODEL,
-        Tokens { input: Some(20), output: Some(10), ..Default::default() },
+        Tokens {
+            input: Some(20),
+            output: Some(10),
+            ..Default::default()
+        },
     );
 
     let h = result.to_value();
@@ -305,7 +385,10 @@ async fn rejects_invalid_question_definitions() {
     ];
 
     for definition in definitions {
-        let options = JudgeOptions { questions: questions(json!({ "question": definition })), ..Default::default() };
+        let options = JudgeOptions {
+            questions: questions(json!({ "question": definition })),
+            ..Default::default()
+        };
         let err = judge.judge_with("Help", options).await.unwrap_err();
         assert!(matches!(err, Error::Argument(_)), "{definition}: {err}");
     }
@@ -315,14 +398,27 @@ async fn rejects_invalid_question_definitions() {
 // spec: judge/question_spec.rb:48 rejects unknown types and misspelled Hash fields
 #[test]
 fn rejects_unknown_types_and_misspelled_hash_fields() {
-    for (definition, inspected) in
-        [(json!({ "type": null }), "nil"), (json!({ "type": "text" }), ":text"), (json!({ "type": 42 }), "42"), (json!({}), "nil")]
-    {
+    for (definition, inspected) in [
+        (json!({ "type": null }), "nil"),
+        (json!({ "type": "text" }), ":text"),
+        (json!({ "type": 42 }), "42"),
+        (json!({}), "nil"),
+    ] {
         let err = Question::from_value("question", &definition).unwrap_err();
         assert!(matches!(err, Error::Argument(_)));
-        assert_eq!(err.to_string(), format!("Unknown judgment type: {inspected}"));
+        assert_eq!(
+            err.to_string(),
+            format!("Unknown judgment type: {inspected}")
+        );
     }
-    let err = Question::from_value("question", &json!({ "type": "choice", "option": { "billing": null } })).unwrap_err();
+    let err = Question::from_value(
+        "question",
+        &json!({ "type": "choice", "option": { "billing": null } }),
+    )
+    .unwrap_err();
     assert!(matches!(err, Error::Argument(_)));
-    assert!(err.to_string().contains("Unknown question options: option"), "{err}");
+    assert!(
+        err.to_string().contains("Unknown question options: option"),
+        "{err}"
+    );
 }

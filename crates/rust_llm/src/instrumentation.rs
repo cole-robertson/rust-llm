@@ -85,7 +85,11 @@ pub struct Event {
 impl Event {
     /// Starts an event. `payload` runs only when `config.instrumenter` is set; the current
     /// workflow context is merged over it, as Ruby merges it at the start of the block.
-    pub fn start(config: &Arc<Config>, name: &str, payload: impl FnOnce() -> Map<String, Value>) -> Event {
+    pub fn start(
+        config: &Arc<Config>,
+        name: &str,
+        payload: impl FnOnce() -> Map<String, Value>,
+    ) -> Event {
         let payload = config.instrumenter.as_ref().map(|_| {
             let mut payload = payload();
             payload.extend(current_workflow().unwrap_or_default());
@@ -120,7 +124,9 @@ impl Event {
     /// Ends the block and delivers the event, with `exception` added when it failed.
     pub fn finish(mut self, error: Option<&Error>) {
         if let Some(e) = error {
-            self.set("exception", || json!([format!("{:?}", e.kind()), e.to_string()]));
+            self.set("exception", || {
+                json!([format!("{:?}", e.kind()), e.to_string()])
+            });
         }
         let elapsed = self.started.elapsed();
         self.emit(Some(elapsed));

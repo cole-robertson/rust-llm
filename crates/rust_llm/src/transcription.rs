@@ -153,7 +153,12 @@ impl Transcription {
         if !self.usage_entries.is_empty() {
             return Tokens::aggregate(self.usage_entries.iter().map(|e| &e.tokens));
         }
-        Tokens { input: self.input_tokens, output: self.output_tokens, reported_cost: self.reported_cost, ..Default::default() }
+        Tokens {
+            input: self.input_tokens,
+            output: self.output_tokens,
+            reported_cost: self.reported_cost,
+            ..Default::default()
+        }
     }
 
     /// Cost across every provider attempt, priced as audio tokens.
@@ -174,7 +179,10 @@ impl Transcription {
 /// `RubyLLM.transcribe(audio_file, model:, language:, provider:, prompt:, temperature:, format:,
 /// timestamps:, speaker_names:, speaker_references:, provider_options:)`. `audio` is a path, URL,
 /// or [`Attachment`].
-pub async fn transcribe(audio: impl Into<Attachment>, options: TranscribeOptions<'_>) -> Result<Transcription> {
+pub async fn transcribe(
+    audio: impl Into<Attachment>,
+    options: TranscribeOptions<'_>,
+) -> Result<Transcription> {
     run(audio.into(), options, None).await
 }
 
@@ -185,7 +193,12 @@ pub async fn transcribe_stream(
     options: TranscribeOptions<'_>,
     mut on_chunk: impl FnMut(&TranscriptionChunk) + Send,
 ) -> Result<Transcription> {
-    run(audio.into(), options, Some(&mut on_chunk as &mut (dyn FnMut(&TranscriptionChunk) + Send))).await
+    run(
+        audio.into(),
+        options,
+        Some(&mut on_chunk as &mut (dyn FnMut(&TranscriptionChunk) + Send)),
+    )
+    .await
 }
 
 /// Which transcription seams a provider's protocol includes.
@@ -216,9 +229,10 @@ impl Family {
             Provider::XAI => Ok(Family::XAI),
             Provider::OpenRouter => Ok(Family::OpenRouter),
             Provider::GPUStack => Ok(Family::GPUStack),
-            Provider::Anthropic | Provider::TypeSafe => {
-                Err(Error::Api(format!("{} doesn't support transcription", provider.display()), None))
-            }
+            Provider::Anthropic | Provider::TypeSafe => Err(Error::Api(
+                format!("{} doesn't support transcription", provider.display()),
+                None,
+            )),
             _ => Ok(Family::OpenAI),
         }
     }
@@ -230,32 +244,50 @@ impl Family {
     }
 
     /// `render_transcription_options(timestamps:, format:, streaming:)`.
-    fn render_options(self, timestamps: Option<&[&str]>, format: Option<&str>, streaming: bool) -> Result<Value> {
-        let Some(values) = timestamps else { return Ok(json!({})) };
+    fn render_options(
+        self,
+        timestamps: Option<&[&str]>,
+        format: Option<&str>,
+        streaming: bool,
+    ) -> Result<Value> {
+        let Some(values) = timestamps else {
+            return Ok(json!({}));
+        };
         let single = |name: &str| values == [name];
         match self {
             Family::OpenAI | Family::GPUStack | Family::OpenRouter => {
                 if values.is_empty() || values.iter().any(|v| !["word", "segment"].contains(v)) {
-                    return Err(Error::Argument("Transcription timestamps must be word or segment".into()));
+                    return Err(Error::Argument(
+                        "Transcription timestamps must be word or segment".into(),
+                    ));
                 }
                 if streaming || format.is_some_and(|f| f != "verbose_json") {
                     return Err(Error::Argument(
-                        "Transcription timestamps require a non-streaming verbose_json response".into(),
+                        "Transcription timestamps require a non-streaming verbose_json response"
+                            .into(),
                     ));
                 }
                 Ok(json!({ "response_format": "verbose_json", "timestamp_granularities": values }))
             }
-            Family::Mistral if single("segment") => Ok(json!({ "timestamp_granularities": ["segment"] })),
-            Family::Mistral => Err(Error::Argument("Mistral transcription timestamps must be segment".into())),
+            Family::Mistral if single("segment") => {
+                Ok(json!({ "timestamp_granularities": ["segment"] }))
+            }
+            Family::Mistral => Err(Error::Argument(
+                "Mistral transcription timestamps must be segment".into(),
+            )),
             Family::XAI if single("word") => Ok(json!({})),
-            Family::XAI => Err(Error::Argument("xAI transcription timestamps must be word".into())),
+            Family::XAI => Err(Error::Argument(
+                "xAI transcription timestamps must be word".into(),
+            )),
             Family::Interactions if single("word") => Ok(json!({
                 "generation_config": { "transcription_config": { "mode": { "type": "verbatim", "timestamp_granularities": ["word"] } } }
             })),
-            Family::Interactions => Err(Error::Argument("Gemini transcription timestamps must be word".into())),
-            Family::Gemini | Family::GeminiLive => {
-                Err(Error::Argument("This transcription protocol does not support timestamps".into()))
-            }
+            Family::Interactions => Err(Error::Argument(
+                "Gemini transcription timestamps must be word".into(),
+            )),
+            Family::Gemini | Family::GeminiLive => Err(Error::Argument(
+                "This transcription protocol does not support timestamps".into(),
+            )),
         }
     }
 }
@@ -266,14 +298,22 @@ async fn run(
     on_chunk: Option<&mut (dyn FnMut(&TranscriptionChunk) + Send)>,
 ) -> Result<Transcription> {
     let config = options.config.clone().unwrap_or_else(crate::config);
-    let model_id = options.model.unwrap_or(&config.default_transcription_model).to_string();
-    let (model, provider) = resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let model_id = options
+        .model
+        .unwrap_or(&config.default_transcription_model)
+        .to_string();
+    let (model, provider) =
+        resolve_model(&model_id, options.provider, options.assume_model_exists)?;
     provider.ensure_configured(&config)?;
     let connection = Connection::new(provider, config.clone())?;
     let family = Family::for_model(provider, &model.id)?;
 
     // `Provider#transcribe`: timestamp options are rendered first and sit under provider_options.
-    let mut provider_options = family.render_options(options.timestamps.as_deref(), options.format, on_chunk.is_some())?;
+    let mut provider_options = family.render_options(
+        options.timestamps.as_deref(),
+        options.format,
+        on_chunk.is_some(),
+    )?;
     // `provider_options: {}` by default; `Null` would replace the options in a deep merge.
     if !options.provider_options.is_null() {
         deep_merge(&mut provider_options, &options.provider_options);
@@ -281,14 +321,26 @@ async fn run(
     if on_chunk.is_some() && !family.streams() {
         return Err(match family {
             Family::XAI | Family::GeminiLive => Error::Api(
-                format!("{} streams transcriptions over a WebSocket, which rust_llm has not ported", provider.display()),
+                format!(
+                    "{} streams transcriptions over a WebSocket, which rust_llm has not ported",
+                    provider.display()
+                ),
                 None,
             ),
-            _ => Error::Api(format!("{} doesn't support streaming transcription", provider.display()), None),
+            _ => Error::Api(
+                format!(
+                    "{} doesn't support streaming transcription",
+                    provider.display()
+                ),
+                None,
+            ),
         });
     }
     if family == Family::GeminiLive {
-        return Err(Error::Api("Gemini Live transcription needs a WebSocket, which rust_llm has not ported".into(), None));
+        return Err(Error::Api(
+            "Gemini Live transcription needs a WebSocket, which rust_llm has not ported".into(),
+            None,
+        ));
     }
 
     audio.load(connection.client()).await?;
@@ -311,46 +363,96 @@ async fn run(
     let mut transcription = match family {
         Family::Gemini => {
             let payload = gemini_payload(&audio, &request)?;
-            let raw = connection.post(&format!("models/{}:generateContent", model.id), &payload, &[], &mut tracker.on_attempt()).await?;
+            let raw = connection
+                .post(
+                    &format!("models/{}:generateContent", model.id),
+                    &payload,
+                    &[],
+                    &mut tracker.on_attempt(),
+                )
+                .await?;
             parse_gemini(&raw.body, &model.id)
         }
         Family::Interactions => {
             let payload = interactions_payload(&audio, &request)?;
-            let raw = connection.post("interactions", &payload, &[], &mut tracker.on_attempt()).await?;
+            let raw = connection
+                .post("interactions", &payload, &[], &mut tracker.on_attempt())
+                .await?;
             parse_interactions(&raw.body, &model.id)?
         }
         Family::OpenRouter => {
             let payload = openrouter_payload(&audio, &request)?;
-            let raw = connection.post("audio/transcriptions", &payload, &[], &mut tracker.on_attempt()).await?;
+            let raw = connection
+                .post(
+                    "audio/transcriptions",
+                    &payload,
+                    &[],
+                    &mut tracker.on_attempt(),
+                )
+                .await?;
             parse_json(provider, &raw.body, &model.id)
         }
         _ => {
             let file = FilePart::new(&audio)?;
             let mut payload = multipart_payload(family, &request)?;
-            let path = if family == Family::XAI { "stt" } else { "audio/transcriptions" };
+            let path = if family == Family::XAI {
+                "stt"
+            } else {
+                "audio/transcriptions"
+            };
             match on_chunk {
                 Some(on_chunk) => {
                     if family == Family::GPUStack {
                         // `{ stream_include_usage: 'true' }.merge(payload)`: the flag goes first.
-                        let mut merged = Map::from_iter([("stream_include_usage".to_string(), Value::from("true"))]);
+                        let mut merged = Map::from_iter([(
+                            "stream_include_usage".to_string(),
+                            Value::from("true"),
+                        )]);
                         merged.extend(payload);
                         payload = merged;
                     }
                     payload.insert("stream".into(), "true".into());
-                    stream(family, provider, &connection, path, &payload, &file, &model.id, &mut tracker, on_chunk).await?
+                    stream(
+                        family,
+                        provider,
+                        &connection,
+                        path,
+                        &payload,
+                        &file,
+                        &model.id,
+                        &mut tracker,
+                        on_chunk,
+                    )
+                    .await?
                 }
                 None => {
                     let resp = connection
-                        .send_tracked(reqwest::Method::POST, path, &[], true, &|req| req.multipart(file.form(&payload)), &mut tracker.on_attempt())
+                        .send_tracked(
+                            reqwest::Method::POST,
+                            path,
+                            &[],
+                            true,
+                            &|req| req.multipart(file.form(&payload)),
+                            &mut tracker.on_attempt(),
+                        )
                         .await?;
                     let raw = json_response(resp, Value::Null).await?;
-                    if family == Family::XAI { parse_xai(&raw.body, &model.id) } else { parse_json(provider, &raw.body, &model.id) }
+                    if family == Family::XAI {
+                        parse_xai(&raw.body, &model.id)
+                    } else {
+                        parse_json(provider, &raw.body, &model.id)
+                    }
                 }
             }
         }
     };
-    transcription.usage_entries =
-        tracker.entries(Operation::Transcription, provider, &model, transcription.tokens(), transcription.cost());
+    transcription.usage_entries = tracker.entries(
+        Operation::Transcription,
+        provider,
+        &model,
+        transcription.tokens(),
+        transcription.cost(),
+    );
     Ok(transcription)
 }
 
@@ -376,13 +478,29 @@ struct FilePart {
 impl FilePart {
     fn new(audio: &Attachment) -> Result<FilePart> {
         // `audio_file_name`: providers reject audio whose filename carries no extension.
-        let name = audio.filename.clone().filter(|n| !n.is_empty()).unwrap_or_else(|| "audio".into());
-        let has_extension = std::path::Path::new(&name).extension().is_some_and(|e| !e.is_empty());
-        let filename = if has_extension { name } else { format!("{name}.{}", audio.format()) };
+        let name = audio
+            .filename
+            .clone()
+            .filter(|n| !n.is_empty())
+            .unwrap_or_else(|| "audio".into());
+        let has_extension = std::path::Path::new(&name)
+            .extension()
+            .is_some_and(|e| !e.is_empty());
+        let filename = if has_extension {
+            name
+        } else {
+            format!("{name}.{}", audio.format())
+        };
         reqwest::multipart::Part::bytes(Vec::new())
             .mime_str(&audio.mime_type)
-            .map_err(|e| Error::Argument(format!("invalid content type {:?}: {e}", audio.mime_type)))?;
-        Ok(FilePart { bytes: audio.bytes()?.to_vec(), filename, mime_type: audio.mime_type.clone() })
+            .map_err(|e| {
+                Error::Argument(format!("invalid content type {:?}: {e}", audio.mime_type))
+            })?;
+        Ok(FilePart {
+            bytes: audio.bytes()?.to_vec(),
+            filename,
+            mime_type: audio.mime_type.clone(),
+        })
     }
 
     /// Faraday's multipart encoding of `payload`, where the `file` key (a `Null` placeholder)
@@ -409,8 +527,14 @@ impl FilePart {
 fn flatten_field(key: &str, value: &Value) -> Vec<(String, String)> {
     match value {
         Value::Null => Vec::new(),
-        Value::Array(items) => items.iter().flat_map(|v| flatten_field(&format!("{key}[]"), v)).collect(),
-        Value::Object(map) => map.iter().flat_map(|(k, v)| flatten_field(&format!("{key}[{k}]"), v)).collect(),
+        Value::Array(items) => items
+            .iter()
+            .flat_map(|v| flatten_field(&format!("{key}[]"), v))
+            .collect(),
+        Value::Object(map) => map
+            .iter()
+            .flat_map(|(k, v)| flatten_field(&format!("{key}[{k}]"), v))
+            .collect(),
         Value::String(s) => vec![(key.to_string(), s.clone())],
         other => vec![(key.to_string(), other.to_string())],
     }
@@ -451,17 +575,33 @@ fn multipart_payload(family: Family, r: &Request) -> Result<Map<String, Value>> 
         _ => {
             let references = r
                 .speaker_references
-                .map(|refs| refs.iter().map(|a| a.for_llm().map(Value::from)).collect::<Result<Vec<_>>>())
+                .map(|refs| {
+                    refs.iter()
+                        .map(|a| a.for_llm().map(Value::from))
+                        .collect::<Result<Vec<_>>>()
+                })
                 .transpose()?;
             let default_format = r.model.contains("diarize").then_some("diarized_json");
             put(&mut payload, "model", Some(r.model.into()));
             payload.insert("file".into(), Value::Null);
             put(&mut payload, "language", r.language.map(Into::into));
-            put(&mut payload, "response_format", r.format.or(default_format).map(Into::into));
+            put(
+                &mut payload,
+                "response_format",
+                r.format.or(default_format).map(Into::into),
+            );
             put(&mut payload, "prompt", r.prompt.map(Into::into));
             put(&mut payload, "temperature", r.temperature.map(Into::into));
-            put(&mut payload, "known_speaker_names", r.speaker_names.map(|n| json!(n)));
-            put(&mut payload, "known_speaker_references", references.map(Value::Array));
+            put(
+                &mut payload,
+                "known_speaker_names",
+                r.speaker_names.map(|n| json!(n)),
+            );
+            put(
+                &mut payload,
+                "known_speaker_references",
+                references.map(Value::Array),
+            );
             merge(&mut payload, r.provider_options);
         }
     }
@@ -486,7 +626,10 @@ fn parse_json(provider: Provider, data: &Value, model: &str) -> Transcription {
     let usage = data.get("usage").cloned().unwrap_or_else(|| json!({}));
     let mut t = Transcription::new(str_of(data.get("text")), model);
     t.language = str_of(data.get("language"));
-    t.duration = data.get("duration").and_then(Value::as_f64).or_else(|| duration(provider, &usage));
+    t.duration = data
+        .get("duration")
+        .and_then(Value::as_f64)
+        .or_else(|| duration(provider, &usage));
     t.segments = array(data.get("segments"));
     t.words = array(data.get("words"));
     fill_tokens(&mut t, provider, &usage);
@@ -495,13 +638,16 @@ fn parse_json(provider: Provider, data: &Value, model: &str) -> Transcription {
 
 fn fill_tokens(t: &mut Transcription, provider: Provider, usage: &Value) {
     t.input_tokens = int(usage.get("input_tokens")).or_else(|| int(usage.get("prompt_tokens")));
-    t.output_tokens = int(usage.get("output_tokens")).or_else(|| int(usage.get("completion_tokens")));
+    t.output_tokens =
+        int(usage.get("output_tokens")).or_else(|| int(usage.get("completion_tokens")));
     t.reported_cost = chat_completions::reported_cost(provider, usage);
 }
 
 /// `transcription_duration`: `usage.seconds`, or Mistral's `prompt_audio_seconds`.
 fn duration(provider: Provider, usage: &Value) -> Option<f64> {
-    let mistral = (provider == Provider::Mistral).then(|| usage.get("prompt_audio_seconds").and_then(Value::as_f64)).flatten();
+    let mistral = (provider == Provider::Mistral)
+        .then(|| usage.get("prompt_audio_seconds").and_then(Value::as_f64))
+        .flatten();
     mistral.or_else(|| usage.get("seconds").and_then(Value::as_f64))
 }
 
@@ -534,7 +680,14 @@ async fn stream(
     on_chunk: &mut (dyn FnMut(&TranscriptionChunk) + Send),
 ) -> Result<Transcription> {
     let resp = connection
-        .send_tracked(reqwest::Method::POST, path, &[], true, &|req| req.multipart(file.form(payload)), &mut tracker.on_attempt())
+        .send_tracked(
+            reqwest::Method::POST,
+            path,
+            &[],
+            true,
+            &|req| req.multipart(file.form(payload)),
+            &mut tracker.on_attempt(),
+        )
         .await?;
     let mut chunks: Vec<TranscriptionChunk> = Vec::new();
     let mut on_event = |_event: SseEvent, data: Value| -> Result<()> {
@@ -545,14 +698,23 @@ async fn stream(
     };
     let mut delivered = false;
     connection
-        .read_stream(resp, &mut on_event, crate::protocols::streaming_error_status(ProtocolName::ChatCompletions), &mut delivered)
+        .read_stream(
+            resp,
+            &mut on_event,
+            crate::protocols::streaming_error_status(ProtocolName::ChatCompletions),
+            &mut delivered,
+        )
         .await?;
     Ok(streamed_transcription(provider, &chunks, model))
 }
 
 /// `build_transcription_chunk`, with the Mistral and GPUStack event shapes.
 fn build_chunk(family: Family, data: Value) -> TranscriptionChunk {
-    let kind = data.get("type").and_then(Value::as_str).unwrap_or("").to_string();
+    let kind = data
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
     let segment_of = |data: &Value| {
         let mut segment = data.as_object().cloned().unwrap_or_default();
         segment.remove("type");
@@ -564,20 +726,34 @@ fn build_chunk(family: Family, data: Value) -> TranscriptionChunk {
         "transcription.done" => Some(TranscriptionChunk::DONE),
         _ => None,
     };
-    if family == Family::Mistral && let Some(kind) = mistral {
+    if family == Family::Mistral
+        && let Some(kind) = mistral
+    {
         return TranscriptionChunk {
             kind: kind.into(),
-            delta: (kind == TranscriptionChunk::DELTA).then(|| str_of(data.get("text"))).flatten(),
-            text: (kind == TranscriptionChunk::DONE).then(|| str_of(data.get("text"))).flatten(),
+            delta: (kind == TranscriptionChunk::DELTA)
+                .then(|| str_of(data.get("text")))
+                .flatten(),
+            text: (kind == TranscriptionChunk::DONE)
+                .then(|| str_of(data.get("text")))
+                .flatten(),
             segment: (kind == TranscriptionChunk::SEGMENT).then(|| segment_of(&data)),
             raw: data,
         };
     }
-    if family == Family::GPUStack && let Some(choices) = data.get("choices").and_then(Value::as_array) {
+    if family == Family::GPUStack
+        && let Some(choices) = data.get("choices").and_then(Value::as_array)
+    {
         let choice = choices.first().cloned().unwrap_or_else(|| json!({}));
-        let finished = choice.get("finish_reason").is_some_and(|r| !r.is_null()) || choices.is_empty();
+        let finished =
+            choice.get("finish_reason").is_some_and(|r| !r.is_null()) || choices.is_empty();
         return TranscriptionChunk {
-            kind: if finished { TranscriptionChunk::DONE } else { TranscriptionChunk::DELTA }.into(),
+            kind: if finished {
+                TranscriptionChunk::DONE
+            } else {
+                TranscriptionChunk::DELTA
+            }
+            .into(),
             delta: str_of(choice.pointer("/delta/content")),
             text: None,
             segment: None,
@@ -586,7 +762,9 @@ fn build_chunk(family: Family, data: Value) -> TranscriptionChunk {
     }
     TranscriptionChunk {
         delta: str_of(data.get("delta")),
-        text: (kind == TranscriptionChunk::DONE).then(|| str_of(data.get("text"))).flatten(),
+        text: (kind == TranscriptionChunk::DONE)
+            .then(|| str_of(data.get("text")))
+            .flatten(),
         segment: (kind == TranscriptionChunk::SEGMENT).then(|| segment_of(&data)),
         kind,
         raw: data,
@@ -595,7 +773,11 @@ fn build_chunk(family: Family, data: Value) -> TranscriptionChunk {
 
 /// `build_streamed_transcription`: the final event's transcript and usage, or the transcript
 /// rebuilt from deltas (or segments, on diarization models that stream no deltas).
-fn streamed_transcription(provider: Provider, chunks: &[TranscriptionChunk], model: &str) -> Transcription {
+fn streamed_transcription(
+    provider: Provider,
+    chunks: &[TranscriptionChunk],
+    model: &str,
+) -> Transcription {
     let last = chunks.iter().rev().find(|c| c.is_done());
     let data = last.map(|c| c.raw.clone()).unwrap_or_else(|| json!({}));
     let usage = data.get("usage").cloned().unwrap_or_else(|| json!({}));
@@ -613,13 +795,15 @@ fn streamed_transcription(provider: Provider, chunks: &[TranscriptionChunk], mod
     let mut t = Transcription::new(Some(text), model);
     t.language = str_of(data.get("language"));
     t.duration = duration(provider, &usage);
-    let segments = array(data.get("segments")).unwrap_or_else(|| chunks.iter().filter_map(|c| c.segment.clone()).collect());
+    let segments = array(data.get("segments"))
+        .unwrap_or_else(|| chunks.iter().filter_map(|c| c.segment.clone()).collect());
     t.segments = (!segments.is_empty()).then_some(segments);
     fill_tokens(&mut t, provider, &usage);
     t
 }
 
-const GEMINI_PROMPT: &str = "Transcribe the provided audio and respond with only the transcript text.";
+const GEMINI_PROMPT: &str =
+    "Transcribe the provided audio and respond with only the transcript text.";
 
 /// `Gemini::Transcription#render_transcription_payload` (generateContent).
 fn gemini_payload(audio: &Attachment, r: &Request) -> Result<Value> {
@@ -630,7 +814,8 @@ fn gemini_payload(audio: &Attachment, r: &Request) -> Result<Value> {
     if let Some(custom) = r.prompt {
         prompt.push_str(&format!(" {custom}"));
     }
-    let audio_part = json!({ "inline_data": { "mime_type": audio.mime_type, "data": audio.encoded()? } });
+    let audio_part =
+        json!({ "inline_data": { "mime_type": audio.mime_type, "data": audio.encoded()? } });
     if audio.kind() != AttachmentType::Audio {
         return Err(Error::UnsupportedAttachment(unsupported(&audio.mime_type)));
     }
@@ -658,8 +843,10 @@ fn parse_gemini(data: &Value, model: &str) -> Transcription {
     let mut t = Transcription::new((!texts.is_empty()).then(|| texts.concat()), model);
     if let Some(meta) = data.get("usageMetadata").filter(|m| m.is_object()) {
         t.input_tokens = int(meta.get("promptTokenCount"));
-        t.output_tokens =
-            Some(int(meta.get("candidatesTokenCount")).unwrap_or(0) + int(meta.get("thoughtsTokenCount")).unwrap_or(0));
+        t.output_tokens = Some(
+            int(meta.get("candidatesTokenCount")).unwrap_or(0)
+                + int(meta.get("thoughtsTokenCount")).unwrap_or(0),
+        );
     }
     t
 }
@@ -668,11 +855,14 @@ fn parse_gemini(data: &Value, model: &str) -> Transcription {
 fn interactions_payload(audio: &Attachment, r: &Request) -> Result<Value> {
     if r.format.is_some() || r.speaker_references.is_some() || r.temperature.is_some() {
         return Err(Error::Argument(
-            "Dedicated transcription does not accept format, speaker references, or temperature".into(),
+            "Dedicated transcription does not accept format, speaker references, or temperature"
+                .into(),
         ));
     }
     if audio.kind() != AttachmentType::Audio {
-        return Err(Error::Argument("Dedicated transcription requires exactly one audio file".into()));
+        return Err(Error::Argument(
+            "Dedicated transcription requires exactly one audio file".into(),
+        ));
     }
     let mut config = Map::new();
     if let Some(language) = r.language {
@@ -682,7 +872,10 @@ fn interactions_payload(audio: &Attachment, r: &Request) -> Result<Value> {
         config.insert("custom_vocabulary".into(), json!([prompt]));
     }
     if r.speaker_names.is_some() {
-        config.insert("mode".into(), json!({ "type": "verbatim", "diarization_mode": "speaker" }));
+        config.insert(
+            "mode".into(),
+            json!({ "type": "verbatim", "diarization_mode": "speaker" }),
+        );
     }
     let mut payload = json!({
         "model": r.model,
@@ -694,11 +887,16 @@ fn interactions_payload(audio: &Attachment, r: &Request) -> Result<Value> {
     // `validate_transcription_config`.
     let config = &payload["generation_config"]["transcription_config"];
     let mode = config.get("mode").filter(|m| m.is_object());
-    if config.get("custom_vocabulary").is_some_and(|v| !v.is_null())
-        && mode.is_some_and(|m| m.get("diarization_mode").is_some() || m.get("timestamp_granularities").is_some())
+    if config
+        .get("custom_vocabulary")
+        .is_some_and(|v| !v.is_null())
+        && mode.is_some_and(|m| {
+            m.get("diarization_mode").is_some() || m.get("timestamp_granularities").is_some()
+        })
     {
         return Err(Error::Argument(
-            "Gemini custom vocabulary cannot be combined with diarization or word timestamps".into(),
+            "Gemini custom vocabulary cannot be combined with diarization or word timestamps"
+                .into(),
         ));
     }
     Ok(payload)
@@ -716,23 +914,53 @@ fn parse_interactions(data: &Value, model: &str) -> Result<Transcription> {
             .flatten()
             .filter_map(|e| e.get("message").and_then(Value::as_str))
             .collect();
-        let message = if messages.is_empty() { format!("Gemini interaction ended with status {status}") } else { messages.join("; ") };
+        let message = if messages.is_empty() {
+            format!("Gemini interaction ended with status {status}")
+        } else {
+            messages.join("; ")
+        };
         return Err(Error::Api(message, None));
     }
-    let steps: Vec<&Value> = data.get("steps").and_then(Value::as_array).into_iter().flatten().collect();
-    let parts = || steps.iter().flat_map(|s| s.get("content").and_then(Value::as_array).into_iter().flatten());
+    let steps: Vec<&Value> = data
+        .get("steps")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .collect();
+    let parts = || {
+        steps.iter().flat_map(|s| {
+            s.get("content")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+        })
+    };
     let text: String = steps
         .iter()
         .filter(|s| s.get("type").and_then(Value::as_str) == Some("model_output"))
-        .flat_map(|s| s.get("content").and_then(Value::as_array).into_iter().flatten())
+        .flat_map(|s| {
+            s.get("content")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+        })
         .filter(|p| p.get("type").and_then(Value::as_str) == Some("text"))
         .filter_map(|p| p.get("text").and_then(Value::as_str))
         .collect();
     let words: Vec<Value> = parts()
-        .flat_map(|p| p.get("annotations").and_then(Value::as_array).into_iter().flatten())
+        .flat_map(|p| {
+            p.get("annotations")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+        })
         .filter(|a| a.get("type").and_then(Value::as_str) == Some("word_info"))
         .map(|a| {
-            let offset = |key: &str| a.get(key).and_then(Value::as_str).and_then(|s| s.trim_end_matches('s').parse::<f64>().ok());
+            let offset = |key: &str| {
+                a.get(key)
+                    .and_then(Value::as_str)
+                    .and_then(|s| s.trim_end_matches('s').parse::<f64>().ok())
+            };
             let mut word = Map::new();
             for (key, value) in [
                 ("word", a.get("text").cloned()),
@@ -751,10 +979,11 @@ fn parse_interactions(data: &Value, model: &str) -> Result<Transcription> {
     t.words = (!words.is_empty()).then_some(words);
     let usage = data.get("usage").cloned().unwrap_or_else(|| json!({}));
     let cached = int(usage.get("total_cached_tokens")).unwrap_or(0);
-    t.input_tokens = int(usage.get("total_input_tokens"))
-        .map(|input| (input + int(usage.get("total_tool_use_tokens")).unwrap_or(0) - cached).max(0));
-    t.output_tokens =
-        int(usage.get("total_output_tokens")).map(|out| out + int(usage.get("total_thought_tokens")).unwrap_or(0));
+    t.input_tokens = int(usage.get("total_input_tokens")).map(|input| {
+        (input + int(usage.get("total_tool_use_tokens")).unwrap_or(0) - cached).max(0)
+    });
+    t.output_tokens = int(usage.get("total_output_tokens"))
+        .map(|out| out + int(usage.get("total_thought_tokens")).unwrap_or(0));
     Ok(t)
 }
 
@@ -766,10 +995,17 @@ fn openrouter_payload(audio: &Attachment, r: &Request) -> Result<Value> {
         ));
     }
     if r.prompt.is_some() {
-        return Err(Error::Argument("OpenRouter transcription ignores prompt; use provider_options for backend hints".into()));
+        return Err(Error::Argument(
+            "OpenRouter transcription ignores prompt; use provider_options for backend hints"
+                .into(),
+        ));
     }
     let diarization = r.speaker_names.is_some();
-    let formats: &[&str] = if diarization { &["verbose_json"] } else { &["json", "verbose_json"] };
+    let formats: &[&str] = if diarization {
+        &["verbose_json"]
+    } else {
+        &["json", "verbose_json"]
+    };
     if r.format.is_some_and(|f| !formats.contains(&f)) {
         return Err(Error::Argument(
             "OpenRouter transcription accepts json or verbose_json; diarization requires verbose_json".into(),
@@ -777,7 +1013,10 @@ fn openrouter_payload(audio: &Attachment, r: &Request) -> Result<Value> {
     }
     let mut payload = Map::new();
     payload.insert("model".into(), r.model.into());
-    payload.insert("input_audio".into(), json!({ "data": audio.encoded()?, "format": audio.format() }));
+    payload.insert(
+        "input_audio".into(),
+        json!({ "data": audio.encoded()?, "format": audio.format() }),
+    );
     if let Some(language) = r.language {
         payload.insert("language".into(), language.into());
     }
@@ -785,7 +1024,10 @@ fn openrouter_payload(audio: &Attachment, r: &Request) -> Result<Value> {
         payload.insert("temperature".into(), temperature.into());
     }
     let default_format = if diarization { "verbose_json" } else { "json" };
-    payload.insert("response_format".into(), r.format.unwrap_or(default_format).into());
+    payload.insert(
+        "response_format".into(),
+        r.format.unwrap_or(default_format).into(),
+    );
     if diarization {
         payload.insert(
             "provider".into(),
@@ -805,10 +1047,19 @@ mod tests {
     fn multipart_arrays_and_hashes_flatten_like_faraday() {
         assert_eq!(
             flatten_field("timestamp_granularities", &json!(["word", "segment"])),
-            vec![("timestamp_granularities[]".into(), "word".into()), ("timestamp_granularities[]".into(), "segment".into())]
+            vec![
+                ("timestamp_granularities[]".into(), "word".into()),
+                ("timestamp_granularities[]".into(), "segment".into())
+            ]
         );
-        assert_eq!(flatten_field("diarize", &json!(true)), vec![("diarize".to_string(), "true".to_string())]);
-        assert_eq!(flatten_field("chunking", &json!({ "type": "auto" })), vec![("chunking[type]".to_string(), "auto".to_string())]);
+        assert_eq!(
+            flatten_field("diarize", &json!(true)),
+            vec![("diarize".to_string(), "true".to_string())]
+        );
+        assert_eq!(
+            flatten_field("chunking", &json!({ "type": "auto" })),
+            vec![("chunking[type]".to_string(), "auto".to_string())]
+        );
     }
 
     #[test]
@@ -818,10 +1069,25 @@ mod tests {
             Family::OpenAI.render_options(word, None, false).unwrap(),
             json!({ "response_format": "verbose_json", "timestamp_granularities": ["word"] })
         );
-        assert!(matches!(Family::OpenAI.render_options(word, None, true), Err(Error::Argument(_))));
-        assert!(matches!(Family::OpenAI.render_options(word, Some("json"), false), Err(Error::Argument(_))));
-        assert!(matches!(Family::Mistral.render_options(word, None, false), Err(Error::Argument(_))));
-        assert_eq!(Family::XAI.render_options(word, None, false).unwrap(), json!({}));
-        assert!(matches!(Family::Gemini.render_options(word, None, false), Err(Error::Argument(_))));
+        assert!(matches!(
+            Family::OpenAI.render_options(word, None, true),
+            Err(Error::Argument(_))
+        ));
+        assert!(matches!(
+            Family::OpenAI.render_options(word, Some("json"), false),
+            Err(Error::Argument(_))
+        ));
+        assert!(matches!(
+            Family::Mistral.render_options(word, None, false),
+            Err(Error::Argument(_))
+        ));
+        assert_eq!(
+            Family::XAI.render_options(word, None, false).unwrap(),
+            json!({})
+        );
+        assert!(matches!(
+            Family::Gemini.render_options(word, None, false),
+            Err(Error::Argument(_))
+        ));
     }
 }

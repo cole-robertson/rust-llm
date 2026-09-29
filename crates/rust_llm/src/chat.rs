@@ -32,7 +32,10 @@ use crate::error::{DEFAULT_FALLBACK_ERRORS, Error, ErrorKind, Result};
 use crate::message::{FinishReason, Message, Operation, Role, ToolCall, UsageEntry, UsageStatus};
 use crate::model::Model;
 use crate::models;
-use crate::protocols::{self, Caching, Request, Schema, StreamAccumulator, StreamState, ToolCalls, ToolChoice, ToolPrefs};
+use crate::protocols::{
+    self, Caching, Request, Schema, StreamAccumulator, StreamState, ToolCalls, ToolChoice,
+    ToolPrefs,
+};
 use crate::providers::{ProtocolName, Provider};
 use crate::thinking::ThinkingConfig;
 use crate::tokens::Tokens;
@@ -57,7 +60,10 @@ pub struct Fallback {
 
 impl From<&str> for Fallback {
     fn from(model: &str) -> Self {
-        Fallback { model: model.into(), provider: None }
+        Fallback {
+            model: model.into(),
+            provider: None,
+        }
     }
 }
 
@@ -146,9 +152,16 @@ impl std::fmt::Debug for Chat {
         f.field("model", &self.model.id)
             .field("provider", &self.provider.slug())
             .field("messages", &self.messages.len())
-            .field("tools", &self.tools.iter().map(|t| t.name()).collect::<Vec<_>>());
+            .field(
+                "tools",
+                &self.tools.iter().map(|t| t.name()).collect::<Vec<_>>(),
+            );
         // `inspect_attributes` `awaiting_approval:`, omitted when empty like `Inspectable`.
-        let mut awaiting: Vec<String> = self.pending_approvals().into_iter().map(|c| c.name).collect();
+        let mut awaiting: Vec<String> = self
+            .pending_approvals()
+            .into_iter()
+            .map(|c| c.name)
+            .collect();
         awaiting.dedup();
         if !awaiting.is_empty() {
             f.field("awaiting_approval", &awaiting);
@@ -176,8 +189,9 @@ pub(crate) fn resolve_model(
     let provider_kind = provider.map(Provider::resolve_or_err).transpose()?;
     let assume = assume_model_exists || provider_kind.is_some_and(|p| p.assume_models_exist());
     if assume {
-        let provider_kind = provider_kind
-            .ok_or_else(|| Error::Argument("Provider must be specified if assume_model_exists is true".into()))?;
+        let provider_kind = provider_kind.ok_or_else(|| {
+            Error::Argument("Provider must be specified if assume_model_exists is true".into())
+        })?;
         let model = models::models()
             .find(model_id, Some(provider_kind.slug()))
             .unwrap_or_else(|_| Model::default_for(model_id, provider_kind.slug()));
@@ -194,7 +208,12 @@ impl Chat {
         Chat::with_config(crate::config(), model, provider, false)
     }
 
-    pub fn with_config(config: Arc<Config>, model: Option<&str>, provider: Option<&str>, assume_model_exists: bool) -> Result<Chat> {
+    pub fn with_config(
+        config: Arc<Config>,
+        model: Option<&str>,
+        provider: Option<&str>,
+        assume_model_exists: bool,
+    ) -> Result<Chat> {
         let model_id = model.unwrap_or(&config.default_model).to_string();
         let (model, provider) = resolve_model(&model_id, provider, assume_model_exists)?;
         provider.ensure_configured(&config)?;
@@ -267,7 +286,11 @@ impl Chat {
     pub fn cost(&self) -> Cost {
         let complete = self.usage_entries.iter().all(UsageEntry::cost_available);
         let cost = Cost::aggregate(self.usage_entries.iter().map(|e| &e.cost), complete);
-        if complete { cost } else { cost.mark_incomplete() }
+        if complete {
+            cost
+        } else {
+            cost.mark_incomplete()
+        }
     }
 
     // ---- configuration (with_*) ------------------------------------------------------------
@@ -279,7 +302,12 @@ impl Chat {
     }
 
     /// `with_instructions(text, append: true, cache_until_here:)`; `None` removes all instructions.
-    pub fn set_instructions(&mut self, instructions: Option<String>, append: bool, cache_until_here: bool) -> &mut Self {
+    pub fn set_instructions(
+        &mut self,
+        instructions: Option<String>,
+        append: bool,
+        cache_until_here: bool,
+    ) -> &mut Self {
         if !append {
             self.messages.retain(|m| m.role != Role::System);
         }
@@ -353,11 +381,15 @@ impl Chat {
     fn combined_tools(&self) -> Result<Vec<SharedTool>> {
         let mut tools = self.tools.clone();
         for server in self.mcp.iter() {
-            let Some(server_tools) = server.cached_tools() else { continue };
+            let Some(server_tools) = server.cached_tools() else {
+                continue;
+            };
             for tool in server_tools? {
                 let name = tool.name();
                 if tools.iter().any(|t| t.name() == name) {
-                    return Err(Error::Argument(format!("Two tools are named {name}. Rename one with `tool :{name}, as:`")));
+                    return Err(Error::Argument(format!(
+                        "Two tools are named {name}. Rename one with `tool :{name}, as:`"
+                    )));
                 }
                 tools.push(tool);
             }
@@ -368,7 +400,10 @@ impl Chat {
     /// `with_provider_tools(:web_search, mcp: { ... })`: tools that run on the provider's
     /// servers. Entries add to any enabled earlier. Unknown aliases fail at request time with
     /// `Error::UnsupportedServerTool`.
-    pub fn with_provider_tools(mut self, tools: impl IntoIterator<Item = crate::provider_tools::ProviderTool>) -> Self {
+    pub fn with_provider_tools(
+        mut self,
+        tools: impl IntoIterator<Item = crate::provider_tools::ProviderTool>,
+    ) -> Self {
         self.provider_tools.extend(tools);
         self
     }
@@ -387,14 +422,15 @@ impl Chat {
     /// `with_tool_options(choice:)`.
     pub fn with_tool_choice(mut self, choice: ToolChoice) -> Result<Self> {
         if let ToolChoice::Tool(name) = &choice
-            && !self.tools.iter().any(|t| &t.name() == name) {
-                let mut valid = vec!["auto".to_string(), "none".into(), "required".into()];
-                valid.extend(self.tools.iter().map(|t| t.name()));
-                return Err(Error::InvalidToolChoice(format!(
-                    "Invalid tool choice: {name}. Valid choices are: {}",
-                    valid.join(", ")
-                )));
-            }
+            && !self.tools.iter().any(|t| &t.name() == name)
+        {
+            let mut valid = vec!["auto".to_string(), "none".into(), "required".into()];
+            valid.extend(self.tools.iter().map(|t| t.name()));
+            return Err(Error::InvalidToolChoice(format!(
+                "Invalid tool choice: {name}. Valid choices are: {}",
+                valid.join(", ")
+            )));
+        }
         self.tool_prefs.choice = Some(choice);
         Ok(self)
     }
@@ -519,7 +555,11 @@ impl Chat {
             Value::Bool(true) => Caching::On(Map::new()),
             Value::Bool(false) => Caching::Off,
             Value::Object(options) => Caching::On(options),
-            _ => return Err(Error::Argument("with_caching accepts true, false, or caching options".into())),
+            _ => {
+                return Err(Error::Argument(
+                    "with_caching accepts true, false, or caching options".into(),
+                ));
+            }
         });
         Ok(self)
     }
@@ -537,10 +577,14 @@ impl Chat {
             Value::Bool(true) => Value::Object(Map::new()),
             Value::Bool(false) => Value::Bool(false),
             Value::Object(options) => {
-                let unsupported: Vec<String> =
-                    options.keys().filter(|k| !COMPACTION_OPTIONS.contains(&k.as_str())).map(|k| format!(":{k}")).collect();
+                let unsupported: Vec<String> = options
+                    .keys()
+                    .filter(|k| !COMPACTION_OPTIONS.contains(&k.as_str()))
+                    .map(|k| format!(":{k}"))
+                    .collect();
                 if !unsupported.is_empty() {
-                    let accepted: Vec<String> = COMPACTION_OPTIONS.iter().map(|k| format!(":{k}")).collect();
+                    let accepted: Vec<String> =
+                        COMPACTION_OPTIONS.iter().map(|k| format!(":{k}")).collect();
                     return Err(Error::Argument(format!(
                         "with_compaction accepts {}, got {}. Provider-specific settings go through with_provider_options.",
                         accepted.join(", "),
@@ -549,7 +593,11 @@ impl Chat {
                 }
                 Value::Object(options)
             }
-            _ => return Err(Error::Argument("with_compaction accepts true, false, or compaction options".into())),
+            _ => {
+                return Err(Error::Argument(
+                    "with_compaction accepts true, false, or compaction options".into(),
+                ));
+            }
         });
         Ok(self)
     }
@@ -574,7 +622,9 @@ impl Chat {
     /// `with_context(context)`: send later requests with the context's configuration, or the
     /// global one for `None`. The model and provider stay as they are.
     pub fn with_context(mut self, context: Option<&crate::context::Context>) -> Result<Self> {
-        let config = context.map(|c| c.config().clone()).unwrap_or_else(crate::config);
+        let config = context
+            .map(|c| c.config().clone())
+            .unwrap_or_else(crate::config);
         self.provider.ensure_configured(&config)?;
         self.connection = Connection::new(self.provider, config.clone())?;
         self.config = config;
@@ -672,17 +722,26 @@ impl Chat {
     }
     /// `after_tool_progress { |tool_call, progress| ... }`: what a running tool reports, including
     /// an MCP server's progress notifications.
-    pub fn after_tool_progress(self, f: impl FnMut(&ToolCall, &crate::progress::Progress) + Send + Sync + 'static) -> Self {
+    pub fn after_tool_progress(
+        self,
+        f: impl FnMut(&ToolCall, &crate::progress::Progress) + Send + Sync + 'static,
+    ) -> Self {
         if let Ok(mut callbacks) = self.callbacks.after_tool_progress.lock() {
             callbacks.push(Box::new(f));
         }
         self
     }
-    pub fn before_fallback(mut self, f: impl FnMut(&FallbackAttempt) + Send + Sync + 'static) -> Self {
+    pub fn before_fallback(
+        mut self,
+        f: impl FnMut(&FallbackAttempt) + Send + Sync + 'static,
+    ) -> Self {
         self.callbacks.before_fallback.push(Box::new(f));
         self
     }
-    pub fn after_fallback(mut self, f: impl FnMut(&FallbackAttempt) + Send + Sync + 'static) -> Self {
+    pub fn after_fallback(
+        mut self,
+        f: impl FnMut(&FallbackAttempt) + Send + Sync + 'static,
+    ) -> Self {
         self.callbacks.after_fallback.push(Box::new(f));
         self
     }
@@ -714,7 +773,10 @@ impl Chat {
                 id: UsageEntry::next_id(),
                 operation: Operation::Chat,
                 provider: self.provider.slug().into(),
-                model: message.model.clone().unwrap_or_else(|| self.model.id.clone()),
+                model: message
+                    .model
+                    .clone()
+                    .unwrap_or_else(|| self.model.id.clone()),
                 status: UsageStatus::Succeeded,
                 tokens: message.tokens.clone(),
                 cost: message.cost(None),
@@ -748,7 +810,10 @@ impl Chat {
 
     /// `cache_until_here`: mark the last message as a prompt-cache boundary.
     pub fn cache_until_here(&mut self) -> Result<&mut Self> {
-        let last = self.messages.last_mut().ok_or_else(|| Error::Argument("No messages to cache".into()))?;
+        let last = self
+            .messages
+            .last_mut()
+            .ok_or_else(|| Error::Argument("No messages to cache".into()))?;
         last.cache_until_here = true;
         Ok(self)
     }
@@ -762,13 +827,21 @@ impl Chat {
     }
 
     /// `ask(message, with: [...])`.
-    pub async fn ask_with(&mut self, message: impl Into<String>, attachments: Vec<Attachment>) -> Result<Message> {
+    pub async fn ask_with(
+        &mut self,
+        message: impl Into<String>,
+        attachments: Vec<Attachment>,
+    ) -> Result<Message> {
         self.ask_later_with(message, attachments)?;
         self.complete().await
     }
 
     /// `ask(message) { |chunk| ... }`.
-    pub async fn ask_stream(&mut self, message: impl Into<String>, on_chunk: impl FnMut(&Message) + Send) -> Result<Message> {
+    pub async fn ask_stream(
+        &mut self,
+        message: impl Into<String>,
+        on_chunk: impl FnMut(&Message) + Send,
+    ) -> Result<Message> {
         self.ask_later(message)?;
         self.complete_stream(on_chunk).await
     }
@@ -783,9 +856,14 @@ impl Chat {
         self.ask_later_with(message, Vec::new())
     }
 
-    pub fn ask_later_with(&mut self, message: impl Into<String>, attachments: Vec<Attachment>) -> Result<&mut Self> {
+    pub fn ask_later_with(
+        &mut self,
+        message: impl Into<String>,
+        attachments: Vec<Attachment>,
+    ) -> Result<&mut Self> {
         self.raise_if_pending_tool_calls()?;
-        self.messages.push(Message::user(message).with_attachments(attachments));
+        self.messages
+            .push(Message::user(message).with_attachments(attachments));
         Ok(self)
     }
 
@@ -807,14 +885,25 @@ impl Chat {
         while !self.is_complete() && !self.waiting() {
             self.step_inner(None).await?;
         }
-        Ok(self.last_non_system_message().or_else(|| self.messages.last()).cloned().unwrap_or_else(Message::chunk))
+        Ok(self
+            .last_non_system_message()
+            .or_else(|| self.messages.last())
+            .cloned()
+            .unwrap_or_else(Message::chunk))
     }
 
-    pub async fn complete_stream(&mut self, mut on_chunk: impl FnMut(&Message) + Send) -> Result<Message> {
+    pub async fn complete_stream(
+        &mut self,
+        mut on_chunk: impl FnMut(&Message) + Send,
+    ) -> Result<Message> {
         while !self.is_complete() && !self.waiting() {
             self.step_inner(Some(&mut on_chunk)).await?;
         }
-        Ok(self.last_non_system_message().or_else(|| self.messages.last()).cloned().unwrap_or_else(Message::chunk))
+        Ok(self
+            .last_non_system_message()
+            .or_else(|| self.messages.last())
+            .cloned()
+            .unwrap_or_else(Message::chunk))
     }
 
     /// `step`: run pending tools, or generate the next response. `None` once there is nothing to do.
@@ -823,7 +912,10 @@ impl Chat {
     }
 
     /// `step { |chunk| ... }`.
-    pub async fn step_stream(&mut self, mut on_chunk: impl FnMut(&Message) + Send) -> Result<Option<Message>> {
+    pub async fn step_stream(
+        &mut self,
+        mut on_chunk: impl FnMut(&Message) + Send,
+    ) -> Result<Option<Message>> {
         self.step_inner(Some(&mut on_chunk)).await
     }
 
@@ -832,7 +924,10 @@ impl Chat {
         &mut self.messages
     }
 
-    async fn step_inner(&mut self, on_chunk: Option<&mut (dyn FnMut(&Message) + Send)>) -> Result<Option<Message>> {
+    async fn step_inner(
+        &mut self,
+        on_chunk: Option<&mut (dyn FnMut(&Message) + Send)>,
+    ) -> Result<Option<Message>> {
         if self.is_complete() {
             return Ok(None);
         }
@@ -842,7 +937,9 @@ impl Chat {
         }
         let before = self.messages.len();
         self.run_tools().await?;
-        Ok((self.messages.len() > before).then(|| self.messages.last().cloned()).flatten())
+        Ok((self.messages.len() > before)
+            .then(|| self.messages.last().cloned())
+            .flatten())
     }
 
     /// `complete?`: nothing staged, or the model answered without requesting tools.
@@ -861,20 +958,36 @@ impl Chat {
         self.generate_inner(None).await
     }
 
-    async fn generate_inner(&mut self, mut on_chunk: Option<&mut (dyn FnMut(&Message) + Send)>) -> Result<Message> {
+    async fn generate_inner(
+        &mut self,
+        mut on_chunk: Option<&mut (dyn FnMut(&Message) + Send)>,
+    ) -> Result<Message> {
         self.raise_if_cancelled()?;
         if self.fallbacks.is_empty() {
             return self.generate_once(on_chunk, &mut false).await;
         }
-        let original = (self.model.clone(), self.provider, self.protocol, self.connection.clone());
+        let original = (
+            self.model.clone(),
+            self.provider,
+            self.protocol,
+            self.connection.clone(),
+        );
         let usage_start = self.usage_entries.len();
-        let mut queue: std::collections::VecDeque<Fallback> = self.fallbacks.iter().cloned().collect();
+        let mut queue: std::collections::VecDeque<Fallback> =
+            self.fallbacks.iter().cloned().collect();
         let mut attempt = 0;
         let mut active: Option<FallbackAttempt> = None;
         let result = loop {
             let mut chunks_yielded = false;
             let streaming = on_chunk.is_some();
-            let result = self.generate_once(on_chunk.as_mut().map(|f| &mut **f as &mut (dyn FnMut(&Message) + Send)), &mut chunks_yielded).await;
+            let result = self
+                .generate_once(
+                    on_chunk
+                        .as_mut()
+                        .map(|f| &mut **f as &mut (dyn FnMut(&Message) + Send)),
+                    &mut chunks_yielded,
+                )
+                .await;
             if let Some(mut a) = active.take() {
                 a.succeeded = Some(result.is_ok());
                 match &result {
@@ -896,11 +1009,15 @@ impl Chat {
                     break Ok(message);
                 }
                 Err(e) if self.fallback_errors.contains(&e.kind()) => {
-                    let Some(next) = queue.pop_front() else { break Err(e) };
+                    let Some(next) = queue.pop_front() else {
+                        break Err(e);
+                    };
                     attempt += 1;
                     let from = self.model.id.clone();
                     let from_provider = self.provider;
-                    if let Err(switch_err) = self.switch_model(&next.model, next.provider.as_deref(), false) {
+                    if let Err(switch_err) =
+                        self.switch_model(&next.model, next.provider.as_deref(), false)
+                    {
                         break Err(switch_err);
                     }
                     if self.provider != from_provider {
@@ -946,10 +1063,21 @@ impl Chat {
                 // A thinking signature is opaque to every provider but the one that issued it.
                 let carries = m.thinking.is_some()
                     || m.raw_reasoning.is_some()
-                    || m.tool_calls.iter().flat_map(|c| c.values()).any(|c| c.thought_signature.is_some());
-                let producer = m.usage_entries.iter().rev().find(|e| e.status == UsageStatus::Succeeded).map(|e| e.provider.as_str());
+                    || m.tool_calls
+                        .iter()
+                        .flat_map(|c| c.values())
+                        .any(|c| c.thought_signature.is_some());
+                let producer = m
+                    .usage_entries
+                    .iter()
+                    .rev()
+                    .find(|e| e.status == UsageStatus::Succeeded)
+                    .map(|e| e.provider.as_str());
                 let lean = m.for_request();
-                if m.role == Role::Assistant && carries && producer.is_some_and(|p| p != self.provider.slug()) {
+                if m.role == Role::Assistant
+                    && carries
+                    && producer.is_some_and(|p| p != self.provider.slug())
+                {
                     lean.without_thinking()
                 } else {
                     lean
@@ -961,11 +1089,14 @@ impl Chat {
     /// `Chat#render`: the payload that would be sent, with `before_request` hooks applied,
     /// without sending it.
     pub fn render(&self) -> Result<Value> {
-        self.render_with(&self.preprocessed_messages(), false).map(|(p, _)| p)
+        self.render_with(&self.preprocessed_messages(), false)
+            .map(|(p, _)| p)
     }
 
     fn render_with(&self, messages: &[Message], stream: bool) -> Result<(Value, ProtocolName)> {
-        let protocol = self.provider.resolve_protocol(self.protocol, &self.model, &self.config)?;
+        let protocol = self
+            .provider
+            .resolve_protocol(self.protocol, &self.model, &self.config)?;
         let thinking = match &self.thinking {
             Some(t) => t.resolve(&self.model)?,
             None => None,
@@ -994,7 +1125,9 @@ impl Chat {
             protocols::apply_compaction(protocol, self.provider, &mut payload, compaction);
         }
         protocols::deep_merge(&mut payload, &self.provider_options);
-        if let Some(resolution) = crate::provider_tools::resolve(protocol, self.provider, &self.provider_tools)? {
+        if let Some(resolution) =
+            crate::provider_tools::resolve(protocol, self.provider, &self.provider_tools)?
+        {
             crate::provider_tools::apply(&mut payload, &resolution);
         }
         self.apply_before_request_hooks(&mut payload);
@@ -1017,7 +1150,11 @@ impl Chat {
     /// Clones share the bytes, so history keeps them (and the detected type) for later turns.
     async fn load_attachments(&mut self, messages: &mut [Message]) -> Result<()> {
         let client = self.connection.client().clone();
-        for a in self.messages.iter_mut().flat_map(|m| m.attachments.iter_mut()) {
+        for a in self
+            .messages
+            .iter_mut()
+            .flat_map(|m| m.attachments.iter_mut())
+        {
             a.prepare(&client).await?;
         }
         for a in messages.iter_mut().flat_map(|m| m.attachments.iter_mut()) {
@@ -1026,7 +1163,11 @@ impl Chat {
         loop {
             let _ = self.render_with(messages, false);
             let mut fetched = false;
-            for a in messages.iter_mut().flat_map(|m| m.attachments.iter_mut()).filter(|a| a.is_wanted()) {
+            for a in messages
+                .iter_mut()
+                .flat_map(|m| m.attachments.iter_mut())
+                .filter(|a| a.is_wanted())
+            {
                 a.load(&client).await?;
                 fetched = true;
             }
@@ -1044,7 +1185,11 @@ impl Chat {
     ) -> Result<Message> {
         self.raise_if_cancelled()?;
         let event = self.instrumentation_event("chat.rust_llm", on_chunk.is_some());
-        let result = tracing::Instrument::instrument(self.generate_once_inner(on_chunk, chunks_yielded), event.span()).await;
+        let result = tracing::Instrument::instrument(
+            self.generate_once_inner(on_chunk, chunks_yielded),
+            event.span(),
+        )
+        .await;
         self.finish_completion_event(event, &result);
         result
     }
@@ -1059,39 +1204,70 @@ impl Chat {
                 ToolChoice::Required => "required".into(),
                 ToolChoice::Tool(name) => name.clone(),
             });
-            let calls = self.tool_prefs.calls.map(|c| if c == ToolCalls::One { "one" } else { "many" });
+            let calls = self
+                .tool_prefs
+                .calls
+                .map(|c| if c == ToolCalls::One { "one" } else { "many" });
             crate::instrumentation::payload([
                 ("provider", self.provider.slug().into()),
                 ("provider_class", self.provider.display().into()),
                 ("model", self.model.id.clone().into()),
-                ("input_messages", Value::Array(self.messages.iter().map(Message::to_h).collect())),
+                (
+                    "input_messages",
+                    Value::Array(self.messages.iter().map(Message::to_h).collect()),
+                ),
                 ("message_count", self.messages.len().into()),
-                ("tools", Value::Array(self.tools.iter().map(|t| t.name().into()).collect())),
+                (
+                    "tools",
+                    Value::Array(self.tools.iter().map(|t| t.name().into()).collect()),
+                ),
                 ("tool_choice", choice.into()),
                 ("tool_call_limit", calls.into()),
                 ("temperature", self.temperature.into()),
                 ("max_output_tokens", self.max_output_tokens.into()),
                 ("provider_options", self.provider_options.clone()),
-                ("schema", self.schema.as_ref().map(|s| s.schema.clone()).into()),
+                (
+                    "schema",
+                    self.schema.as_ref().map(|s| s.schema.clone()).into(),
+                ),
                 ("citations", self.citations.into()),
                 ("streaming", streaming.into()),
                 ("tokens", crate::instrumentation::tokens_h(&empty)),
-                ("cost", crate::instrumentation::cost_h(&Cost::new(&empty, Some(&self.model), Tier::Standard))),
+                (
+                    "cost",
+                    crate::instrumentation::cost_h(&Cost::new(
+                        &empty,
+                        Some(&self.model),
+                        Tier::Standard,
+                    )),
+                ),
             ])
         })
     }
 
     /// `record_completion_event`.
-    fn finish_completion_event(&self, mut event: crate::instrumentation::Event, result: &Result<Message>) {
+    fn finish_completion_event(
+        &self,
+        mut event: crate::instrumentation::Event,
+        result: &Result<Message>,
+    ) {
         if let Ok(message) = result {
             event.set("response", || message.to_h());
-            event.set("messages_after", || Value::Array(self.messages.iter().map(Message::to_h).collect()));
+            event.set("messages_after", || {
+                Value::Array(self.messages.iter().map(Message::to_h).collect())
+            });
             event.set("response_role", || message.role.as_str().into());
-            event.set("tokens", || crate::instrumentation::tokens_h(&message.tokens()));
-            event.set("cost", || crate::instrumentation::cost_h(&message.cost(None)));
+            event.set("tokens", || {
+                crate::instrumentation::tokens_h(&message.tokens())
+            });
+            event.set("cost", || {
+                crate::instrumentation::cost_h(&message.cost(None))
+            });
             event.set("response_model", || message.model.clone().into());
             event.set("tool_call", || message.is_tool_call().into());
-            event.set("tool_calls", || serde_json::to_value(&message.tool_calls).unwrap_or(Value::Null));
+            event.set("tool_calls", || {
+                serde_json::to_value(&message.tool_calls).unwrap_or(Value::Null)
+            });
         }
         event.finish(result.as_ref().err());
     }
@@ -1104,8 +1280,17 @@ impl Chat {
         self.load_mcp_tools().await?;
         self.load_attachments(&mut []).await?;
         let mut messages = self.preprocessed_messages();
-        let upload_protocol = self.provider.resolve_protocol(self.protocol, &self.model, &self.config)?;
-        crate::files::preprocess_messages(&mut messages, upload_protocol, self.provider, &self.config, &self.connection).await?;
+        let upload_protocol =
+            self.provider
+                .resolve_protocol(self.protocol, &self.model, &self.config)?;
+        crate::files::preprocess_messages(
+            &mut messages,
+            upload_protocol,
+            self.provider,
+            &self.config,
+            &self.connection,
+        )
+        .await?;
         self.load_attachments(&mut messages).await?;
         let streaming = on_chunk.is_some();
         if streaming {
@@ -1119,11 +1304,16 @@ impl Chat {
         let mut call_entries = Vec::new();
         let mut billed_model = None;
         for _ in 0..protocols::anthropic::MAX_PAUSE_TURN_CONTINUATIONS {
-            let chunk_sink = on_chunk.as_mut().map(|f| &mut **f as &mut (dyn FnMut(&Message) + Send));
-            let (segment, entries, billed, protocol) = self.request_once(&messages, chunk_sink, chunks_yielded).await?;
+            let chunk_sink = on_chunk
+                .as_mut()
+                .map(|f| &mut **f as &mut (dyn FnMut(&Message) + Send));
+            let (segment, entries, billed, protocol) = self
+                .request_once(&messages, chunk_sink, chunks_yielded)
+                .await?;
             call_entries.extend(entries);
             billed_model = Some(billed);
-            let paused = protocol == ProtocolName::Anthropic && segment.finish_reason == Some(FinishReason::PauseTurn);
+            let paused = protocol == ProtocolName::Anthropic
+                && segment.finish_reason == Some(FinishReason::PauseTurn);
             if paused {
                 messages.push(segment.for_request());
             }
@@ -1170,11 +1360,19 @@ impl Chat {
         }
         let mut headers = endpoint.headers;
         // `resolution.headers.merge(headers)`: the chat's own headers win.
-        if let Some(resolution) = crate::provider_tools::resolve(protocol, self.provider, &self.provider_tools)? {
-            headers.extend(resolution.headers.into_iter().filter(|(k, _)| !self.headers.iter().any(|(h, _)| h.eq_ignore_ascii_case(k))));
+        if let Some(resolution) =
+            crate::provider_tools::resolve(protocol, self.provider, &self.provider_tools)?
+        {
+            headers.extend(
+                resolution
+                    .headers
+                    .into_iter()
+                    .filter(|(k, _)| !self.headers.iter().any(|(h, _)| h.eq_ignore_ascii_case(k))),
+            );
         }
         headers.extend(self.headers.iter().cloned());
-        if protocol == ProtocolName::Anthropic && matches!(self.compaction, Some(Value::Object(_))) {
+        if protocol == ProtocolName::Anthropic && matches!(self.compaction, Some(Value::Object(_)))
+        {
             protocols::anthropic::apply_compaction_headers(&mut headers);
         }
         crate::files::apply_files_beta(protocol, &payload, &mut headers);
@@ -1191,7 +1389,8 @@ impl Chat {
         let mut observed = Tokens::default();
         let result = if let Some(on_chunk) = on_chunk {
             let mut acc = StreamAccumulator::default();
-            let mut state = StreamState::for_payload(protocol, self.provider, &self.model, &payload);
+            let mut state =
+                StreamState::for_payload(protocol, self.provider, &self.model, &payload);
             let provider = self.provider;
             let cancelled = self.cancelled.clone();
             let checker = self.cancellation_checker.clone();
@@ -1208,9 +1407,20 @@ impl Chat {
                 Ok(())
             };
             let status = protocols::streaming_error_status(protocol);
-            let streamed = self.connection.stream(&endpoint.path, &payload, &headers, &mut on_attempt, &mut on_event, status).await;
+            let streamed = self
+                .connection
+                .stream(
+                    &endpoint.path,
+                    &payload,
+                    &headers,
+                    &mut on_attempt,
+                    &mut on_event,
+                    status,
+                )
+                .await;
             observed = acc.tokens().clone();
-            match streamed.and_then(|raw| protocols::finish_stream(protocol, &mut state, acc, raw)) {
+            match streamed.and_then(|raw| protocols::finish_stream(protocol, &mut state, acc, raw))
+            {
                 // `MultiCompletion#stream_response` yields one more chunk with the whole message.
                 Ok((message, Some(last))) => {
                     on_chunk(&last);
@@ -1220,7 +1430,11 @@ impl Chat {
                 Err(e) => Err(e),
             }
         } else {
-            match self.connection.post(&endpoint.path, &payload, &headers, &mut on_attempt).await {
+            match self
+                .connection
+                .post(&endpoint.path, &payload, &headers, &mut on_attempt)
+                .await
+            {
                 Ok(raw) => protocols::parse_completion(protocol, self.provider, &self.model, raw),
                 Err(e) => Err(e),
             }
@@ -1238,7 +1452,11 @@ impl Chat {
         let mut message = match result {
             Ok(m) => m,
             Err(e) => {
-                let status = if matches!(e, Error::Cancelled) { UsageStatus::Cancelled } else { UsageStatus::Failed };
+                let status = if matches!(e, Error::Cancelled) {
+                    UsageStatus::Cancelled
+                } else {
+                    UsageStatus::Failed
+                };
                 if attempts > 0 {
                     let observed = (!observed.is_empty()).then_some(observed);
                     self.record_usage(self.entry(status, failure_tokens(&e, observed), None));
@@ -1251,7 +1469,11 @@ impl Chat {
             .as_deref()
             .and_then(|id| models::models().find(id, Some(self.provider.slug())).ok())
             .unwrap_or_else(|| self.model.clone());
-        let entry = self.entry(UsageStatus::Succeeded, message.tokens.clone(), Some(&billed_model));
+        let entry = self.entry(
+            UsageStatus::Succeeded,
+            message.tokens.clone(),
+            Some(&billed_model),
+        );
         self.record_usage(entry.clone());
         // `record_generated_message`: the tracker has already billed the attempt, so a cancel
         // during the request keeps the usage but adds no message.
@@ -1267,14 +1489,24 @@ impl Chat {
     /// The chat is not changed. Provider tools, provider options, compaction, and before_request
     /// hooks are not included. Anthropic, Gemini, and OpenAI's Responses API count tokens.
     pub async fn count_tokens(&self, message: Option<&str>) -> Result<i64> {
-        let protocol = self.provider.resolve_protocol(self.protocol, &self.model, &self.config)?;
-        let path = crate::tokenization::count_tokens_endpoint(protocol, self.provider, &self.model)?;
+        let protocol = self
+            .provider
+            .resolve_protocol(self.protocol, &self.model, &self.config)?;
+        let path =
+            crate::tokenization::count_tokens_endpoint(protocol, self.provider, &self.model)?;
         self.load_mcp_tools().await?;
         let mut messages = self.preprocessed_messages();
         if let Some(text) = message {
             messages.push(Message::user(text));
         }
-        crate::files::preprocess_messages(&mut messages, protocol, self.provider, &self.config, &self.connection).await?;
+        crate::files::preprocess_messages(
+            &mut messages,
+            protocol,
+            self.provider,
+            &self.config,
+            &self.connection,
+        )
+        .await?;
         for m in &mut messages {
             for a in &mut m.attachments {
                 a.load(self.connection.client()).await?;
@@ -1302,7 +1534,10 @@ impl Chat {
         };
         let rendered = protocols::render(protocol, &request)?;
         let payload = crate::tokenization::count_tokens_payload(protocol, &self.model, rendered);
-        let raw = self.connection.post(&path, &payload, &[], &mut |_| {}).await?;
+        let raw = self
+            .connection
+            .post(&path, &payload, &[], &mut |_| {})
+            .await?;
         crate::tokenization::parse_count_tokens(protocol, &raw.body)
     }
 
@@ -1321,18 +1556,39 @@ impl Chat {
     }
 
     async fn compact_inner(&mut self) -> Result<Message> {
-        let protocol = self.provider.resolve_protocol(self.protocol, &self.model, &self.config)?;
-        if !(protocol == ProtocolName::Responses && matches!(self.provider, Provider::OpenAI | Provider::XAI)) {
-            return Err(Error::Api(format!("{} doesn't support manual compaction", self.provider.display()), None));
+        let protocol = self
+            .provider
+            .resolve_protocol(self.protocol, &self.model, &self.config)?;
+        if !(protocol == ProtocolName::Responses
+            && matches!(self.provider, Provider::OpenAI | Provider::XAI))
+        {
+            return Err(Error::Api(
+                format!(
+                    "{} doesn't support manual compaction",
+                    self.provider.display()
+                ),
+                None,
+            ));
         }
         let mut messages = self.preprocessed_messages();
-        crate::files::preprocess_messages(&mut messages, protocol, self.provider, &self.config, &self.connection).await?;
+        crate::files::preprocess_messages(
+            &mut messages,
+            protocol,
+            self.provider,
+            &self.config,
+            &self.connection,
+        )
+        .await?;
         for m in &mut messages {
             for a in &mut m.attachments {
                 a.load(self.connection.client()).await?;
             }
         }
-        let mut payload = protocols::responses::render_compaction_payload(self.provider, &self.model.id, &messages)?;
+        let mut payload = protocols::responses::render_compaction_payload(
+            self.provider,
+            &self.model.id,
+            &messages,
+        )?;
         self.apply_before_request_hooks(&mut payload);
         let mut attempts = 0usize;
         let mut retried: Vec<Tokens> = Vec::new();
@@ -1342,8 +1598,19 @@ impl Chat {
                 retried.push(failure_tokens(e, None));
             }
         };
-        let result = match self.connection.post("responses/compact", &payload, &self.headers, &mut on_attempt).await {
-            Ok(raw) => protocols::responses::parse_compaction_response(self.provider, &self.model.id, raw),
+        let result = match self
+            .connection
+            .post(
+                "responses/compact",
+                &payload,
+                &self.headers,
+                &mut on_attempt,
+            )
+            .await
+        {
+            Ok(raw) => {
+                protocols::responses::parse_compaction_response(self.provider, &self.model.id, raw)
+            }
             Err(e) => Err(e),
         };
         let mut entries = Vec::new();
@@ -1356,7 +1623,11 @@ impl Chat {
             Ok(m) => m,
             Err(e) => {
                 if attempts > 0 {
-                    self.record_usage(self.entry(UsageStatus::Failed, failure_tokens(&e, None), None));
+                    self.record_usage(self.entry(
+                        UsageStatus::Failed,
+                        failure_tokens(&e, None),
+                        None,
+                    ));
                 }
                 return Err(e);
             }
@@ -1394,12 +1665,21 @@ impl Chat {
     // ---- tools -----------------------------------------------------------------------------
 
     fn pending_tool_response(&self) -> Option<&Message> {
-        let response = self.messages.iter().rev().find(|m| m.role != Role::System && !m.is_tool_result())?;
-        (response.is_tool_call() && !self.pending_tool_calls(response).is_empty()).then_some(response)
+        let response = self
+            .messages
+            .iter()
+            .rev()
+            .find(|m| m.role != Role::System && !m.is_tool_result())?;
+        (response.is_tool_call() && !self.pending_tool_calls(response).is_empty())
+            .then_some(response)
     }
 
     fn pending_tool_calls(&self, response: &Message) -> Vec<ToolCall> {
-        let answered: Vec<&str> = self.messages.iter().filter_map(|m| m.tool_call_id.as_deref()).collect();
+        let answered: Vec<&str> = self
+            .messages
+            .iter()
+            .filter_map(|m| m.tool_call_id.as_deref())
+            .collect();
         response
             .tool_calls
             .iter()
@@ -1418,7 +1698,9 @@ impl Chat {
         if call.remote {
             return !self.tool_call_decisions.contains_key(&call.id);
         }
-        let Some(tool) = self.find_tool(&call.name) else { return false };
+        let Some(tool) = self.find_tool(&call.name) else {
+            return false;
+        };
         tool.requires_approval() && self.tool_call_approval(&*tool, call).is_none()
     }
 
@@ -1433,7 +1715,9 @@ impl Chat {
     /// Execute the pending tool calls of the latest response (`run_tools`).
     pub async fn run_tools(&mut self) -> Result<&mut Self> {
         self.raise_if_cancelled()?;
-        let Some(response) = self.pending_tool_response().cloned() else { return Ok(self) };
+        let Some(response) = self.pending_tool_response().cloned() else {
+            return Ok(self);
+        };
         self.load_mcp_tools().await?;
         let mut executable = Vec::new();
         for call in self.pending_tool_calls(&response) {
@@ -1444,7 +1728,10 @@ impl Chat {
             if call.remote {
                 // Remote (provider-executed) approvals are answered on the next request.
                 if let Some(&approved) = self.tool_call_decisions.get(&call.id) {
-                    let mut m = Message::tool_result(call.id.clone(), if approved { "Approved" } else { "Denied" });
+                    let mut m = Message::tool_result(
+                        call.id.clone(),
+                        if approved { "Approved" } else { "Denied" },
+                    );
                     m.raw_content = Some(serde_json::json!([{
                         "type": "mcp_approval_response", "approval_request_id": call.id, "approve": approved
                     }]));
@@ -1460,7 +1747,8 @@ impl Chat {
             match decision {
                 None => continue,
                 Some(false) => {
-                    let denied = ToolResult::error(format!("The user denied the {} tool call.", call.name));
+                    let denied =
+                        ToolResult::error(format!("The user denied the {} tool call.", call.name));
                     self.push_tool_result(&call, denied);
                 }
                 Some(true) if self.concurrency => executable.push((call, tool)),
@@ -1472,7 +1760,8 @@ impl Chat {
                     // result; a resumed one clears them.
                     let result = match self.tool_invocation(tool, &call).await {
                         Err(Error::McpInputRequired(paused)) => {
-                            self.tool_call_inputs.insert(call.id.clone(), paused.input.to_h());
+                            self.tool_call_inputs
+                                .insert(call.id.clone(), paused.input.to_h());
                             continue;
                         }
                         other => other?,
@@ -1489,7 +1778,10 @@ impl Chat {
         if !executable.is_empty() {
             self.run_tools_concurrently(executable).await?;
         }
-        if matches!(self.tool_prefs.choice, Some(ToolChoice::Required | ToolChoice::Tool(_))) {
+        if matches!(
+            self.tool_prefs.choice,
+            Some(ToolChoice::Required | ToolChoice::Tool(_))
+        ) {
             self.tool_prefs.choice = None;
         }
         Ok(self)
@@ -1498,7 +1790,10 @@ impl Chat {
     /// `handle_concurrent_tool_calls` (`Chat::ToolConcurrency.run`): every call starts at once and
     /// each result is added as its call finishes, so results land in finishing order. The first
     /// failure is returned once every call has ended, like `collect_results`.
-    async fn run_tools_concurrently(&mut self, calls: Vec<(ToolCall, Option<SharedTool>)>) -> Result<()> {
+    async fn run_tools_concurrently(
+        &mut self,
+        calls: Vec<(ToolCall, Option<SharedTool>)>,
+    ) -> Result<()> {
         use futures::stream::{FuturesUnordered, StreamExt};
         let mut running = FuturesUnordered::new();
         for (call, tool) in calls {
@@ -1513,7 +1808,8 @@ impl Chat {
         while let Some((call, result)) = running.next().await {
             let result = match result {
                 Err(Error::McpInputRequired(paused)) => {
-                    self.tool_call_inputs.insert(call.id.clone(), paused.input.to_h());
+                    self.tool_call_inputs
+                        .insert(call.id.clone(), paused.input.to_h());
                     continue;
                 }
                 Err(e) => {
@@ -1534,9 +1830,18 @@ impl Chat {
 
     /// `execute_tool`: the returned future owns everything the call needs, so several calls can
     /// run at once while the chat adds their results.
-    fn tool_invocation(&self, tool: Option<SharedTool>, call: &ToolCall) -> impl Future<Output = Result<ToolResult>> + Send + 'static {
+    fn tool_invocation(
+        &self,
+        tool: Option<SharedTool>,
+        call: &ToolCall,
+    ) -> impl Future<Output = Result<ToolResult>> + Send + 'static {
         let unavailable = tool.is_none().then(|| {
-            let names: Vec<String> = self.combined_tools().unwrap_or_else(|_| self.tools.clone()).iter().map(|t| t.name()).collect();
+            let names: Vec<String> = self
+                .combined_tools()
+                .unwrap_or_else(|_| self.tools.clone())
+                .iter()
+                .map(|t| t.name())
+                .collect();
             format!(
                 "Model tried to call unavailable tool `{}`. Available tools: {}.",
                 call.name,
@@ -1554,7 +1859,10 @@ impl Chat {
                     ("provider", self.provider.slug().into()),
                     ("provider_class", self.provider.display().into()),
                     ("model", self.model.id.clone().into()),
-                    ("tool_call", serde_json::to_value(&call).unwrap_or(Value::Null)),
+                    (
+                        "tool_call",
+                        serde_json::to_value(&call).unwrap_or(Value::Null),
+                    ),
                     ("tool_name", tool.name().into()),
                     ("tool_arguments", Value::Object(call.arguments())),
                     ("tool_call_id", call.id.clone().into()),
@@ -1563,7 +1871,9 @@ impl Chat {
         });
         let run = self.run_tool(tool, call, input, cancelled, listener, unavailable);
         async move {
-            let Some(mut event) = event else { return run.await };
+            let Some(mut event) = event else {
+                return run.await;
+            };
             let result = tracing::Instrument::instrument(run, event.span()).await;
             if let Ok(r) = &result {
                 event.set("result", || r.content.clone().into());
@@ -1575,6 +1885,9 @@ impl Chat {
         }
     }
 
+    // Returns an explicit `Send + 'static` future (tool calls run concurrently), which an
+    // `async fn` taking `&self` could not promise.
+    #[allow(clippy::manual_async_fn)]
     fn run_tool(
         &self,
         tool: Option<SharedTool>,
@@ -1585,10 +1898,14 @@ impl Chat {
         unavailable: Option<String>,
     ) -> impl Future<Output = Result<ToolResult>> + Send + 'static {
         async move {
-            let Some(tool) = tool else { return Ok(ToolResult::error(unavailable.unwrap_or_default())) };
+            let Some(tool) = tool else {
+                return Ok(ToolResult::error(unavailable.unwrap_or_default()));
+            };
             let arguments = call.arguments();
             if let Some(problem) = validate_arguments(&*tool, &arguments) {
-                return Ok(ToolResult::error(format!("Invalid tool arguments: {problem}")));
+                return Ok(ToolResult::error(format!(
+                    "Invalid tool arguments: {problem}"
+                )));
             }
             // `Cancellation.watch` + `ProgressReporter.listen(progress_listener(tool_call))`.
             let run = async {
@@ -1597,10 +1914,17 @@ impl Chat {
                     None => tool.execute(arguments, &call).await,
                 }
             };
-            let result = crate::progress::watch(cancelled.clone(), crate::progress::listen(listener, run)).await;
+            let result =
+                crate::progress::watch(cancelled.clone(), crate::progress::listen(listener, run))
+                    .await;
             result.map_err(|e| match e.downcast::<Error>() {
                 // MCP pauses, protocol errors, and cancellation keep their meaning.
-                Ok(e) if matches!(*e, Error::Cancelled | Error::Mcp(_) | Error::McpInputRequired(_)) => {
+                Ok(e)
+                    if matches!(
+                        *e,
+                        Error::Cancelled | Error::Mcp(_) | Error::McpInputRequired(_)
+                    ) =>
+                {
                     if matches!(*e, Error::Cancelled) {
                         cancelled.store(false, Ordering::SeqCst);
                     }
@@ -1662,9 +1986,14 @@ impl Chat {
     }
 
     fn waiting(&self) -> bool {
-        let Some(response) = self.pending_tool_response() else { return false };
+        let Some(response) = self.pending_tool_response() else {
+            return false;
+        };
         let pending = self.pending_tool_calls(response);
-        !pending.is_empty() && pending.iter().all(|c| self.approval_pending(c) || self.input_pending(c))
+        !pending.is_empty()
+            && pending
+                .iter()
+                .all(|c| self.approval_pending(c) || self.input_pending(c))
     }
 
     /// `input_pending?(tool_call)`: the call paused on a request nobody has settled.
@@ -1673,7 +2002,11 @@ impl Chat {
             .get(&call.id)
             .and_then(|input| input.get("requests"))
             .and_then(Value::as_array)
-            .is_some_and(|requests| requests.iter().any(|r| r.get("response").is_none_or(Value::is_null)))
+            .is_some_and(|requests| {
+                requests
+                    .iter()
+                    .any(|r| r.get("response").is_none_or(Value::is_null))
+            })
     }
 
     /// `awaiting_input?`: every pending tool call waits on input or an approval decision, and at
@@ -1685,11 +2018,18 @@ impl Chat {
     /// `pending_inputs`: the unanswered requests that paused MCP tool calls. Settle each with
     /// `answer` or `decline`, then call `complete` to resume the calls.
     pub fn pending_inputs(&self) -> Vec<crate::mcp::InputRequest> {
-        let Some(response) = self.pending_tool_response() else { return Vec::new() };
+        let Some(response) = self.pending_tool_response() else {
+            return Vec::new();
+        };
         self.pending_tool_calls(response)
             .into_iter()
             .flat_map(|call| {
-                let requests = self.tool_call_inputs.get(&call.id).and_then(|i| i.get("requests")).and_then(Value::as_array).cloned();
+                let requests = self
+                    .tool_call_inputs
+                    .get(&call.id)
+                    .and_then(|i| i.get("requests"))
+                    .and_then(Value::as_array)
+                    .cloned();
                 requests
                     .unwrap_or_default()
                     .iter()
@@ -1701,7 +2041,11 @@ impl Chat {
     }
 
     /// `answer(request, **values)`: values for a form, or none to accept a URL request.
-    pub fn answer(&mut self, request: &crate::mcp::InputRequest, values: Map<String, Value>) -> Result<&mut Self> {
+    pub fn answer(
+        &mut self,
+        request: &crate::mcp::InputRequest,
+        values: Map<String, Value>,
+    ) -> Result<&mut Self> {
         self.settle_input(request, |pending| pending.answer(values))
     }
 
@@ -1716,10 +2060,23 @@ impl Chat {
         settle: impl FnOnce(&mut crate::mcp::InputRequest),
     ) -> Result<&mut Self> {
         let unknown = || Error::Argument("Unknown input request".into());
-        let call_id = request.tool_call.as_ref().map(|c| c.id.clone()).ok_or_else(unknown)?;
-        let input = self.tool_call_inputs.get_mut(&call_id).ok_or_else(unknown)?;
-        let requests = input.get_mut("requests").and_then(Value::as_array_mut).ok_or_else(unknown)?;
-        let data = requests.iter_mut().find(|d| d.get("key").and_then(Value::as_str) == Some(request.key.as_str())).ok_or_else(unknown)?;
+        let call_id = request
+            .tool_call
+            .as_ref()
+            .map(|c| c.id.clone())
+            .ok_or_else(unknown)?;
+        let input = self
+            .tool_call_inputs
+            .get_mut(&call_id)
+            .ok_or_else(unknown)?;
+        let requests = input
+            .get_mut("requests")
+            .and_then(Value::as_array_mut)
+            .ok_or_else(unknown)?;
+        let data = requests
+            .iter_mut()
+            .find(|d| d.get("key").and_then(Value::as_str) == Some(request.key.as_str()))
+            .ok_or_else(unknown)?;
         let mut pending = crate::mcp::InputRequest::from_h(data, None);
         settle(&mut pending);
         *data = pending.to_h();
@@ -1743,13 +2100,24 @@ impl Chat {
 
     /// `pending_approvals`.
     pub fn pending_approvals(&self) -> Vec<ToolCall> {
-        let Some(response) = self.pending_tool_response() else { return Vec::new() };
-        self.pending_tool_calls(response).into_iter().filter(|c| self.approval_pending(c)).collect()
+        let Some(response) = self.pending_tool_response() else {
+            return Vec::new();
+        };
+        self.pending_tool_calls(response)
+            .into_iter()
+            .filter(|c| self.approval_pending(c))
+            .collect()
     }
 
     fn raise_if_pending_tool_calls(&self) -> Result<()> {
-        let Some(response) = self.pending_tool_response() else { return Ok(()) };
-        let mut names: Vec<String> = self.pending_tool_calls(response).into_iter().map(|c| c.name).collect();
+        let Some(response) = self.pending_tool_response() else {
+            return Ok(());
+        };
+        let mut names: Vec<String> = self
+            .pending_tool_calls(response)
+            .into_iter()
+            .map(|c| c.name)
+            .collect();
         names.dedup();
         Err(Error::PendingToolCalls(format!(
             "The last response has unanswered tool calls ({}). Run complete, recording approve or deny \
@@ -1799,9 +2167,19 @@ pub(crate) fn failure_tokens(error: &Error, observed: Option<Tokens>) -> Tokens 
     if let Some(tokens) = observed {
         return tokens;
     }
-    let refused = error.response().is_some_and(|r| (400..500).contains(&r.status));
+    let refused = error
+        .response()
+        .is_some_and(|r| (400..500).contains(&r.status));
     let never_sent = error.kind() == ErrorKind::ConnectionFailed;
-    if refused || never_sent { Tokens { input: Some(0), output: Some(0), ..Default::default() } } else { Tokens::default() }
+    if refused || never_sent {
+        Tokens {
+            input: Some(0),
+            output: Some(0),
+            ..Default::default()
+        }
+    } else {
+        Tokens::default()
+    }
 }
 
 /// `Chat::COMPACTION_OPTIONS`: the provider-neutral options `with_compaction` accepts.
@@ -1820,7 +2198,10 @@ fn normalize_schema(raw: Value) -> Option<Schema> {
     }
     let strict = match obj.get("strict").and_then(Value::as_bool) {
         Some(s) => Some(s),
-        None => definition.as_object_mut().and_then(|d| d.remove("strict")).and_then(|v| v.as_bool()),
+        None => definition
+            .as_object_mut()
+            .and_then(|d| d.remove("strict"))
+            .and_then(|v| v.as_bool()),
     };
     let name = obj
         .get("name")
@@ -1828,12 +2209,25 @@ fn normalize_schema(raw: Value) -> Option<Schema> {
         .and_then(Value::as_str)
         .unwrap_or("response")
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect::<String>();
     Some(Schema {
-        name: if name.is_empty() { "response".into() } else { name },
+        name: if name.is_empty() {
+            "response".into()
+        } else {
+            name
+        },
         schema: definition,
         strict,
-        description: obj.get("description").and_then(Value::as_str).map(str::to_string),
+        description: obj
+            .get("description")
+            .and_then(Value::as_str)
+            .map(str::to_string),
     })
 }

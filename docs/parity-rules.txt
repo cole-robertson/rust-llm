@@ -28,10 +28,10 @@ protocols/system_one_spec.rb:126	PORTED	tests/judgments.rs::reports_normalized_e
 protocols/system_one_spec.rb:57	PORTED	tests/judgments.rs::validates_before_sending_anything (reserved provider_options)
 
 # ---- rules_c
-models/registry_spec.rb	OWNED	lane G: registry store (FileStore/PublishedSource/ETag/cache_path) not ported
-models_json_validation_spec.rb:9	OWNED	lane G: Models::Schema JSON-schema validation of models.json
+models/registry_spec.rb	MISSING	lane G: registry store (FileStore/PublishedSource/ETag/cache_path) not ported (was OWNED; lane finished — port or mark N/A)
+models_json_validation_spec.rb:9	MISSING	lane G: Models::Schema JSON-schema validation of models.json (was OWNED; lane finished — port or mark N/A)
 models_json_validation_spec.rb:24	N/A	Rust type system: Model.capabilities is Vec<String>; bundled models.json deserializes into it
-models_refresh_spec.rb	OWNED	lane G: Models.refresh / models.dev merge not ported
+models_refresh_spec.rb	MISSING	lane G: Models.refresh / models.dev merge not ported (was OWNED; lane finished — port or mark N/A)
 models_refresh_spec.rb:12	N/A	Rust type system: bundled models.json deserializes into typed Model (String/Option/Vec fields)
 models_refresh_spec.rb:61	N/A	provider not ported: Vertex AI
 models_refresh_spec.rb:68	N/A	Rust type system: capabilities is Vec<String>
@@ -42,9 +42,9 @@ models_refresh_spec.rb:198	N/A	Rust type system: capabilities is a plain Vec<Str
 models_refresh_spec.rb:202	PORTED	crates/rust_llm/tests/spec_values.rs::model_supports_reads_capabilities
 models_refresh_spec.rb:209	N/A	Ruby-only: Model#to_h Hash coercion
 models_refresh_spec.rb:216	N/A	Rust type system: capabilities is Vec<String>, a hash cannot be passed
-models_local_refresh_spec.rb	OWNED	lane G: Models.refresh / provider list_models not ported
+models_local_refresh_spec.rb	MISSING	lane G: Models.refresh / provider list_models not ported (was OWNED; lane finished — port or mark N/A)
 models_local_refresh_spec.rb:127	MISSING	no test that gpustack auto-assumes models exist without assume_model_exists
-models_merge_spec.rb	OWNED	lane G: models.dev merge / refresh / registry store not ported
+models_merge_spec.rb	MISSING	lane G: models.dev merge / refresh / registry store not ported (was OWNED; lane finished — port or mark N/A)
 models_merge_spec.rb:79	N/A	Ruby-only: provider gem catalogs (no provider-gem plugin system in Rust)
 models_merge_spec.rb:251	N/A	provider not ported: Vertex AI
 models_merge_spec.rb:403	N/A	provider not ported: Bedrock
@@ -58,18 +58,18 @@ models_merge_spec.rb:798	N/A	Ruby-only: provider gem catalogs (no provider-gem p
 models_merge_spec.rb:842	MISSING	no test for "Provider must be specified if assume_model_exists is true" (chat.rs resolve_model)
 support/deprecator_spec.rb	N/A	Ruby-only: deprecator
 support/inspectable_spec.rb	N/A	Ruby-only: inspect/pretty_print/full_inspect
-support/instrumentation_spec.rb	OWNED	lane G: instrumentation events not ported
+support/instrumentation_spec.rb	MISSING	lane G: instrumentation events not ported (was OWNED; lane finished — port or mark N/A)
 support/instrumentation_spec.rb:100	N/A	Ruby-only: SimpleDelegator-wrapped provider
 support/utils_spec.rb	N/A	Ruby-only: Hash/Array helpers (symbol-vs-string keys, to_safe_array, deep_dup, constantize)
 support/utils_spec.rb:25	MISSING	underscore: tool.rs tests cover HTTPProxyTool only; no XMLHttpRequest/Tool2Name/MyTool
 support/utils_spec.rb:32	N/A	Ruby-only: regex backtracking guard; Rust underscore is a linear char loop
-support/utils_spec.rb:68	OWNED	lane G: ISO date prefix parsing for models.dev merge
-support/utils_spec.rb:72	OWNED	lane G: ISO date prefix parsing for models.dev merge
-support/utils_spec.rb:76	OWNED	lane G: ISO date prefix parsing for models.dev merge
-support/utils_spec.rb:80	OWNED	lane G: ISO date prefix parsing for models.dev merge
-support/utils_spec.rb:87	OWNED	lane G: created_at UTC midnight formatting for models.dev merge
-support/utils_spec.rb:91	OWNED	lane G: created_at UTC midnight formatting for models.dev merge
-support/utils_spec.rb:95	OWNED	lane G: created_at UTC midnight formatting for models.dev merge
+support/utils_spec.rb:68	MISSING	lane G: ISO date prefix parsing for models.dev merge (was OWNED; lane finished — port or mark N/A)
+support/utils_spec.rb:72	MISSING	lane G: ISO date prefix parsing for models.dev merge (was OWNED; lane finished — port or mark N/A)
+support/utils_spec.rb:76	MISSING	lane G: ISO date prefix parsing for models.dev merge (was OWNED; lane finished — port or mark N/A)
+support/utils_spec.rb:80	MISSING	lane G: ISO date prefix parsing for models.dev merge (was OWNED; lane finished — port or mark N/A)
+support/utils_spec.rb:87	MISSING	lane G: created_at UTC midnight formatting for models.dev merge (was OWNED; lane finished — port or mark N/A)
+support/utils_spec.rb:91	MISSING	lane G: created_at UTC midnight formatting for models.dev merge (was OWNED; lane finished — port or mark N/A)
+support/utils_spec.rb:95	MISSING	lane G: created_at UTC midnight formatting for models.dev merge (was OWNED; lane finished — port or mark N/A)
 support/utils_spec.rb:102	MISSING	no direct test for protocols/mod.rs deep_merge of nested objects
 transport/connection_logging_spec.rb	N/A	Ruby-only: Faraday logging middleware / adapter config
 transport/connection_retry_spec.rb:31	PORTED	crates/rust_llm/tests/review_regressions.rs::a_retried_429_keeps_the_cost_known_and_links_to_the_answer
@@ -114,11 +114,11 @@ transport/error_middleware_spec.rb:321	PORTED	crates/rust_llm/tests/spec_values.
 transport/error_middleware_spec.rb:330	PORTED	crates/rust_llm/tests/spec_values.rs::every_error_class_has_its_default_message
 transport/error_middleware_spec.rb:340	N/A	Ruby-only: hash-like Faraday response with stored streaming error
 transport/json_response_spec.rb	N/A	Ruby-only: Faraday JSON response middleware (content-type/raw_body/ParsingError)
-transport/websocket_connection_spec.rb	OWNED	lane D: WebSocket transport for streaming transcription not ported
+transport/websocket_connection_spec.rb	MISSING	lane D: WebSocket transport for streaming transcription not ported (was OWNED; lane finished — port or mark N/A)
 transport/websocket_connection_spec.rb:9	N/A	Ruby-only: spec harness guard against live WebSocket connections
 
 # ---- rules_b
-provider_capability_augmenters_spec.rb	OWNED	lane G: capability augmenters only run in model registry refresh/models.dev merge
+provider_capability_augmenters_spec.rb	MISSING	lane G: capability augmenters only run in model registry refresh/models.dev merge (was OWNED; lane finished — port or mark N/A)
 provider_contract_spec.rb	N/A	Ruby-only: Provider/Protocol subclass registry contract; Rust uses Provider/ProtocolName enums
 provider_spec.rb:174	MISSING	no test that {} / [] / nil error bodies parse to no message (only empty 401)
 provider_spec.rb:204	PORTED	crates/rust_llm/tests/batches.rs::applies_the_provider_batch_discount_when_the_model_has_no_batch_tier
@@ -199,7 +199,7 @@ providers/gpustack/embeddings_spec.rb:37	PORTED	crates/rust_llm/tests/media_repl
 providers/gpustack/embeddings_spec.rb:41	MISSING	no test for GPUStack rejecting non-image embedding attachments
 providers/gpustack/embeddings_spec.rb:47	MISSING	no test for GPUStack image embedding through public API
 providers/gpustack/media_spec.rb	MISSING	no test for GPUStack video_url data-URI attachments
-providers/gpustack/models_spec.rb	OWNED	lane G: provider model listing (registry refresh)
+providers/gpustack/models_spec.rb	MISSING	lane G: provider model listing (registry refresh) (was OWNED; lane finished — port or mark N/A)
 providers/gpustack/speech_spec.rb:8	MISSING	no test for GPUStack streamed PCM speech
 providers/gpustack/transcription_spec.rb	MISSING	no test for GPUStack streamed transcription events
 providers/gpustack_spec.rb:9	MISSING	no test for GPUStack empty content on thinking-only replay
@@ -211,13 +211,13 @@ providers/hetzner_spec.rb:25	MISSING	no test for Hetzner default api_base and be
 providers/hetzner_spec.rb:30	PORTED	crates/rust_llm/tests/cassette_replay.rs::basic_conversation (hetzner_api_base set)
 providers/hetzner_spec.rb:36	MISSING	no test for Hetzner remote + requires API key
 providers/hetzner_spec.rb:43	MISSING	no test for Provider::assume_models_exist on Hetzner
-providers/hetzner_spec.rb:47	OWNED	lane G: models.dev provider map
+providers/hetzner_spec.rb:47	MISSING	lane G: models.dev provider map (was OWNED; lane finished — port or mark N/A)
 providers/hetzner_spec.rb:51	PORTED	crates/rust_llm/tests/cassette_replay_more.rs::auth_errors_are_human_readable
 providers/hetzner_spec.rb:74	PORTED	crates/rust_llm/tests/cassette_replay.rs::system_prompt
 providers/hetzner_spec.rb:97	PORTED	crates/rust_llm/tests/media_replay.rs::vision_models_can_understand_remote_images_without_extension
 providers/hetzner_spec.rb:109	MISSING	no test for Hetzner rejecting PDF/audio attachments
-providers/hetzner_spec.rb:133	OWNED	lane G: provider model listing
-providers/mistral/capabilities_spec.rb	OWNED	lane G: capability augmenter (registry refresh)
+providers/hetzner_spec.rb:133	MISSING	lane G: provider model listing (was OWNED; lane finished — port or mark N/A)
+providers/mistral/capabilities_spec.rb	MISSING	lane G: capability augmenter (registry refresh) (was OWNED; lane finished — port or mark N/A)
 providers/mistral/chat_completions/batches_spec.rb:9	PORTED	crates/rust_llm/tests/batches.rs::providers_answer_staged_chats_and_append_the_answers_to_their_conversations
 providers/mistral/chat_completions/batches_spec.rb:32	MISSING	no test for Mistral embedding batch endpoint
 providers/mistral/chat_completions/batches_spec.rb:50	MISSING	no test for Mistral mixed chat+embedding rejection
@@ -255,7 +255,7 @@ providers/mistral/chat_spec.rb:235	MISSING	no test for Mistral prompt_cache_key 
 providers/mistral/chat_spec.rb:239	MISSING	no test for Mistral caching option rejection message
 providers/mistral/chat_spec.rb:247	MISSING	no test for Mistral multi-tool staying on "any"
 providers/mistral/chat_spec.rb:261	MISSING	no test for Mistral nameless single tool
-providers/mistral/models_spec.rb	OWNED	lane G: provider model listing
+providers/mistral/models_spec.rb	MISSING	lane G: provider model listing (was OWNED; lane finished — port or mark N/A)
 providers/mistral/ocr_spec.rb:7	MISSING	no test for OCR remote document_url payload
 providers/mistral/ocr_spec.rb:16	PORTED	crates/rust_llm/tests/ocr.rs::extracts_markdown_from_a_pdf
 providers/mistral/ocr_spec.rb:25	MISSING	no test for OCR image_url variant
@@ -283,10 +283,10 @@ providers/ollama_cloud_spec.rb:29	PORTED	crates/rust_llm/tests/cassette_replay.r
 providers/ollama_cloud_spec.rb:35	MISSING	no test that OllamaCloud is not local
 providers/ollama_cloud_spec.rb:40	MISSING	no test for OllamaCloud requiring an API key
 providers/ollama_cloud_spec.rb:45	MISSING	no test for Provider::assume_models_exist on OllamaCloud
-providers/ollama_cloud_spec.rb:61	OWNED	lane G: provider model listing
-providers/ollama_cloud_spec.rb:68	OWNED	lane G: provider model listing
-providers/ollama_cloud_spec.rb:77	OWNED	lane G: provider model listing
-providers/ollama_spec.rb	OWNED	lane G: provider model listing via /api/show
+providers/ollama_cloud_spec.rb:61	MISSING	lane G: provider model listing (was OWNED; lane finished — port or mark N/A)
+providers/ollama_cloud_spec.rb:68	MISSING	lane G: provider model listing (was OWNED; lane finished — port or mark N/A)
+providers/ollama_cloud_spec.rb:77	MISSING	lane G: provider model listing (was OWNED; lane finished — port or mark N/A)
+providers/ollama_spec.rb	MISSING	lane G: provider model listing via /api/show (was OWNED; lane finished — port or mark N/A)
 providers/ollama_spec.rb:9	MISSING	no test for Ollama headers without an API key
 providers/ollama_spec.rb:16	MISSING	no test for Ollama bearer header with an API key
 providers/openai/responses_spec.rb:12	PORTED	crates/rust_llm/tests/count_tokens.rs::counts_a_staged_message_without_mutating_the_chat
@@ -361,7 +361,7 @@ providers/openrouter/images_spec.rb:87	PORTED	crates/rust_llm/tests/images.rs::o
 providers/openrouter/images_spec.rb:100	MISSING	no test for OpenRouter default image MIME type
 providers/openrouter/images_spec.rb:108	MISSING	no test for OpenRouter empty image response
 providers/openrouter/media_spec.rb:7	MISSING	no test for OpenRouter video_url chat parts
-providers/openrouter/models_spec.rb	OWNED	lane G: provider model listing
+providers/openrouter/models_spec.rb	MISSING	lane G: provider model listing (was OWNED; lane finished — port or mark N/A)
 providers/openrouter/parse_error_spec.rb:13	MISSING	feature absent: OpenRouter metadata.raw nested error message
 providers/openrouter/parse_error_spec.rb:39	PORTED	crates/rust_llm/src/error.rs::tests::a_400_about_context_becomes_context_length_exceeded
 providers/openrouter/parse_error_spec.rb:53	MISSING	no test for joining a list of errors
@@ -374,7 +374,7 @@ providers/openrouter/parse_error_spec.rb:98	MISSING	no test for array error valu
 providers/openrouter/parse_error_spec.rb:107	MISSING	feature absent: OpenRouter metadata handling
 providers/openrouter/parse_error_spec.rb:116	MISSING	feature absent: OpenRouter metadata.raw string error
 providers/openrouter/videos_spec.rb	MISSING	no test for OpenRouter video payload/job/status/download
-providers/perplexity/models_spec.rb	OWNED	lane G: provider model listing
+providers/perplexity/models_spec.rb	MISSING	lane G: provider model listing (was OWNED; lane finished — port or mark N/A)
 providers/perplexity/models_spec.rb:88	MISSING	no test for Perplexity HTML <title> error parsing
 providers/perplexity/models_spec.rb:94	MISSING	no test for HTML without a title match
 providers/perplexity/models_spec.rb:100	PORTED	crates/rust_llm/tests/cassette_replay_more.rs::auth_errors_are_human_readable (perplexity JSON error)
@@ -394,7 +394,7 @@ providers/typesafe_spec.rb:106	PORTED	crates/rust_llm/tests/judgments.rs::judges
 providers/typesafe_spec.rb:137	PORTED	crates/rust_llm/tests/judgments.rs::preserves_structured_descriptions_and_arbitrary_choice_names
 providers/typesafe_spec.rb:154	PORTED	crates/rust_llm/tests/judgments.rs::accepts_omitted_instructions_when_criteria_describe_the_judgment
 providers/typesafe_spec.rb:165	PORTED	crates/rust_llm/tests/judgments.rs::lists_the_available_judgment_models
-providers/xai/capabilities_spec.rb	OWNED	lane G: capability augmenter (registry refresh)
+providers/xai/capabilities_spec.rb	MISSING	lane G: capability augmenter (registry refresh) (was OWNED; lane finished — port or mark N/A)
 providers/xai/chat_completions/batches_live_spec.rb:6	PORTED	crates/rust_llm/tests/protocols_replay.rs::xai_collects_structured_responses_and_chat_completions_results_in_order
 providers/xai/chat_completions/batches_spec.rb:9	PORTED	crates/rust_llm/tests/protocols_replay.rs::xai_collects_structured_responses_and_chat_completions_results_in_order
 providers/xai/chat_completions/batches_spec.rb:20	PORTED	crates/rust_llm/tests/protocols_replay.rs::xai_collects_structured_responses_and_chat_completions_results_in_order
@@ -412,7 +412,7 @@ providers/xai/images_spec.rb:20	PORTED	crates/rust_llm/tests/images.rs::xai_supp
 providers/xai/images_spec.rb:30	MISSING	no test for xAI remote reference URL pass-through
 providers/xai/images_spec.rb:40	PORTED	crates/rust_llm/tests/images.rs::xai_supports_image_edits_with_reference_images
 providers/xai/images_spec.rb:47	PORTED	crates/rust_llm/tests/images.rs::xai_rejects_masks
-providers/xai/models_spec.rb	OWNED	lane G: provider model listing
+providers/xai/models_spec.rb	MISSING	lane G: provider model listing (was OWNED; lane finished — port or mark N/A)
 providers/xai/responses_spec.rb:6	PORTED	crates/rust_llm/tests/remote_mcp.rs::xai_executes_a_read_only_tool_and_replays_its_history
 providers/xai/responses_spec.rb:15	MISSING	no test for xAI collection citations beside web citations
 providers/xai/responses_spec.rb:29	MISSING	no test for xAI collection citations in completed streams
@@ -452,7 +452,7 @@ chat_cache_until_here_spec.rb:114	MISSING	no test for Responses prompt_cache_bre
 chat_cache_until_here_spec.rb:126	MISSING	no test for cache-bounded instructions sent as a system input item on Responses
 chat_cache_until_here_spec.rb:142	PORTED	tests/chat_options.rs::gemini_attaches_an_explicit_cache_by_id
 chat_cache_until_here_spec.rb:150	PORTED	tests/chat_options.rs::gemini_attaches_an_explicit_cache_by_id
-chat_cache_until_here_spec.rb:158	OWNED	lane G: Gemini CachedContent type not ported yet
+chat_cache_until_here_spec.rb:158	MISSING	lane G: Gemini CachedContent type not ported yet (was OWNED; lane finished — port or mark N/A)
 chat_cache_until_here_spec.rb:167	MISSING	no debug note that Gemini caching is implicit (payload half tested in gemini_attaches_...)
 chat_cache_until_here_spec.rb:179	MISSING	no debug note that Gemini ignores cache_until_here boundaries
 chat_cache_until_here_spec.rb:189	PORTED	tests/chat_options.rs::anthropic_rejects_the_id_option_and_renders_ttl
@@ -890,7 +890,7 @@ protocols/anthropic/media_spec.rb:22	MISSING	no test: empty text skipped beside 
 protocols/anthropic/media_spec.rb:29	PORTED	crates/rust_llm/tests/spec_values.rs::unsupported_attachment_errors_name_the_type_and_guide
 protocols/anthropic/media_spec.rb:40	MISSING	no test: provider-file PDF with citations title/enabled
 protocols/anthropic/media_spec.rb:56	PORTED	crates/rust_llm/tests/files.rs::anthropic_references_uploaded_documents_and_images_by_file_id
-protocols/anthropic/models_spec.rb	OWNED	lane G: provider list_models parsing (registry refresh)
+protocols/anthropic/models_spec.rb	MISSING	lane G: provider list_models parsing (registry refresh) (was OWNED; lane finished — port or mark N/A)
 protocols/anthropic/streaming_spec.rb:14	MISSING	no test: message_delta stop_reason on chunk
 protocols/anthropic/streaming_spec.rb:27	MISSING	no test: thinking tokens from message_delta usage
 protocols/anthropic/streaming_spec.rb:40	MISSING	no test: Accept-Encoding identity header asserted
@@ -993,7 +993,7 @@ protocols/chat_completions/media_spec.rb:49	MISSING	no test: CC docx rejected
 protocols/chat_completions/media_spec.rb:60	MISSING	no test: CC low image detail
 protocols/chat_completions/media_spec.rb:68	MISSING	no test: CC high image detail
 protocols/chat_completions/media_spec.rb:76	PORTED	crates/rust_llm/tests/media_replay.rs::vision_models_can_understand_local_images
-protocols/chat_completions/models_spec.rb	OWNED	lane G: provider list_models parsing (registry refresh)
+protocols/chat_completions/models_spec.rb	MISSING	lane G: provider list_models parsing (registry refresh) (was OWNED; lane finished — port or mark N/A)
 protocols/chat_completions/moderation_spec.rb:6	MISSING	no test: raw response kept on Moderation
 protocols/chat_completions/moderation_spec.rb:18	PORTED	crates/rust_llm/tests/moderation.rs::moderates_content_and_returns_a_moderation_instance
 protocols/chat_completions/moderation_spec.rb:32	PORTED	crates/rust_llm/tests/moderation.rs::moderates_text_with_an_image_attachment
@@ -1086,7 +1086,7 @@ protocols/gemini/batches_spec.rb:99	MISSING	no test: FAILED/CANCELLED/EXPIRED/JO
 protocols/gemini/batches_spec.rb:109	PORTED	crates/rust_llm/tests/batches.rs::providers_answer_staged_chats_and_append_the_answers_to_their_conversations
 protocols/gemini/batches_spec.rb:127	MISSING	no test: metadata.key then position fallback
 protocols/gemini/batches_spec.rb:135	MISSING	no test: per-item error skipped
-protocols/gemini/caches_spec.rb	OWNED	lane G: Gemini cached content (CachedContent create/update/parse)
+protocols/gemini/caches_spec.rb	MISSING	lane G: Gemini cached content (CachedContent create/update/parse) (was OWNED; lane finished — port or mark N/A)
 protocols/gemini/caches_spec.rb:113	N/A	provider not ported: Vertex AI
 protocols/gemini/caches_spec.rb:117	N/A	provider not ported: Vertex AI
 protocols/gemini/caches_spec.rb:125	N/A	provider not ported: Vertex AI
@@ -1148,7 +1148,7 @@ protocols/gemini/images_spec.rb:205	MISSING	no test: generateContent without ima
 protocols/gemini/images_spec.rb:225	MISSING	no test: Gemini mask rejected
 protocols/gemini/images_spec.rb:242	N/A	provider not ported: Vertex AI
 protocols/gemini/images_spec.rb:253	N/A	provider not ported: Vertex AI
-protocols/gemini/live_transcription_spec.rb	OWNED	lane D: Gemini Live WebSocket transcription
+protocols/gemini/live_transcription_spec.rb	MISSING	lane D: Gemini Live WebSocket transcription (was OWNED; lane finished — port or mark N/A)
 protocols/gemini/live_transcription_spec.rb:128	N/A	provider not ported: Vertex AI
 protocols/gemini/media_spec.rb:7	MISSING	no test: Gemini docx rejected
 protocols/gemini/media_spec.rb:18	PORTED	crates/rust_llm/tests/media_replay.rs::pdf_models_understand_pdfs
@@ -1172,7 +1172,7 @@ protocols/gemini/media_spec.rb:189	MISSING	no test: attachment_filename fallback
 protocols/gemini/media_spec.rb:193	MISSING	no test: extension normalization (jpg/txt/svg.xml)
 protocols/gemini/media_spec.rb:201	MISSING	no test: attachments without text
 protocols/gemini/media_spec.rb:212	PORTED	crates/rust_llm/tests/files.rs::gemini_falls_back_to_the_file_id_without_a_uri
-protocols/gemini/models_spec.rb	OWNED	lane G: provider list_models parsing (registry refresh)
+protocols/gemini/models_spec.rb	MISSING	lane G: provider list_models parsing (registry refresh) (was OWNED; lane finished — port or mark N/A)
 protocols/gemini/speech_spec.rb:9	PORTED	crates/rust_llm/tests/speech.rs::gemini_2_5_flash_preview_tts_can_speak
 protocols/gemini/speech_spec.rb:43	PORTED	crates/rust_llm/tests/speech.rs::gemini_2_5_flash_preview_tts_can_speak
 protocols/gemini/speech_spec.rb:72	MISSING	no test: unexpected speech response error
@@ -1225,7 +1225,7 @@ protocols/gpustack/responses_spec.rb	MISSING	no test: GPUStack Responses MCP/ser
 protocols/gpustack/tokenization_spec.rb:14	MISSING	no test: GPUStack /tokenize request+result
 protocols/gpustack/tokenization_spec.rb:29	PORTED	crates/rust_llm/src/tokenization.rs::tests::gpustack_needs_a_model_proxy_base
 protocols/gpustack/tokenization_spec.rb:37	MISSING	no test: tokenization ignores responses protocol
-protocols/gpustack/videos_spec.rb	OWNED	lane E: GPUStack video generation
+protocols/gpustack/videos_spec.rb	MISSING	lane E: GPUStack video generation (was OWNED; lane finished — port or mark N/A)
 protocols/openrouter/responses_spec.rb:23	PORTED	crates/rust_llm/tests/protocols_replay.rs::openrouter_executes_a_hosted_shell
 protocols/openrouter/responses_spec.rb:37	MISSING	no test: OpenRouter chat stays on CC by default
 protocols/openrouter/responses_spec.rb:46	PORTED	crates/rust_llm/src/provider_tools.rs::tests::openrouter_mcp_must_opt_out_of_approval
@@ -1317,7 +1317,7 @@ protocols/responses/streaming_spec.rb:199	MISSING	no test: flat server_error -> 
 protocols/responses/streaming_spec.rb:205	MISSING	no test: flat other -> 400
 protocols/responses/streaming_spec.rb:212	MISSING	no test: nested error object
 protocols/responses/streaming_spec.rb:220	MISSING	no test: incomplete_details on completed
-protocols/xai/streaming_transcription_spec.rb	OWNED	lane D: xAI WebSocket streaming transcription
+protocols/xai/streaming_transcription_spec.rb	MISSING	lane D: xAI WebSocket streaming transcription (was OWNED; lane finished — port or mark N/A)
 
 # ---- rules_d
 # ---- d: features (active_record, generators, agents, MCP, judge, batches, media, files, ...) ----
@@ -1354,8 +1354,8 @@ research_job_spec.rb	N/A	provider not ported: Vertex AI (ResearchJob drives the 
 # ---- active_record/* vs crates/rust_llm_loco ----
 active_record/acts_as_action_text_spec.rb	N/A	Ruby-only: ActionText rich text / blob preloading internals
 active_record/attachment_helpers_spec.rb	N/A	Ruby-only: ActiveStorage/ActionText attachment helper internals
-active_record/attachment_helpers_spec.rb:86	OWNED	lane H: attachment resolution metadata round-trip through rust_llm_attachments untested
-active_record/attachment_helpers_spec.rb:96	OWNED	lane H: attachment resolution kept before save untested
+active_record/attachment_helpers_spec.rb:86	MISSING	lane H: attachment resolution metadata round-trip through rust_llm_attachments untested (was OWNED; lane finished — port or mark N/A)
+active_record/attachment_helpers_spec.rb:96	MISSING	lane H: attachment resolution kept before save untested (was OWNED; lane finished — port or mark N/A)
 active_record/record_spec.rb	N/A	Ruby-only: ActiveRecord connection pools / secondary database wiring
 active_record/acts_as_attachment_spec.rb:57	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::handles_multiple_attachments (reload restores mime/bytes)
 active_record/acts_as_attachment_spec.rb:72	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::handles_multiple_attachments
@@ -1367,12 +1367,12 @@ active_record/acts_as_attachment_spec.rb:170	N/A	Ruby-only: ActiveStorage::Blob 
 active_record/acts_as_attachment_spec.rb:188	N/A	Ruby-only: ActiveStorage::Attached::One reuse
 active_record/acts_as_attachment_spec.rb:206	N/A	Ruby-only: ActiveStorage::Attached::Many reuse
 active_record/acts_as_attachment_spec.rb:228	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::handles_multiple_attachments (reloaded kind Image)
-active_record/acts_as_attachment_spec.rb:243	OWNED	lane H: reloaded video attachment type untested
+active_record/acts_as_attachment_spec.rb:243	MISSING	lane H: reloaded video attachment type untested (was OWNED; lane finished — port or mark N/A)
 active_record/acts_as_attachment_spec.rb:259	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::handles_multiple_attachments (reloaded kind Pdf)
-active_record/acts_as_batch_spec.rb	OWNED	lane H: persisted batches (acts_as_batch / batch_store) not in rust_llm_loco
+active_record/acts_as_batch_spec.rb	MISSING	lane H: persisted batches (acts_as_batch / batch_store) not in rust_llm_loco (was OWNED; lane finished — port or mark N/A)
 active_record/acts_as_mcp_input_spec.rb:30	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::persists_the_input_a_paused_tool_call_waits_on
 active_record/acts_as_mcp_input_spec.rb:38	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::resumes_from_another_process_after_the_user_answers
-active_record/acts_as_model_spec.rb	OWNED	lane G: model registry store in rust_llm_models (refresh, unlisting, fallback)
+active_record/acts_as_model_spec.rb	MISSING	lane G: model registry store in rust_llm_models (refresh, unlisting, fallback) (was OWNED; lane finished — port or mark N/A)
 active_record/acts_as_model_spec.rb:60	N/A	Ruby-only: respond_to? on acts_as macros
 active_record/acts_as_model_spec.rb:79	N/A	Ruby-only: store describes itself by table name (inspect)
 active_record/acts_as_spec.rb:18	N/A	Ruby-only: respond_to? on acts_as macros
@@ -1382,36 +1382,36 @@ active_record/acts_as_spec.rb:40	PORTED	crates/rust_llm_loco/tests/acts_as_parit
 active_record/acts_as_spec.rb:53	N/A	Rust type system: rust_llm_usages.model is a non-null String column
 active_record/acts_as_spec.rb:62	N/A	Rust type system: usage model NOT NULL in the SeaORM migration and entity
 active_record/acts_as_spec.rb:69	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::persists_attempts_independently_and_links_them_to_the_resulting_message
-active_record/acts_as_spec.rb:95	OWNED	lane G: usage instrumentation event ordering vs persistence
-active_record/acts_as_spec.rb:127	OWNED	lane H: persisted batch response as one usage attempt
+active_record/acts_as_spec.rb:95	MISSING	lane G: usage instrumentation event ordering vs persistence (was OWNED; lane finished — port or mark N/A)
+active_record/acts_as_spec.rb:127	MISSING	lane H: persisted batch response as one usage attempt (was OWNED; lane finished — port or mark N/A)
 active_record/acts_as_spec.rb:147	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::reloads_linked_and_unlinked_entries_chronologically
 active_record/acts_as_spec.rb:167	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::notices_a_request_another_process_wrote_while_running
 active_record/acts_as_spec.rb:196	N/A	Rust type system: rust_llm_usages entity has typed *_cost columns, no JSON cost payload
 active_record/acts_as_spec.rb:204	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::does_not_reprice_a_persisted_entry_whose_cost_was_unavailable
 active_record/acts_as_spec.rb:217	PORTED	crates/rust_llm_loco/tests/acts_as_chat.rs::persists_a_tool_calling_conversation_and_reloads_it
-active_record/acts_as_spec.rb:231	OWNED	lane H: tool-call/usage rows removed when the chat is destroyed untested
-active_record/acts_as_spec.rb:285	OWNED	lane H: custom chat/message table names not supported
-active_record/acts_as_spec.rb:296	OWNED	lane H: custom chat/message table names not supported
+active_record/acts_as_spec.rb:231	MISSING	lane H: tool-call/usage rows removed when the chat is destroyed untested (was OWNED; lane finished — port or mark N/A)
+active_record/acts_as_spec.rb:285	MISSING	lane H: custom chat/message table names not supported (was OWNED; lane finished — port or mark N/A)
+active_record/acts_as_spec.rb:296	MISSING	lane H: custom chat/message table names not supported (was OWNED; lane finished — port or mark N/A)
 active_record/acts_as_tool_approval_spec.rb:32	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::returns_the_persisted_tool_call_rows_awaiting_a_decision
 active_record/acts_as_tool_approval_spec.rb:41	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::returns_the_persisted_tool_call_rows_awaiting_a_decision
 active_record/acts_as_tool_approval_spec.rb:51	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::reads_a_decision_another_process_persisted_into_a_built_chat
 active_record/acts_as_tool_approval_spec.rb:62	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::refuses_to_persist_a_new_question_while_the_round_is_parked
 active_record/acts_as_with_context_spec.rb	PORTED	crates/rust_llm_loco/tests/acts_as_chat.rs::persists_a_tool_calling_conversation_and_reloads_it (to_llm_with config)
-active_record/chat_methods_compact_spec.rb	OWNED	lane H: compaction persisted through records
-active_record/chat_methods_server_approval_spec.rb	OWNED	lane H: remote MCP approval persisted and resumed through records
-active_record/chat_methods_thinking_replay_spec.rb:20	OWNED	lane H: multi-block Anthropic thinking replay after reload untested
+active_record/chat_methods_compact_spec.rb	MISSING	lane H: compaction persisted through records (was OWNED; lane finished — port or mark N/A)
+active_record/chat_methods_server_approval_spec.rb	MISSING	lane H: remote MCP approval persisted and resumed through records (was OWNED; lane finished — port or mark N/A)
+active_record/chat_methods_thinking_replay_spec.rb:20	MISSING	lane H: multi-block Anthropic thinking replay after reload untested (was OWNED; lane finished — port or mark N/A)
 active_record/chat_methods_thinking_replay_spec.rb:36	N/A	provider not ported: Bedrock (Converse)
-active_record/chat_methods_thinking_replay_spec.rb:53	OWNED	lane H: persisted Gemini signature dropped on provider switch untested
+active_record/chat_methods_thinking_replay_spec.rb:53	MISSING	lane H: persisted Gemini signature dropped on provider switch untested (was OWNED; lane finished — port or mark N/A)
 active_record/mcp_credential_spec.rb	PORTED	crates/rust_llm_loco/tests/spec_mcp_credential.rs (each example cites its line)
 active_record/message_methods_spec.rb:17	MISSING	no test for tool_error_message (generated message_model.rs template)
 active_record/message_methods_spec.rb:22	MISSING	no test for tool_error_message on JSON string content
 active_record/message_methods_spec.rb:27	PORTED	crates/rust_llm/tests/spec_values.rs::message_parsed_reads_json
 active_record/message_methods_spec.rb:32	PORTED	crates/rust_llm/tests/spec_values.rs::message_parsed_is_none_without_content
 active_record/message_methods_spec.rb:37	MISSING	no test for tool_error_message on non-JSON content
-active_record/message_methods_spec.rb:49	OWNED	lane H: model of the successful attempt after reload untested
+active_record/message_methods_spec.rb:49	MISSING	lane H: model of the successful attempt after reload untested (was OWNED; lane finished — port or mark N/A)
 active_record/message_methods_spec.rb:64	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::round_trips_server_tool_calls_thinking_citations_and_raw_content
-active_record/message_methods_spec.rb:74	OWNED	lane H: successful-attempt provider for overlapping model id after reload
-active_record/message_methods_spec.rb:91	OWNED	lane H: tool_call_stop after reload with provider stop untested
+active_record/message_methods_spec.rb:74	MISSING	lane H: successful-attempt provider for overlapping model id after reload (was OWNED; lane finished — port or mark N/A)
+active_record/message_methods_spec.rb:91	MISSING	lane H: tool_call_stop after reload with provider stop untested (was OWNED; lane finished — port or mark N/A)
 active_record/message_methods_spec.rb:101	N/A	Ruby-only: Rails to_partial_path
 active_record/message_methods_spec.rb:107	N/A	Ruby-only: Rails to_partial_path
 active_record/message_methods_spec.rb:118	PORTED	crates/rust_llm_loco/tests/acts_as_chat.rs::persists_a_tool_calling_conversation_and_reloads_it
@@ -1419,23 +1419,23 @@ active_record/message_methods_spec.rb:128	PORTED	crates/rust_llm_loco/tests/acts
 active_record/message_methods_spec.rb:138	N/A	Ruby-only: ActiveRecord association reflection
 active_record/chat_methods_spec.rb:17	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::cancel_persists_the_request_on_the_row
 active_record/chat_methods_spec.rb:26	N/A	Rust type system: ChatRecord only exists once saved
-active_record/chat_methods_spec.rb:34	OWNED	lane H: record cancel forwarded to an already-built chat
+active_record/chat_methods_spec.rb:34	MISSING	lane H: record cancel forwarded to an already-built chat (was OWNED; lane finished — port or mark N/A)
 active_record/chat_methods_spec.rb:45	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::consumes_a_request_written_straight_to_the_row
-active_record/chat_methods_spec.rb:54	OWNED	lane H: cancellation poll interval not asserted
+active_record/chat_methods_spec.rb:54	MISSING	lane H: cancellation poll interval not asserted (was OWNED; lane finished — port or mark N/A)
 active_record/chat_methods_spec.rb:62	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::notices_a_request_another_process_wrote_while_running
 active_record/chat_methods_spec.rb:69	N/A	Ruby-only: ActiveRecord query cache
 active_record/chat_methods_spec.rb:80	N/A	Rust type system: ChatRecord only exists once saved
 active_record/chat_methods_spec.rb:84	N/A	Rust type system: no unsaved ChatRecord with an in-memory request
-active_record/chat_methods_spec.rb:95	OWNED	lane G: registry store filled before the first chat
+active_record/chat_methods_spec.rb:95	MISSING	lane G: registry store filled before the first chat (was OWNED; lane finished — port or mark N/A)
 active_record/chat_methods_spec.rb:104	N/A	Ruby-only: model= accepts a RubyLLM::Model value (type coercion)
 active_record/chat_methods_spec.rb:112	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::belongs_to_rust_llms_internal_model_record
 active_record/chat_methods_spec.rb:123	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::switches_models_with_with_model
-active_record/chat_methods_spec.rb:133	OWNED	lane H: record falls back to configured default model
+active_record/chat_methods_spec.rb:133	MISSING	lane H: record falls back to configured default model (was OWNED; lane finished — port or mark N/A)
 active_record/chat_methods_spec.rb:141	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::accepts_an_unregistered_id_only_when_told_the_model_exists
 active_record/chat_methods_spec.rb:149	N/A	provider not ported: Azure
-active_record/chat_methods_spec.rb:161	OWNED	lane H: model row insert race (reuse after lookup miss)
+active_record/chat_methods_spec.rb:161	MISSING	lane H: model row insert race (reuse after lookup miss) (was OWNED; lane finished — port or mark N/A)
 active_record/chat_methods_spec.rb:179	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::accepts_an_unregistered_id_only_when_told_the_model_exists
-active_record/chat_methods_spec.rb:191	OWNED	lane H: record with_context rebinding
+active_record/chat_methods_spec.rb:191	MISSING	lane H: record with_context rebinding (was OWNED; lane finished — port or mark N/A)
 active_record/chat_methods_spec.rb:203	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::with_instructions_replaces_the_persisted_system_message_and_keeps_its_place
 active_record/chat_methods_spec.rb:212	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::with_instructions_replaces_the_persisted_system_message_and_keeps_its_place
 active_record/chat_methods_spec.rb:225	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::with_instructions_replaces_the_persisted_system_message_and_keeps_its_place
@@ -1448,7 +1448,7 @@ active_record/chat_methods_spec.rb:283	PORTED	crates/rust_llm_loco/tests/acts_as
 active_record/chat_methods_spec.rb:295	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::runtime_instructions_append_to_persisted_ones_and_keep_their_cache_boundary
 active_record/chat_methods_spec.rb:310	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::runtime_instructions_apply_without_persisting_and_survive_a_reload
 active_record/chat_methods_spec.rb:320	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::persisted_instructions_keep_a_cache_boundary
-active_record/chat_methods_spec.rb:331	OWNED	lane H: add_message copying an existing message record
+active_record/chat_methods_spec.rb:331	MISSING	lane H: add_message copying an existing message record (was OWNED; lane finished — port or mark N/A)
 active_record/chat_methods_spec.rb:347	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::add_message_links_a_tool_result_to_its_call
 active_record/chat_methods_spec.rb:359	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::cache_until_here_marks_the_last_persisted_message_or_the_in_memory_one
 active_record/chat_methods_spec.rb:368	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::cache_until_here_marks_the_last_persisted_message_or_the_in_memory_one
@@ -1461,15 +1461,15 @@ active_record/chat_methods_spec.rb:433	N/A	Ruby-only: record delegates count_tok
 active_record/chat_methods_spec.rb:442	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::renders_the_payload_with_before_request_hooks_applied
 active_record/chat_methods_spec.rb:450	N/A	Ruby-only: record delegates Chat configuration readers
 active_record/chat_methods_spec.rb:473	N/A	Ruby-only: record delegates after_tool_progress to Chat
-active_record/chat_methods_spec.rb:495	OWNED	lane H: add_completion out of band persisted through a record
+active_record/chat_methods_spec.rb:495	MISSING	lane H: add_completion out of band persisted through a record (was OWNED; lane finished — port or mark N/A)
 active_record/chat_methods_spec.rb:503	N/A	Ruby-only: Enumerable
 active_record/chat_methods_spec.rb:511	N/A	Ruby-only: method classification via reflection
 active_record/chat_methods_spec.rb:524	N/A	Ruby-only: blank placeholder assistant row (Rust persists after each step)
 active_record/chat_methods_spec.rb:536	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::notices_a_request_another_process_wrote_while_running
 active_record/chat_methods_spec.rb:550	PORTED	crates/rust_llm_loco/tests/acts_as_chat.rs::a_failed_tool_round_is_rolled_back_and_the_chat_stays_usable
-active_record/chat_methods_spec.rb:560	OWNED	lane H: cleanup of a partially answered round untested
-active_record/chat_methods_spec.rb:577	OWNED	lane H: cleanup keeps a completed round untested
-active_record/chat_methods_spec.rb:588	OWNED	lane H: cleanup leaves a plain conversation untested
+active_record/chat_methods_spec.rb:560	MISSING	lane H: cleanup of a partially answered round untested (was OWNED; lane finished — port or mark N/A)
+active_record/chat_methods_spec.rb:577	MISSING	lane H: cleanup keeps a completed round untested (was OWNED; lane finished — port or mark N/A)
+active_record/chat_methods_spec.rb:588	MISSING	lane H: cleanup leaves a plain conversation untested (was OWNED; lane finished — port or mark N/A)
 active_record/chat_methods_spec.rb:599	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::records_a_denial_and_rejects_an_unknown_tool_call
 active_record/chat_methods_spec.rb:608	N/A	Ruby-only: approve accepts a ToolCall value (type coercion)
 active_record/chat_methods_spec.rb:618	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::records_a_denial_and_rejects_an_unknown_tool_call
@@ -1487,7 +1487,7 @@ active_record/chat_methods_spec.rb:777	N/A	Ruby-only: ActiveStorage blob preload
 active_record/chat_methods_spec.rb:785	N/A	Ruby-only: ActiveStorage blob preloading
 active_record/chat_methods_spec.rb:796	N/A	Ruby-only: private link_usage_entries
 active_record/chat_methods_spec.rb:806	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::cancel_persists_the_request_on_the_row
-active_record/chat_methods_spec.rb:815	OWNED	lane H: record with_context before the chat is built
+active_record/chat_methods_spec.rb:815	MISSING	lane H: record with_context before the chat is built (was OWNED; lane finished — port or mark N/A)
 # ---- generators/* vs crates/rust_llm_cli ----
 generators/agent_generator_spec.rb	PORTED	crates/rust_llm_cli/tests/generators.rs::agent_writes_the_agent_and_an_empty_instructions_prompt
 generators/schema_generator_spec.rb	PORTED	crates/rust_llm_cli/tests/generators.rs::schema_writes_a_json_schema_struct_and_the_schemars_dependency
@@ -1534,7 +1534,7 @@ generators/provider/cli_spec.rb:89	MISSING	no test for the help command exit sta
 generators/provider/cli_spec.rb:123	PORTED	crates/rust_llm_cli/tests/generators.rs::cli_parses_generators_and_options (NAME required)
 generators/provider/cli_spec.rb:130	MISSING	extra positional arguments are silently ignored; untested
 generators/provider/cli_spec.rb:137	PORTED	crates/rust_llm_cli/tests/generators.rs::cli_parses_generators_and_options (--bogus exits 1)
-generators/provider/cli_spec.rb:168	OWNED	lane G: models.dev provider mapping (--models-dev-provider absent)
+generators/provider/cli_spec.rb:168	MISSING	lane G: models.dev provider mapping (--models-dev-provider absent) (was OWNED; lane finished — port or mark N/A)
 generators/provider/cli_spec.rb:183	PORTED	crates/rust_llm_cli/tests/generators.rs::existing_files_are_skipped_unless_forced
 generators/provider/scaffold_spec.rb	N/A	Ruby-only: provider gem packaging (gemspec, bundle, models.json)
 generators/provider/scaffold_spec.rb:128	PORTED	crates/rust_llm_cli/tests/generators.rs::provider_writes_a_module_and_test_and_registers_the_module
@@ -1543,7 +1543,7 @@ generators/provider/scaffold_spec.rb:217	PORTED	crates/rust_llm_cli/tests/genera
 generators/provider/scaffold_spec.rb:288	PORTED	crates/rust_llm_cli/tests/generators.rs::provider_writes_a_module_and_test_and_registers_the_module (converse rejected)
 generators/provider/scaffold_spec.rb:300	MISSING	no test that a class-cased name is kept as-is
 generators/provider/scaffold_spec.rb:304	MISSING	no test for default api_base / env names
-generators/provider/scaffold_spec.rb:325	OWNED	lane G: models.dev provider mapping
+generators/provider/scaffold_spec.rb:325	MISSING	lane G: models.dev provider mapping (was OWNED; lane finished — port or mark N/A)
 generators/provider/scaffold_spec.rb:330	N/A	Rust type system: --dynamic-models is a boolean switch
 generators/provider/scaffold_spec.rb:340	MISSING	no test for missing core files (Rust refuses without providers.rs)
 generators/provider/scaffold_spec.rb:351	PORTED	crates/rust_llm_cli/tests/generators.rs::existing_files_are_skipped_unless_forced
@@ -1557,18 +1557,18 @@ generators/upgrade_generator_spec.rb:35	PORTED	crates/rust_llm_cli/tests/generat
 # ---- agents ----
 agent_delegation_spec.rb	N/A	Ruby-only: Agent delegates to Chat (Rust Agent::chat returns the Chat)
 agent_instructions_spec.rb	N/A	Ruby-only: class inheritance of instruction declarations and prompts
-agent_instructions_spec.rb:62	OWNED	lane G: prompt rendering with locals
+agent_instructions_spec.rb:62	MISSING	lane G: prompt rendering with locals (was OWNED; lane finished — port or mark N/A)
 agent_dsl_spec.rb	N/A	Ruby-only: class-level DSL macros, blocks, inputs, inheritance
 agent_dsl_spec.rb:53	MISSING	no test that Agent::apply sets temperature/max tokens/thinking/provider_options
-agent_dsl_spec.rb:67	OWNED	lane E: caching declared on agents
-agent_dsl_spec.rb:76	OWNED	lane E: thinking/citations/compaction defaults on agents
-agent_dsl_spec.rb:91	OWNED	lane E: disabling caching/compaction/citations on agents
+agent_dsl_spec.rb:67	MISSING	lane E: caching declared on agents (was OWNED; lane finished — port or mark N/A)
+agent_dsl_spec.rb:76	MISSING	lane E: thinking/citations/compaction defaults on agents (was OWNED; lane finished — port or mark N/A)
+agent_dsl_spec.rb:91	MISSING	lane E: disabling caching/compaction/citations on agents (was OWNED; lane finished — port or mark N/A)
 agent_dsl_spec.rb:108	N/A	Rust type system: Agent::thinking returns Option<ThinkingConfig>
-agent_dsl_spec.rb:122	OWNED	lane E: context bound on agents
-agent_dsl_spec.rb:262	OWNED	lane E: end_user on agents
+agent_dsl_spec.rb:122	MISSING	lane E: context bound on agents (was OWNED; lane finished — port or mark N/A)
+agent_dsl_spec.rb:262	MISSING	lane E: end_user on agents (was OWNED; lane finished — port or mark N/A)
 agent_dsl_spec.rb:344	N/A	Rust type system: create_for_agent/find_for_agent always take a ChatRecord
 agent_dsl_spec.rb:350	N/A	Rust type system: create_for_agent/find_for_agent always take a ChatRecord
-agent_dsl_spec.rb:422	OWNED	lane G: conventional prompt directory per agent
+agent_dsl_spec.rb:422	MISSING	lane G: conventional prompt directory per agent (was OWNED; lane finished — port or mark N/A)
 agent_spec.rb:17	MISSING	no test that Agent::chat applies instructions/tools/tool_choice/provider_options
 agent_spec.rb:43	MISSING	no test for Agent::max_output_tokens reaching the payload
 agent_spec.rb:52	MISSING	feature absent: agent tool_options calls:/concurrency:
@@ -1577,14 +1577,14 @@ agent_spec.rb:79	N/A	Ruby-only: block-deferred tool_options macro
 agent_spec.rb:93	N/A	Ruby-only: bare model DSL reader
 agent_spec.rb:101	N/A	Ruby-only: execution-context chat in macro blocks
 agent_spec.rb:111	N/A	Ruby-only: string/symbol-key option hashes
-agent_spec.rb:122	OWNED	lane E: caching declared on agents
-agent_spec.rb:131	OWNED	lane E: caching declared on agents
-agent_spec.rb:139	OWNED	lane E: caching declared on agents
+agent_spec.rb:122	MISSING	lane E: caching declared on agents (was OWNED; lane finished — port or mark N/A)
+agent_spec.rb:131	MISSING	lane E: caching declared on agents (was OWNED; lane finished — port or mark N/A)
+agent_spec.rb:139	MISSING	lane E: caching declared on agents (was OWNED; lane finished — port or mark N/A)
 agent_spec.rb:150	MISSING	no test for Agent::thinking applied to the chat
-agent_spec.rb:159	OWNED	lane G: conventional instructions prompt
-agent_spec.rb:167	OWNED	lane G: referenced prompt missing error
-agent_spec.rb:176	OWNED	lane G: conventional instructions prompt
-agent_spec.rb:194	OWNED	lane G: prompt roots (engines)
+agent_spec.rb:159	MISSING	lane G: conventional instructions prompt (was OWNED; lane finished — port or mark N/A)
+agent_spec.rb:167	MISSING	lane G: referenced prompt missing error (was OWNED; lane finished — port or mark N/A)
+agent_spec.rb:176	MISSING	lane G: conventional instructions prompt (was OWNED; lane finished — port or mark N/A)
+agent_spec.rb:194	MISSING	lane G: prompt roots (engines) (was OWNED; lane finished — port or mark N/A)
 agent_spec.rb:218	N/A	Ruby-only: anonymous agent classes
 agent_spec.rb:232	N/A	Ruby-only: inline schema DSL
 agent_spec.rb:250	N/A	Ruby-only: lambda schemas
@@ -1600,27 +1600,27 @@ agent_spec.rb:484	MISSING	no test that Agent::fallbacks reach the chat
 agent_spec.rb:499	N/A	Ruby-only: class inheritance of fallback config
 agent_spec.rb:511	N/A	Rust type system: Agent::fallbacks is a Vec<Fallback>; no separate on: to misconfigure
 agent_spec.rb:520	N/A	Ruby-only: Enumerable
-agent_rails_spec.rb:8	OWNED	lane H: context-configured credentials for agent create/find
+agent_rails_spec.rb:8	MISSING	lane H: context-configured credentials for agent create/find (was OWNED; lane finished — port or mark N/A)
 agent_rails_spec.rb:33	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::an_agent_creates_a_chat_with_persisted_instructions_and_find_reapplies_them
-agent_rails_spec.rb:57	OWNED	lane G: instructions.txt.erb prompt loading
-agent_rails_spec.rb:77	OWNED	lane G: instructions.txt.erb prompt loading
+agent_rails_spec.rb:57	MISSING	lane G: instructions.txt.erb prompt loading (was OWNED; lane finished — port or mark N/A)
+agent_rails_spec.rb:77	MISSING	lane G: instructions.txt.erb prompt loading (was OWNED; lane finished — port or mark N/A)
 agent_rails_spec.rb:96	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::an_agent_without_instructions_adds_no_system_message
-agent_rails_spec.rb:108	OWNED	lane G: referenced prompt missing error
+agent_rails_spec.rb:108	MISSING	lane G: referenced prompt missing error (was OWNED; lane finished — port or mark N/A)
 agent_rails_spec.rb:118	N/A	Ruby-only: execution-context chat record in macro blocks
 agent_rails_spec.rb:135	N/A	Ruby-only: model block macro
 agent_rails_spec.rb:148	N/A	Ruby-only: deferred context block from inputs
 agent_rails_spec.rb:173	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::an_agent_creates_a_chat_with_persisted_instructions_and_find_reapplies_them
-agent_rails_spec.rb:201	OWNED	lane H: persisted vs runtime instruction declarations on agents
-agent_rails_spec.rb:235	OWNED	lane H: sync only persistent agent instructions
+agent_rails_spec.rb:201	MISSING	lane H: persisted vs runtime instruction declarations on agents (was OWNED; lane finished — port or mark N/A)
+agent_rails_spec.rb:235	MISSING	lane H: sync only persistent agent instructions (was OWNED; lane finished — port or mark N/A)
 agent_rails_spec.rb:255	N/A	Ruby-only: inherited instruction declarations
 agent_rails_spec.rb:277	N/A	Ruby-only: inherited instruction declarations
-agent_rails_spec.rb:299	OWNED	lane H: runtime instructions kept on repeated to_llm after find
-agent_rails_spec.rb:323	OWNED	lane H: sync_instructions
+agent_rails_spec.rb:299	MISSING	lane H: runtime instructions kept on repeated to_llm after find (was OWNED; lane finished — port or mark N/A)
+agent_rails_spec.rb:323	MISSING	lane H: sync_instructions (was OWNED; lane finished — port or mark N/A)
 agent_rails_spec.rb:353	N/A	Rust type system: create_for_agent always takes a ChatRecord
-agent_rails_spec.rb:363	OWNED	lane H: assume_model_exists propagated through agent find
-agent_rails_spec.rb:376	OWNED	lane H: assume_model_exists propagated through sync_instructions
-agent_rails_spec.rb:389	OWNED	lane H: assume_model_exists on a reloaded chat record
-agent_rails_spec.rb:403	OWNED	lane H: protocol forwarded to created/found records
+agent_rails_spec.rb:363	MISSING	lane H: assume_model_exists propagated through agent find (was OWNED; lane finished — port or mark N/A)
+agent_rails_spec.rb:376	MISSING	lane H: assume_model_exists propagated through sync_instructions (was OWNED; lane finished — port or mark N/A)
+agent_rails_spec.rb:389	MISSING	lane H: assume_model_exists on a reloaded chat record (was OWNED; lane finished — port or mark N/A)
+agent_rails_spec.rb:403	MISSING	lane H: protocol forwarded to created/found records (was OWNED; lane finished — port or mark N/A)
 agent_rails_spec.rb:419	N/A	Rust type system: no sync_instructions without a ChatRecord
 agent_rescue_from_spec.rb	N/A	Ruby-only: rescue_from exception-class DSL
 # ---- batches ----
@@ -1663,7 +1663,7 @@ batch_helpers_spec.rb:171	PORTED	crates/rust_llm/tests/batches.rs::providers_ans
 batch_helpers_spec.rb:179	PORTED	crates/rust_llm/tests/batches.rs::providers_answer_staged_chats_and_append_the_answers_to_their_conversations
 batch_helpers_spec.rb:185	MISSING	no test for the batch failure warning with detail
 batch_helpers_spec.rb:193	MISSING	no test for the batch failure warning without detail
-batch_helpers_spec.rb:213	OWNED	lane H: batch_store (persisted batches)
+batch_helpers_spec.rb:213	MISSING	lane H: batch_store (persisted batches) (was OWNED; lane finished — port or mark N/A)
 batch_helpers_spec.rb:223	MISSING	no test for Batch::find on a provider without batches
 batch_helpers_spec.rb:231	MISSING	no test for redelivery after the chat stages another question
 batch_helpers_spec.rb:247	MISSING	no test that a failed reloaded batch keeps every slot failed
@@ -1673,10 +1673,10 @@ batch_helpers_spec.rb:302	MISSING	no test for a duplicate embedding result index
 batch_helpers_spec.rb:313	MISSING	no test for sparse results without a request count
 batch_helpers_spec.rb:324	N/A	Ruby-only: inspect
 # ---- cached content / prompts / workflow ----
-cached_content_spec.rb	OWNED	lane G: Gemini explicit cached content (RubyLLM.cache)
+cached_content_spec.rb	MISSING	lane G: Gemini explicit cached content (RubyLLM.cache) (was OWNED; lane finished — port or mark N/A)
 cached_content_spec.rb:42	N/A	provider not ported: Vertex AI
-prompt_spec.rb	OWNED	lane G: prompt rendering (render_prompt, partials, roots)
-workflow_spec.rb	OWNED	lane G: workflow instrumentation context
+prompt_spec.rb	MISSING	lane G: prompt rendering (render_prompt, partials, roots) (was OWNED; lane finished — port or mark N/A)
+workflow_spec.rb	MISSING	lane G: workflow instrumentation context (was OWNED; lane finished — port or mark N/A)
 # ---- MCP ----
 chat_mcp_spec.rb:27	PORTED	crates/rust_llm/tests/remote_mcp.rs::openai_executes_a_remote_read_only_tool_after_approval_using_stateless_continuation
 chat_mcp_spec.rb:43	PORTED	crates/rust_llm/tests/remote_mcp.rs::openai_denies_a_remote_call_without_executing_it
@@ -1904,8 +1904,8 @@ video_spec.rb:54	PORTED	crates/rust_llm/tests/videos.rs::wait_honors_the_deadlin
 video_spec.rb:61	PORTED	crates/rust_llm/tests/videos.rs::wait_honors_the_deadline_and_surfaces_failures
 video_spec.rb:72	PORTED	crates/rust_llm/tests/videos.rs::wait_honors_the_deadline_and_surfaces_failures
 video_spec.rb:81	PORTED	crates/rust_llm/tests/videos.rs::wait_honors_the_deadline_and_surfaces_failures
-video_extension_spec.rb:11	OWNED	lane E: blocking animate with an in-memory Video extend source (data URI) untested
-video_extension_spec.rb:28	OWNED	lane E: 'doesn't support video extension' error untested
+video_extension_spec.rb:11	MISSING	lane E: blocking animate with an in-memory Video extend source (data URI) untested (was OWNED; lane finished — port or mark N/A)
+video_extension_spec.rb:28	MISSING	lane E: 'doesn't support video extension' error untested (was OWNED; lane finished — port or mark N/A)
 # ---- speech / transcription / websocket ----
 speech_spec.rb:8	PORTED	crates/rust_llm/tests/speech.rs::openai_gpt_4o_mini_tts_can_speak
 speech_spec.rb:21	PORTED	crates/rust_llm/tests/speech.rs::uses_the_configured_default_speech_model
@@ -1922,7 +1922,7 @@ speech_streaming_spec.rb:93	N/A	Ruby-only: Faraday adapter omitting response met
 speech_streaming_spec.rb:101	PORTED	crates/rust_llm/tests/speech.rs::does_not_treat_successful_json_or_html_as_audio
 speech_streaming_spec.rb:108	PORTED	crates/rust_llm/tests/speech.rs::retries_a_failure_before_audio_delivery_and_records_both_attempts
 speech_streaming_spec.rb:124	N/A	Rust type system: speak_stream callback returns (), cannot raise a caller error
-speech_streaming_spec.rb:134	OWNED	lane G: speech instrumentation event for streamed speech through a context
+speech_streaming_spec.rb:134	MISSING	lane G: speech instrumentation event for streamed speech through a context (was OWNED; lane finished — port or mark N/A)
 speech_streaming_spec.rb:148	PORTED	crates/rust_llm/tests/speech.rs::rejects_a_block_for_a_speech_protocol_without_streaming_support
 speech_streaming_spec.rb:154	N/A	provider not ported: ElevenLabs
 speech_streaming_spec.rb:173	N/A	provider not ported: Azure
@@ -1940,9 +1940,9 @@ transcription_spec.rb:102	N/A	Rust type system: TranscribeOptions is a struct, n
 transcription_timestamps_spec.rb	PORTED	crates/rust_llm/tests/transcription.rs::requests_word_timestamps_through_openai_with_the_shared_keyword
 transcription_google_spec.rb:12	PORTED	crates/rust_llm/tests/transcription.rs::transcribes_audio_with_speaker_labels_and_word_timestamps_through_gemini
 transcription_google_spec.rb:24	PORTED	crates/rust_llm/tests/transcription.rs::distinguishes_two_speakers_through_gemini_dedicated_transcription
-transcription_google_spec.rb:38	OWNED	lane D: Gemini Live WebSocket transcription
+transcription_google_spec.rb:38	MISSING	lane D: Gemini Live WebSocket transcription (was OWNED; lane finished — port or mark N/A)
 transcription_websocket_spec.rb	N/A	provider not ported: Deepgram, ElevenLabs (only websocket_transcription rows)
-transcription/wav_audio_spec.rb	OWNED	lane D: WavAudio parser for WebSocket streaming transcription
+transcription/wav_audio_spec.rb	MISSING	lane D: WavAudio parser for WebSocket streaming transcription (was OWNED; lane finished — port or mark N/A)
 websocket_cassette_spec.rb	N/A	Ruby-only: VCR WebSocket cassette test helper (redaction/replay infra)
 
 # ---- rules_core
@@ -2023,8 +2023,8 @@ chat_options_spec.rb:123	PORTED	tests/cassette_replay_more.rs::typed_schema_matc
 chat_options_spec.rb:145	PORTED	src/protocols/chat_completions.rs schema_strict; cassette_replay_more.rs::schema_returns_structured_output
 chat_options_spec.rb:179	N/A	Ruby-only: option-hash key coercion (ThinkingConfig is typed)
 chat_options_spec.rb:187	N/A	Rust type system: feature switches take typed values, never nil
-chat_options_spec.rb:195	OWNED	lane B: thinking accessor on Chat
-chat_options_spec.rb:199	OWNED	lane B: thinking accessor on Chat
+chat_options_spec.rb:195	MISSING	lane B: thinking accessor on Chat (was OWNED; lane finished — port or mark N/A)
+chat_options_spec.rb:199	MISSING	lane B: thinking accessor on Chat (was OWNED; lane finished — port or mark N/A)
 chat_options_spec.rb:207	N/A	Rust type system: callbacks always take a closure
 chat_options_spec.rb:215	PORTED	tests/spec_chat_loop.rs::cancel_raises_before_the_next_request_and_clears_the_flag
 chat_options_spec.rb:222	MISSING	no external cancellation checker hook (CancelHandle covers other tasks)
@@ -2089,36 +2089,36 @@ model_spec.rb:232	PORTED	tests/spec_values.rs::model_type_follows_output_modalit
 model_spec.rb:245	N/A	Rust type system: typed PricingCategory accessors replace Model#price(kind)
 model_spec.rb:250	N/A	Rust type system: typed PricingCategory accessors
 model_spec.rb:268	N/A	Rust type system: no kind symbol to get wrong
-model_spec.rb:308	OWNED	lane G: models.dev metadata.cost tier hydration (registry)
+model_spec.rb:308	MISSING	lane G: models.dev metadata.cost tier hydration (registry) (was OWNED; lane finished — port or mark N/A)
 model_spec.rb:348	N/A	Ruby-only: to_h (Model derives Serialize)
 models/aliases_spec.rb	N/A	Ruby-only: locale/encoding of aliases.json (Rust include_str! is UTF-8)
-models/lookup_spec.rb:68	OWNED	lane G: registry load_from_json/store
-models/lookup_spec.rb:86	OWNED	lane G: registry store
-models/lookup_spec.rb:98	OWNED	lane G: registry store
-models/lookup_spec.rb:133	OWNED	lane G: registry refresh
-models/lookup_spec.rb:149	OWNED	lane G: registry refresh_from_providers
+models/lookup_spec.rb:68	MISSING	lane G: registry load_from_json/store (was OWNED; lane finished — port or mark N/A)
+models/lookup_spec.rb:86	MISSING	lane G: registry store (was OWNED; lane finished — port or mark N/A)
+models/lookup_spec.rb:98	MISSING	lane G: registry store (was OWNED; lane finished — port or mark N/A)
+models/lookup_spec.rb:133	MISSING	lane G: registry refresh (was OWNED; lane finished — port or mark N/A)
+models/lookup_spec.rb:149	MISSING	lane G: registry refresh_from_providers (was OWNED; lane finished — port or mark N/A)
 models_spec.rb:23	N/A	Ruby-only: chainable filter objects (Rust returns Vecs)
 models_spec.rb:32	N/A	Ruby-only: Enumerable
 models_spec.rb:41	N/A	Ruby-only: class-level Enumerable
 models_spec.rb:71	MISSING	no vision filter on Models
 models_spec.rb:77	MISSING	no video filter on Models
-models_spec.rb:82	OWNED	lane D: transcription model registry lookup
+models_spec.rb:82	MISSING	lane D: transcription model registry lookup (was OWNED; lane finished — port or mark N/A)
 models_spec.rb:147	N/A	provider not ported: bedrock
-models_spec.rb:187	OWNED	lane G: models refresh
-models_spec.rb:200	OWNED	lane G: models refresh
-models_spec.rb:238	OWNED	lane G: models.dev merge
-models_spec.rb:283	OWNED	lane G: models.dev merge
-models_spec.rb:293	OWNED	lane G: models.dev merge
-models_spec.rb:303	OWNED	lane G: models.dev merge
-models_spec.rb:313	OWNED	lane G: models.dev merge
-models_spec.rb:323	OWNED	lane G: models.dev merge
-models_spec.rb:333	OWNED	lane G: models.dev merge
-models_spec.rb:373	OWNED	lane G: models.dev merge
-models_spec.rb:399	OWNED	lane G: models.dev merge
-models_spec.rb:424	OWNED	lane G: models.dev merge
-models_spec.rb:430	OWNED	lane G: models.dev merge
-models_spec.rb:438	OWNED	lane G: models.dev merge
-models_spec.rb:444	OWNED	lane G: models.dev merge
+models_spec.rb:187	MISSING	lane G: models refresh (was OWNED; lane finished — port or mark N/A)
+models_spec.rb:200	MISSING	lane G: models refresh (was OWNED; lane finished — port or mark N/A)
+models_spec.rb:238	MISSING	lane G: models.dev merge (was OWNED; lane finished — port or mark N/A)
+models_spec.rb:283	MISSING	lane G: models.dev merge (was OWNED; lane finished — port or mark N/A)
+models_spec.rb:293	MISSING	lane G: models.dev merge (was OWNED; lane finished — port or mark N/A)
+models_spec.rb:303	MISSING	lane G: models.dev merge (was OWNED; lane finished — port or mark N/A)
+models_spec.rb:313	MISSING	lane G: models.dev merge (was OWNED; lane finished — port or mark N/A)
+models_spec.rb:323	MISSING	lane G: models.dev merge (was OWNED; lane finished — port or mark N/A)
+models_spec.rb:333	MISSING	lane G: models.dev merge (was OWNED; lane finished — port or mark N/A)
+models_spec.rb:373	MISSING	lane G: models.dev merge (was OWNED; lane finished — port or mark N/A)
+models_spec.rb:399	MISSING	lane G: models.dev merge (was OWNED; lane finished — port or mark N/A)
+models_spec.rb:424	MISSING	lane G: models.dev merge (was OWNED; lane finished — port or mark N/A)
+models_spec.rb:430	MISSING	lane G: models.dev merge (was OWNED; lane finished — port or mark N/A)
+models_spec.rb:438	MISSING	lane G: models.dev merge (was OWNED; lane finished — port or mark N/A)
+models_spec.rb:444	MISSING	lane G: models.dev merge (was OWNED; lane finished — port or mark N/A)
 models_spec.rb:481	MISSING	no audio_models filter
 models_spec.rb:496	MISSING	no image_models filter
 models_spec.rb:511	MISSING	no by_family filter
@@ -2127,15 +2127,15 @@ models_spec.rb:569	PORTED	src/chat.rs resolve_model; tests/spec_chat_options.rs:
 models_spec.rb:579	PORTED	tests/leftovers_replay.rs (assume_model_exists cases)
 models_spec.rb:595	MISSING	no test: dynamic providers use registry metadata before the fallback model
 models_spec.rb:623	PORTED	src/chat.rs resolve_model (Model::default_for for dynamic providers); tests/leftovers_replay.rs
-models_spec.rb:636	OWNED	lane G: registry save_to_json
-models_spec.rb:654	OWNED	lane G: registry save_to_json
+models_spec.rb:636	MISSING	lane G: registry save_to_json (was OWNED; lane finished — port or mark N/A)
+models_spec.rb:654	MISSING	lane G: registry save_to_json (was OWNED; lane finished — port or mark N/A)
 progress_spec.rb:16	N/A	Ruby-only: inspect
 protocol_contract_spec.rb	N/A	Ruby-only: Protocol subclass method contract (Rust dispatches with match; the compiler checks exhaustiveness)
 protocol_file_preprocessing_spec.rb	MISSING	auto-upload rules exercised in tests/files.rs, not every per-provider case
 protocol_file_preprocessing_spec.rb:10	PORTED	tests/files.rs::attachments_over_the_inline_limit_upload_once_and_go_as_file_references
 protocol_file_preprocessing_spec.rb:34	PORTED	tests/files.rs::attachments_over_the_inline_limit_upload_once_and_go_as_file_references
 protocol_file_preprocessing_spec.rb:117	PORTED	tests/files.rs::small_attachments_stay_inline
-protocol_file_preprocessing_spec.rb:193	OWNED	lane E: count_tokens preprocessing
+protocol_file_preprocessing_spec.rb:193	MISSING	lane E: count_tokens preprocessing (was OWNED; lane finished — port or mark N/A)
 protocol_file_preprocessing_spec.rb:203	N/A	provider not ported: vertexai
 tool_spec.rb:32	N/A	Ruby-only: parameters DSL argument check
 tool_spec.rb:39	N/A	Ruby-only: class-level tool_name without instantiation

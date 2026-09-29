@@ -37,6 +37,8 @@ impl Collection {
 
 impl std::fmt::Debug for Collection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_list().entries(self.servers.iter().map(|s| s.name())).finish()
+        f.debug_list()
+            .entries(self.servers.iter().map(|s| s.name()))
+            .finish()
     }
 }

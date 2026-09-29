@@ -13,7 +13,9 @@ use serde_json::json;
 use support::{Cassette, config_for};
 
 async fn start(name: &str) -> Cassette {
-    Cassette::start(name).await.unwrap_or_else(|| panic!("missing cassette {name}; run bin/convert-cassettes 'video_*'"))
+    Cassette::start(name)
+        .await
+        .unwrap_or_else(|| panic!("missing cassette {name}; run bin/convert-cassettes 'video_*'"))
 }
 
 /// The replay server's config with polling that never sleeps.
@@ -26,7 +28,11 @@ fn no_wait(cassette: &Cassette, provider: &str) -> Arc<Config> {
 /// Hosted videos download from the provider's CDN; send that request to the replay server.
 fn hosted_on(video: &mut Video, cassette: &Cassette) {
     let url = video.url.clone().expect("hosted video url");
-    let path = url.split_once("://").and_then(|(_, rest)| rest.split_once('/')).map(|(_, p)| p).unwrap_or("");
+    let path = url
+        .split_once("://")
+        .and_then(|(_, rest)| rest.split_once('/'))
+        .map(|(_, p)| p)
+        .unwrap_or("");
     video.url = Some(format!("{}/{path}", cassette.server.uri()));
 }
 
@@ -37,14 +43,19 @@ async fn saves_a_real_clip(video: &Video) {
     assert_eq!(saved, path);
     let size = std::fs::metadata(&path).expect("saved file").len();
     std::fs::remove_file(&path).ok();
-    assert!(size > 10_000, "a real clip is larger than 10KB, saved {size} bytes");
+    assert!(
+        size > 10_000,
+        "a real clip is larger than 10KB, saved {size} bytes"
+    );
 }
 
 /// "gemini/veo-3.1-lite-generate-preview can animate videos": predictLongRunning, six pending
 /// polls, then an authenticated download of the Files API URI.
 #[tokio::test]
 async fn gemini_can_animate_videos() {
-    let cassette = start("video_basic_functionality_gemini_veo-3_1-lite-generate-preview_can_animate_videos").await;
+    let cassette =
+        start("video_basic_functionality_gemini_veo-3_1-lite-generate-preview_can_animate_videos")
+            .await;
     let base = cassette.server.uri();
     let options = AnimateOptions {
         model: Some("veo-3.1-lite-generate-preview"),
@@ -54,19 +65,41 @@ async fn gemini_can_animate_videos() {
         ..Default::default()
     };
     // The download URI is absolute; point it at the replay server by rewriting the job's response.
-    let mut job = animate_later(Some("a calm ocean wave at sunset"), options).await.unwrap();
-    assert_eq!(job.id, "models/veo-3.1-lite-generate-preview/operations/q7m9xli7kryn");
+    let mut job = animate_later(Some("a calm ocean wave at sunset"), options)
+        .await
+        .unwrap();
+    assert_eq!(
+        job.id,
+        "models/veo-3.1-lite-generate-preview/operations/q7m9xli7kryn"
+    );
     assert!(job.is_pending());
     job.wait(None, None).await.unwrap();
     assert!(job.is_completed());
-    let uri = job.raw.pointer("/response/generateVideoResponse/generatedSamples/0/video/uri").and_then(|u| u.as_str()).unwrap().to_string();
-    let path = uri.split_once("://").and_then(|(_, rest)| rest.split_once('/')).map(|(_, p)| p).unwrap();
-    job.raw["response"]["generateVideoResponse"]["generatedSamples"][0]["video"]["uri"] = json!(format!("{base}/{path}"));
-    let video = job.video().await.unwrap().expect("a completed job has a video");
+    let uri = job
+        .raw
+        .pointer("/response/generateVideoResponse/generatedSamples/0/video/uri")
+        .and_then(|u| u.as_str())
+        .unwrap()
+        .to_string();
+    let path = uri
+        .split_once("://")
+        .and_then(|(_, rest)| rest.split_once('/'))
+        .map(|(_, p)| p)
+        .unwrap();
+    job.raw["response"]["generateVideoResponse"]["generatedSamples"][0]["video"]["uri"] =
+        json!(format!("{base}/{path}"));
+    let video = job
+        .video()
+        .await
+        .unwrap()
+        .expect("a completed job has a video");
 
     assert!(video.mime_type.as_deref().unwrap().contains("video"));
     assert!(video.data.is_some());
-    assert_eq!(video.model.as_deref(), Some("veo-3.1-lite-generate-preview"));
+    assert_eq!(
+        video.model.as_deref(),
+        Some("veo-3.1-lite-generate-preview")
+    );
     saves_a_real_clip(&video).await;
     cassette.assert_all_matched().await;
 }
@@ -74,7 +107,8 @@ async fn gemini_can_animate_videos() {
 /// "xai/grok-imagine-video can animate videos" through the blocking `animate`.
 #[tokio::test]
 async fn xai_can_animate_videos() {
-    let cassette = start("video_basic_functionality_xai_grok-imagine-video_can_animate_videos").await;
+    let cassette =
+        start("video_basic_functionality_xai_grok-imagine-video_can_animate_videos").await;
     let options = AnimateOptions {
         model: Some("grok-imagine-video"),
         provider: Some("xai"),
@@ -82,7 +116,9 @@ async fn xai_can_animate_videos() {
         config: Some(no_wait(&cassette, "xai")),
         ..Default::default()
     };
-    let mut video = animate(Some("a calm ocean wave at sunset"), options).await.unwrap();
+    let mut video = animate(Some("a calm ocean wave at sunset"), options)
+        .await
+        .unwrap();
 
     assert_eq!(video.mime_type.as_deref(), Some("video/mp4"));
     assert!(video.url.is_some());
@@ -98,17 +134,28 @@ async fn xai_can_animate_videos() {
 /// takes the `videos/edits` route.
 #[tokio::test]
 async fn xai_completes_a_video_edit() {
-    let cassette = start("providers_xai_videos_completes_a_video_edit_through_the_public_api").await;
+    let cassette =
+        start("providers_xai_videos_completes_a_video_edit_through_the_public_api").await;
     let context = rust_llm::Context::new((*no_wait(&cassette, "xai")).clone());
     let options = AnimateOptions {
         model: Some("grok-imagine-video"),
         provider: Some("xai"),
-        with: vec![rust_llm::Attachment::new("https://data.x.ai/docs/video-generation/portrait-wave.mp4")],
+        with: vec![rust_llm::Attachment::new(
+            "https://data.x.ai/docs/video-generation/portrait-wave.mp4",
+        )],
         ..Default::default()
     };
-    let mut job = context.animate_later(Some("Make the background blue"), options).await.unwrap();
+    let mut job = context
+        .animate_later(Some("Make the background blue"), options)
+        .await
+        .unwrap();
     assert!(!job.id.is_empty());
-    assert!(job.wait(Some(Duration::from_secs(180)), None).await.unwrap().is_completed());
+    assert!(
+        job.wait(Some(Duration::from_secs(180)), None)
+            .await
+            .unwrap()
+            .is_completed()
+    );
     let mut video = job.video().await.unwrap().unwrap();
     assert_eq!(video.mime_type.as_deref(), Some("video/mp4"));
     assert_eq!(video.raw["status"], "done");
@@ -120,7 +167,8 @@ async fn xai_completes_a_video_edit() {
 /// xai/videos_spec.rb "completes a video extension through the public API".
 #[tokio::test]
 async fn xai_completes_a_video_extension() {
-    let cassette = start("providers_xai_videos_completes_a_video_extension_through_the_public_api").await;
+    let cassette =
+        start("providers_xai_videos_completes_a_video_extension_through_the_public_api").await;
     let context = rust_llm::Context::new((*no_wait(&cassette, "xai")).clone());
     let options = AnimateOptions {
         model: Some("grok-imagine-video"),
@@ -129,8 +177,16 @@ async fn xai_completes_a_video_extension() {
         provider_options: json!({ "duration": 2 }),
         ..Default::default()
     };
-    let mut job = context.animate_later(Some("Continue the gentle waving motion"), options).await.unwrap();
-    assert!(job.wait(Some(Duration::from_secs(180)), None).await.unwrap().is_completed());
+    let mut job = context
+        .animate_later(Some("Continue the gentle waving motion"), options)
+        .await
+        .unwrap();
+    assert!(
+        job.wait(Some(Duration::from_secs(180)), None)
+            .await
+            .unwrap()
+            .is_completed()
+    );
     let mut video = job.video().await.unwrap().unwrap();
     assert_eq!(video.raw["status"], "done");
     hosted_on(&mut video, &cassette);
@@ -141,7 +197,15 @@ async fn xai_completes_a_video_extension() {
 /// "validates model existence".
 #[tokio::test]
 async fn validates_model_existence() {
-    let err = animate(Some("a cat"), AnimateOptions { model: Some("invalid-model"), ..Default::default() }).await.unwrap_err();
+    let err = animate(
+        Some("a cat"),
+        AnimateOptions {
+            model: Some("invalid-model"),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap_err();
     assert!(matches!(err, Error::ModelNotFound(_)), "{err}");
 }
 
@@ -150,9 +214,17 @@ async fn validates_model_existence() {
 async fn providers_without_video_generation_fail_clearly() {
     let mut config = Config::default();
     config.set("anthropic_api_key", "test");
-    let options = AnimateOptions { model: Some("claude-haiku-4-5"), config: Some(config.into()), ..Default::default() };
+    let options = AnimateOptions {
+        model: Some("claude-haiku-4-5"),
+        config: Some(config.into()),
+        ..Default::default()
+    };
     let err = animate_later(Some("a cat"), options).await.unwrap_err();
-    assert!(err.to_string().contains("Anthropic doesn't support video generation"), "{err}");
+    assert!(
+        err.to_string()
+            .contains("Anthropic doesn't support video generation"),
+        "{err}"
+    );
 }
 
 /// xai/videos_spec.rb "rejects conflicting sources ... before sending requests".
@@ -181,40 +253,92 @@ async fn wait_honors_the_deadline_and_surfaces_failures() {
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     let server = MockServer::start().await;
-    Mock::given(method("POST")).and(path("/v1/videos/generations"))
+    Mock::given(method("POST"))
+        .and(path("/v1/videos/generations"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "request_id": "slow" })))
-        .mount(&server).await;
-    Mock::given(method("GET")).and(path("/v1/videos/slow"))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v1/videos/slow"))
         .respond_with(ResponseTemplate::new(202).set_body_json(json!({ "status": "pending" })))
-        .mount(&server).await;
-    Mock::given(method("GET")).and(path("/v1/videos/bad"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "status": "failed", "error": "flagged by moderation" })))
-        .mount(&server).await;
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v1/videos/bad"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "status": "failed", "error": "flagged by moderation" })),
+        )
+        .mount(&server)
+        .await;
 
     let mut config = Config::default();
     config.set("xai_api_key", "test");
     config.set("xai_api_base", format!("{}/v1", server.uri()));
     config.max_retries = 0;
     let config = Arc::new(config);
-    let options = || AnimateOptions { model: Some("grok-imagine-video"), provider: Some("xai"), config: Some(config.clone()), ..Default::default() };
+    let options = || AnimateOptions {
+        model: Some("grok-imagine-video"),
+        provider: Some("xai"),
+        config: Some(config.clone()),
+        ..Default::default()
+    };
 
     let mut job = animate_later(Some("a cat"), options()).await.unwrap();
-    assert_eq!(job.video().await.unwrap().map(|_| ()), None, "no video while pending");
-    let err = job.wait(Some(Duration::ZERO), Some(Duration::ZERO)).await.unwrap_err();
-    assert_eq!(err.to_string(), "Video generation timed out after 0 seconds");
+    assert_eq!(
+        job.video().await.unwrap().map(|_| ()),
+        None,
+        "no video while pending"
+    );
+    let err = job
+        .wait(Some(Duration::ZERO), Some(Duration::ZERO))
+        .await
+        .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "Video generation timed out after 0 seconds"
+    );
 
     let started = std::time::Instant::now();
-    let err = job.wait(Some(Duration::from_millis(200)), Some(Duration::from_secs(60))).await.unwrap_err();
-    assert!(started.elapsed() < Duration::from_secs(5), "slept past the deadline: {:?}", started.elapsed());
-    assert!(err.to_string().contains("timed out after 0.2 seconds"), "{err}");
+    let err = job
+        .wait(
+            Some(Duration::from_millis(200)),
+            Some(Duration::from_secs(60)),
+        )
+        .await
+        .unwrap_err();
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "slept past the deadline: {:?}",
+        started.elapsed()
+    );
+    assert!(
+        err.to_string().contains("timed out after 0.2 seconds"),
+        "{err}"
+    );
 
     job.id = "bad".into();
-    let err = job.wait(Some(Duration::from_secs(10)), Some(Duration::ZERO)).await.unwrap_err();
+    let err = job
+        .wait(Some(Duration::from_secs(10)), Some(Duration::ZERO))
+        .await
+        .unwrap_err();
     assert!(err.to_string().contains("flagged by moderation"), "{err}");
     assert_eq!(job.status, VideoStatus::Failed);
-    assert!(job.video().await.unwrap_err().to_string().contains("flagged by moderation"));
+    assert!(
+        job.video()
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("flagged by moderation")
+    );
     // Done jobs stop refreshing.
     job.refresh().await.unwrap();
-    let polls = server.received_requests().await.unwrap().iter().filter(|r| r.url.path() == "/v1/videos/bad").count();
+    let polls = server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .filter(|r| r.url.path() == "/v1/videos/bad")
+        .count();
     assert_eq!(polls, 1);
 }

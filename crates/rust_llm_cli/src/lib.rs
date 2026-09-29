@@ -64,7 +64,14 @@ pub struct Generator {
 
 impl Generator {
     pub fn new(root: impl Into<PathBuf>, force: bool) -> Generator {
-        Generator { root: root.into(), force, echo: false, actions: Vec::new(), failures: Vec::new(), notes: Vec::new() }
+        Generator {
+            root: root.into(),
+            force,
+            echo: false,
+            actions: Vec::new(),
+            failures: Vec::new(),
+            notes: Vec::new(),
+        }
     }
 
     /// Print each action as it happens, like `say_status`.
@@ -132,7 +139,9 @@ impl Generator {
     /// `identical` (not inserted twice) when the file already contains it.
     pub fn inject(&mut self, rel: &str, content: &str, anchor: Anchor) {
         let Some(existing) = self.read(rel) else {
-            return self.fail(format!("{rel}: file not found; add this yourself:\n{content}"));
+            return self.fail(format!(
+                "{rel}: file not found; add this yourself:\n{content}"
+            ));
         };
         // Whole trimmed lines, so `mod chats;` is not found inside `pub mod chats;`.
         let normalize = |s: &str| {
@@ -142,9 +151,17 @@ impl Generator {
         if normalize(&existing).contains(&normalize(content)) {
             return self.record("identical", rel);
         }
-        let first = content.lines().find(|l| !l.trim().is_empty()).unwrap_or("").trim();
+        let first = content
+            .lines()
+            .find(|l| !l.trim().is_empty())
+            .unwrap_or("")
+            .trim();
         // A blank file (the kit's `src/initializers/mod.rs` is a lone newline) becomes the content.
-        let lines: Vec<&str> = if existing.trim().is_empty() { Vec::new() } else { existing.lines().collect() };
+        let lines: Vec<&str> = if existing.trim().is_empty() {
+            Vec::new()
+        } else {
+            existing.lines().collect()
+        };
         let at = match anchor {
             Anchor::Before(marker) => lines.iter().position(|l| l.contains(marker)),
             Anchor::After(marker) => lines.iter().position(|l| l.contains(marker)).map(|i| i + 1),
@@ -154,7 +171,9 @@ impl Generator {
             let marker = match anchor {
                 Anchor::Before(m) | Anchor::After(m) | Anchor::Sorted(m) => m,
             };
-            return self.fail(format!("{rel}: anchor `{marker}` not found; add this yourself:\n{content}"));
+            return self.fail(format!(
+                "{rel}: anchor `{marker}` not found; add this yourself:\n{content}"
+            ));
         };
         let mut out: Vec<&str> = lines[..at].to_vec();
         out.extend(content.lines());
@@ -183,7 +202,10 @@ impl Generator {
             match existing[at..].find(marker) {
                 Some(i) => at += i + marker.len(),
                 None => {
-                    return self.fail(format!("{rel}: `{}` not found; add `{present}` yourself", markers.join(" .. ")));
+                    return self.fail(format!(
+                        "{rel}: `{}` not found; add `{present}` yourself",
+                        markers.join(" .. ")
+                    ));
                 }
             }
         }
@@ -198,7 +220,9 @@ impl Generator {
     /// kit's `scaffold:pages` does for the sidebar.
     pub fn named_import(&mut self, rel: &str, module: &str, name: &str) {
         let Some(existing) = self.read(rel) else {
-            return self.fail(format!("{rel}: file not found; import `{name}` from \"{module}\" yourself"));
+            return self.fail(format!(
+                "{rel}: file not found; import `{name}` from \"{module}\" yourself"
+            ));
         };
         let suffix = format!(" }} from \"{module}\"");
         let mut found = false;
@@ -206,7 +230,10 @@ impl Generator {
         let lines: Vec<String> = existing
             .lines()
             .map(|line| {
-                let Some(names) = line.strip_prefix("import { ").and_then(|l| l.strip_suffix(&suffix)) else {
+                let Some(names) = line
+                    .strip_prefix("import { ")
+                    .and_then(|l| l.strip_suffix(&suffix))
+                else {
                     return line.to_string();
                 };
                 found = true;
@@ -221,7 +248,9 @@ impl Generator {
             })
             .collect();
         if !found {
-            return self.fail(format!("{rel}: no one-line import from \"{module}\"; import `{name}` yourself"));
+            return self.fail(format!(
+                "{rel}: no one-line import from \"{module}\"; import `{name}` yourself"
+            ));
         }
         if !changed {
             return self.record("identical", rel);
@@ -241,24 +270,39 @@ impl Generator {
         if !self.exists(&rel) {
             self.file(&rel, doc);
         }
-        self.inject("src/lib.rs", &format!("pub mod {dir};"), Anchor::Sorted("pub mod "));
+        self.inject(
+            "src/lib.rs",
+            &format!("pub mod {dir};"),
+            Anchor::Sorted("pub mod "),
+        );
     }
 
     /// Adds `name = spec` to a Cargo.toml `[dependencies]` table, after its last entry.
     pub fn dependency(&mut self, rel: &str, name: &str, spec: &str) {
         let Some(existing) = self.read(rel) else {
-            return self.fail(format!("{rel}: file not found; add `{name} = {spec}` to [dependencies]"));
+            return self.fail(format!(
+                "{rel}: file not found; add `{name} = {spec}` to [dependencies]"
+            ));
         };
         let line = format!("{name} = {spec}");
         let lines: Vec<&str> = existing.lines().collect();
         let Some(start) = lines.iter().position(|l| l.trim() == "[dependencies]") else {
             return self.fail(format!("{rel}: no [dependencies] table; add `{line}`"));
         };
-        let end = lines[start + 1..].iter().position(|l| l.trim_start().starts_with('[')).map_or(lines.len(), |i| start + 1 + i);
-        if lines[start + 1..end].iter().any(|l| l.split('=').next().is_some_and(|k| k.trim() == name)) {
+        let end = lines[start + 1..]
+            .iter()
+            .position(|l| l.trim_start().starts_with('['))
+            .map_or(lines.len(), |i| start + 1 + i);
+        if lines[start + 1..end]
+            .iter()
+            .any(|l| l.split('=').next().is_some_and(|k| k.trim() == name))
+        {
             return self.record("identical", rel);
         }
-        let last = lines[start + 1..end].iter().rposition(|l| !l.trim().is_empty()).map_or(start + 1, |i| start + 2 + i);
+        let last = lines[start + 1..end]
+            .iter()
+            .rposition(|l| !l.trim().is_empty())
+            .map_or(start + 1, |i| start + 2 + i);
         let mut out: Vec<&str> = lines[..last].to_vec();
         out.push(&line);
         out.extend(&lines[last..]);
@@ -275,10 +319,23 @@ impl Generator {
 /// comments that belong to the next one.
 fn sorted_index(lines: &[&str], line: &str, prefix: &str) -> usize {
     let key = |l: &str| l.trim().trim_end_matches(';').to_string();
-    let matching: Vec<usize> = (0..lines.len()).filter(|&i| lines[i].starts_with(prefix)).collect();
-    let Some(&last) = matching.last() else { return lines.len() };
-    let Some(mut at) = matching.iter().copied().find(|&i| key(line) < key(lines[i])) else { return last + 1 };
-    while at > 0 && (lines[at - 1].trim_start().starts_with("#[") || lines[at - 1].trim_start().starts_with("///")) {
+    let matching: Vec<usize> = (0..lines.len())
+        .filter(|&i| lines[i].starts_with(prefix))
+        .collect();
+    let Some(&last) = matching.last() else {
+        return lines.len();
+    };
+    let Some(mut at) = matching
+        .iter()
+        .copied()
+        .find(|&i| key(line) < key(lines[i]))
+    else {
+        return last + 1;
+    };
+    while at > 0
+        && (lines[at - 1].trim_start().starts_with("#[")
+            || lines[at - 1].trim_start().starts_with("///"))
+    {
         at -= 1;
     }
     at
@@ -301,7 +358,10 @@ pub fn camelize(name: &str) -> String {
         .filter(|w| !w.is_empty())
         .map(|w| {
             let mut chars = w.chars();
-            chars.next().map(|c| c.to_ascii_uppercase().to_string() + chars.as_str()).unwrap_or_default()
+            chars
+                .next()
+                .map(|c| c.to_ascii_uppercase().to_string() + chars.as_str())
+                .unwrap_or_default()
         })
         .collect()
 }
@@ -315,12 +375,20 @@ pub fn underscore(name: &str) -> String {
 /// supported: Rust modules would need a `mod.rs` per level.
 pub fn class_name(name: &str, suffix: &str) -> Result<String, String> {
     let ok = name.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
-        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
     if !ok {
-        return Err(format!("invalid name {name:?}: use letters, digits, `_` or `-` (namespaces are not supported)"));
+        return Err(format!(
+            "invalid name {name:?}: use letters, digits, `_` or `-` (namespaces are not supported)"
+        ));
     }
     let class = camelize(name);
-    Ok(if class.ends_with(suffix) { class } else { format!("{class}{suffix}") })
+    Ok(if class.ends_with(suffix) {
+        class
+    } else {
+        format!("{class}{suffix}")
+    })
 }
 
 pub const USAGE: &str = "Usage:
@@ -368,7 +436,11 @@ pub fn run(args: &[String], cwd: &Path) -> i32 {
         i += 1;
     }
     let option = |name: &str| options.iter().find(|(k, _)| *k == name).map(|(_, v)| *v);
-    let (command, generator, name) = (positional.first(), positional.get(1), positional.get(2).copied());
+    let (command, generator, name) = (
+        positional.first(),
+        positional.get(1),
+        positional.get(2).copied(),
+    );
     if !matches!(command, Some(&"generate") | Some(&"g")) {
         eprintln!("{USAGE}");
         return 1;
@@ -379,19 +451,28 @@ pub fn run(args: &[String], cwd: &Path) -> i32 {
         Some("install") => install::generate(&mut generator_run, option("--path")),
         Some("tool") => needs_name("tool").and_then(|n| tool::generate(&mut generator_run, n)),
         Some("agent") => needs_name("agent").and_then(|n| agent::generate(&mut generator_run, n)),
-        Some("schema") => needs_name("schema").and_then(|n| schema::generate(&mut generator_run, n)),
+        Some("schema") => {
+            needs_name("schema").and_then(|n| schema::generate(&mut generator_run, n))
+        }
         Some("chat_ui") => chat_ui::generate(&mut generator_run),
         Some("provider") => needs_name("provider").and_then(|n| {
             let root = option("--destination").map_or_else(|| cwd.to_path_buf(), |d| cwd.join(d));
             generator_run = Generator::new(root, force).echo();
-            let opts = provider::Options { dialect: option("--dialect"), api_base: option("--api-base"), dynamic_models };
+            let opts = provider::Options {
+                dialect: option("--dialect"),
+                api_base: option("--api-base"),
+                dynamic_models,
+            };
             provider::generate(&mut generator_run, n, &opts)
         }),
         Some("upgrade") => {
             upgrade::generate(&mut generator_run);
             Ok(())
         }
-        other => Err(format!("Unknown generator: {}\n\n{USAGE}", other.unwrap_or("(none)"))),
+        other => Err(format!(
+            "Unknown generator: {}\n\n{USAGE}",
+            other.unwrap_or("(none)")
+        )),
     };
     if let Err(message) = result {
         eprintln!("{message}");
@@ -400,5 +481,9 @@ pub fn run(args: &[String], cwd: &Path) -> i32 {
     for line in &generator_run.notes {
         println!("{line}");
     }
-    if generator_run.failures.is_empty() { 0 } else { 1 }
+    if generator_run.failures.is_empty() {
+        0
+    } else {
+        1
+    }
 }

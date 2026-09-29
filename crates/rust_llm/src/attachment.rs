@@ -64,25 +64,61 @@ impl PartialEq for Wanted {
 }
 
 const DOCUMENT_EXTENSIONS: &[&str] = &[
-    "doc", "docx", "dot", "key", "numbers", "odp", "ods", "odt", "pages", "pot", "pps", "ppt", "pptx", "rtf",
-    "xls", "xlsx",
+    "doc", "docx", "dot", "key", "numbers", "odp", "ods", "odt", "pages", "pot", "pps", "ppt",
+    "pptx", "rtf", "xls", "xlsx",
 ];
-const TEXT_SUFFIXES: &[&str] = &["+json", "+xml", "+html", "+yaml", "+csv", "+plain", "+javascript", "+svg"];
+const TEXT_SUFFIXES: &[&str] = &[
+    "+json",
+    "+xml",
+    "+html",
+    "+yaml",
+    "+csv",
+    "+plain",
+    "+javascript",
+    "+svg",
+];
 const TEXT_MIME_TYPES: &[&str] = &[
-    "application/json", "application/xml", "application/javascript", "application/ecmascript",
-    "application/rtf", "application/sql", "application/x-sh", "application/x-csh", "application/x-httpd-php",
-    "application/sdp", "application/sparql-query", "application/graphql", "application/yang", "application/mbox",
-    "application/x-tex", "application/x-latex", "application/x-perl", "application/x-python", "application/x-tcl",
-    "application/pgp-signature", "application/pgp-keys", "application/vnd.coffeescript", "application/vnd.dart",
-    "application/vnd.oai.openapi", "application/vnd.zul", "application/x-yaml", "application/yaml",
+    "application/json",
+    "application/xml",
+    "application/javascript",
+    "application/ecmascript",
+    "application/rtf",
+    "application/sql",
+    "application/x-sh",
+    "application/x-csh",
+    "application/x-httpd-php",
+    "application/sdp",
+    "application/sparql-query",
+    "application/graphql",
+    "application/yang",
+    "application/mbox",
+    "application/x-tex",
+    "application/x-latex",
+    "application/x-perl",
+    "application/x-python",
+    "application/x-tcl",
+    "application/pgp-signature",
+    "application/pgp-keys",
+    "application/vnd.coffeescript",
+    "application/vnd.dart",
+    "application/vnd.oai.openapi",
+    "application/vnd.zul",
+    "application/x-yaml",
+    "application/yaml",
     "application/toml",
 ];
 const DOCUMENT_MIME_TYPES: &[&str] = &[
-    "application/msword", "application/rtf", "application/vnd.apple.keynote", "application/vnd.apple.numbers",
-    "application/vnd.apple.pages", "application/vnd.google-apps.document",
+    "application/msword",
+    "application/rtf",
+    "application/vnd.apple.keynote",
+    "application/vnd.apple.numbers",
+    "application/vnd.apple.pages",
+    "application/vnd.google-apps.document",
 ];
-const DOCUMENT_MIME_PREFIXES: &[&str] =
-    &["application/vnd.openxmlformats-officedocument.", "application/vnd.oasis.opendocument."];
+const DOCUMENT_MIME_PREFIXES: &[&str] = &[
+    "application/vnd.openxmlformats-officedocument.",
+    "application/vnd.oasis.opendocument.",
+];
 
 /// The magic numbers Marcel checks for the media types attachments carry.
 fn sniff(bytes: &[u8]) -> Option<&'static str> {
@@ -110,14 +146,22 @@ fn sniff(bytes: &[u8]) -> Option<&'static str> {
 
 /// `Files::MimeType.for(StringIO.new(bytes))`: the type Marcel reads from the magic numbers.
 pub(crate) fn mime_type_for_bytes(bytes: &[u8]) -> String {
-    sniff(bytes).unwrap_or("application/octet-stream").to_string()
+    sniff(bytes)
+        .unwrap_or("application/octet-stream")
+        .to_string()
 }
 
 /// Text formats `mime_guess` maps to octet-stream but Marcel knows as text.
-const TEXT_EXTENSIONS: &[&str] = &["rb", "rs", "py", "go", "ts", "tsx", "jsx", "md", "yml", "yaml", "toml", "sh"];
+const TEXT_EXTENSIONS: &[&str] = &[
+    "rb", "rs", "py", "go", "ts", "tsx", "jsx", "md", "yml", "yaml", "toml", "sh",
+];
 
 fn mime_for_name(name: &str) -> String {
-    let ext = Path::new(name).extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    let ext = Path::new(name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
     if TEXT_EXTENSIONS.contains(&ext.as_str()) {
         return "text/plain".into();
     }
@@ -152,18 +196,40 @@ impl Attachment {
             let path = source.split(['?', '#']).next().unwrap_or(source);
             let filename = path.rsplit('/').next().map(str::to_string);
             let mime = mime_for_name(filename.as_deref().unwrap_or(""));
-            Attachment { source: Source::Url(source.to_string()), filename, mime_type: mime, resolution: None, content: Default::default(), wanted: Default::default(), provider_uploads: Default::default() }
+            Attachment {
+                source: Source::Url(source.to_string()),
+                filename,
+                mime_type: mime,
+                resolution: None,
+                content: Default::default(),
+                wanted: Default::default(),
+                provider_uploads: Default::default(),
+            }
         } else {
             let path = PathBuf::from(source);
             let filename = path.file_name().map(|f| f.to_string_lossy().into_owned());
             let mime = mime_for_name(source);
-            Attachment { source: Source::Path(path), filename, mime_type: mime, resolution: None, content: Default::default(), wanted: Default::default(), provider_uploads: Default::default() }
+            Attachment {
+                source: Source::Path(path),
+                filename,
+                mime_type: mime,
+                resolution: None,
+                content: Default::default(),
+                wanted: Default::default(),
+                provider_uploads: Default::default(),
+            }
         }
     }
 
-    pub fn from_bytes(bytes: Vec<u8>, filename: impl Into<String>, mime_type: Option<&str>) -> Attachment {
+    pub fn from_bytes(
+        bytes: Vec<u8>,
+        filename: impl Into<String>,
+        mime_type: Option<&str>,
+    ) -> Attachment {
         let filename = filename.into();
-        let mime = mime_type.map(str::to_string).unwrap_or_else(|| mime_for_name(&filename));
+        let mime = mime_type
+            .map(str::to_string)
+            .unwrap_or_else(|| mime_for_name(&filename));
         Attachment {
             source: Source::Bytes(bytes.clone()),
             filename: Some(filename),
@@ -194,7 +260,10 @@ impl Attachment {
     /// `Attachment.new(uploaded_file)`: the filename and MIME type come from the provider's record.
     pub fn from_uploaded(file: crate::files::UploadedFile) -> Attachment {
         let filename = file.filename.clone();
-        let mime = file.mime_type.clone().unwrap_or_else(|| mime_for_name(filename.as_deref().unwrap_or("")));
+        let mime = file
+            .mime_type
+            .clone()
+            .unwrap_or_else(|| mime_for_name(filename.as_deref().unwrap_or("")));
         Attachment {
             source: Source::ProviderFile(Box::new(file)),
             filename,
@@ -209,7 +278,10 @@ impl Attachment {
     /// `Attachment.new(source, filename:)`: the same source under another name, typed by that name.
     pub(crate) fn with_filename(&self, filename: &str) -> Attachment {
         let mime_type = match &self.source {
-            Source::ProviderFile(f) => f.mime_type.clone().unwrap_or_else(|| mime_for_name(filename)),
+            Source::ProviderFile(f) => f
+                .mime_type
+                .clone()
+                .unwrap_or_else(|| mime_for_name(filename)),
             _ => mime_for_name(filename),
         };
         Attachment {
@@ -280,9 +352,10 @@ impl Attachment {
                 .to_vec(),
         };
         if self.mime_type == "application/octet-stream"
-            && let Some(mime) = sniff(&bytes) {
-                self.mime_type = mime.to_string();
-            }
+            && let Some(mime) = sniff(&bytes)
+        {
+            self.mime_type = mime.to_string();
+        }
         let _ = self.content.set(bytes);
         Ok(())
     }
@@ -299,13 +372,19 @@ impl Attachment {
 
     pub(crate) fn bytes(&self) -> Result<&[u8]> {
         if let Some(id) = self.provider_file_id() {
-            return Err(Error::Api(format!("Provider-managed file {id} cannot be read as inline attachment content"), None));
+            return Err(Error::Api(
+                format!("Provider-managed file {id} cannot be read as inline attachment content"),
+                None,
+            ));
         }
         if self.is_url() && self.content.get().is_none() {
             self.wanted.0.store(true, Ordering::SeqCst);
         }
         self.content.get().map(Vec::as_slice).ok_or_else(|| {
-            Error::Argument(format!("attachment {:?} was not loaded before rendering", self.filename))
+            Error::Argument(format!(
+                "attachment {:?} was not loaded before rendering",
+                self.filename
+            ))
         })
     }
 
@@ -314,7 +393,8 @@ impl Attachment {
     pub async fn content(&mut self) -> Result<Vec<u8>> {
         if !self.is_provider_file() {
             // `Connection.basic(config)` with the global configuration's proxy and timeout.
-            self.load(&crate::transport::basic(&crate::config())?).await?;
+            self.load(&crate::transport::basic(&crate::config())?)
+                .await?;
         }
         self.bytes().map(<[u8]>::to_vec)
     }
@@ -328,7 +408,11 @@ impl Attachment {
     }
 
     pub fn data_uri(&self) -> Result<String> {
-        Ok(format!("data:{};base64,{}", self.mime_type, self.encoded()?))
+        Ok(format!(
+            "data:{};base64,{}",
+            self.mime_type,
+            self.encoded()?
+        ))
     }
 
     pub fn url_or_data_uri(&self) -> Result<String> {
@@ -372,7 +456,9 @@ impl Attachment {
 
     fn is_text(&self) -> bool {
         let m = self.mime_type.as_str();
-        m.starts_with("text/") || TEXT_SUFFIXES.iter().any(|s| m.ends_with(s)) || TEXT_MIME_TYPES.contains(&m)
+        m.starts_with("text/")
+            || TEXT_SUFFIXES.iter().any(|s| m.ends_with(s))
+            || TEXT_MIME_TYPES.contains(&m)
     }
 
     fn is_document(&self) -> bool {
@@ -393,7 +479,12 @@ impl Attachment {
 
     /// `Attachment#extension`: the filename's extension, downcased; `None` without one.
     pub fn extension(&self) -> Option<String> {
-        self.filename.as_deref().and_then(|f| Path::new(f).extension()).and_then(|e| e.to_str()).filter(|e| !e.is_empty()).map(str::to_lowercase)
+        self.filename
+            .as_deref()
+            .and_then(|f| Path::new(f).extension())
+            .and_then(|e| e.to_str())
+            .filter(|e| !e.is_empty())
+            .map(str::to_lowercase)
     }
 
     /// `Attachment#format`: the short audio format name providers expect.
@@ -417,12 +508,18 @@ mod tests {
         assert_eq!(Attachment::new("app.rb").kind(), AttachmentType::Text);
         assert_eq!(Attachment::new("meeting.wav").kind(), AttachmentType::Audio);
         assert_eq!(Attachment::new("meeting.wav").format(), "wav");
-        assert_eq!(Attachment::new("deck.pptx").kind(), AttachmentType::Document);
+        assert_eq!(
+            Attachment::new("deck.pptx").kind(),
+            AttachmentType::Document
+        );
     }
 
     #[test]
     fn text_files_are_wrapped_for_the_model() {
         let a = Attachment::from_bytes(b"puts 1".to_vec(), "app.rb", None);
-        assert_eq!(a.for_llm().unwrap(), "<file name='app.rb' mime_type='text/plain'>puts 1</file>");
+        assert_eq!(
+            a.for_llm().unwrap(),
+            "<file name='app.rb' mime_type='text/plain'>puts 1</file>"
+        );
     }
 }

@@ -29,14 +29,20 @@ use crate::providers::{ProtocolName, Provider};
 /// vocabulary, or the provider's tool definition passed verbatim.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProviderTool {
-    Alias { name: String, options: Map<String, Value> },
+    Alias {
+        name: String,
+        options: Map<String, Value>,
+    },
     Raw(Value),
 }
 
 impl ProviderTool {
     /// `with_provider_tools(:web_search)`.
     pub fn alias(name: impl Into<String>) -> ProviderTool {
-        ProviderTool::Alias { name: name.into(), options: Map::new() }
+        ProviderTool::Alias {
+            name: name.into(),
+            options: Map::new(),
+        }
     }
 
     /// `with_provider_tools(web_search: { allowed_domains: [...] })`.
@@ -45,7 +51,10 @@ impl ProviderTool {
             Value::Object(map) => map,
             _ => Map::new(),
         };
-        ProviderTool::Alias { name: name.into(), options }
+        ProviderTool::Alias {
+            name: name.into(),
+            options,
+        }
     }
 
     /// `with_provider_tools({ type: "...", ... })`: a tool RubyLLM has no alias for yet.
@@ -88,7 +97,10 @@ impl Resolution {
             Spec::Build(build) => build(options)?,
             Spec::Tool(mut tool) => {
                 deep_merge(&mut tool, &Value::Object(options.clone()));
-                Entry { tool: Some(tool), ..Default::default() }
+                Entry {
+                    tool: Some(tool),
+                    ..Default::default()
+                }
             }
         };
         self.tools.extend(entry.tool);
@@ -102,7 +114,9 @@ impl Resolution {
                         }
                     }
                 }
-                (Some(current @ Value::Object(_)), Value::Object(_)) => deep_merge(current, &addition),
+                (Some(current @ Value::Object(_)), Value::Object(_)) => {
+                    deep_merge(current, &addition)
+                }
                 _ => {
                     self.payload.insert(key, addition);
                 }
@@ -111,7 +125,9 @@ impl Resolution {
         // Anthropic-style beta headers combine as comma-separated values.
         for (key, value) in entry.headers {
             match self.headers.iter_mut().find(|(k, _)| *k == key) {
-                Some((_, existing)) if !existing.split(',').any(|v| v == value) => *existing = format!("{existing},{value}"),
+                Some((_, existing)) if !existing.split(',').any(|v| v == value) => {
+                    *existing = format!("{existing},{value}")
+                }
                 Some(_) => {}
                 None => self.headers.push((key, value)),
             }
@@ -121,7 +137,11 @@ impl Resolution {
 }
 
 /// `Protocol#resolve_provider_tools_for_request`. `None` when the chat enabled none.
-pub(crate) fn resolve(protocol: ProtocolName, provider: Provider, entries: &[ProviderTool]) -> Result<Option<Resolution>> {
+pub(crate) fn resolve(
+    protocol: ProtocolName,
+    provider: Provider,
+    entries: &[ProviderTool],
+) -> Result<Option<Resolution>> {
     if entries.is_empty() {
         return Ok(None);
     }
@@ -137,7 +157,11 @@ pub(crate) fn resolve(protocol: ProtocolName, provider: Provider, entries: &[Pro
             ProviderTool::Raw(tool) => resolution.tools.push(tool.clone()),
             ProviderTool::Alias { name, options } => {
                 let Some(spec) = table(name) else {
-                    let known: Vec<String> = ALIAS_NAMES.iter().filter(|n| table(n).is_some()).map(|n| format!(":{n}")).collect();
+                    let known: Vec<String> = ALIAS_NAMES
+                        .iter()
+                        .filter(|n| table(n).is_some())
+                        .map(|n| format!(":{n}"))
+                        .collect();
                     return Err(Error::UnsupportedServerTool(format!(
                         "{} has no server tool alias :{name}. Known aliases: {}. New or unlisted tools work by passing the provider's tool definition as a Hash.",
                         provider.display(),
@@ -177,8 +201,21 @@ pub(crate) fn apply(payload: &mut Value, resolution: &Resolution) {
 
 /// Every alias name any table defines, in a stable order for error messages.
 const ALIAS_NAMES: &[&str] = &[
-    "web_search", "web_fetch", "url_context", "code_execution", "code_interpreter", "file_search", "image_generation",
-    "x_search", "collections_search", "google_search", "google_maps", "datetime", "apply_patch", "shell", "mcp",
+    "web_search",
+    "web_fetch",
+    "url_context",
+    "code_execution",
+    "code_interpreter",
+    "file_search",
+    "image_generation",
+    "x_search",
+    "collections_search",
+    "google_search",
+    "google_maps",
+    "datetime",
+    "apply_patch",
+    "shell",
+    "mcp",
 ];
 
 type Table = fn(&str) -> Option<Spec>;
@@ -207,16 +244,24 @@ fn tool(value: Value) -> Option<Spec> {
 }
 
 fn slice(options: &Map<String, Value>, keys: &[&str]) -> Map<String, Value> {
-    keys.iter().filter_map(|k| options.get(*k).map(|v| (k.to_string(), v.clone()))).collect()
+    keys.iter()
+        .filter_map(|k| options.get(*k).map(|v| (k.to_string(), v.clone())))
+        .collect()
 }
 
 /// `Protocols::Anthropic::SERVER_TOOL_ALIASES`. web_search/web_fetch pin `allowed_callers` to
 /// direct invocation.
 fn anthropic(name: &str) -> Option<Spec> {
     match name {
-        "web_search" => tool(json!({ "type": "web_search_20260318", "name": "web_search", "allowed_callers": ["direct"] })),
-        "web_fetch" | "url_context" => tool(json!({ "type": "web_fetch_20260318", "name": "web_fetch", "allowed_callers": ["direct"] })),
-        "code_execution" => tool(json!({ "type": "code_execution_20260521", "name": "code_execution" })),
+        "web_search" => tool(
+            json!({ "type": "web_search_20260318", "name": "web_search", "allowed_callers": ["direct"] }),
+        ),
+        "web_fetch" | "url_context" => tool(
+            json!({ "type": "web_fetch_20260318", "name": "web_fetch", "allowed_callers": ["direct"] }),
+        ),
+        "code_execution" => {
+            tool(json!({ "type": "code_execution_20260521", "name": "code_execution" }))
+        }
         "mcp" => Some(Spec::Build(anthropic_mcp)),
         _ => None,
     }
@@ -246,7 +291,9 @@ fn responses(name: &str) -> Option<Spec> {
     match name {
         "web_search" => tool(json!({ "type": "web_search" })),
         "file_search" => tool(json!({ "type": "file_search" })),
-        "code_execution" | "code_interpreter" => tool(json!({ "type": "code_interpreter", "container": { "type": "auto" } })),
+        "code_execution" | "code_interpreter" => {
+            tool(json!({ "type": "code_interpreter", "container": { "type": "auto" } }))
+        }
         "image_generation" => tool(json!({ "type": "image_generation" })),
         "mcp" => Some(Spec::Build(responses_mcp)),
         _ => None,
@@ -265,7 +312,10 @@ fn responses_mcp(options: &Map<String, Value>) -> Result<Entry> {
         };
         definition.insert(key.into(), value.clone());
     }
-    Ok(Entry { tool: Some(Value::Object(definition)), ..Default::default() })
+    Ok(Entry {
+        tool: Some(Value::Object(definition)),
+        ..Default::default()
+    })
 }
 
 /// `Providers::XAI::Responses::SERVER_TOOL_ALIASES`.
@@ -332,17 +382,30 @@ fn check_openrouter_mcp(tools: &[Value]) -> Result<()> {
 /// deployment.
 fn gpustack_responses(name: &str) -> Option<Spec> {
     match name {
-        "web_search" => Some(Spec::Build(|o| gpustack_mcp_alias(o, "web_search_preview", Some(&["search"])))),
-        "web_fetch" => Some(Spec::Build(|o| gpustack_mcp_alias(o, "web_search_preview", Some(&["open"])))),
-        "code_execution" => Some(Spec::Build(|o| gpustack_mcp_alias(o, "code_interpreter", None))),
+        "web_search" => Some(Spec::Build(|o| {
+            gpustack_mcp_alias(o, "web_search_preview", Some(&["search"]))
+        })),
+        "web_fetch" => Some(Spec::Build(|o| {
+            gpustack_mcp_alias(o, "web_search_preview", Some(&["open"]))
+        })),
+        "code_execution" => Some(Spec::Build(|o| {
+            gpustack_mcp_alias(o, "code_interpreter", None)
+        })),
         "mcp" => Some(Spec::Build(responses_mcp)),
         _ => None,
     }
 }
 
-fn gpustack_mcp_alias(options: &Map<String, Value>, label: &str, tools: Option<&[&str]>) -> Result<Entry> {
+fn gpustack_mcp_alias(
+    options: &Map<String, Value>,
+    label: &str,
+    tools: Option<&[&str]>,
+) -> Result<Entry> {
     if options.keys().any(|k| k != "require_approval") {
-        return Err(Error::Argument("GPUStack server tool aliases accept only require_approval; use mcp for custom filters".into()));
+        return Err(Error::Argument(
+            "GPUStack server tool aliases accept only require_approval; use mcp for custom filters"
+                .into(),
+        ));
     }
     let mut definition = json!({ "type": "mcp", "server_label": label });
     if let Some(approval) = options.get("require_approval") {
@@ -351,7 +414,10 @@ fn gpustack_mcp_alias(options: &Map<String, Value>, label: &str, tools: Option<&
     if let Some(tools) = tools {
         definition["allowed_tools"] = json!(tools);
     }
-    Ok(Entry { tool: Some(definition), ..Default::default() })
+    Ok(Entry {
+        tool: Some(definition),
+        ..Default::default()
+    })
 }
 
 const GPUSTACK_MCP_LABELS: &[&str] = &["web_search_preview", "code_interpreter", "container"];
@@ -367,7 +433,13 @@ fn gpustack_mcp_tools(tools: Vec<Value>) -> Result<Vec<Value>> {
     let mut merged: Vec<Value> = Vec::new();
     for tool in tools {
         let label = tool.get("server_label");
-        let existing = if is_mcp(&tool) { merged.iter_mut().find(|e| is_mcp(e) && e.get("server_label") == label) } else { None };
+        let existing = if is_mcp(&tool) {
+            merged
+                .iter_mut()
+                .find(|e| is_mcp(e) && e.get("server_label") == label)
+        } else {
+            None
+        };
         match existing {
             None => merged.push(tool),
             Some(existing) if *existing == tool => {}
@@ -387,12 +459,19 @@ fn merge_gpustack_mcp_filter(existing: &mut Value, tool: &Value) -> Result<()> {
         t
     };
     let explicit = |t: &Value| {
-        t.get("allowed_tools").and_then(Value::as_array).is_some_and(|names| !names.iter().any(|n| n.as_str() == Some("*")))
+        t.get("allowed_tools")
+            .and_then(Value::as_array)
+            .is_some_and(|names| !names.iter().any(|n| n.as_str() == Some("*")))
     };
     if without_filter(existing) != without_filter(tool) || !explicit(existing) || !explicit(tool) {
-        return Err(Error::Argument("Combine GPUStack MCP settings for each server in one entry with explicit tool names".into()));
+        return Err(Error::Argument(
+            "Combine GPUStack MCP settings for each server in one entry with explicit tool names"
+                .into(),
+        ));
     }
-    if let (Some(Value::Array(names)), Some(Value::Array(more))) = (existing.get_mut("allowed_tools"), tool.get("allowed_tools")) {
+    if let (Some(Value::Array(names)), Some(Value::Array(more))) =
+        (existing.get_mut("allowed_tools"), tool.get("allowed_tools"))
+    {
         for name in more {
             if !names.contains(name) {
                 names.push(name.clone());
@@ -404,21 +483,39 @@ fn merge_gpustack_mcp_filter(existing: &mut Value, tool: &Value) -> Result<()> {
 
 /// `validate_mcp_tool`.
 fn validate_gpustack_mcp(tool: &Value) -> Result<()> {
-    let present = |k: &str| tool.get(k).is_some_and(|v| !v.is_null() && *v != Value::Bool(false));
+    let present = |k: &str| {
+        tool.get(k)
+            .is_some_and(|v| !v.is_null() && *v != Value::Bool(false))
+    };
     if tool.get("require_approval").and_then(Value::as_str) != Some("never") {
-        return Err(Error::Argument("GPUStack MCP requires explicit require_approval: 'never'; vLLM has no approval events".into()));
+        return Err(Error::Argument(
+            "GPUStack MCP requires explicit require_approval: 'never'; vLLM has no approval events"
+                .into(),
+        ));
     }
     if present("server_url") || present("connector_id") || present("authorization") {
-        return Err(Error::Argument("GPUStack MCP uses servers configured on vLLM, not per-request URLs or connectors".into()));
+        return Err(Error::Argument(
+            "GPUStack MCP uses servers configured on vLLM, not per-request URLs or connectors"
+                .into(),
+        ));
     }
-    if !tool.get("server_label").and_then(Value::as_str).is_some_and(|l| GPUSTACK_MCP_LABELS.contains(&l)) {
+    if !tool
+        .get("server_label")
+        .and_then(Value::as_str)
+        .is_some_and(|l| GPUSTACK_MCP_LABELS.contains(&l))
+    {
         return Err(Error::Argument(format!(
             "GPUStack MCP name must match a configured vLLM label: {}",
             GPUSTACK_MCP_LABELS.join(", ")
         )));
     }
-    if tool.pointer("/allowed_tools/read_only").is_some_and(|v| !v.is_null() && *v != Value::Bool(false)) {
-        return Err(Error::Argument("vLLM filters MCP tools by name, not by read_only; use allowed_tools: [name]".into()));
+    if tool
+        .pointer("/allowed_tools/read_only")
+        .is_some_and(|v| !v.is_null() && *v != Value::Bool(false))
+    {
+        return Err(Error::Argument(
+            "vLLM filters MCP tools by name, not by read_only; use allowed_tools: [name]".into(),
+        ));
     }
     Ok(())
 }
@@ -470,16 +567,24 @@ fn gemini(name: &str) -> Option<Spec> {
 }
 
 fn gemini_tool(key: &str, options: &Map<String, Value>) -> Result<Entry> {
-    Ok(Entry { tool: Some(json!({ key: options })), ..Default::default() })
+    Ok(Entry {
+        tool: Some(json!({ key: options })),
+        ..Default::default()
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn applied(protocol: ProtocolName, provider: Provider, entries: &[ProviderTool]) -> (Value, Vec<(String, String)>) {
+    fn applied(
+        protocol: ProtocolName,
+        provider: Provider,
+        entries: &[ProviderTool],
+    ) -> (Value, Vec<(String, String)>) {
         let resolution = resolve(protocol, provider, entries).unwrap().unwrap();
-        let mut payload = json!({ "model": "m", "tools": [{ "type": "function", "name": "weather" }] });
+        let mut payload =
+            json!({ "model": "m", "tools": [{ "type": "function", "name": "weather" }] });
         apply(&mut payload, &resolution);
         (payload, resolution.headers)
     }
@@ -487,16 +592,38 @@ mod tests {
     #[test]
     fn anthropic_mcp_adds_a_server_a_toolset_and_the_beta_header() {
         let options = json!({ "name": "docs", "url": "https://learn.microsoft.com/api/mcp", "default_config": { "enabled": false } });
-        let (payload, headers) = applied(ProtocolName::Anthropic, Provider::Anthropic, &[ProviderTool::with_options("mcp", options)]);
-        assert_eq!(payload["mcp_servers"], json!([{ "type": "url", "name": "docs", "url": "https://learn.microsoft.com/api/mcp" }]));
-        assert_eq!(payload["tools"][1], json!({ "type": "mcp_toolset", "mcp_server_name": "docs", "default_config": { "enabled": false } }));
-        assert_eq!(headers, vec![("anthropic-beta".to_string(), "mcp-client-2025-11-20".to_string())]);
+        let (payload, headers) = applied(
+            ProtocolName::Anthropic,
+            Provider::Anthropic,
+            &[ProviderTool::with_options("mcp", options)],
+        );
+        assert_eq!(
+            payload["mcp_servers"],
+            json!([{ "type": "url", "name": "docs", "url": "https://learn.microsoft.com/api/mcp" }])
+        );
+        assert_eq!(
+            payload["tools"][1],
+            json!({ "type": "mcp_toolset", "mcp_server_name": "docs", "default_config": { "enabled": false } })
+        );
+        assert_eq!(
+            headers,
+            vec![(
+                "anthropic-beta".to_string(),
+                "mcp-client-2025-11-20".to_string()
+            )]
+        );
     }
 
     #[test]
     fn two_anthropic_servers_accumulate_and_share_one_beta_header() {
-        let a = ProviderTool::with_options("mcp", json!({ "name": "a", "url": "https://a.example/mcp" }));
-        let b = ProviderTool::with_options("mcp", json!({ "name": "b", "url": "https://b.example/mcp" }));
+        let a = ProviderTool::with_options(
+            "mcp",
+            json!({ "name": "a", "url": "https://a.example/mcp" }),
+        );
+        let b = ProviderTool::with_options(
+            "mcp",
+            json!({ "name": "b", "url": "https://b.example/mcp" }),
+        );
         let (payload, headers) = applied(ProtocolName::Anthropic, Provider::Anthropic, &[a, b]);
         assert_eq!(payload["mcp_servers"].as_array().unwrap().len(), 2);
         assert_eq!(headers.len(), 1);
@@ -504,19 +631,41 @@ mod tests {
 
     #[test]
     fn aliases_merge_options_and_raw_tools_pass_through() {
-        let search = ProviderTool::with_options("web_search", json!({ "allowed_domains": ["ruby-lang.org"] }));
+        let search = ProviderTool::with_options(
+            "web_search",
+            json!({ "allowed_domains": ["ruby-lang.org"] }),
+        );
         let raw = ProviderTool::raw(json!({ "type": "shell" }));
         let (payload, _) = applied(ProtocolName::Responses, Provider::OpenAI, &[search, raw]);
-        assert_eq!(payload["tools"][1], json!({ "type": "web_search", "allowed_domains": ["ruby-lang.org"] }));
+        assert_eq!(
+            payload["tools"][1],
+            json!({ "type": "web_search", "allowed_domains": ["ruby-lang.org"] })
+        );
         assert_eq!(payload["tools"][2], json!({ "type": "shell" }));
     }
 
     #[test]
     fn unknown_aliases_and_unsupported_providers_are_refused() {
-        let err = resolve(ProtocolName::Anthropic, Provider::Anthropic, &["x_search".into()]).err().unwrap();
-        assert!(matches!(&err, Error::UnsupportedServerTool(m) if m.contains("no server tool alias :x_search") && m.contains(":mcp")));
-        let err = resolve(ProtocolName::ChatCompletions, Provider::Ollama, &["web_search".into()]).err().unwrap();
-        assert!(matches!(&err, Error::UnsupportedServerTool(m) if m.contains("has no provider-tool support")));
+        let err = resolve(
+            ProtocolName::Anthropic,
+            Provider::Anthropic,
+            &["x_search".into()],
+        )
+        .err()
+        .unwrap();
+        assert!(
+            matches!(&err, Error::UnsupportedServerTool(m) if m.contains("no server tool alias :x_search") && m.contains(":mcp"))
+        );
+        let err = resolve(
+            ProtocolName::ChatCompletions,
+            Provider::Ollama,
+            &["web_search".into()],
+        )
+        .err()
+        .unwrap();
+        assert!(
+            matches!(&err, Error::UnsupportedServerTool(m) if m.contains("has no provider-tool support"))
+        );
     }
 
     #[test]

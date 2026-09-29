@@ -28,9 +28,19 @@ pub fn load(name: &str) -> Option<Vec<Interaction>> {
     // docs/PARITY.md's "replayed" column comes from this log (`bin/parity`).
     if let Ok(log) = std::env::var("RUST_LLM_CASSETTE_LOG") {
         use std::io::Write;
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(log) {
-            let bin = std::env::current_exe().ok().and_then(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned())).unwrap_or_default();
-            let bin = bin.rsplit_once('-').map_or(bin.as_str(), |(b, _)| b).to_string();
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log)
+        {
+            let bin = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned()))
+                .unwrap_or_default();
+            let bin = bin
+                .rsplit_once('-')
+                .map_or(bin.as_str(), |(b, _)| b)
+                .to_string();
             let _ = f.write_all(format!("{name}\t{bin}\n").as_bytes()); // one write, so parallel tests don't interleave
         }
     }
@@ -53,7 +63,11 @@ pub fn diff(expected: &Value, actual: &Value, path: &str, out: &mut Vec<String>)
         }
         (Value::Array(e), Value::Array(a)) => {
             if e.len() != a.len() {
-                out.push(format!("{path}: expected {} items, got {}", e.len(), a.len()));
+                out.push(format!(
+                    "{path}: expected {} items, got {}",
+                    e.len(),
+                    a.len()
+                ));
             }
             for (i, (ev, av)) in e.iter().zip(a).enumerate() {
                 diff(ev, av, &format!("{path}/{i}"), out);
@@ -67,7 +81,11 @@ pub fn diff(expected: &Value, actual: &Value, path: &str, out: &mut Vec<String>)
 
 fn short(v: &Value) -> String {
     let s = v.to_string();
-    if s.len() > 160 { format!("{}…", &s[..160]) } else { s }
+    if s.len() > 160 {
+        format!("{}…", &s[..160])
+    } else {
+        s
+    }
 }
 
 /// Serves the cassette's interactions in order, recording any body mismatches.
@@ -81,22 +99,44 @@ impl Respond for Replay {
     fn respond(&self, request: &Request) -> ResponseTemplate {
         let mut next = self.next.lock().unwrap();
         let Some(interaction) = self.interactions.get(*next) else {
-            self.mismatches.lock().unwrap().push(format!("unexpected extra request to {}", request.url));
+            self.mismatches
+                .lock()
+                .unwrap()
+                .push(format!("unexpected extra request to {}", request.url));
             return ResponseTemplate::new(599);
         };
         *next += 1;
-        let recorded_path = interaction.uri.split_once("://").map(|(_, r)| r.split_once('/').map(|(_, p)| p).unwrap_or("")).unwrap_or("");
-        let sent = format!("{}{}", request.url.path().trim_start_matches('/'), request.url.query().map(|q| format!("?{q}")).unwrap_or_default());
+        let recorded_path = interaction
+            .uri
+            .split_once("://")
+            .map(|(_, r)| r.split_once('/').map(|(_, p)| p).unwrap_or(""))
+            .unwrap_or("");
+        let sent = format!(
+            "{}{}",
+            request.url.path().trim_start_matches('/'),
+            request
+                .url
+                .query()
+                .map(|q| format!("?{q}"))
+                .unwrap_or_default()
+        );
         let recorded = recorded_path.trim_start_matches('/');
         if !recorded.ends_with(&sent) && !sent.ends_with(recorded) {
-            self.mismatches.lock().unwrap().push(format!("request {}: path {sent} != recorded {recorded}", *next - 1));
+            self.mismatches.lock().unwrap().push(format!(
+                "request {}: path {sent} != recorded {recorded}",
+                *next - 1
+            ));
         }
-        let expected: Value = serde_json::from_str(&interaction.request_body).unwrap_or(Value::Null);
+        let expected: Value =
+            serde_json::from_str(&interaction.request_body).unwrap_or(Value::Null);
         let actual: Value = serde_json::from_slice(&request.body).unwrap_or(Value::Null);
         let mut out = Vec::new();
         diff(&expected, &actual, "", &mut out);
         for d in out {
-            self.mismatches.lock().unwrap().push(format!("request {}: {d}", *next - 1));
+            self.mismatches
+                .lock()
+                .unwrap()
+                .push(format!("request {}: {d}", *next - 1));
         }
         let content_type = interaction
             .response_headers
@@ -105,7 +145,8 @@ impl Respond for Replay {
             .and_then(|(_, v)| v.as_str())
             .unwrap_or("application/json")
             .to_string();
-        let mut response = ResponseTemplate::new(interaction.status).insert_header("content-type", content_type.as_str());
+        let mut response = ResponseTemplate::new(interaction.status)
+            .insert_header("content-type", content_type.as_str());
         // Gemini's resumable upload returns the URL to send the bytes to; point it at this server.
         if let Some(url) = interaction
             .response_headers
@@ -113,16 +154,24 @@ impl Respond for Replay {
             .find(|(k, _)| k.eq_ignore_ascii_case("x-goog-upload-url"))
             .and_then(|(_, v)| v.as_str())
         {
-            let host = request.headers.get("host").and_then(|v| v.to_str().ok()).unwrap_or_default();
+            let host = request
+                .headers
+                .get("host")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or_default();
             let here = format!("http://{host}");
-            let rewritten = match url.split_once("://").and_then(|(_, rest)| rest.split_once('/')) {
+            let rewritten = match url
+                .split_once("://")
+                .and_then(|(_, rest)| rest.split_once('/'))
+            {
                 Some((_, path)) => format!("{here}/{path}"),
                 None => url.to_string(),
             };
             response = response.insert_header("x-goog-upload-url", rewritten.as_str());
         }
         let body = match &interaction.response_body_base64 {
-            Some(b64) => base64::Engine::decode(&base64::engine::general_purpose::STANDARD, b64).unwrap_or_default(),
+            Some(b64) => base64::Engine::decode(&base64::engine::general_purpose::STANDARD, b64)
+                .unwrap_or_default(),
             None => interaction.response_body.clone().into_bytes(),
         };
         response.set_body_raw(body, &content_type)
@@ -154,10 +203,18 @@ impl Cassette {
         }
         let mismatches = Arc::new(Mutex::new(Vec::new()));
         Mock::given(wiremock::matchers::any())
-            .respond_with(Replay { interactions, next: Mutex::new(0), mismatches: mismatches.clone() })
+            .respond_with(Replay {
+                interactions,
+                next: Mutex::new(0),
+                mismatches: mismatches.clone(),
+            })
             .mount(&server)
             .await;
-        Some(Cassette { server, mismatches, count })
+        Some(Cassette {
+            server,
+            mismatches,
+            count,
+        })
     }
 
     /// Points every provider this test might use at the replay server.
@@ -178,9 +235,22 @@ impl Cassette {
 
     pub async fn assert_all_matched(&self) {
         let mismatches = self.mismatches.lock().unwrap().clone();
-        assert!(mismatches.is_empty(), "request bodies differ from RubyLLM's:\n  {}", mismatches.join("\n  "));
-        let received = self.server.received_requests().await.unwrap_or_default().len();
-        assert_eq!(received, self.count, "expected {} requests like RubyLLM made, sent {received}", self.count);
+        assert!(
+            mismatches.is_empty(),
+            "request bodies differ from RubyLLM's:\n  {}",
+            mismatches.join("\n  ")
+        );
+        let received = self
+            .server
+            .received_requests()
+            .await
+            .unwrap_or_default()
+            .len();
+        assert_eq!(
+            received, self.count,
+            "expected {} requests like RubyLLM made, sent {received}",
+            self.count
+        );
     }
 }
 
@@ -229,7 +299,13 @@ pub fn cassette_name(describe: &str, provider: &str, model: &str, it: &str) -> S
 /// aren't in the bundled registry, so they assume the model exists, as the Ruby specs do.
 pub fn chat_for(cassette: &Cassette, provider: &str, model: &str) -> rust_llm::Chat {
     let assume = matches!(provider, "ollama" | "gpustack" | "ollama_cloud" | "hetzner");
-    rust_llm::Chat::with_config(config_for(cassette, provider), Some(model), Some(provider), assume).expect("chat")
+    rust_llm::Chat::with_config(
+        config_for(cassette, provider),
+        Some(model),
+        Some(provider),
+        assume,
+    )
+    .expect("chat")
 }
 
 /// `each_model(MODELS) { it "#{provider}/#{model} ..." }`: runs `body` for each model in
@@ -242,7 +318,9 @@ macro_rules! each_model {
         let mut ran = 0;
         for &($provider, $model) in $models {
             let name = crate::support::cassette_name($describe, $provider, $model, $it);
-            let Some(cassette) = crate::support::Cassette::start(&name).await else { continue };
+            let Some(cassette) = crate::support::Cassette::start(&name).await else {
+                continue;
+            };
             ran += 1;
             #[allow(unused_mut)]
             let mut $chat = crate::support::chat_for(&cassette, $provider, $model);
@@ -257,7 +335,12 @@ macro_rules! each_model {
             }
         }
         assert!(ran > 0, "no cassettes found for {}", $it);
-        assert!(failures.is_empty(), "{} of {ran} providers failed:\n{}", failures.len(), failures.join("\n\n"));
+        assert!(
+            failures.is_empty(),
+            "{} of {ran} providers failed:\n{}",
+            failures.len(),
+            failures.join("\n\n")
+        );
         eprintln!("{}: {ran} providers replayed", $it);
     }};
 }

@@ -11,7 +11,9 @@ use rust_llm::error::ErrorResponse;
 use rust_llm::message::Operation;
 use rust_llm::model::{PricingCategory, PricingTier};
 use rust_llm::models::Models;
-use rust_llm::{Chat, Config, Cost, Error, Message, Model, Moderation, Role, Tokens, UsageEntry, UsageStatus};
+use rust_llm::{
+    Chat, Config, Cost, Error, Message, Model, Moderation, Role, Tokens, UsageEntry, UsageStatus,
+};
 use serde_json::json;
 
 static REGISTRY: Mutex<()> = Mutex::new(());
@@ -29,7 +31,10 @@ impl Registry {
         if let Some(models) = models {
             Models::install(models);
         }
-        Registry { original, _lock: lock }
+        Registry {
+            original,
+            _lock: lock,
+        }
     }
 }
 
@@ -57,24 +62,42 @@ fn build_tracker(model: Model) -> Tracker {
 
 /// `model_for(:openai, :temperature)`.
 fn temperature_model() -> Model {
-    rust_llm::models().find("gpt-4.1-nano", Some("openai")).expect("gpt-4.1-nano in the registry")
+    rust_llm::models()
+        .find("gpt-4.1-nano", Some("openai"))
+        .expect("gpt-4.1-nano in the registry")
 }
 
-fn assistant(content: &str, model: Option<&str>, input: Option<i64>, output: Option<i64>) -> Message {
+fn assistant(
+    content: &str,
+    model: Option<&str>,
+    input: Option<i64>,
+    output: Option<i64>,
+) -> Message {
     let mut m = Message::new(Role::Assistant, Some(content.to_string()));
     m.model = model.map(str::to_string);
-    m.tokens = Tokens { input, output, ..Default::default() };
+    m.tokens = Tokens {
+        input,
+        output,
+        ..Default::default()
+    };
     m
 }
 
 fn response(status: u16) -> Option<ErrorResponse> {
-    Some(ErrorResponse { status, body: String::new() })
+    Some(ErrorResponse {
+        status,
+        body: String::new(),
+    })
 }
 
 fn priced(id: &str, provider: &str, input: f64, output: f64) -> Model {
     let mut m = Model::default_for(id, provider);
     m.pricing.text_tokens = Some(PricingCategory {
-        standard: Some(PricingTier { input_per_million: Some(input), output_per_million: Some(output), ..Default::default() }),
+        standard: Some(PricingTier {
+            input_per_million: Some(input),
+            output_per_million: Some(output),
+            ..Default::default()
+        }),
         ..Default::default()
     });
     m
@@ -108,18 +131,36 @@ fn a_model_free_operation_keeps_no_model_and_unknown_tokens() {
     let _r = Registry::lock(None);
     let mut tracker = Tracker::new(Operation::Moderation, "openai", None, config(), None);
     let entry = tracker.start();
-    let mut result = Moderation { id: Some("request".into()), model: String::new(), results: vec![], raw: json!({}), usage_entries: vec![] };
+    let mut result = Moderation {
+        id: Some("request".into()),
+        model: String::new(),
+        results: vec![],
+        raw: json!({}),
+        usage_entries: vec![],
+    };
     tracker.succeed(&mut result);
 
     let h = tracker.entry(entry).unwrap().to_h();
-    assert_eq!((h["model"].clone(), h["status"].clone(), h["tokens"].clone()), (json!(null), json!("succeeded"), json!({})));
-    assert_eq!(result.usage_entries, vec![tracker.entry(entry).unwrap().clone()]);
+    assert_eq!(
+        (h["model"].clone(), h["status"].clone(), h["tokens"].clone()),
+        (json!(null), json!("succeeded"), json!({}))
+    );
+    assert_eq!(
+        result.usage_entries,
+        vec![tracker.entry(entry).unwrap().clone()]
+    );
     assert_eq!(result.cost().total(), None);
 
     let refused = tracker.start();
-    tracker.fail_attempt(Some(refused), &Error::Forbidden("Not allowed".into(), response(403)));
+    tracker.fail_attempt(
+        Some(refused),
+        &Error::Forbidden("Not allowed".into(), response(403)),
+    );
     let h = tracker.entry(refused).unwrap().to_h();
-    assert_eq!((h["model"].clone(), h["status"].clone(), h["tokens"].clone()), (json!(null), json!("failed"), json!({})));
+    assert_eq!(
+        (h["model"].clone(), h["status"].clone(), h["tokens"].clone()),
+        (json!(null), json!("failed"), json!({}))
+    );
 }
 
 // spec: accounting/usage_spec.rb:80 prices against the requested model when the provider echoes an unregistered id
@@ -268,10 +309,14 @@ fn recorded_entry(status: UsageStatus, cost: Option<Cost>) -> UsageEntry {
 #[test]
 fn an_exact_cost_counts_without_token_counts() {
     let _r = Registry::lock(None);
-    let entry = recorded_entry(UsageStatus::Pending, Some(Cost::from_h(&json!({ "total": 0.0042 }), None)));
+    let entry = recorded_entry(
+        UsageStatus::Pending,
+        Some(Cost::from_h(&json!({ "total": 0.0042 }), None)),
+    );
     let mut message = Message::new(Role::Assistant, Some("hi".to_string()));
     message.usage_entries = vec![entry.clone()];
-    let mut chat = Chat::with_config(config(), Some("gpt-4.1-nano"), Some("openai"), false).unwrap();
+    let mut chat =
+        Chat::with_config(config(), Some("gpt-4.1-nano"), Some("openai"), false).unwrap();
     chat.set_usage_entries(vec![entry.clone()]);
 
     assert!(entry.cost_available());
@@ -284,9 +329,13 @@ fn an_exact_cost_counts_without_token_counts() {
 #[test]
 fn one_unknown_attempt_keeps_the_aggregate_unknown() {
     let _r = Registry::lock(None);
-    let known = recorded_entry(UsageStatus::Pending, Some(Cost::from_h(&json!({ "total": 0.0042 }), None)));
+    let known = recorded_entry(
+        UsageStatus::Pending,
+        Some(Cost::from_h(&json!({ "total": 0.0042 }), None)),
+    );
     let unknown = recorded_entry(UsageStatus::Failed, None);
-    let mut chat = Chat::with_config(config(), Some("gpt-4.1-nano"), Some("openai"), false).unwrap();
+    let mut chat =
+        Chat::with_config(config(), Some("gpt-4.1-nano"), Some("openai"), false).unwrap();
     chat.set_usage_entries(vec![known, unknown]);
 
     assert_eq!(chat.cost().total(), None);
@@ -304,7 +353,10 @@ fn a_second_failure_is_ignored() {
     let entry = tracker.entry(id).unwrap();
     assert_eq!(entry.status, UsageStatus::Failed);
     // Still the never-sent zero, not the timeout's unknown.
-    assert_eq!(entry.to_h()["tokens"], json!({ "input_tokens": 0, "output_tokens": 0 }));
+    assert_eq!(
+        entry.to_h()["tokens"],
+        json!({ "input_tokens": 0, "output_tokens": 0 })
+    );
     tracker.fail_attempt(None, &Error::Timeout("late".into()));
 }
 

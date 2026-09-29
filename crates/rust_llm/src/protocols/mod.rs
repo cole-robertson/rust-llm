@@ -14,7 +14,10 @@ pub mod responses;
 use serde_json::{Map, Value};
 
 use crate::error::{Error, Result};
-use crate::message::{Citation, FinishReason, Message, RawResponse, ServerToolCall, Thinking, ToolArguments, ToolCall, indexmap_lite::IndexMap};
+use crate::message::{
+    Citation, FinishReason, Message, RawResponse, ServerToolCall, Thinking, ToolArguments,
+    ToolCall, indexmap_lite::IndexMap,
+};
 use crate::model::Model;
 use crate::providers::{ProtocolName, Provider};
 use crate::thinking::ThinkingConfig;
@@ -94,19 +97,37 @@ impl Caching {
     }
 
     /// `prompt_cache_options`: rejects keys outside `allowed`, naming them as Ruby symbols.
-    pub(crate) fn checked<'a>(caching: Option<&'a Caching>, allowed: &[&str], label: &str) -> Result<Option<&'a Map<String, Value>>> {
-        let Some(options) = Caching::options(caching) else { return Ok(None) };
-        let unsupported: Vec<String> = options.keys().filter(|k| !allowed.contains(&k.as_str())).map(|k| format!(":{k}")).collect();
+    pub(crate) fn checked<'a>(
+        caching: Option<&'a Caching>,
+        allowed: &[&str],
+        label: &str,
+    ) -> Result<Option<&'a Map<String, Value>>> {
+        let Some(options) = Caching::options(caching) else {
+            return Ok(None);
+        };
+        let unsupported: Vec<String> = options
+            .keys()
+            .filter(|k| !allowed.contains(&k.as_str()))
+            .map(|k| format!(":{k}"))
+            .collect();
         if unsupported.is_empty() {
             return Ok(Some(options));
         }
-        Err(Error::Argument(format!("{label} prompt caching accepts {}, got {}", symbols(allowed), unsupported.join(", "))))
+        Err(Error::Argument(format!(
+            "{label} prompt caching accepts {}, got {}",
+            symbols(allowed),
+            unsupported.join(", ")
+        )))
     }
 }
 
 /// `:key, :ttl, and :mode` for the Responses/Chat Completions messages, `:ttl` for one key.
 fn symbols(keys: &[&str]) -> String {
-    let visible: Vec<String> = keys.iter().filter(|k| **k != "retention").map(|k| format!(":{k}")).collect();
+    let visible: Vec<String> = keys
+        .iter()
+        .filter(|k| **k != "retention")
+        .map(|k| format!(":{k}"))
+        .collect();
     match visible.len() {
         0 | 1 => visible.join(""),
         n => format!("{}, and {}", visible[..n - 1].join(", "), visible[n - 1]),
@@ -114,17 +135,30 @@ fn symbols(keys: &[&str]) -> String {
 }
 
 /// `apply_end_user`: each protocol's safety identifier field; the rest drop it.
-pub(crate) fn apply_end_user(protocol: ProtocolName, provider: Provider, payload: &mut Value, identifier: &str) {
+pub(crate) fn apply_end_user(
+    protocol: ProtocolName,
+    provider: Provider,
+    payload: &mut Value,
+    identifier: &str,
+) {
     let field = match (protocol, provider) {
         (ProtocolName::Anthropic, _) => {
-            deep_merge(payload, &serde_json::json!({ "metadata": { "user_id": identifier } }));
+            deep_merge(
+                payload,
+                &serde_json::json!({ "metadata": { "user_id": identifier } }),
+            );
             return;
         }
-        (ProtocolName::ChatCompletions | ProtocolName::Responses, Provider::OpenAI) => "safety_identifier",
+        (ProtocolName::ChatCompletions | ProtocolName::Responses, Provider::OpenAI) => {
+            "safety_identifier"
+        }
         (ProtocolName::ChatCompletions | ProtocolName::Responses, Provider::DeepSeek) => "user_id",
         (ProtocolName::ChatCompletions, Provider::OpenRouter) => "user",
         _ => {
-            tracing::debug!("{} has no safety identifier parameter, dropping {identifier}", provider.display());
+            tracing::debug!(
+                "{} has no safety identifier parameter, dropping {identifier}",
+                provider.display()
+            );
             return;
         }
     };
@@ -135,12 +169,20 @@ pub(crate) fn apply_end_user(protocol: ProtocolName, provider: Provider, payload
 
 /// `apply_compaction`: Anthropic's `context_management` edit, OpenAI's Responses
 /// `compact_threshold` entry, or OpenRouter's context-compression plugin; dropped elsewhere.
-pub(crate) fn apply_compaction(protocol: ProtocolName, provider: Provider, payload: &mut Value, compaction: &Map<String, Value>) {
+pub(crate) fn apply_compaction(
+    protocol: ProtocolName,
+    provider: Provider,
+    payload: &mut Value,
+    compaction: &Map<String, Value>,
+) {
     match (protocol, provider) {
         (ProtocolName::Anthropic, _) => anthropic::apply_compaction(payload, compaction),
         (ProtocolName::Responses, Provider::OpenAI) => {
             let mut entry = serde_json::json!({ "type": "compaction" });
-            if let Some(at) = compaction.get("at").filter(|v| !v.is_null() && **v != Value::Bool(false)) {
+            if let Some(at) = compaction
+                .get("at")
+                .filter(|v| !v.is_null() && **v != Value::Bool(false))
+            {
                 entry["compact_threshold"] = at.clone();
             }
             if let Some(p) = payload.as_object_mut() {
@@ -149,15 +191,24 @@ pub(crate) fn apply_compaction(protocol: ProtocolName, provider: Provider, paylo
         }
         (ProtocolName::ChatCompletions, Provider::OpenRouter) => {
             if !compaction.is_empty() {
-                tracing::debug!("OpenRouter compresses context at the model's own limit, dropping {compaction:?}");
+                tracing::debug!(
+                    "OpenRouter compresses context at the model's own limit, dropping {compaction:?}"
+                );
             }
             if let Some(p) = payload.as_object_mut() {
-                let mut plugins = p.get("plugins").and_then(Value::as_array).cloned().unwrap_or_default();
+                let mut plugins = p
+                    .get("plugins")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default();
                 plugins.push(serde_json::json!({ "id": "context-compression" }));
                 p.insert("plugins".into(), Value::Array(plugins));
             }
         }
-        _ => tracing::debug!("{} has no context compaction parameter, dropping {compaction:?}", provider.display()),
+        _ => tracing::debug!(
+            "{} has no context compaction parameter, dropping {compaction:?}",
+            provider.display()
+        ),
     }
 }
 
@@ -187,15 +238,33 @@ pub fn render(protocol: ProtocolName, req: &Request) -> Result<Value> {
 /// base format, so it stands in for the dialect; its one OpenAI-only field is renamed back.
 fn router_render_payload(req: &Request) -> Result<Value> {
     if req.schema.is_some_and(|s| s.strict == Some(false)) {
-        return Err(Error::Argument("Perplexity Router requires strict structured output".into()));
+        return Err(Error::Argument(
+            "Perplexity Router requires strict structured output".into(),
+        ));
     }
-    for a in req.messages.iter().filter(|m| !m.is_tool_result()).flat_map(|m| m.attachments.iter()) {
-        if a.kind() == crate::attachment::AttachmentType::Audio && !["mp3", "wav"].contains(&a.format().as_str()) {
-            return Err(Error::UnsupportedAttachment(anthropic::unsupported(&a.mime_type)));
+    for a in req
+        .messages
+        .iter()
+        .filter(|m| !m.is_tool_result())
+        .flat_map(|m| m.attachments.iter())
+    {
+        if a.kind() == crate::attachment::AttachmentType::Audio
+            && !["mp3", "wav"].contains(&a.format().as_str())
+        {
+            return Err(Error::UnsupportedAttachment(anthropic::unsupported(
+                &a.mime_type,
+            )));
         }
     }
-    let strict = req.schema.map(|s| Schema { strict: Some(true), ..s.clone() });
-    let base = Request { provider: Provider::OpenAI, schema: strict.as_ref(), ..*req };
+    let strict = req.schema.map(|s| Schema {
+        strict: Some(true),
+        ..s.clone()
+    });
+    let base = Request {
+        provider: Provider::OpenAI,
+        schema: strict.as_ref(),
+        ..*req
+    };
     let mut payload = chat_completions::render_payload(&base)?;
     if let Some(p) = payload.as_object_mut()
         && let Some(max) = p.remove("max_completion_tokens")
@@ -219,8 +288,17 @@ pub(crate) fn finish_render(protocol: ProtocolName, payload: &mut Value) -> Resu
 /// `Router#validate_router_options` and `#validate_router_tools`.
 fn validate_router(payload: &Value) -> Result<()> {
     const REJECTED: &[&str] = &[
-        "seed", "logit_bias", "top_logprobs", "functions", "function_call", "modalities", "audio", "prediction",
-        "web_search_options", "moderation", "verbosity",
+        "seed",
+        "logit_bias",
+        "top_logprobs",
+        "functions",
+        "function_call",
+        "modalities",
+        "audio",
+        "prediction",
+        "web_search_options",
+        "moderation",
+        "verbosity",
     ];
     let defaults = [
         ("n", serde_json::json!(1)),
@@ -229,23 +307,47 @@ fn validate_router(payload: &Value) -> Result<()> {
         ("presence_penalty", serde_json::json!(0)),
         ("frequency_penalty", serde_json::json!(0)),
     ];
-    let Some(p) = payload.as_object() else { return Ok(()) };
-    let mut unsupported: Vec<&str> = p.keys().map(String::as_str).filter(|k| REJECTED.contains(k)).collect();
+    let Some(p) = payload.as_object() else {
+        return Ok(());
+    };
+    let mut unsupported: Vec<&str> = p
+        .keys()
+        .map(String::as_str)
+        .filter(|k| REJECTED.contains(k))
+        .collect();
     for (key, default) in &defaults {
         if p.get(*key).is_some_and(|v| !json_eq(v, default)) {
             unsupported.push(key);
         }
     }
-    if p.get("stream_options").and_then(|o| o.get("include_obfuscation")).is_some_and(|v| !v.is_null() && *v != Value::Bool(false)) {
+    if p.get("stream_options")
+        .and_then(|o| o.get("include_obfuscation"))
+        .is_some_and(|v| !v.is_null() && *v != Value::Bool(false))
+    {
         unsupported.push("include_obfuscation");
     }
     if !unsupported.is_empty() {
-        return Err(Error::Argument(format!("Perplexity Router does not support these options: {}", unsupported.join(", "))));
+        return Err(Error::Argument(format!(
+            "Perplexity Router does not support these options: {}",
+            unsupported.join(", ")
+        )));
     }
     // A Rust tool always has a description string; an empty one is the absent description here.
-    let described = |t: &Value| t.pointer("/function/description").and_then(Value::as_str).is_some_and(|d| !d.is_empty());
-    if !p.get("tools").and_then(Value::as_array).into_iter().flatten().all(described) {
-        return Err(Error::Argument("Perplexity Router function tools require a description".into()));
+    let described = |t: &Value| {
+        t.pointer("/function/description")
+            .and_then(Value::as_str)
+            .is_some_and(|d| !d.is_empty())
+    };
+    if !p
+        .get("tools")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .all(described)
+    {
+        return Err(Error::Argument(
+            "Perplexity Router function tools require a description".into(),
+        ));
     }
     Ok(())
 }
@@ -265,10 +367,18 @@ fn warn_unsupported_citations(protocol: ProtocolName, model: &Model) {
     } else {
         "with_citations may have no effect."
     };
-    tracing::warn!("{} does not support citations according to the model registry. {hint}", model.id);
+    tracing::warn!(
+        "{} does not support citations according to the model registry. {hint}",
+        model.id
+    );
 }
 
-pub fn endpoint(protocol: ProtocolName, provider: Provider, model: &Model, stream: bool) -> Endpoint {
+pub fn endpoint(
+    protocol: ProtocolName,
+    provider: Provider,
+    model: &Model,
+    stream: bool,
+) -> Endpoint {
     let path = match protocol {
         ProtocolName::Interactions => "interactions".to_string(),
         ProtocolName::Conversations => "conversations".to_string(),
@@ -278,7 +388,9 @@ pub fn endpoint(protocol: ProtocolName, provider: Provider, model: &Model, strea
         ProtocolName::Responses if provider == Provider::Perplexity => "v1/agent".to_string(),
         ProtocolName::Responses => "responses".to_string(),
         ProtocolName::Anthropic => "v1/messages".to_string(),
-        ProtocolName::Gemini if stream => format!("models/{}:streamGenerateContent?alt=sse", model.id),
+        ProtocolName::Gemini if stream => {
+            format!("models/{}:streamGenerateContent?alt=sse", model.id)
+        }
         ProtocolName::Gemini => format!("models/{}:generateContent", model.id),
     };
     let headers = if protocol == ProtocolName::Anthropic && stream {
@@ -289,23 +401,41 @@ pub fn endpoint(protocol: ProtocolName, provider: Provider, model: &Model, strea
     Endpoint { path, headers }
 }
 
-pub fn parse_completion(protocol: ProtocolName, provider: Provider, model: &Model, raw: RawResponse) -> Result<Message> {
+pub fn parse_completion(
+    protocol: ProtocolName,
+    provider: Provider,
+    model: &Model,
+    raw: RawResponse,
+) -> Result<Message> {
     let body = raw.body.clone();
     if body.is_null() || body.as_object().is_some_and(Map::is_empty) {
-        return Err(Error::Api("Provider returned an empty response body".into(), None));
+        return Err(Error::Api(
+            "Provider returned an empty response body".into(),
+            None,
+        ));
     }
     match protocol {
         // `MultiCompletion#parse_completion_body`: Mistral returns every hosted-tool step.
-        ProtocolName::ChatCompletions if provider == Provider::Mistral && body.pointer("/choices/0/messages").is_some_and(Value::is_array) => {
-            mistral::parse_multi_message(&body, Some(raw))?.ok_or_else(|| Error::Api("Provider returned no completion message".into(), None))
+        ProtocolName::ChatCompletions
+            if provider == Provider::Mistral
+                && body
+                    .pointer("/choices/0/messages")
+                    .is_some_and(Value::is_array) =>
+        {
+            mistral::parse_multi_message(&body, Some(raw))?
+                .ok_or_else(|| Error::Api("Provider returned no completion message".into(), None))
         }
-        ProtocolName::ChatCompletions => chat_completions::parse_completion_body(provider, &body, raw),
+        ProtocolName::ChatCompletions => {
+            chat_completions::parse_completion_body(provider, &body, raw)
+        }
         ProtocolName::Responses => responses::parse_completion_body(provider, &body, raw),
         ProtocolName::Anthropic => anthropic::parse_completion_body(&body, raw),
         ProtocolName::Gemini => gemini::parse_completion_body(model, &body, raw),
         ProtocolName::Interactions => interactions::parse_completion_body(model, &body, Some(raw)),
         ProtocolName::Conversations => mistral::parse_completion_body(&model.id, &body, Some(raw)),
-        ProtocolName::RouterChatCompletions => chat_completions::parse_completion_body(provider, &body, raw),
+        ProtocolName::RouterChatCompletions => {
+            chat_completions::parse_completion_body(provider, &body, raw)
+        }
     }
 }
 
@@ -330,9 +460,19 @@ pub struct StreamState {
 impl StreamState {
     /// The state for a stream of `payload`: Mistral Chat Completions with hosted tools streams
     /// several completions (`MultiCompletion#stream_response`).
-    pub fn for_payload(protocol: ProtocolName, provider: Provider, model: &Model, payload: &Value) -> StreamState {
-        let multi = mistral::is_multi_stream(protocol, provider, payload).then(mistral::MultiStream::default);
-        StreamState { multi, model: Some(model.clone()), ..Default::default() }
+    pub fn for_payload(
+        protocol: ProtocolName,
+        provider: Provider,
+        model: &Model,
+        payload: &Value,
+    ) -> StreamState {
+        let multi = mistral::is_multi_stream(protocol, provider, payload)
+            .then(mistral::MultiStream::default);
+        StreamState {
+            multi,
+            model: Some(model.clone()),
+            ..Default::default()
+        }
     }
 
     fn model_id(&self) -> &str {
@@ -355,22 +495,36 @@ pub fn finish_stream(
         return Ok((message, Some(last)));
     }
     match protocol {
-        ProtocolName::Interactions => interactions::finish_stream(&mut state.interactions, raw).map(|m| (m, None)),
-        ProtocolName::Conversations => mistral::finish_conversation_stream(&mut state.conversation, raw).map(|m| (m, None)),
+        ProtocolName::Interactions => {
+            interactions::finish_stream(&mut state.interactions, raw).map(|m| (m, None))
+        }
+        ProtocolName::Conversations => {
+            mistral::finish_conversation_stream(&mut state.conversation, raw).map(|m| (m, None))
+        }
         _ => acc.into_message(raw).map(|m| (m, None)),
     }
 }
 
-pub fn build_chunk(protocol: ProtocolName, provider: Provider, state: &mut StreamState, data: &Value) -> Result<Message> {
+pub fn build_chunk(
+    protocol: ProtocolName,
+    provider: Provider,
+    state: &mut StreamState,
+    data: &Value,
+) -> Result<Message> {
     match protocol {
-        ProtocolName::ChatCompletions if state.multi.is_some() => {
-            Ok(state.multi.as_mut().map(|multi| mistral::build_multi_chunk(multi, data)).unwrap_or_else(Message::chunk))
-        }
+        ProtocolName::ChatCompletions if state.multi.is_some() => Ok(state
+            .multi
+            .as_mut()
+            .map(|multi| mistral::build_multi_chunk(multi, data))
+            .unwrap_or_else(Message::chunk)),
         ProtocolName::ChatCompletions => {
             let mut chunk = chat_completions::build_chunk(provider, data);
             if provider == Provider::OpenRouter {
                 let details = data.pointer("/choices/0/delta/reasoning_details");
-                chunk.raw_reasoning = chat_completions::accumulate_raw_reasoning(&mut state.openrouter_reasoning, details);
+                chunk.raw_reasoning = chat_completions::accumulate_raw_reasoning(
+                    &mut state.openrouter_reasoning,
+                    details,
+                );
             }
             Ok(chunk)
         }
@@ -378,7 +532,10 @@ pub fn build_chunk(protocol: ProtocolName, provider: Provider, state: &mut Strea
         ProtocolName::Anthropic => Ok(anthropic::build_chunk(&mut state.anthropic, data)),
         ProtocolName::Gemini => Ok(gemini::build_chunk(state, data)),
         ProtocolName::Interactions => {
-            let model = state.model.clone().unwrap_or_else(|| Model::default_for("", provider.slug()));
+            let model = state
+                .model
+                .clone()
+                .unwrap_or_else(|| Model::default_for("", provider.slug()));
             interactions::build_chunk(&model, &mut state.interactions, data)
         }
         ProtocolName::Conversations => {
@@ -481,14 +638,20 @@ impl StreamAccumulator {
         }
         if let Some(t) = &chunk.thinking {
             if let Some(text) = &t.text {
-                self.thinking_text.get_or_insert_with(String::new).push_str(text);
+                self.thinking_text
+                    .get_or_insert_with(String::new)
+                    .push_str(text);
             }
             if self.thinking_signature.is_none() {
                 self.thinking_signature = t.signature.clone();
             }
         }
         for call in &chunk.server_tool_calls {
-            match self.server_tool_calls.iter_mut().find(|e| call.id.is_some() && e.id == call.id && e.kind == call.kind) {
+            match self
+                .server_tool_calls
+                .iter_mut()
+                .find(|e| call.id.is_some() && e.id == call.id && e.kind == call.kind)
+            {
                 Some(existing) => *existing = call.clone(),
                 None => self.server_tool_calls.push(call.clone()),
             }
@@ -508,16 +671,18 @@ impl StreamAccumulator {
     fn start_tool_call(&mut self, stream_key: &str, call: &ToolCall) {
         let mut call = call.clone();
         if let ToolArguments::Parsed(m) = &call.arguments
-            && m.is_empty() {
-                call.arguments = ToolArguments::Partial(String::new());
-            }
+            && m.is_empty()
+        {
+            call.arguments = ToolArguments::Partial(String::new());
+        }
         if call.id.is_empty() {
             call.id = uuid::Uuid::new_v4().to_string();
         }
         let id = call.id.clone();
         self.tool_calls.insert(id.clone(), call);
         self.tool_call_ids_by_index.retain(|(k, _)| k != stream_key);
-        self.tool_call_ids_by_index.push((stream_key.to_string(), id.clone()));
+        self.tool_call_ids_by_index
+            .push((stream_key.to_string(), id.clone()));
         self.latest_tool_call_id = Some(id);
     }
 
@@ -527,10 +692,21 @@ impl StreamAccumulator {
             .iter()
             .find(|(k, _)| k == stream_key)
             .map(|(_, id)| id.clone())
-            .or_else(|| self.tool_calls.contains_key(stream_key).then(|| stream_key.to_string()))
+            .or_else(|| {
+                self.tool_calls
+                    .contains_key(stream_key)
+                    .then(|| stream_key.to_string())
+            })
             // A keyless fragment continues the latest call; an unknown key is dropped (find_tool_call).
-            .or_else(|| stream_key.is_empty().then(|| self.latest_tool_call_id.clone()).flatten());
-        let Some(existing) = id.and_then(|id| self.tool_calls.get_mut(&id)) else { return };
+            .or_else(|| {
+                stream_key
+                    .is_empty()
+                    .then(|| self.latest_tool_call_id.clone())
+                    .flatten()
+            });
+        let Some(existing) = id.and_then(|id| self.tool_calls.get_mut(&id)) else {
+            return;
+        };
         let fragment = match &call.arguments {
             ToolArguments::Partial(s) => s.clone(),
             ToolArguments::Parsed(m) if m.is_empty() => String::new(),
@@ -555,7 +731,13 @@ impl StreamAccumulator {
                     .map_err(|_| Error::tool_call_parse(finish.as_deref()))?,
                 ToolArguments::Parsed(m) => m,
             };
-            tool_calls.insert(id, ToolCall { arguments: ToolArguments::Parsed(arguments), ..call });
+            tool_calls.insert(
+                id,
+                ToolCall {
+                    arguments: ToolArguments::Parsed(arguments),
+                    ..call
+                },
+            );
         }
         let content = self.content;
         let citations = self
@@ -563,9 +745,10 @@ impl StreamAccumulator {
             .into_iter()
             .map(|mut c| {
                 if c.text.is_none()
-                    && let (Some(s), Some(e)) = (c.start_index, c.end_index) {
-                        c.text = char_slice(&content, s, e);
-                    }
+                    && let (Some(s), Some(e)) = (c.start_index, c.end_index)
+                {
+                    c.text = char_slice(&content, s, e);
+                }
                 c
             })
             .collect();
@@ -594,12 +777,23 @@ pub(crate) fn char_slice(s: &str, start: i64, end: i64) -> Option<String> {
     if start as usize > chars.len() {
         return None;
     }
-    Some(chars[start as usize..(end as usize).min(chars.len())].iter().collect())
+    Some(
+        chars[start as usize..(end as usize).min(chars.len())]
+            .iter()
+            .collect(),
+    )
 }
 
-pub(crate) fn normalize_finish_reason(reason: Option<&str>, table: &[(&str, &str)]) -> Option<FinishReason> {
+pub(crate) fn normalize_finish_reason(
+    reason: Option<&str>,
+    table: &[(&str, &str)],
+) -> Option<FinishReason> {
     let reason = reason?;
-    let symbol = table.iter().find(|(k, _)| *k == reason).map(|(_, v)| *v).unwrap_or(reason);
+    let symbol = table
+        .iter()
+        .find(|(k, _)| *k == reason)
+        .map(|(_, v)| *v)
+        .unwrap_or(reason);
     Some(FinishReason::from_symbol(symbol))
 }
 
@@ -617,7 +811,9 @@ pub(crate) fn deep_merge(base: &mut Value, overlay: &Value) {
         (Value::Object(b), Value::Object(o)) => {
             for (k, v) in o {
                 match b.get_mut(k) {
-                    Some(existing) if existing.is_object() && v.is_object() => deep_merge(existing, v),
+                    Some(existing) if existing.is_object() && v.is_object() => {
+                        deep_merge(existing, v)
+                    }
                     _ => {
                         b.insert(k.clone(), v.clone());
                     }

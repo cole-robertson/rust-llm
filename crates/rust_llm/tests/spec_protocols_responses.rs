@@ -7,7 +7,10 @@
 mod spec_helpers;
 
 use async_trait::async_trait;
-use rust_llm::{Attachment, Chat, Error, Message, ProtocolName, Resolution, ThinkingConfig, ThinkingDisplay, Tool, ToolCall, ToolError, ToolResult};
+use rust_llm::{
+    Attachment, Chat, Error, Message, ProtocolName, Resolution, ThinkingConfig, ThinkingDisplay,
+    Tool, ToolCall, ToolError, ToolResult,
+};
 use serde_json::{Map, Value, json};
 use spec_helpers::*;
 use wiremock::MockServer;
@@ -23,7 +26,9 @@ fn inline(name: &str) -> Attachment {
 
 /// `RubyLLM.chat(model: 'gpt-5-nano', provider: :openai, protocol: :responses)`.
 fn openai(server: &MockServer) -> Chat {
-    Chat::with_config(config(server), Some("gpt-5-nano"), Some("openai"), false).unwrap().with_protocol(ProtocolName::Responses)
+    Chat::with_config(config(server), Some("gpt-5-nano"), Some("openai"), false)
+        .unwrap()
+        .with_protocol(ProtocolName::Responses)
 }
 
 fn user_chat(server: &MockServer) -> Chat {
@@ -93,9 +98,13 @@ async fn tools_opt_into_strict_mode_via_provider_options() {
 #[tokio::test]
 async fn asks_for_a_reasoning_summary_when_display_is_summarized() {
     let server = serve(vec![]).await;
-    let mut chat = openai(&server).with_thinking(ThinkingConfig::effort("low").with_display(ThinkingDisplay::Summarized));
+    let mut chat = openai(&server)
+        .with_thinking(ThinkingConfig::effort("low").with_display(ThinkingDisplay::Summarized));
     chat.add_message(Message::user("hi"));
-    assert_eq!(chat.render().unwrap()["reasoning"], json!({ "effort": "low", "summary": "auto" }));
+    assert_eq!(
+        chat.render().unwrap()["reasoning"],
+        json!({ "effort": "low", "summary": "auto" })
+    );
 }
 
 // spec: protocols/responses/chat_spec.rb:153 #render_payload > marks cache boundaries without disabling implicit caching
@@ -111,7 +120,10 @@ async fn marks_cache_boundaries_without_disabling_implicit_caching() {
         payload["input"][0]["content"],
         json!([{ "type": "input_text", "text": "Long context", "prompt_cache_breakpoint": { "mode": "explicit" } }])
     );
-    assert_eq!(payload["input"].as_array().unwrap().last().unwrap(), &json!({ "role": "user", "content": "hi" }));
+    assert_eq!(
+        payload["input"].as_array().unwrap().last().unwrap(),
+        &json!({ "role": "user", "content": "hi" })
+    );
     assert!(payload.get("prompt_cache_options").is_none());
 }
 
@@ -119,13 +131,18 @@ async fn marks_cache_boundaries_without_disabling_implicit_caching() {
 #[tokio::test]
 async fn preserves_cache_options_alongside_explicit_boundaries() {
     let server = serve(vec![]).await;
-    let mut chat = openai(&server).with_caching(json!({ "ttl": "30m" })).unwrap();
+    let mut chat = openai(&server)
+        .with_caching(json!({ "ttl": "30m" }))
+        .unwrap();
     chat.add_message(Message::user("Long context"));
     chat.cache_until_here().unwrap();
     let payload = chat.render().unwrap();
     assert_eq!(payload["prompt_cache_options"], json!({ "ttl": "30m" }));
     let parts = payload["input"][0]["content"].as_array().unwrap();
-    assert_eq!(parts.last().unwrap()["prompt_cache_breakpoint"], json!({ "mode": "explicit" }));
+    assert_eq!(
+        parts.last().unwrap()["prompt_cache_breakpoint"],
+        json!({ "mode": "explicit" })
+    );
 }
 
 // spec: protocols/responses/chat_spec.rb:177 #render_payload > sends cache-bounded system messages as input items
@@ -164,12 +181,29 @@ async fn preserves_web_file_search_and_container_file_citations() {
     .unwrap();
     let c = &message.citations;
     assert_eq!(c.len(), 3);
-    assert_eq!((c[0].url.as_deref(), c[0].text.as_deref(), c[0].source_id.as_deref()), (Some("https://ruby-lang.org"), Some("Ruby"), None));
+    assert_eq!(
+        (
+            c[0].url.as_deref(),
+            c[0].text.as_deref(),
+            c[0].source_id.as_deref()
+        ),
+        (Some("https://ruby-lang.org"), Some("Ruby"), None)
+    );
     assert_eq!(c[1].source_id.as_deref(), Some("file_facts"));
     assert_eq!(c[1].title.as_deref(), Some("facts.pdf"));
     assert_eq!(c[1].source_index, Some(0));
-    assert_eq!((c[1].start_index, c[1].end_index, c[1].url.as_deref()), (None, None, None));
-    assert_eq!((c[2].source_id.as_deref(), c[2].title.as_deref(), c[2].text.as_deref()), (Some("file_report"), Some("report.txt"), Some("facts")));
+    assert_eq!(
+        (c[1].start_index, c[1].end_index, c[1].url.as_deref()),
+        (None, None, None)
+    );
+    assert_eq!(
+        (
+            c[2].source_id.as_deref(),
+            c[2].title.as_deref(),
+            c[2].text.as_deref()
+        ),
+        (Some("file_report"), Some("report.txt"), Some("facts"))
+    );
 }
 
 // spec: protocols/responses/chat_spec.rb:240 #parse_completion_response > places citation spans against all preceding response text
@@ -190,7 +224,14 @@ async fn places_citation_spans_against_all_preceding_response_text() {
     .await
     .unwrap();
     let citation = &message.citations[0];
-    assert_eq!((citation.start_index, citation.end_index, citation.text.as_deref()), (Some(11), Some(15), Some("Ruby")));
+    assert_eq!(
+        (
+            citation.start_index,
+            citation.end_index,
+            citation.text.as_deref()
+        ),
+        (Some(11), Some(15), Some("Ruby"))
+    );
     let span: String = message.content().chars().skip(11).take(4).collect();
     assert_eq!(Some(span.as_str()), citation.text.as_deref());
 }
@@ -219,7 +260,9 @@ async fn wraps_malformed_function_call_arguments_in_a_rust_llm_error() {
         "incomplete_details": { "reason": "max_output_tokens" }
     });
     match parse(body).await.unwrap_err() {
-        Error::ToolCallParse { finish_reason, .. } => assert_eq!(finish_reason.as_deref(), Some("max_tokens")),
+        Error::ToolCallParse { finish_reason, .. } => {
+            assert_eq!(finish_reason.as_deref(), Some("max_tokens"))
+        }
         other => panic!("expected ToolCallParse, got {other:?}"),
     }
 }
@@ -276,13 +319,21 @@ async fn preserves_incomplete_details_reason_as_finish_reason() {
     }))
     .await
     .unwrap();
-    assert_eq!(message.finish_reason, Some(rust_llm::FinishReason::MaxTokens));
+    assert_eq!(
+        message.finish_reason,
+        Some(rust_llm::FinishReason::MaxTokens)
+    );
 }
 
 // ---- responses/media_spec.rb -------------------------------------------------------------------
 
 fn rendered_parts(chat: &Chat) -> rust_llm::Result<Vec<Value>> {
-    chat.render().map(|p| p["input"][0]["content"].as_array().cloned().unwrap_or_default())
+    chat.render().map(|p| {
+        p["input"][0]["content"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+    })
 }
 
 // spec: protocols/responses/media_spec.rb:48 .format_content > still rejects attachments the API cannot take
@@ -290,7 +341,8 @@ fn rendered_parts(chat: &Chat) -> rust_llm::Result<Vec<Value>> {
 async fn still_rejects_attachments_the_api_cannot_take() {
     let server = serve(vec![]).await;
     let mut chat = openai(&server);
-    chat.ask_later_with("Listen", vec![inline("ruby.wav")]).unwrap();
+    chat.ask_later_with("Listen", vec![inline("ruby.wav")])
+        .unwrap();
     match rendered_parts(&chat).unwrap_err() {
         Error::UnsupportedAttachment(m) => assert!(m.contains("audio/wav"), "{m}"),
         other => panic!("expected UnsupportedAttachment, got {other:?}"),
@@ -304,7 +356,11 @@ async fn maps_image_resolution_to_detail() {
     let server = serve(vec![]).await;
     for (resolution, detail) in [(Resolution::Low, "low"), (Resolution::UltraHigh, "high")] {
         let mut chat = openai(&server);
-        chat.ask_later_with("Describe this", vec![inline("ruby.png").with_resolution(resolution)]).unwrap();
+        chat.ask_later_with(
+            "Describe this",
+            vec![inline("ruby.png").with_resolution(resolution)],
+        )
+        .unwrap();
         assert_eq!(rendered_parts(&chat).unwrap()[1]["detail"], json!(detail));
     }
 }
@@ -321,8 +377,20 @@ fn approval() -> Value {
 async fn accepts_arguments_already_decoded_by_the_provider() {
     let mut item = approval();
     item["arguments"] = json!({ "query": "Ruby" });
-    let message = parse(json!({ "status": "completed", "output": [item] })).await.unwrap();
-    assert_eq!(Value::Object(message.tool_calls.unwrap().get("approval_1").unwrap().arguments()), json!({ "query": "Ruby" }));
+    let message = parse(json!({ "status": "completed", "output": [item] }))
+        .await
+        .unwrap();
+    assert_eq!(
+        Value::Object(
+            message
+                .tool_calls
+                .unwrap()
+                .get("approval_1")
+                .unwrap()
+                .arguments()
+        ),
+        json!({ "query": "Ruby" })
+    );
 }
 
 // spec: protocols/responses/approvals_spec.rb:34 identifies remote approvals independently of their provider label
@@ -330,8 +398,17 @@ async fn accepts_arguments_already_decoded_by_the_provider() {
 async fn identifies_remote_approvals_independently_of_their_provider_label() {
     let mut item = approval();
     item.as_object_mut().unwrap().remove("server_label");
-    let message = parse(json!({ "status": "completed", "output": [item] })).await.unwrap();
-    assert!(message.tool_calls.unwrap().get("approval_1").unwrap().remote);
+    let message = parse(json!({ "status": "completed", "output": [item] }))
+        .await
+        .unwrap();
+    assert!(
+        message
+            .tool_calls
+            .unwrap()
+            .get("approval_1")
+            .unwrap()
+            .remote
+    );
 }
 
 // spec: protocols/responses/approvals_spec.rb:68 preserves a streamed approval exactly once across repeated final events
@@ -353,7 +430,8 @@ async fn preserves_a_streamed_approval_exactly_once_across_repeated_final_events
 // spec: protocols/responses/streaming_spec.rb:18 streams refusal deltas as content
 #[tokio::test]
 async fn streams_refusal_deltas_as_content() {
-    let (result, chunks) = stream(&[json!({ "type": "response.refusal.delta", "delta": "I cannot help" })]).await;
+    let (result, chunks) =
+        stream(&[json!({ "type": "response.refusal.delta", "delta": "I cannot help" })]).await;
     assert_eq!(chunks[0].content.as_deref(), Some("I cannot help"));
     assert_eq!(result.unwrap().content(), "I cannot help");
 }
@@ -368,7 +446,10 @@ async fn streams_file_citations_with_their_source_identities() {
     .await;
     result.unwrap();
     let c = &chunks[0].citations[0];
-    assert_eq!((c.source_id.as_deref(), c.title.as_deref(), c.source_index), (Some("file_facts"), Some("facts.pdf"), Some(0)));
+    assert_eq!(
+        (c.source_id.as_deref(), c.title.as_deref(), c.source_index),
+        (Some("file_facts"), Some("facts.pdf"), Some(0))
+    );
 }
 
 // spec: protocols/responses/streaming_spec.rb:34 keeps streamed citation positions across output parts without duplicating final annotations
@@ -394,7 +475,12 @@ async fn keeps_streamed_citation_positions_without_duplicating_final_annotations
     assert_eq!(citations.len(), 1);
     let c = &citations[0];
     assert_eq!(
-        (c.source_id.as_deref(), c.start_index, c.end_index, c.text.as_deref()),
+        (
+            c.source_id.as_deref(),
+            c.start_index,
+            c.end_index,
+            c.text.as_deref()
+        ),
         (Some("file_report"), Some(11), Some(15), Some("Ruby"))
     );
 }
@@ -413,16 +499,23 @@ async fn resets_citation_positions_when_another_stream_starts() {
     for _ in 0..2 {
         let response = chat.ask_stream("hi", |_| {}).await.unwrap();
         let c = &response.citations[0];
-        assert_eq!((c.start_index, c.end_index, c.text.as_deref()), (Some(5), Some(9), Some("Ruby")));
+        assert_eq!(
+            (c.start_index, c.end_index, c.text.as_deref()),
+            (Some(5), Some(9), Some("Ruby"))
+        );
     }
 }
 
 // spec: protocols/responses/streaming_spec.rb:91 streams reasoning summary deltas as thinking
 #[tokio::test]
 async fn streams_reasoning_summary_deltas_as_thinking() {
-    let (result, chunks) = stream(&[json!({ "type": "response.reasoning_summary_text.delta", "delta": "hmm" })]).await;
+    let (result, chunks) =
+        stream(&[json!({ "type": "response.reasoning_summary_text.delta", "delta": "hmm" })]).await;
     result.unwrap();
-    assert_eq!(chunks[0].thinking.as_ref().and_then(|t| t.text.as_deref()), Some("hmm"));
+    assert_eq!(
+        chunks[0].thinking.as_ref().and_then(|t| t.text.as_deref()),
+        Some("hmm")
+    );
 }
 
 // spec: protocols/responses/streaming_spec.rb:97 separates reasoning summary parts
@@ -436,7 +529,10 @@ async fn separates_reasoning_summary_parts() {
     ])
     .await;
     let message = result.unwrap();
-    assert_eq!(message.thinking.and_then(|t| t.text).as_deref(), Some("**First summary**\n\n**Second summary**"));
+    assert_eq!(
+        message.thinking.and_then(|t| t.text).as_deref(),
+        Some("**First summary**\n\n**Second summary**")
+    );
 }
 
 // spec: protocols/responses/streaming_spec.rb:146 reads usage and model from the completed event
@@ -478,7 +574,10 @@ async fn preserves_incomplete_details_reason_on_completed_events() {
     } })])
     .await;
     result.unwrap();
-    assert_eq!(chunks[0].finish_reason, Some(rust_llm::FinishReason::MaxTokens));
+    assert_eq!(
+        chunks[0].finish_reason,
+        Some(rust_llm::FinishReason::MaxTokens)
+    );
 }
 
 // ---- responses/streaming_spec.rb #parse_streaming_error ----------------------------------------
@@ -492,26 +591,45 @@ async fn stream_error(frame: Value) -> Error {
 #[tokio::test]
 async fn classifies_a_rate_limit_reported_by_a_flat_error_event() {
     let error = stream_error(json!({ "type": "error", "code": "rate_limit_exceeded", "message": "Slow down", "param": null, "sequence_number": 3 })).await;
-    assert!(matches!(&error, Error::RateLimit(m, Some(r)) if m == "Slow down" && r.status == 429), "{error:?}");
+    assert!(
+        matches!(&error, Error::RateLimit(m, Some(r)) if m == "Slow down" && r.status == 429),
+        "{error:?}"
+    );
 }
 
 // spec: protocols/responses/streaming_spec.rb:199 #parse_streaming_error > classifies a server error reported by a flat error event
 #[tokio::test]
 async fn classifies_a_server_error_reported_by_a_flat_error_event() {
-    let error = stream_error(json!({ "type": "error", "code": "server_error", "message": "Internal error" })).await;
-    assert!(matches!(&error, Error::Server(_, Some(r)) if r.status == 500), "{error:?}");
+    let error = stream_error(
+        json!({ "type": "error", "code": "server_error", "message": "Internal error" }),
+    )
+    .await;
+    assert!(
+        matches!(&error, Error::Server(_, Some(r)) if r.status == 500),
+        "{error:?}"
+    );
 }
 
 // spec: protocols/responses/streaming_spec.rb:205 #parse_streaming_error > falls back to a 400 for other flat error codes
 #[tokio::test]
 async fn falls_back_to_a_400_for_other_flat_error_codes() {
-    let error = stream_error(json!({ "type": "error", "code": "invalid_prompt", "message": "Bad prompt" })).await;
-    assert!(matches!(&error, Error::BadRequest(m, Some(r)) if m == "Bad prompt" && r.status == 400), "{error:?}");
+    let error =
+        stream_error(json!({ "type": "error", "code": "invalid_prompt", "message": "Bad prompt" }))
+            .await;
+    assert!(
+        matches!(&error, Error::BadRequest(m, Some(r)) if m == "Bad prompt" && r.status == 400),
+        "{error:?}"
+    );
 }
 
 // spec: protocols/responses/streaming_spec.rb:212 #parse_streaming_error > still classifies nested error objects
 #[tokio::test]
 async fn still_classifies_nested_error_objects() {
-    let error = stream_error(json!({ "error": { "type": "rate_limit_exceeded", "message": "Slow down" } })).await;
-    assert!(matches!(&error, Error::RateLimit(m, Some(r)) if m == "Slow down" && r.status == 429), "{error:?}");
+    let error =
+        stream_error(json!({ "error": { "type": "rate_limit_exceeded", "message": "Slow down" } }))
+            .await;
+    assert!(
+        matches!(&error, Error::RateLimit(m, Some(r)) if m == "Slow down" && r.status == 429),
+        "{error:?}"
+    );
 }

@@ -43,20 +43,32 @@ pub struct ThinkingConfig {
 impl ThinkingConfig {
     /// `with_thinking`: turn thinking on the way the model prefers.
     pub fn on() -> Self {
-        ThinkingConfig { intent: Some(Intent::Enable), ..Default::default() }
+        ThinkingConfig {
+            intent: Some(Intent::Enable),
+            ..Default::default()
+        }
     }
 
     /// `with_thinking(false)`.
     pub fn off() -> Self {
-        ThinkingConfig { intent: Some(Intent::Disable), ..Default::default() }
+        ThinkingConfig {
+            intent: Some(Intent::Disable),
+            ..Default::default()
+        }
     }
 
     pub fn effort(effort: impl Into<String>) -> Self {
-        ThinkingConfig { effort: Some(effort.into()), ..Default::default() }
+        ThinkingConfig {
+            effort: Some(effort.into()),
+            ..Default::default()
+        }
     }
 
     pub fn budget(budget: i64) -> Self {
-        ThinkingConfig { budget: Some(budget), ..Default::default() }
+        ThinkingConfig {
+            budget: Some(budget),
+            ..Default::default()
+        }
     }
 
     pub fn with_display(mut self, display: Display) -> Self {
@@ -78,7 +90,9 @@ impl ThinkingConfig {
 
     /// `Config#resolve`: `Ok(None)` when the model reasons anyway and needs no control.
     pub fn resolve(&self, model: &Model) -> Result<Option<ThinkingConfig>> {
-        let Some(intent) = self.intent else { return Ok(Some(self.clone())) };
+        let Some(intent) = self.intent else {
+            return Ok(Some(self.clone()));
+        };
         let controls = Controls { model };
         let resolved = match intent {
             Intent::Enable => controls.enable(),
@@ -123,10 +137,16 @@ impl Controls<'_> {
             return Resolved::Options(ThinkingConfig::budget(budget));
         }
         if self.model.reasoning_option("toggle").is_some() {
-            return Resolved::Options(ThinkingConfig { enabled: Some(true), ..Default::default() });
+            return Resolved::Options(ThinkingConfig {
+                enabled: Some(true),
+                ..Default::default()
+            });
         }
         let values = self.model.reasoning_option_values("effort");
-        if let Some(effort) = PREFERRED_EFFORTS.iter().find(|e| values.iter().any(|v| v == *e)) {
+        if let Some(effort) = PREFERRED_EFFORTS
+            .iter()
+            .find(|e| values.iter().any(|v| v == *e))
+        {
             return Resolved::Options(ThinkingConfig::effort(*effort));
         }
         if let Some(budget) = self.minimum_budget() {
@@ -139,16 +159,28 @@ impl Controls<'_> {
     }
 
     fn disable(&self) -> Resolved {
-        if self.model.reasoning_option_values("effort").iter().any(|v| v == "none") {
+        if self
+            .model
+            .reasoning_option_values("effort")
+            .iter()
+            .any(|v| v == "none")
+        {
             return Resolved::Options(ThinkingConfig::effort("none"));
         }
         let budget = self.model.reasoning_option("budget_tokens");
-        if let Some(min) = budget.as_ref().and_then(|b| b.get("min")).and_then(Value::as_f64)
-            && min <= 0.0 {
-                return Resolved::Options(ThinkingConfig::budget(0));
-            }
+        if let Some(min) = budget
+            .as_ref()
+            .and_then(|b| b.get("min"))
+            .and_then(Value::as_f64)
+            && min <= 0.0
+        {
+            return Resolved::Options(ThinkingConfig::budget(0));
+        }
         if self.model.reasoning_option("toggle").is_some() || budget.is_some() {
-            return Resolved::Options(ThinkingConfig { enabled: Some(false), ..Default::default() });
+            return Resolved::Options(ThinkingConfig {
+                enabled: Some(false),
+                ..Default::default()
+            });
         }
         Resolved::Unsupported
     }
@@ -156,21 +188,38 @@ impl Controls<'_> {
     fn default_effort(&self) -> Option<String> {
         let option = self.model.reasoning_option("effort")?;
         let default = option.get("default")?;
-        let default = default.as_str().map(str::to_string).unwrap_or_else(|| default.to_string());
+        let default = default
+            .as_str()
+            .map(str::to_string)
+            .unwrap_or_else(|| default.to_string());
         (default != "none").then_some(default)
     }
 
     fn explicit_budget(&self) -> Option<i64> {
-        let d = self.model.reasoning_option("budget_tokens")?.get("default")?.as_i64()?;
+        let d = self
+            .model
+            .reasoning_option("budget_tokens")?
+            .get("default")?
+            .as_i64()?;
         (d > 0).then_some(d)
     }
 
     fn minimum_budget(&self) -> Option<i64> {
-        let min = self.model.reasoning_option("budget_tokens")?.get("min")?.as_i64()?;
+        let min = self
+            .model
+            .reasoning_option("budget_tokens")?
+            .get("min")?
+            .as_i64()?;
         Some(min.max(1))
     }
 
     fn reasoning_model(&self) -> bool {
-        self.model.supports("reasoning") || self.model.metadata.get("reasoning").and_then(Value::as_bool) == Some(true)
+        self.model.supports("reasoning")
+            || self
+                .model
+                .metadata
+                .get("reasoning")
+                .and_then(Value::as_bool)
+                == Some(true)
     }
 }

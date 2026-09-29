@@ -18,7 +18,10 @@ pub struct McpError {
 
 impl McpError {
     pub fn new(message: impl Into<String>) -> McpError {
-        McpError { message: message.into(), ..Default::default() }
+        McpError {
+            message: message.into(),
+            ..Default::default()
+        }
     }
 }
 

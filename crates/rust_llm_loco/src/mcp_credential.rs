@@ -25,7 +25,9 @@ use async_trait::async_trait;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use rust_llm::mcp::{CredentialStore, McpError};
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+};
 use serde_json::{Value, json};
 
 use crate::entities::rust_llm_mcp_credentials;
@@ -52,7 +54,10 @@ fn failure(message: impl std::fmt::Display) -> rust_llm::Error {
 impl McpCredentialStore {
     /// A store in `db`, encrypting with the 32-byte `key` (`active_record_encryption.primary_key`).
     pub fn new(db: DatabaseConnection, key: [u8; 32]) -> McpCredentialStore {
-        McpCredentialStore { db, cipher: Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key)) }
+        McpCredentialStore {
+            db,
+            cipher: Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key)),
+        }
     }
 
     /// The owner key of a record, `gid://rust_llm/<type>/<id>`, which the store keeps as its
@@ -62,19 +67,30 @@ impl McpCredentialStore {
     }
 
     /// `find_by(key:)`, for reading the owner and the stored ciphertext.
-    pub async fn find_by_key(&self, key: &str) -> Result<Option<rust_llm_mcp_credentials::Model>, sea_orm::DbErr> {
-        rust_llm_mcp_credentials::Entity::find().filter(rust_llm_mcp_credentials::Column::Key.eq(key)).one(&self.db).await
+    pub async fn find_by_key(
+        &self,
+        key: &str,
+    ) -> Result<Option<rust_llm_mcp_credentials::Model>, sea_orm::DbErr> {
+        rust_llm_mcp_credentials::Entity::find()
+            .filter(rust_llm_mcp_credentials::Column::Key.eq(key))
+            .one(&self.db)
+            .await
     }
 
     /// `count`.
     pub async fn count(&self) -> Result<u64, sea_orm::DbErr> {
         use sea_orm::PaginatorTrait;
-        rust_llm_mcp_credentials::Entity::find().count(&self.db).await
+        rust_llm_mcp_credentials::Entity::find()
+            .count(&self.db)
+            .await
     }
 
     fn encrypt(&self, data: &Value) -> rust_llm::Result<String> {
         let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-        let mut sealed = self.cipher.encrypt(&nonce, data.to_string().as_bytes()).map_err(failure)?;
+        let mut sealed = self
+            .cipher
+            .encrypt(&nonce, data.to_string().as_bytes())
+            .map_err(failure)?;
         let tag = sealed.split_off(sealed.len() - TAG_LENGTH);
         Ok(json!({ "p": STANDARD.encode(sealed), "h": { "iv": STANDARD.encode(nonce), "at": STANDARD.encode(tag) } }).to_string())
     }
@@ -82,24 +98,35 @@ impl McpCredentialStore {
     fn decrypt(&self, stored: &str) -> rust_llm::Result<Value> {
         let message: Value = serde_json::from_str(stored).map_err(failure)?;
         let field = |pointer: &str| {
-            message.pointer(pointer).and_then(Value::as_str).and_then(|v| STANDARD.decode(v).ok()).ok_or_else(|| failure("unreadable"))
+            message
+                .pointer(pointer)
+                .and_then(Value::as_str)
+                .and_then(|v| STANDARD.decode(v).ok())
+                .ok_or_else(|| failure("unreadable"))
         };
         let (mut sealed, iv, tag) = (field("/p")?, field("/h/iv")?, field("/h/at")?);
         if iv.len() != 12 {
             return Err(failure("unreadable"));
         }
         sealed.extend(tag);
-        let plain = self.cipher.decrypt(Nonce::from_slice(&iv), sealed.as_slice()).map_err(failure)?;
+        let plain = self
+            .cipher
+            .decrypt(Nonce::from_slice(&iv), sealed.as_slice())
+            .map_err(failure)?;
         serde_json::from_slice(&plain).map_err(failure)
     }
 }
 
 /// `owner.is_a?(ActiveRecord::Base) ? owner : nil`: a GlobalID names a record.
 fn polymorphic_owner(owner: Option<&str>) -> (Option<String>, Option<i64>) {
-    let Some(path) = owner.and_then(|o| o.strip_prefix("gid://")) else { return (None, None) };
+    let Some(path) = owner.and_then(|o| o.strip_prefix("gid://")) else {
+        return (None, None);
+    };
     let mut parts = path.splitn(3, '/').skip(1);
     match (parts.next(), parts.next().and_then(|id| id.parse().ok())) {
-        (Some(owner_type), Some(id)) if !owner_type.is_empty() => (Some(owner_type.to_string()), Some(id)),
+        (Some(owner_type), Some(id)) if !owner_type.is_empty() => {
+            (Some(owner_type.to_string()), Some(id))
+        }
         _ => (None, None),
     }
 }
@@ -109,7 +136,10 @@ impl CredentialStore for McpCredentialStore {
     /// `find_by(key:)&.data`.
     async fn read(&self, key: &str) -> rust_llm::Result<Option<Value>> {
         let record = self.find_by_key(key).await.map_err(failure)?;
-        record.and_then(|r| r.data).map(|data| self.decrypt(&data)).transpose()
+        record
+            .and_then(|r| r.data)
+            .map(|data| self.decrypt(&data))
+            .transpose()
     }
 
     /// `find_or_initialize_by(key:).update!(data:, owner:)`.

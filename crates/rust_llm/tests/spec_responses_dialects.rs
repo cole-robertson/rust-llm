@@ -8,7 +8,10 @@ mod spec_helpers;
 
 use std::sync::Arc;
 
-use rust_llm::{Attachment, Chat, Config, Error, FnTool, Message, ProtocolName, ProviderTool, Role, ThinkingConfig, ToolCalls, ToolChoice, ToolResult};
+use rust_llm::{
+    Attachment, Chat, Config, Error, FnTool, Message, ProtocolName, ProviderTool, Role,
+    ThinkingConfig, ToolCalls, ToolChoice, ToolResult,
+};
 use serde_json::{Value, json};
 use spec_helpers::*;
 use wiremock::MockServer;
@@ -49,11 +52,24 @@ fn config_with_xai(server: &MockServer) -> Arc<Config> {
 
 /// `RubyLLM.chat(model: model_for(:deepseek), provider: :deepseek, protocol: :responses)`.
 fn deepseek(server: &MockServer) -> Chat {
-    Chat::with_config(config(server), Some("deepseek-v4-flash"), Some("deepseek"), false).unwrap().with_protocol(ProtocolName::Responses)
+    Chat::with_config(
+        config(server),
+        Some("deepseek-v4-flash"),
+        Some("deepseek"),
+        false,
+    )
+    .unwrap()
+    .with_protocol(ProtocolName::Responses)
 }
 
 fn xai(server: &MockServer) -> Chat {
-    Chat::with_config(config_with_xai(server), Some("grok-4-1-fast-non-reasoning"), Some("xai"), false).unwrap()
+    Chat::with_config(
+        config_with_xai(server),
+        Some("grok-4-1-fast-non-reasoning"),
+        Some("xai"),
+        false,
+    )
+    .unwrap()
 }
 
 fn openai(server: &MockServer) -> Chat {
@@ -71,7 +87,9 @@ fn render_input(chat: &Chat) -> rust_llm::Result<Value> {
 async fn deepseek_rejects_the_web_search_alias_before_sending() {
     let server = serve(vec![]).await;
     let chat = deepseek(&server).with_provider_tools(["web_search".into()]);
-    let Err(Error::UnsupportedServerTool(message)) = chat.render() else { panic!("expected UnsupportedServerTool") };
+    let Err(Error::UnsupportedServerTool(message)) = chat.render() else {
+        panic!("expected UnsupportedServerTool")
+    };
     let web_search = message.find(":web_search").expect(":web_search in message");
     assert!(message[web_search..].contains(":apply_patch"), "{message}");
     assert_eq!(requests(&server).await, 0);
@@ -81,8 +99,14 @@ async fn deepseek_rejects_the_web_search_alias_before_sending() {
 #[tokio::test]
 async fn deepseek_keeps_the_patch_tool_alias() {
     let server = serve(vec![]).await;
-    let payload = deepseek(&server).with_provider_tools(["apply_patch".into()]).render().unwrap();
-    assert_eq!(payload["tools"], json!([{ "type": "custom", "name": "apply_patch" }]));
+    let payload = deepseek(&server)
+        .with_provider_tools(["apply_patch".into()])
+        .render()
+        .unwrap();
+    assert_eq!(
+        payload["tools"],
+        json!([{ "type": "custom", "name": "apply_patch" }])
+    );
 }
 
 // spec: providers/deepseek/responses_spec.rb:33 passes raw tool definitions through unchanged
@@ -90,7 +114,10 @@ async fn deepseek_keeps_the_patch_tool_alias() {
 async fn deepseek_passes_raw_tool_definitions_through() {
     let server = serve(vec![]).await;
     let definition = json!({ "type": "web_search" });
-    let payload = deepseek(&server).with_provider_tools([ProviderTool::raw(definition.clone())]).render().unwrap();
+    let payload = deepseek(&server)
+        .with_provider_tools([ProviderTool::raw(definition.clone())])
+        .render()
+        .unwrap();
     assert_eq!(payload["tools"], json!([definition]));
 }
 
@@ -112,11 +139,22 @@ async fn deepseek_sends_json_schema_through_the_text_format() {
 async fn deepseek_renders_inline_images_as_input_image() {
     let server = serve(vec![]).await;
     let mut chat = deepseek(&server);
-    chat.ask_later_with("Describe this image", vec![inline("ruby.png")]).unwrap();
+    chat.ask_later_with("Describe this image", vec![inline("ruby.png")])
+        .unwrap();
     let input = render_input(&chat).unwrap();
-    let part = input[0]["content"].as_array().unwrap().last().unwrap().clone();
+    let part = input[0]["content"]
+        .as_array()
+        .unwrap()
+        .last()
+        .unwrap()
+        .clone();
     assert_eq!(part["type"], json!("input_image"));
-    assert!(part["image_url"].as_str().unwrap().starts_with("data:image/png;base64,"));
+    assert!(
+        part["image_url"]
+            .as_str()
+            .unwrap()
+            .starts_with("data:image/png;base64,")
+    );
 }
 
 // spec: providers/deepseek/responses_spec.rb:60 renders uploaded images as input_image references
@@ -124,7 +162,11 @@ async fn deepseek_renders_inline_images_as_input_image() {
 async fn deepseek_renders_uploaded_images_as_input_image_references() {
     let server = serve(vec![]).await;
     let mut chat = deepseek(&server);
-    chat.ask_later_with("Read the screenshot", vec![uploaded("file-api-image", "screenshot.png", "image/png")]).unwrap();
+    chat.ask_later_with(
+        "Read the screenshot",
+        vec![uploaded("file-api-image", "screenshot.png", "image/png")],
+    )
+    .unwrap();
     assert_eq!(
         render_input(&chat).unwrap()[0]["content"],
         json!([
@@ -140,7 +182,11 @@ async fn deepseek_keeps_image_attachments_inside_the_function_call_output() {
     let server = serve(vec![]).await;
     let mut chat = deepseek(&server);
     chat.add_message(
-        Message::tool_result("call_1", "Screenshot").with_attachments(vec![uploaded("file-api-image", "screenshot.png", "image/png")]),
+        Message::tool_result("call_1", "Screenshot").with_attachments(vec![uploaded(
+            "file-api-image",
+            "screenshot.png",
+            "image/png",
+        )]),
     );
     assert_eq!(
         render_input(&chat).unwrap(),
@@ -156,8 +202,11 @@ async fn deepseek_keeps_image_attachments_inside_the_function_call_output() {
 async fn deepseek_rejects_inline_documents() {
     let server = serve(vec![]).await;
     let mut chat = deepseek(&server);
-    chat.ask_later_with("Read this", vec![inline("sample.pdf")]).unwrap();
-    let Err(Error::UnsupportedAttachment(message)) = chat.render() else { panic!("expected UnsupportedAttachment") };
+    chat.ask_later_with("Read this", vec![inline("sample.pdf")])
+        .unwrap();
+    let Err(Error::UnsupportedAttachment(message)) = chat.render() else {
+        panic!("expected UnsupportedAttachment")
+    };
     assert!(message.contains("application/pdf"), "{message}");
 }
 
@@ -166,8 +215,15 @@ async fn deepseek_rejects_inline_documents() {
 async fn deepseek_rejects_uploaded_documents() {
     let server = serve(vec![]).await;
     let mut chat = deepseek(&server);
-    chat.ask_later_with("Read this", vec![uploaded("file-api-pdf", "report.pdf", "application/pdf")]).unwrap();
-    assert!(matches!(chat.render(), Err(Error::UnsupportedAttachment(_))));
+    chat.ask_later_with(
+        "Read this",
+        vec![uploaded("file-api-pdf", "report.pdf", "application/pdf")],
+    )
+    .unwrap();
+    assert!(matches!(
+        chat.render(),
+        Err(Error::UnsupportedAttachment(_))
+    ));
 }
 
 // spec: providers/deepseek/responses_spec.rb:118 replays server-tool history without duplicating its reasoning
@@ -180,7 +236,10 @@ async fn deepseek_replays_server_tool_history_without_duplicating_reasoning() {
     let server = serve(vec![json!({ "status": "completed", "output": output })]).await;
     let mut chat = deepseek(&server);
     let message = chat.ask("Search").await.unwrap();
-    assert_eq!(message.thinking.as_ref().and_then(|t| t.text.as_deref()), Some("Search first."));
+    assert_eq!(
+        message.thinking.as_ref().and_then(|t| t.text.as_deref()),
+        Some("Search first.")
+    );
     chat.set_messages(vec![message]);
     assert_eq!(render_input(&chat).unwrap(), output);
 }
@@ -190,15 +249,24 @@ async fn deepseek_replays_server_tool_history_without_duplicating_reasoning() {
 async fn counted_body(server: &MockServer) -> Value {
     let requests = server.received_requests().await.unwrap_or_default();
     let request = requests.last().expect("a count request");
-    assert!(request.url.path().ends_with("/responses/input_tokens"), "{}", request.url);
+    assert!(
+        request.url.path().ends_with("/responses/input_tokens"),
+        "{}",
+        request.url
+    );
     serde_json::from_slice(&request.body).unwrap()
 }
 
 // spec: providers/openai/responses_spec.rb:23 counts instructions, function tools, schemas and reasoning without generation-only options
 #[tokio::test]
 async fn openai_count_payload_keeps_instructions_tools_schema_and_reasoning_only() {
-    let server = serve(vec![json!({ "object": "response.input_tokens", "input_tokens": 42 })]).await;
-    let weather = FnTool::new("weather", "Looks up weather", |_| async { Ok(ToolResult::from("sunny")) });
+    let server = serve(vec![
+        json!({ "object": "response.input_tokens", "input_tokens": 42 }),
+    ])
+    .await;
+    let weather = FnTool::new("weather", "Looks up weather", |_| async {
+        Ok(ToolResult::from("sunny"))
+    });
     let inner = json!({ "type": "object", "properties": { "answer": { "type": "string" } } });
     let mut chat = openai(&server)
         .with_instructions("Be concise.")
@@ -215,33 +283,70 @@ async fn openai_count_payload_keeps_instructions_tools_schema_and_reasoning_only
     let payload = counted_body(&server).await;
     assert_eq!(payload["model"], json!("gpt-5-nano"));
     assert_eq!(payload["instructions"], json!("Be concise."));
-    assert_eq!(payload["input"], json!([{ "role": "user", "content": "Weather?" }]));
+    assert_eq!(
+        payload["input"],
+        json!([{ "role": "user", "content": "Weather?" }])
+    );
     assert_eq!(payload["tools"].as_array().unwrap().len(), 1);
     assert_eq!(payload["tools"][0]["type"], json!("function"));
     assert_eq!(payload["tools"][0]["name"], json!("weather"));
     assert_eq!(payload["tool_choice"], json!("required"));
     assert_eq!(payload["parallel_tool_calls"], json!(false));
     assert_eq!(payload["reasoning"], json!({ "effort": "low" }));
-    assert_eq!(payload["text"], json!({ "format": { "type": "json_schema", "name": "answer", "schema": inner, "strict": true } }));
-    let mut keys: Vec<&str> = payload.as_object().unwrap().keys().map(String::as_str).collect();
+    assert_eq!(
+        payload["text"],
+        json!({ "format": { "type": "json_schema", "name": "answer", "schema": inner, "strict": true } })
+    );
+    let mut keys: Vec<&str> = payload
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
     keys.sort_unstable();
-    assert_eq!(keys, ["input", "instructions", "model", "parallel_tool_calls", "reasoning", "text", "tool_choice", "tools"]);
+    assert_eq!(
+        keys,
+        [
+            "input",
+            "instructions",
+            "model",
+            "parallel_tool_calls",
+            "reasoning",
+            "text",
+            "tool_choice",
+            "tools"
+        ]
+    );
 }
 
 // spec: providers/openai/responses_spec.rb:47 keeps file references and image inputs in the counting payload
 #[tokio::test]
 async fn openai_count_payload_keeps_file_references_and_images() {
-    let server = serve(vec![json!({ "object": "response.input_tokens", "input_tokens": 7 })]).await;
+    let server = serve(vec![
+        json!({ "object": "response.input_tokens", "input_tokens": 7 }),
+    ])
+    .await;
     let mut chat = openai(&server);
     let file = uploaded("file_123", "proposal.pdf", "application/pdf");
-    chat.ask_later_with("Compare these", vec![file, Attachment::new(fixture("ruby.png"))]).unwrap();
+    chat.ask_later_with(
+        "Compare these",
+        vec![file, Attachment::new(fixture("ruby.png"))],
+    )
+    .unwrap();
     chat.count_tokens(None).await.unwrap();
-    let content = counted_body(&server).await["input"][0]["content"].as_array().unwrap().clone();
+    let content = counted_body(&server).await["input"][0]["content"]
+        .as_array()
+        .unwrap()
+        .clone();
     assert_eq!(content.len(), 3);
     assert!(content.contains(&json!({ "type": "input_text", "text": "Compare these" })));
     assert!(content.contains(&json!({ "type": "input_file", "file_id": "file_123" })));
-    assert!(content.iter().any(|p| p["type"] == "input_image"
-        && p["image_url"].as_str().is_some_and(|u| u.starts_with("data:image/png;base64,"))));
+    assert!(content.iter().any(|p| {
+        p["type"] == "input_image"
+            && p["image_url"]
+                .as_str()
+                .is_some_and(|u| u.starts_with("data:image/png;base64,"))
+    }));
 }
 
 // spec: providers/openai/responses_spec.rb:63 does not enable OpenAI token counting on #{dialect}
@@ -249,7 +354,9 @@ async fn openai_count_payload_keeps_file_references_and_images() {
 async fn xai_and_deepseek_responses_do_not_count_tokens() {
     let server = serve(vec![]).await;
     for (chat, name) in [(xai(&server), "XAI"), (deepseek(&server), "DeepSeek")] {
-        let Err(Error::Api(message, _)) = chat.count_tokens(Some("Hi")).await else { panic!("{name}: expected an error") };
+        let Err(Error::Api(message, _)) = chat.count_tokens(Some("Hi")).await else {
+            panic!("{name}: expected an error")
+        };
         assert_eq!(message, format!("{name} doesn't support token counting"));
     }
     assert_eq!(requests(&server).await, 0);
@@ -281,12 +388,21 @@ async fn xai_preserves_collection_citations_from_completed_streams() {
         "type": "response.completed",
         "response": { "status": "completed", "output": [], "citations": [COLLECTION_SOURCE] }
     });
-    let server = serve_templates(vec![sse(format!("event: response.completed\ndata: {event}\n\n"))]).await;
+    let server = serve_templates(vec![sse(format!(
+        "event: response.completed\ndata: {event}\n\n"
+    ))])
+    .await;
     let chunks = log::<Message>();
     let sink = chunks.clone();
-    xai(&server).ask_stream("Facts?", move |c| sink.lock().unwrap().push(c.clone())).await.unwrap();
+    xai(&server)
+        .ask_stream("Facts?", move |c| sink.lock().unwrap().push(c.clone()))
+        .await
+        .unwrap();
     let chunks = chunks.lock().unwrap();
-    let chunk = chunks.iter().find(|c| !c.citations.is_empty()).expect("a chunk with citations");
+    let chunk = chunks
+        .iter()
+        .find(|c| !c.citations.is_empty())
+        .expect("a chunk with citations");
     assert_citation(&chunk.citations[0], COLLECTION_SOURCE, 0);
 }
 
@@ -294,15 +410,27 @@ async fn xai_preserves_collection_citations_from_completed_streams() {
 #[tokio::test]
 async fn xai_converts_cost_in_usd_ticks_into_dollars() {
     let usage = json!({ "input_tokens": 10, "output_tokens": 5, "cost_in_usd_ticks": 2_909_000 });
-    let server = serve(vec![json!({ "status": "completed", "output": [], "usage": usage })]).await;
-    let cost = xai(&server).ask("Hi").await.unwrap().tokens.reported_cost.expect("a reported cost");
+    let server = serve(vec![
+        json!({ "status": "completed", "output": [], "usage": usage }),
+    ])
+    .await;
+    let cost = xai(&server)
+        .ask("Hi")
+        .await
+        .unwrap()
+        .tokens
+        .reported_cost
+        .expect("a reported cost");
     assert!((cost - 0.0002909).abs() <= 1e-12, "{cost}");
 }
 
 // spec: providers/xai/responses_spec.rb:52 #parse_usage > leaves reported cost nil when ticks are absent
 #[tokio::test]
 async fn xai_leaves_reported_cost_nil_without_ticks() {
-    let server = serve(vec![json!({ "status": "completed", "output": [], "usage": { "input_tokens": 10 } })]).await;
+    let server = serve(vec![
+        json!({ "status": "completed", "output": [], "usage": { "input_tokens": 10 } }),
+    ])
+    .await;
     let message = xai(&server).ask("Hi").await.unwrap();
     assert_eq!(message.role, Role::Assistant);
     assert_eq!(message.tokens.reported_cost, None);

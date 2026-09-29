@@ -36,7 +36,10 @@ pub enum Error {
     #[error("{0}")]
     Overloaded(String, Option<ErrorResponse>),
     #[error("{message}")]
-    ToolCallParse { message: String, finish_reason: Option<String> },
+    ToolCallParse {
+        message: String,
+        finish_reason: Option<String>,
+    },
     #[error("{0}")]
     UnsupportedAttachment(String),
     #[error("{0}")]
@@ -172,7 +175,10 @@ impl Error {
         if let Some(reason) = finish_reason {
             message = format!("{message} (finish_reason: {reason})");
         }
-        Error::ToolCallParse { message, finish_reason: finish_reason.map(str::to_string) }
+        Error::ToolCallParse {
+            message,
+            finish_reason: finish_reason.map(str::to_string),
+        }
     }
 }
 
@@ -187,7 +193,9 @@ pub const DEFAULT_FALLBACK_ERRORS: &[ErrorKind] = &[
 ];
 
 fn patterns(list: &[&str]) -> Vec<Regex> {
-    list.iter().map(|p| Regex::new(&format!("(?i){p}")).unwrap()).collect() // patterns are constants in this file
+    list.iter()
+        .map(|p| Regex::new(&format!("(?i){p}")).unwrap())
+        .collect() // patterns are constants in this file
 }
 
 static CONTEXT_LENGTH_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
@@ -208,7 +216,8 @@ static CONTEXT_LENGTH_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
 });
 static RATE_LIMIT_PATTERNS: LazyLock<Vec<Regex>> =
     LazyLock::new(|| patterns(&["rate limit", "per minute", "per hour", "per day"]));
-static OVERLOAD_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| patterns(&["currently overloaded"]));
+static OVERLOAD_PATTERNS: LazyLock<Vec<Regex>> =
+    LazyLock::new(|| patterns(&["currently overloaded"]));
 
 fn matches_any(list: &[Regex], message: &str) -> bool {
     list.iter().any(|re| re.is_match(message))
@@ -234,7 +243,10 @@ pub(crate) fn parse_error_message(body: &str) -> Option<String> {
         if let Some(s) = obj.get("error").and_then(|e| e.as_str()) {
             return Some(s.to_string());
         }
-        let nested = obj.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str());
+        let nested = obj
+            .get("error")
+            .and_then(|e| e.get("message"))
+            .and_then(|m| m.as_str());
         nested
             .or_else(|| obj.get("message").and_then(|m| m.as_str()))
             .or_else(|| obj.get("detail").and_then(|m| m.as_str()))
@@ -242,8 +254,11 @@ pub(crate) fn parse_error_message(body: &str) -> Option<String> {
     }
     match &json {
         serde_json::Value::Array(parts) => {
-            let messages: Vec<String> =
-                parts.iter().filter_map(part_message).filter(|m| !m.is_empty()).collect();
+            let messages: Vec<String> = parts
+                .iter()
+                .filter_map(part_message)
+                .filter(|m| !m.is_empty())
+                .collect();
             (!messages.is_empty()).then(|| messages.join(". "))
         }
         serde_json::Value::Object(_) => part_message(&json),
@@ -260,7 +275,10 @@ pub(crate) fn error_for_status(status: u16, body: &str) -> Error {
 
 /// `ErrorMiddleware.parse_error` with the message a provider's `parse_error` already read.
 pub(crate) fn error_for_status_message(status: u16, body: &str, message: Option<String>) -> Error {
-    let response = Some(ErrorResponse { status, body: body.to_string() });
+    let response = Some(ErrorResponse {
+        status,
+        body: body.to_string(),
+    });
     let text = message.clone().unwrap_or_default();
     let msg = |default: &str| message.clone().unwrap_or_else(|| default.to_string());
     match status {
@@ -274,22 +292,28 @@ pub(crate) fn error_for_status_message(status: u16, body: &str, message: Option<
             }
         }
         401 => Error::Unauthorized(msg("Invalid API key - check your credentials"), response),
-        402 => Error::PaymentRequired(msg("Payment required - please top up your account"), response),
+        402 => Error::PaymentRequired(
+            msg("Payment required - please top up your account"),
+            response,
+        ),
         403 => Error::Forbidden(
             msg("Forbidden - you do not have permission to access this resource"),
             response,
         ),
         429 => {
-            if !matches_any(&RATE_LIMIT_PATTERNS, &text) && matches_any(&CONTEXT_LENGTH_PATTERNS, &text) {
+            if !matches_any(&RATE_LIMIT_PATTERNS, &text)
+                && matches_any(&CONTEXT_LENGTH_PATTERNS, &text)
+            {
                 Error::ContextLengthExceeded(msg("Context length exceeded"), response)
             } else {
                 Error::RateLimit(msg("Rate limit exceeded - please wait a moment"), response)
             }
         }
         500 => Error::Server(msg("API server error - please try again"), response),
-        502..=504 => {
-            Error::ServiceUnavailable(msg("API server unavailable - please try again later"), response)
-        }
+        502..=504 => Error::ServiceUnavailable(
+            msg("API server unavailable - please try again later"),
+            response,
+        ),
         529 => Error::Overloaded(msg("Service overloaded - please try again later"), response),
         _ => Error::Api(message.unwrap_or_else(|| body.to_string()), response),
     }
@@ -301,26 +325,38 @@ mod tests {
 
     #[test]
     fn a_400_about_context_becomes_context_length_exceeded() {
-        let err = error_for_status(400, r#"{"error":{"message":"prompt is too long: 250000 tokens"}}"#);
+        let err = error_for_status(
+            400,
+            r#"{"error":{"message":"prompt is too long: 250000 tokens"}}"#,
+        );
         assert_eq!(err.kind(), ErrorKind::ContextLengthExceeded);
         assert_eq!(err.to_string(), "prompt is too long: 250000 tokens");
     }
 
     #[test]
     fn a_429_that_mentions_rate_limits_stays_a_rate_limit_even_if_it_mentions_tokens() {
-        let err = error_for_status(429, r#"{"error":{"message":"Rate limit reached for input tokens per minute"}}"#);
+        let err = error_for_status(
+            429,
+            r#"{"error":{"message":"Rate limit reached for input tokens per minute"}}"#,
+        );
         assert_eq!(err.kind(), ErrorKind::RateLimit);
     }
 
     #[test]
     fn a_529_is_overloaded_and_retryable() {
-        let err = error_for_status(529, r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#);
+        let err = error_for_status(
+            529,
+            r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#,
+        );
         assert_eq!(err.kind(), ErrorKind::Overloaded);
         assert!(err.retryable());
     }
 
     #[test]
     fn an_empty_401_uses_the_default_message() {
-        assert_eq!(error_for_status(401, "").to_string(), "Invalid API key - check your credentials");
+        assert_eq!(
+            error_for_status(401, "").to_string(),
+            "Invalid API key - check your credentials"
+        );
     }
 }

@@ -20,7 +20,9 @@ fn pdf_bytes() -> Vec<u8> {
 }
 
 async fn start(name: &str) -> Cassette {
-    Cassette::start(name).await.unwrap_or_else(|| panic!("missing cassette {name}; run bin/convert-cassettes 'uploadedfile_*'"))
+    Cassette::start(name).await.unwrap_or_else(|| {
+        panic!("missing cassette {name}; run bin/convert-cassettes 'uploadedfile_*'")
+    })
 }
 
 /// One part of a multipart body: its disposition name, filename, content type, and bytes.
@@ -33,7 +35,11 @@ struct Part {
 }
 
 fn find(haystack: &[u8], needle: &[u8], from: usize) -> Option<usize> {
-    haystack.get(from..)?.windows(needle.len()).position(|w| w == needle).map(|p| p + from)
+    haystack
+        .get(from..)?
+        .windows(needle.len())
+        .position(|w| w == needle)
+        .map(|p| p + from)
 }
 
 /// Splits a `multipart/form-data` body on `boundary`.
@@ -44,11 +50,14 @@ fn parse_multipart(body: &[u8], boundary: &str) -> Vec<Part> {
     while body.get(at..at + 2) == Some(b"\r\n") {
         let head_end = find(body, b"\r\n\r\n", at).expect("part headers");
         let head = String::from_utf8_lossy(&body[at + 2..head_end]).to_string();
-        let next = find(body, format!("\r\n{delimiter}").as_bytes(), head_end).expect("next boundary");
+        let next =
+            find(body, format!("\r\n{delimiter}").as_bytes(), head_end).expect("next boundary");
         let header = |key: &str| {
             head.lines().find_map(|l| {
                 let (k, v) = l.split_once(':')?;
-                k.trim().eq_ignore_ascii_case(key).then(|| v.trim().to_string())
+                k.trim()
+                    .eq_ignore_ascii_case(key)
+                    .then(|| v.trim().to_string())
             })
         };
         let disposition = header("content-disposition").unwrap_or_default();
@@ -70,14 +79,28 @@ fn parse_multipart(body: &[u8], boundary: &str) -> Vec<Part> {
 
 /// The recorded Ruby body names its own boundary on the first line.
 fn recorded_parts(interaction: &Interaction) -> Vec<Part> {
-    let first = interaction.request_body.lines().next().expect("recorded multipart body");
-    parse_multipart(interaction.request_body.as_bytes(), first.trim().strip_prefix("--").expect("boundary line"))
+    let first = interaction
+        .request_body
+        .lines()
+        .next()
+        .expect("recorded multipart body");
+    parse_multipart(
+        interaction.request_body.as_bytes(),
+        first.trim().strip_prefix("--").expect("boundary line"),
+    )
 }
 
 fn sent_parts(request: &wiremock::Request) -> Vec<Part> {
     let content_type = header(request, "content-type").unwrap_or_default();
-    assert!(content_type.starts_with("multipart/form-data"), "upload must be multipart, sent {content_type}");
-    let boundary = content_type.split("boundary=").nth(1).expect("multipart boundary").to_string();
+    assert!(
+        content_type.starts_with("multipart/form-data"),
+        "upload must be multipart, sent {content_type}"
+    );
+    let boundary = content_type
+        .split("boundary=")
+        .nth(1)
+        .expect("multipart boundary")
+        .to_string();
     parse_multipart(&request.body, &boundary)
 }
 
@@ -94,33 +117,70 @@ fn assert_same_form(recorded: &Interaction, sent: &wiremock::Request) {
         assert_eq!(a.content_type, e.content_type, "content type of {}", e.name);
         if e.name == "file" {
             assert_eq!(a.body, pdf_bytes(), "the file part is the PDF's bytes");
-            let recorded_len = recorded.request_body.lines().find_map(|l| l.strip_prefix("Content-Length: ")).expect("recorded length");
+            let recorded_len = recorded
+                .request_body
+                .lines()
+                .find_map(|l| l.strip_prefix("Content-Length: "))
+                .expect("recorded length");
             assert_eq!(a.body.len().to_string(), recorded_len.trim());
         } else {
-            assert_eq!(String::from_utf8_lossy(&a.body), String::from_utf8_lossy(&e.body), "value of {}", e.name);
+            assert_eq!(
+                String::from_utf8_lossy(&a.body),
+                String::from_utf8_lossy(&e.body),
+                "value of {}",
+                e.name
+            );
         }
     }
 }
 
 fn header(request: &wiremock::Request, name: &str) -> Option<String> {
-    request.headers.get(name).and_then(|v| v.to_str().ok()).map(str::to_string)
+    request
+        .headers
+        .get(name)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string)
 }
 
-fn upload_options<'a>(provider: &'a str, purpose: Option<&'a str>, config: Arc<Config>) -> UploadOptions<'a> {
-    UploadOptions { provider: Some(provider), purpose, config: Some(config), ..Default::default() }
+fn upload_options<'a>(
+    provider: &'a str,
+    purpose: Option<&'a str>,
+    config: Arc<Config>,
+) -> UploadOptions<'a> {
+    UploadOptions {
+        provider: Some(provider),
+        purpose,
+        config: Some(config),
+        ..Default::default()
+    }
 }
 
 /// `it "#{provider} uploads a PDF through the Files API"`: `file.id` is present and
 /// `file.byte_size` equals the PDF's size.
-async fn uploads_a_pdf(provider: &str, purpose: Option<&str>) -> (UploadedFile, Vec<wiremock::Request>, Vec<Interaction>) {
+async fn uploads_a_pdf(
+    provider: &str,
+    purpose: Option<&str>,
+) -> (UploadedFile, Vec<wiremock::Request>, Vec<Interaction>) {
     let name = format!("uploadedfile_live_uploads_{provider}_uploads_a_pdf_through_the_files_api");
     let cassette = start(&name).await;
-    let file = upload(pdf_path().as_str(), upload_options(provider, purpose, config_for(&cassette, provider))).await.expect("upload");
+    let file = upload(
+        pdf_path().as_str(),
+        upload_options(provider, purpose, config_for(&cassette, provider)),
+    )
+    .await
+    .expect("upload");
     assert!(!file.id.is_empty(), "file.id is present");
-    assert_eq!(file.byte_size, Some(std::fs::metadata(pdf_path()).unwrap().len()));
+    assert_eq!(
+        file.byte_size,
+        Some(std::fs::metadata(pdf_path()).unwrap().len())
+    );
     assert_eq!(file.provider, provider);
     cassette.assert_all_matched().await;
-    let requests = cassette.server.received_requests().await.unwrap_or_default();
+    let requests = cassette
+        .server
+        .received_requests()
+        .await
+        .unwrap_or_default();
     (file, requests, support::load(&name).unwrap())
 }
 
@@ -133,8 +193,14 @@ async fn anthropic_uploads_a_pdf_through_the_files_api() {
     assert_eq!(file.created_at.map(|t| t.timestamp()), Some(1789683298));
     assert_eq!(requests[0].method.as_str(), "POST");
     assert_eq!(requests[0].url.path(), "/v1/files");
-    assert_eq!(header(&requests[0], "anthropic-beta").as_deref(), Some("files-api-2025-04-14"));
-    assert_eq!(header(&requests[0], "x-api-key").as_deref(), Some("test-key"));
+    assert_eq!(
+        header(&requests[0], "anthropic-beta").as_deref(),
+        Some("files-api-2025-04-14")
+    );
+    assert_eq!(
+        header(&requests[0], "x-api-key").as_deref(),
+        Some("test-key")
+    );
     assert_same_form(&recorded[0], &requests[0]);
 }
 
@@ -147,7 +213,10 @@ async fn openai_uploads_a_pdf_through_the_files_api() {
     assert_eq!(file.expires_at, None);
     assert_eq!(requests[0].method.as_str(), "POST");
     assert_eq!(requests[0].url.path(), "/v1/files");
-    assert_eq!(header(&requests[0], "authorization").as_deref(), Some("Bearer test-key"));
+    assert_eq!(
+        header(&requests[0], "authorization").as_deref(),
+        Some("Bearer test-key")
+    );
     assert_same_form(&recorded[0], &requests[0]);
 }
 
@@ -175,17 +244,36 @@ fn assert_gemini_resumable_upload(requests: &[wiremock::Request], recorded: &[In
     let start = &requests[0];
     assert_eq!(start.method.as_str(), "POST");
     assert_eq!(start.url.path(), "/upload/v1beta/files");
-    assert_eq!(header(start, "x-goog-upload-protocol").as_deref(), Some("resumable"));
-    assert_eq!(header(start, "x-goog-upload-command").as_deref(), Some("start"));
-    assert_eq!(header(start, "x-goog-upload-header-content-length").as_deref(), Some("18810"));
-    assert_eq!(header(start, "x-goog-upload-header-content-type").as_deref(), Some("application/pdf"));
+    assert_eq!(
+        header(start, "x-goog-upload-protocol").as_deref(),
+        Some("resumable")
+    );
+    assert_eq!(
+        header(start, "x-goog-upload-command").as_deref(),
+        Some("start")
+    );
+    assert_eq!(
+        header(start, "x-goog-upload-header-content-length").as_deref(),
+        Some("18810")
+    );
+    assert_eq!(
+        header(start, "x-goog-upload-header-content-type").as_deref(),
+        Some("application/pdf")
+    );
     assert_eq!(header(start, "x-goog-api-key").as_deref(), Some("test-key"));
 
     let bytes = &requests[1];
     let recorded_query = recorded[1].uri.split_once('?').map(|(_, q)| q).unwrap();
     assert_eq!(bytes.url.path(), "/upload/v1beta/files");
-    assert_eq!(bytes.url.query(), Some(recorded_query), "bytes go to the upload URL Gemini returned");
-    assert_eq!(header(bytes, "x-goog-upload-command").as_deref(), Some("upload, finalize"));
+    assert_eq!(
+        bytes.url.query(),
+        Some(recorded_query),
+        "bytes go to the upload URL Gemini returned"
+    );
+    assert_eq!(
+        header(bytes, "x-goog-upload-command").as_deref(),
+        Some("upload, finalize")
+    );
     assert_eq!(header(bytes, "x-goog-upload-offset").as_deref(), Some("0"));
     assert_eq!(bytes.body, pdf_bytes());
 }
@@ -196,7 +284,10 @@ async fn gemini_uploads_a_pdf_through_the_files_api() {
     assert_eq!(file.id, "files/x6n2073cih2g");
     assert_eq!(file.filename.as_deref(), Some("sample.pdf"));
     assert_eq!(file.status.as_deref(), Some("ACTIVE"));
-    assert_eq!(file.uri.as_deref(), Some("https://generativelanguage.googleapis.com/v1beta/files/x6n2073cih2g"));
+    assert_eq!(
+        file.uri.as_deref(),
+        Some("https://generativelanguage.googleapis.com/v1beta/files/x6n2073cih2g")
+    );
     assert_eq!(file.expires_at.map(|t| t.timestamp()), Some(1789856099));
     assert_gemini_resumable_upload(&requests, &recorded);
 }
@@ -206,11 +297,27 @@ async fn openai_gpt_5_nano_reuses_an_uploaded_file_in_chat() {
     let name = "uploadedfile_live_uploads_openai_gpt-5-nano_reuses_an_uploaded_file_in_chat";
     let cassette = start(name).await;
     let config = config_for(&cassette, "openai");
-    let file = upload(pdf_path().as_str(), upload_options("openai", Some("user_data"), config.clone())).await.unwrap();
+    let file = upload(
+        pdf_path().as_str(),
+        upload_options("openai", Some("user_data"), config.clone()),
+    )
+    .await
+    .unwrap();
     let mut chat = Chat::with_config(config, Some("gpt-5-nano"), Some("openai"), false).unwrap();
-    let response = chat.ask_with("Summarize this document in one sentence.", vec![file.into()]).await.unwrap();
+    let response = chat
+        .ask_with(
+            "Summarize this document in one sentence.",
+            vec![file.into()],
+        )
+        .await
+        .unwrap();
     let content = response.content().to_lowercase();
-    assert!(["pdf", "document", "lorem", "sample"].iter().any(|w| content.contains(w)), "{content}");
+    assert!(
+        ["pdf", "document", "lorem", "sample"]
+            .iter()
+            .any(|w| content.contains(w)),
+        "{content}"
+    );
     // The responses request (input_file with file_id) is JSON-compared to RubyLLM's here.
     cassette.assert_all_matched().await;
     let requests = cassette.server.received_requests().await.unwrap();
@@ -222,11 +329,28 @@ async fn gemini_2_5_flash_reuses_an_uploaded_file_in_chat() {
     let name = "uploadedfile_live_uploads_gemini_gemini-2_5-flash_reuses_an_uploaded_file_in_chat";
     let cassette = start(name).await;
     let config = config_for(&cassette, "gemini");
-    let file = upload(pdf_path().as_str(), upload_options("gemini", None, config.clone())).await.unwrap();
-    let mut chat = Chat::with_config(config, Some("gemini-2.5-flash"), Some("gemini"), false).unwrap();
-    let response = chat.ask_with("Summarize this document in one sentence.", vec![file.into()]).await.unwrap();
+    let file = upload(
+        pdf_path().as_str(),
+        upload_options("gemini", None, config.clone()),
+    )
+    .await
+    .unwrap();
+    let mut chat =
+        Chat::with_config(config, Some("gemini-2.5-flash"), Some("gemini"), false).unwrap();
+    let response = chat
+        .ask_with(
+            "Summarize this document in one sentence.",
+            vec![file.into()],
+        )
+        .await
+        .unwrap();
     let content = response.content().to_lowercase();
-    assert!(["pdf", "document", "lorem", "sample"].iter().any(|w| content.contains(w)), "{content}");
+    assert!(
+        ["pdf", "document", "lorem", "sample"]
+            .iter()
+            .any(|w| content.contains(w)),
+        "{content}"
+    );
     // The start body and the generateContent request (file_data.file_uri) are JSON-compared here.
     cassette.assert_all_matched().await;
     let requests = cassette.server.received_requests().await.unwrap();
@@ -261,7 +385,10 @@ fn offline_chat(model: &str, provider: &str) -> Chat {
 #[test]
 fn anthropic_references_uploaded_documents_and_images_by_file_id() {
     let mut chat = offline_chat("claude-haiku-4-5", "anthropic");
-    let files = vec![uploaded("anthropic", "file_pdf", "application/pdf").into(), uploaded("anthropic", "file_png", "image/png").into()];
+    let files = vec![
+        uploaded("anthropic", "file_pdf", "application/pdf").into(),
+        uploaded("anthropic", "file_png", "image/png").into(),
+    ];
     chat.ask_later_with("Compare", files).unwrap();
     let payload = chat.render().unwrap();
     assert_eq!(
@@ -276,25 +403,48 @@ fn anthropic_references_uploaded_documents_and_images_by_file_id() {
 
 #[test]
 fn openai_chat_completions_references_an_uploaded_file_by_id() {
-    let mut chat = offline_chat("gpt-5-nano", "openai").with_protocol(rust_llm::ProtocolName::ChatCompletions);
-    chat.ask_later_with("Summarize", vec![uploaded("openai", "file-1", "application/pdf").into()]).unwrap();
+    let mut chat =
+        offline_chat("gpt-5-nano", "openai").with_protocol(rust_llm::ProtocolName::ChatCompletions);
+    chat.ask_later_with(
+        "Summarize",
+        vec![uploaded("openai", "file-1", "application/pdf").into()],
+    )
+    .unwrap();
     let payload = chat.render().unwrap();
-    assert_eq!(payload["messages"][0]["content"][1], json!({ "type": "file", "file": { "file_id": "file-1" } }));
+    assert_eq!(
+        payload["messages"][0]["content"][1],
+        json!({ "type": "file", "file": { "file_id": "file-1" } })
+    );
 }
 
 #[test]
 fn gemini_falls_back_to_the_file_id_without_a_uri() {
     let mut chat = offline_chat("gemini-2.5-flash", "gemini");
-    chat.ask_later_with("Summarize", vec![uploaded("gemini", "files/abc", "application/pdf").into()]).unwrap();
+    chat.ask_later_with(
+        "Summarize",
+        vec![uploaded("gemini", "files/abc", "application/pdf").into()],
+    )
+    .unwrap();
     let payload = chat.render().unwrap();
-    assert_eq!(payload["contents"][0]["parts"][1], json!({ "file_data": { "mime_type": "application/pdf", "file_uri": "files/abc" } }));
+    assert_eq!(
+        payload["contents"][0]["parts"][1],
+        json!({ "file_data": { "mime_type": "application/pdf", "file_uri": "files/abc" } })
+    );
 }
 
 #[test]
 fn xai_chat_completions_refuses_a_provider_file() {
-    let mut chat = offline_chat("grok-4-1-fast-non-reasoning", "xai").with_protocol(rust_llm::ProtocolName::ChatCompletions);
-    chat.ask_later_with("Summarize", vec![uploaded("xai", "file_1", "application/pdf").into()]).unwrap();
-    assert!(matches!(chat.render(), Err(Error::UnsupportedAttachment(_))));
+    let mut chat = offline_chat("grok-4-1-fast-non-reasoning", "xai")
+        .with_protocol(rust_llm::ProtocolName::ChatCompletions);
+    chat.ask_later_with(
+        "Summarize",
+        vec![uploaded("xai", "file_1", "application/pdf").into()],
+    )
+    .unwrap();
+    assert!(matches!(
+        chat.render(),
+        Err(Error::UnsupportedAttachment(_))
+    ));
 }
 
 #[test]
@@ -304,7 +454,10 @@ fn a_provider_file_has_no_inline_content() {
     assert_eq!(a.filename.as_deref(), Some("sample.pdf"));
     assert_eq!(a.byte_size(), Some(18810));
     let err = a.encoded().unwrap_err();
-    assert_eq!(err.to_string(), "Provider-managed file file-1 cannot be read as inline attachment content");
+    assert_eq!(
+        err.to_string(),
+        "Provider-managed file file-1 cannot be read as inline attachment content"
+    );
 }
 
 // ---- auto-upload of large attachments (Protocol#preprocess_message) -------------------------
@@ -347,17 +500,33 @@ async fn mock_anthropic() -> (wiremock::MockServer, Config) {
 #[tokio::test]
 async fn attachments_over_the_inline_limit_upload_once_and_go_as_file_references() {
     let (server, config) = mock_anthropic().await;
-    let mut chat = Chat::with_config(Arc::new(config), Some("claude-haiku-4-5"), Some("anthropic"), false).unwrap();
+    let mut chat = Chat::with_config(
+        Arc::new(config),
+        Some("claude-haiku-4-5"),
+        Some("anthropic"),
+        false,
+    )
+    .unwrap();
     chat.ask_with("Summarize", vec![large_pdf()]).await.unwrap();
     chat.ask("And again").await.unwrap();
 
     let requests = server.received_requests().await.unwrap();
     let paths: Vec<&str> = requests.iter().map(|r| r.url.path()).collect();
-    assert_eq!(paths, ["/v1/files", "/v1/messages", "/v1/messages"], "the second turn reuses the upload");
+    assert_eq!(
+        paths,
+        ["/v1/files", "/v1/messages", "/v1/messages"],
+        "the second turn reuses the upload"
+    );
     for chat_request in &requests[1..] {
         let body: serde_json::Value = serde_json::from_slice(&chat_request.body).unwrap();
-        assert_eq!(body["messages"][0]["content"][1], json!({ "type": "document", "source": { "type": "file", "file_id": "file_large" } }));
-        assert_eq!(header(chat_request, "anthropic-beta").as_deref(), Some("files-api-2025-04-14"));
+        assert_eq!(
+            body["messages"][0]["content"][1],
+            json!({ "type": "document", "source": { "type": "file", "file_id": "file_large" } })
+        );
+        assert_eq!(
+            header(chat_request, "anthropic-beta").as_deref(),
+            Some("files-api-2025-04-14")
+        );
     }
     // History keeps the original attachment; only the request carries the reference.
     assert!(!chat.messages()[0].attachments[0].is_provider_file());
@@ -367,22 +536,45 @@ async fn attachments_over_the_inline_limit_upload_once_and_go_as_file_references
 async fn auto_upload_can_be_turned_off() {
     let (server, mut config) = mock_anthropic().await;
     config.auto_upload_large_files = false;
-    let mut chat = Chat::with_config(Arc::new(config), Some("claude-haiku-4-5"), Some("anthropic"), false).unwrap();
+    let mut chat = Chat::with_config(
+        Arc::new(config),
+        Some("claude-haiku-4-5"),
+        Some("anthropic"),
+        false,
+    )
+    .unwrap();
     chat.ask_with("Summarize", vec![large_pdf()]).await.unwrap();
     let requests = server.received_requests().await.unwrap();
-    assert_eq!(requests.iter().map(|r| r.url.path()).collect::<Vec<_>>(), ["/v1/messages"]);
+    assert_eq!(
+        requests.iter().map(|r| r.url.path()).collect::<Vec<_>>(),
+        ["/v1/messages"]
+    );
     let body: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
-    assert_eq!(body["messages"][0]["content"][1]["source"]["type"], "base64");
+    assert_eq!(
+        body["messages"][0]["content"][1]["source"]["type"],
+        "base64"
+    );
     assert_eq!(header(&requests[0], "anthropic-beta"), None);
 }
 
 #[tokio::test]
 async fn small_attachments_stay_inline() {
     let (server, config) = mock_anthropic().await;
-    let mut chat = Chat::with_config(Arc::new(config), Some("claude-haiku-4-5"), Some("anthropic"), false).unwrap();
-    chat.ask_with("Summarize", vec![Attachment::new(pdf_path())]).await.unwrap();
+    let mut chat = Chat::with_config(
+        Arc::new(config),
+        Some("claude-haiku-4-5"),
+        Some("anthropic"),
+        false,
+    )
+    .unwrap();
+    chat.ask_with("Summarize", vec![Attachment::new(pdf_path())])
+        .await
+        .unwrap();
     let requests = server.received_requests().await.unwrap();
-    assert_eq!(requests.iter().map(|r| r.url.path()).collect::<Vec<_>>(), ["/v1/messages"]);
+    assert_eq!(
+        requests.iter().map(|r| r.url.path()).collect::<Vec<_>>(),
+        ["/v1/messages"]
+    );
 }
 
 // ---- argument errors, find, and download --------------------------------------------------
@@ -391,17 +583,32 @@ async fn small_attachments_stay_inline() {
 async fn openai_uploads_require_a_purpose() {
     let mut config = Config::default();
     config.set("openai_api_key", "test-key");
-    let options = UploadOptions { provider: Some("openai"), config: Some(Arc::new(config)), ..Default::default() };
+    let options = UploadOptions {
+        provider: Some("openai"),
+        config: Some(Arc::new(config)),
+        ..Default::default()
+    };
     let err = upload(pdf_path().as_str(), options).await.unwrap_err();
-    assert!(err.to_string().starts_with("OpenAI file uploads require purpose: assistants, batch"), "{err}");
+    assert!(
+        err.to_string()
+            .starts_with("OpenAI file uploads require purpose: assistants, batch"),
+        "{err}"
+    );
 }
 
 #[tokio::test]
 async fn unknown_upload_options_are_rejected() {
     let mut config = Config::default();
     config.set("openai_api_key", "test-key");
-    let mut options = UploadOptions { provider: Some("openai"), purpose: Some("batch"), config: Some(Arc::new(config)), ..Default::default() };
-    options.provider_options.insert("unsupported".into(), json!(true));
+    let mut options = UploadOptions {
+        provider: Some("openai"),
+        purpose: Some("batch"),
+        config: Some(Arc::new(config)),
+        ..Default::default()
+    };
+    options
+        .provider_options
+        .insert("unsupported".into(), json!(true));
     let err = upload(pdf_path().as_str(), options).await.unwrap_err();
     assert!(err.to_string().contains("unknown keyword"), "{err}");
 }
@@ -410,7 +617,15 @@ async fn unknown_upload_options_are_rejected() {
 async fn providers_without_a_files_api_say_so() {
     let mut config = Config::default();
     config.set("ollama_api_base", "http://localhost:11434/v1");
-    let err = UploadedFile::find("file_1", FileOptions { provider: Some("ollama"), config: Some(Arc::new(config)) }).await.unwrap_err();
+    let err = UploadedFile::find(
+        "file_1",
+        FileOptions {
+            provider: Some("ollama"),
+            config: Some(Arc::new(config)),
+        },
+    )
+    .await
+    .unwrap_err();
     assert_eq!(err.to_string(), "ollama doesn't support file uploads");
 }
 
@@ -437,10 +652,16 @@ async fn find_and_download_use_the_files_endpoints() {
     config.set("anthropic_api_base", server.uri());
     config.set("anthropic_api_key", "test-key");
     let config = Arc::new(config);
-    let options = || FileOptions { provider: Some("anthropic"), config: Some(config.clone()) };
+    let options = || FileOptions {
+        provider: Some("anthropic"),
+        config: Some(config.clone()),
+    };
 
     let file = UploadedFile::find("file_1", options()).await.unwrap();
-    assert_eq!((file.id.as_str(), file.byte_size, file.downloadable), ("file_1", Some(5), Some(true)));
+    assert_eq!(
+        (file.id.as_str(), file.byte_size, file.downloadable),
+        ("file_1", Some(5), Some(true))
+    );
     let downloaded = rust_llm::download("file_1", options()).await.unwrap();
     assert_eq!(downloaded.to_blob(), b"hello");
     let path = std::env::temp_dir().join(format!("rust_llm_download_{}.txt", std::process::id()));

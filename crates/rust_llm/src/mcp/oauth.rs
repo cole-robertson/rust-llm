@@ -46,8 +46,12 @@ use crate::error::{Error, Result};
 
 const PENDING_FOR: i64 = 600;
 const REFRESH_EARLY: i64 = 60;
-const SERVER_FIELDS: &[&str] =
-    &["issuer", "token_endpoint", "token_endpoint_auth_methods_supported", "authorization_response_iss_parameter_supported"];
+const SERVER_FIELDS: &[&str] = &[
+    "issuer",
+    "token_endpoint",
+    "token_endpoint_auth_methods_supported",
+    "authorization_response_iss_parameter_supported",
+];
 
 /// The parameters of a Bearer `WWW-Authenticate` challenge (`OAuth.challenge`).
 pub type Challenge = HashMap<String, String>;
@@ -128,7 +132,10 @@ impl OAuthSettings {
     }
 
     /// `owner: :user`: evaluated when the MCP needs its credentials.
-    pub fn owner_with(mut self, owner: impl Fn() -> Option<String> + Send + Sync + 'static) -> Self {
+    pub fn owner_with(
+        mut self,
+        owner: impl Fn() -> Option<String> + Send + Sync + 'static,
+    ) -> Self {
         self.owner = Some(Arc::new(owner));
         self
     }
@@ -153,7 +160,9 @@ impl OAuthSettings {
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 fn error(message: impl Into<String>) -> Error {
@@ -161,7 +170,10 @@ fn error(message: impl Into<String>) -> Error {
 }
 
 fn now() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
 }
 
 /// Ruby's `value.to_s` for a JSON value: strings bare, `nil` empty.
@@ -195,12 +207,18 @@ fn random_token(bytes: usize) -> String {
 
 /// `OpenSSL.fixed_length_secure_compare` after the length check.
 fn secure_compare(a: &str, b: &str) -> bool {
-    a.len() == b.len() && a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+    a.len() == b.len()
+        && a.bytes()
+            .zip(b.bytes())
+            .fold(0u8, |acc, (x, y)| acc | (x ^ y))
+            == 0
 }
 
 /// `URI.encode_www_form`: spaces as `+`, everything but `*-._` and alphanumerics escaped.
 fn encode_form(pairs: &[(&str, String)]) -> String {
-    let Ok(mut url) = Url::parse("http://form.invalid/") else { return String::new() };
+    let Ok(mut url) = Url::parse("http://form.invalid/") else {
+        return String::new();
+    };
     url.query_pairs_mut().extend_pairs(pairs);
     url.query().unwrap_or("").to_string()
 }
@@ -211,7 +229,12 @@ fn chomp(path: &str) -> &str {
 }
 
 fn same_origin(url: &Url, server: &Url) -> bool {
-    (url.scheme(), url.host_str(), url.port_or_known_default()) == (server.scheme(), server.host_str(), server.port_or_known_default())
+    (url.scheme(), url.host_str(), url.port_or_known_default())
+        == (
+            server.scheme(),
+            server.host_str(),
+            server.port_or_known_default(),
+        )
 }
 
 fn has_userinfo(url: &Url) -> bool {
@@ -245,7 +268,8 @@ pub struct OAuth {
 impl OAuth {
     /// `OAuth.challenge(header)`: the parameters of a Bearer `WWW-Authenticate` challenge.
     pub fn challenge(header: Option<&str>) -> Challenge {
-        static BEARER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\A\s*Bearer\s+").expect("constant pattern"));
+        static BEARER: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"(?i)\A\s*Bearer\s+").expect("constant pattern"));
         let rest = BEARER.replace(header.unwrap_or(""), "");
         let mut pairs: Vec<&str> = rest.split(',').collect();
         while pairs.last() == Some(&"") {
@@ -258,7 +282,10 @@ impl OAuth {
                 let name = parts.next().unwrap_or("").trim();
                 let value = parts.next().unwrap_or("").trim();
                 let value = value.strip_prefix('"').unwrap_or(value);
-                (name.to_string(), value.strip_suffix('"').unwrap_or(value).to_string())
+                (
+                    name.to_string(),
+                    value.strip_suffix('"').unwrap_or(value).to_string(),
+                )
             })
             .collect()
     }
@@ -296,22 +323,51 @@ impl OAuth {
 
     /// `authorized?`.
     pub async fn is_authorized(&self) -> Result<bool> {
-        Ok(self.credential().await?.is_some_and(|c| c.contains_key("access_token")))
+        Ok(self
+            .credential()
+            .await?
+            .is_some_and(|c| c.contains_key("access_token")))
     }
 
     /// `access_token`: refreshed first when it expires within a minute.
     pub async fn access_token(&self) -> Result<Option<String>> {
-        let Some(credential) = self.credential().await?.filter(|c| c.contains_key("access_token")) else { return Ok(None) };
-        if credential.get("expires_at").and_then(Value::as_i64).is_some_and(|at| at - REFRESH_EARLY < now()) {
+        let Some(credential) = self
+            .credential()
+            .await?
+            .filter(|c| c.contains_key("access_token"))
+        else {
+            return Ok(None);
+        };
+        if credential
+            .get("expires_at")
+            .and_then(Value::as_i64)
+            .is_some_and(|at| at - REFRESH_EARLY < now())
+        {
             self.refresh().await?;
         }
-        Ok(self.credential().await?.map(|c| text(c.get("access_token"))))
+        Ok(self
+            .credential()
+            .await?
+            .map(|c| text(c.get("access_token"))))
     }
 
     /// `refresh`: `false` when there is no refresh token or the authorization server refuses.
     pub async fn refresh(&self) -> Result<bool> {
-        let Some(refresh_token) = self.credential().await?.and_then(|c| c.get("refresh_token").cloned()) else { return Ok(false) };
-        match self.token_request("refresh_token", None, vec![("refresh_token", Some(text(Some(&refresh_token))))]).await {
+        let Some(refresh_token) = self
+            .credential()
+            .await?
+            .and_then(|c| c.get("refresh_token").cloned())
+        else {
+            return Ok(false);
+        };
+        match self
+            .token_request(
+                "refresh_token",
+                None,
+                vec![("refresh_token", Some(text(Some(&refresh_token))))],
+            )
+            .await
+        {
             Ok(tokens) => {
                 self.store_tokens(&tokens, None).await?;
                 Ok(true)
@@ -324,7 +380,11 @@ impl OAuth {
     /// `authorization_url(redirect_uri:, challenge:)`: discovers the authorization server,
     /// registers a client when needed, stores the pending authorization (state, PKCE verifier,
     /// issuer), and returns where to send the user.
-    pub async fn authorization_url(&self, redirect_uri: &str, challenge: Option<Challenge>) -> Result<String> {
+    pub async fn authorization_url(
+        &self,
+        redirect_uri: &str,
+        challenge: Option<Challenge>,
+    ) -> Result<String> {
         *lock(&self.challenge) = challenge;
         let server = self.authorization_server().await?;
         let client = self.client_for(&server, redirect_uri).await?;
@@ -335,11 +395,19 @@ impl OAuth {
         pending.insert("state".into(), state.clone().into());
         pending.insert("verifier".into(), verifier.clone().into());
         pending.insert("redirect_uri".into(), redirect_uri.into());
-        pending.insert("issuer".into(), server.get("issuer").cloned().unwrap_or(Value::Null));
-        pending.insert("scope".into(), scope.clone().map_or(Value::Null, Value::String));
+        pending.insert(
+            "issuer".into(),
+            server.get("issuer").cloned().unwrap_or(Value::Null),
+        );
+        pending.insert(
+            "scope".into(),
+            scope.clone().map_or(Value::Null, Value::String),
+        );
         pending.insert("expires_at".into(), (now() + PENDING_FOR).into());
-        let server_fields: Map<String, Value> =
-            SERVER_FIELDS.iter().filter_map(|f| server.get(*f).map(|v| (f.to_string(), v.clone()))).collect();
+        let server_fields: Map<String, Value> = SERVER_FIELDS
+            .iter()
+            .filter_map(|f| server.get(*f).map(|v| (f.to_string(), v.clone())))
+            .collect();
         pending.insert("server".into(), Value::Object(server_fields));
         let mut data = self.credential().await?.unwrap_or_default();
         data.insert("pending".into(), Value::Object(pending));
@@ -375,14 +443,23 @@ impl OAuth {
         check_callback(&pending, params)?;
         let form = vec![
             ("code", params.get("code").cloned()),
-            ("redirect_uri", pending.get("redirect_uri").map(|v| text(Some(v)))),
-            ("code_verifier", pending.get("verifier").map(|v| text(Some(v)))),
+            (
+                "redirect_uri",
+                pending.get("redirect_uri").map(|v| text(Some(v))),
+            ),
+            (
+                "code_verifier",
+                pending.get("verifier").map(|v| text(Some(v))),
+            ),
         ];
-        let tokens = self.token_request("authorization_code", Some(&pending), form).await?;
-        let client: Map<String, Value> = ["client_id", "client_secret", "issuer", "server", "scope"]
-            .iter()
-            .filter_map(|k| pending.get(*k).map(|v| (k.to_string(), v.clone())))
-            .collect();
+        let tokens = self
+            .token_request("authorization_code", Some(&pending), form)
+            .await?;
+        let client: Map<String, Value> =
+            ["client_id", "client_secret", "issuer", "server", "scope"]
+                .iter()
+                .filter_map(|k| pending.get(*k).map(|v| (k.to_string(), v.clone())))
+                .collect();
         self.store_tokens(&tokens, Some(client)).await
     }
 
@@ -393,12 +470,19 @@ impl OAuth {
     }
 
     fn store(&self) -> Arc<dyn CredentialStore> {
-        self.config.mcp_credential_store.clone().unwrap_or_else(|| MEMORY_STORE.clone())
+        self.config
+            .mcp_credential_store
+            .clone()
+            .unwrap_or_else(|| MEMORY_STORE.clone())
     }
 
     /// `"#{owner}@#{server_url}"`.
     fn key(&self) -> String {
-        format!("{}@{}", self.owner.as_deref().unwrap_or(""), self.server_url)
+        format!(
+            "{}@{}",
+            self.owner.as_deref().unwrap_or(""),
+            self.server_url
+        )
     }
 
     /// `@credential ||= store.read(key)`.
@@ -418,19 +502,33 @@ impl OAuth {
 
     async fn write(&self, data: Map<String, Value>) -> Result<()> {
         *lock(&self.credential) = Some(data.clone());
-        self.store().write(&self.key(), Value::Object(data), self.owner.as_deref()).await
+        self.store()
+            .write(&self.key(), Value::Object(data), self.owner.as_deref())
+            .await
     }
 
     async fn store_tokens(&self, tokens: &Value, client: Option<Map<String, Value>>) -> Result<()> {
         let mut data = self.credential().await?.unwrap_or_default();
         data.remove("pending");
         data.extend(client.unwrap_or_default());
-        data.insert("access_token".into(), tokens.get("access_token").cloned().unwrap_or(Value::Null));
-        let scope = truthy(tokens.get("scope")).or(data.get("scope")).cloned().unwrap_or(Value::Null);
+        data.insert(
+            "access_token".into(),
+            tokens.get("access_token").cloned().unwrap_or(Value::Null),
+        );
+        let scope = truthy(tokens.get("scope"))
+            .or(data.get("scope"))
+            .cloned()
+            .unwrap_or(Value::Null);
         data.insert("scope".into(), scope);
-        let expires_in = truthy(tokens.get("expires_in"))
-            .map(|v| v.as_i64().or_else(|| v.as_f64().map(|f| f as i64)).unwrap_or_else(|| text(Some(v)).trim().parse().unwrap_or(0)));
-        data.insert("expires_at".into(), expires_in.map_or(Value::Null, |e| (now() + e).into()));
+        let expires_in = truthy(tokens.get("expires_in")).map(|v| {
+            v.as_i64()
+                .or_else(|| v.as_f64().map(|f| f as i64))
+                .unwrap_or_else(|| text(Some(v)).trim().parse().unwrap_or(0))
+        });
+        data.insert(
+            "expires_at".into(),
+            expires_in.map_or(Value::Null, |e| (now() + e).into()),
+        );
         if let Some(refresh) = truthy(tokens.get("refresh_token")) {
             data.insert("refresh_token".into(), refresh.clone());
         }
@@ -438,18 +536,31 @@ impl OAuth {
         self.write(data).await
     }
 
-    async fn token_request(&self, grant_type: &str, pending: Option<&Map<String, Value>>, params: Vec<(&str, Option<String>)>) -> Result<Value> {
+    async fn token_request(
+        &self,
+        grant_type: &str,
+        pending: Option<&Map<String, Value>>,
+        params: Vec<(&str, Option<String>)>,
+    ) -> Result<Value> {
         let client = match pending {
             Some(pending) => pending.clone(),
             None => self.credential().await?.unwrap_or_default(),
         };
-        let server = truthy(client.get("server")).cloned().ok_or_else(|| error("No authorization server known; authorize first"))?;
+        let server = truthy(client.get("server"))
+            .cloned()
+            .ok_or_else(|| error("No authorization server known; authorize first"))?;
         let mut form = params;
         form.push(("grant_type", Some(grant_type.to_string())));
-        form.push(("client_id", truthy(client.get("client_id")).map(|v| text(Some(v)))));
+        form.push((
+            "client_id",
+            truthy(client.get("client_id")).map(|v| text(Some(v))),
+        ));
         form.push(("resource", Some(self.resource())));
         let mut headers = vec![
-            ("Content-Type", "application/x-www-form-urlencoded".to_string()),
+            (
+                "Content-Type",
+                "application/x-www-form-urlencoded".to_string(),
+            ),
             ("Accept", "application/json".to_string()),
         ];
         if let Some(secret) = truthy(client.get("client_secret")) {
@@ -457,14 +568,26 @@ impl OAuth {
                 .map(|m| strings(Some(m)))
                 .unwrap_or_else(|| vec!["client_secret_basic".to_string()]);
             if methods.iter().any(|m| m == "client_secret_basic") {
-                let credentials = STANDARD.encode(format!("{}:{}", text(client.get("client_id")), text(Some(secret))));
+                let credentials = STANDARD.encode(format!(
+                    "{}:{}",
+                    text(client.get("client_id")),
+                    text(Some(secret))
+                ));
                 headers.push(("Authorization", format!("Basic {credentials}")));
             } else {
                 form.push(("client_secret", Some(text(Some(secret)))));
             }
         }
-        let form: Vec<(&str, String)> = form.into_iter().filter_map(|(k, v)| v.map(|v| (k, v))).collect();
-        self.post(&text(server.get("token_endpoint")), encode_form(&form), &headers).await
+        let form: Vec<(&str, String)> = form
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|v| (k, v)))
+            .collect();
+        self.post(
+            &text(server.get("token_endpoint")),
+            encode_form(&form),
+            &headers,
+        )
+        .await
     }
 
     async fn authorization_server(&self) -> Result<Value> {
@@ -472,8 +595,14 @@ impl OAuth {
             Some(metadata) => self.described_authorization_server(&metadata).await?,
             None => self.legacy_authorization_server().await,
         };
-        if !strings(server.get("code_challenge_methods_supported")).iter().any(|m| m == "S256") {
-            return Err(error(format!("{} does not support PKCE with S256", text(server.get("issuer")))));
+        if !strings(server.get("code_challenge_methods_supported"))
+            .iter()
+            .any(|m| m == "S256")
+        {
+            return Err(error(format!(
+                "{} does not support PKCE with S256",
+                text(server.get("issuer"))
+            )));
         }
         Ok(server)
     }
@@ -490,21 +619,31 @@ impl OAuth {
     }
 
     fn server_uri(&self) -> Result<Url> {
-        Url::parse(&self.server_url).map_err(|e| Error::Argument(format!("{}: {e}", self.server_url)))
+        Url::parse(&self.server_url)
+            .map_err(|e| Error::Argument(format!("{}: {e}", self.server_url)))
     }
 
     async fn protected_resource_metadata(&self) -> Result<Option<Value>> {
         let server = self.server_uri()?;
-        let challenged = lock(&self.challenge).as_ref().and_then(|c| c.get("resource_metadata").cloned());
+        let challenged = lock(&self.challenge)
+            .as_ref()
+            .and_then(|c| c.get("resource_metadata").cloned());
         if let Some(url) = challenged
             && Url::parse(&url).is_ok_and(|u| same_origin(&u, &server))
         {
             return self.get_json(&url).await.map(Some);
         }
         let path = chomp(server.path()).to_string();
-        let mut candidates = vec![format!("/.well-known/oauth-protected-resource{path}"), "/.well-known/oauth-protected-resource".to_string()];
+        let mut candidates = vec![
+            format!("/.well-known/oauth-protected-resource{path}"),
+            "/.well-known/oauth-protected-resource".to_string(),
+        ];
         candidates.dedup();
-        let urls: Vec<String> = candidates.iter().filter_map(|c| server.join(c).ok()).map(String::from).collect();
+        let urls: Vec<String> = candidates
+            .iter()
+            .filter_map(|c| server.join(c).ok())
+            .map(String::from)
+            .collect();
         Ok(self.first_json(&urls).await)
     }
 
@@ -512,9 +651,17 @@ impl OAuth {
     /// origin is the authorization server, with default endpoints when it publishes no metadata
     /// either.
     async fn legacy_authorization_server(&self) -> Value {
-        let origin = self.server_uri().ok().and_then(|u| u.join("/").ok()).map(String::from).unwrap_or_default();
+        let origin = self
+            .server_uri()
+            .ok()
+            .and_then(|u| u.join("/").ok())
+            .map(String::from)
+            .unwrap_or_default();
         let origin = chomp(&origin).to_string();
-        if let Some(server) = self.first_json(&[format!("{origin}/.well-known/oauth-authorization-server")]).await {
+        if let Some(server) = self
+            .first_json(&[format!("{origin}/.well-known/oauth-authorization-server")])
+            .await
+        {
             return server;
         }
         json!({
@@ -525,17 +672,26 @@ impl OAuth {
     }
 
     fn checked_resource(&self, resource: Option<&Value>) -> Result<Option<String>> {
-        let Some(resource) = resource else { return Ok(None) };
+        let Some(resource) = resource else {
+            return Ok(None);
+        };
         let resource = text(Some(resource));
         let server = self.server_uri()?;
         if Url::parse(&resource).is_ok_and(|r| covers(&r, &server)) {
             return Ok(Some(resource));
         }
-        Err(error(format!("{} published metadata for another resource: {resource}", self.server_url)))
+        Err(error(format!(
+            "{} published metadata for another resource: {resource}",
+            self.server_url
+        )))
     }
 
     async fn discover_authorization_server(&self, issuer: &str) -> Result<Value> {
-        let missing = || error(format!("{issuer} publishes no authorization server metadata"));
+        let missing = || {
+            error(format!(
+                "{issuer} publishes no authorization server metadata"
+            ))
+        };
         let uri = Url::parse(issuer).map_err(|_| missing())?;
         let path = chomp(uri.path()).to_string();
         let mut paths = vec![
@@ -547,7 +703,11 @@ impl OAuth {
             paths.truncate(2);
         }
         let mut urls: Vec<String> = Vec::new();
-        for url in paths.iter().filter_map(|p| uri.join(p).ok()).map(String::from) {
+        for url in paths
+            .iter()
+            .filter_map(|p| uri.join(p).ok())
+            .map(String::from)
+        {
             if !urls.contains(&url) {
                 urls.push(url);
             }
@@ -580,7 +740,8 @@ impl OAuth {
 
     async fn register(&self, server: &Value, redirect_uri: &str) -> Result<Map<String, Value>> {
         let issuer = text(server.get("issuer"));
-        let endpoint = truthy(server.get("registration_endpoint")).ok_or_else(|| error(format!("{issuer} does not register clients")))?;
+        let endpoint = truthy(server.get("registration_endpoint"))
+            .ok_or_else(|| error(format!("{issuer} does not register clients")))?;
         let registration_key = format!("client:{issuer} {redirect_uri}");
         if let Some(Value::Object(registered)) = self.store().read(&registration_key).await? {
             return Ok(registered);
@@ -590,18 +751,35 @@ impl OAuth {
             "grant_types": ["authorization_code", "refresh_token"], "token_endpoint_auth_method": "none",
             "application_type": if Http::is_loopback(redirect_uri) { "native" } else { "web" }
         });
-        let response = self.post(&text(Some(endpoint)), body.to_string(), &[("Content-Type", "application/json".into())]).await?;
-        let client: Map<String, Value> =
-            ["client_id", "client_secret"].iter().filter_map(|k| response.get(*k).map(|v| (k.to_string(), v.clone()))).collect();
-        self.store().write(&registration_key, Value::Object(client.clone()), None).await?;
+        let response = self
+            .post(
+                &text(Some(endpoint)),
+                body.to_string(),
+                &[("Content-Type", "application/json".into())],
+            )
+            .await?;
+        let client: Map<String, Value> = ["client_id", "client_secret"]
+            .iter()
+            .filter_map(|k| response.get(*k).map(|v| (k.to_string(), v.clone())))
+            .collect();
+        self.store()
+            .write(&registration_key, Value::Object(client.clone()), None)
+            .await?;
         Ok(client)
     }
 
     async fn scopes_for(&self, server: &Value) -> Result<Option<String>> {
-        let challenged = lock(&self.challenge).as_ref().and_then(|c| c.get("scope").cloned());
+        let challenged = lock(&self.challenge)
+            .as_ref()
+            .and_then(|c| c.get("scope").cloned());
         let mut scopes: Vec<String> = match challenged {
             Some(challenged) => {
-                let granted = text(self.credential().await?.as_ref().and_then(|c| c.get("scope")));
+                let granted = text(
+                    self.credential()
+                        .await?
+                        .as_ref()
+                        .and_then(|c| c.get("scope")),
+                );
                 let mut scopes = self.scopes.clone().unwrap_or_default();
                 scopes.extend(challenged.split_whitespace().map(str::to_string));
                 scopes.extend(granted.split_whitespace().map(str::to_string));
@@ -612,7 +790,10 @@ impl OAuth {
                 None => strings(lock(&self.scopes_supported).as_ref()),
             },
         };
-        if strings(server.get("scopes_supported")).iter().any(|s| s == "offline_access") {
+        if strings(server.get("scopes_supported"))
+            .iter()
+            .any(|s| s == "offline_access")
+        {
             scopes.push("offline_access".into());
         }
         let mut unique: Vec<String> = Vec::new();
@@ -626,7 +807,9 @@ impl OAuth {
 
     /// `@resource || @server_url.chomp('/')`.
     fn resource(&self) -> String {
-        lock(&self.resource).clone().unwrap_or_else(|| chomp(&self.server_url).to_string())
+        lock(&self.resource)
+            .clone()
+            .unwrap_or_else(|| chomp(&self.server_url).to_string())
     }
 
     async fn first_json(&self, urls: &[String]) -> Option<Value> {
@@ -648,9 +831,15 @@ impl OAuth {
             .await
             .map_err(|e| Error::ConnectionFailed(e.to_string()))?;
         let status = response.status().as_u16();
-        let body = response.text().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
+        let body = response
+            .text()
+            .await
+            .map_err(|e| Error::ConnectionFailed(e.to_string()))?;
         if status >= 400 {
-            let host = Url::parse(url).ok().and_then(|u| u.host_str().map(str::to_string)).unwrap_or_default();
+            let host = Url::parse(url)
+                .ok()
+                .and_then(|u| u.host_str().map(str::to_string))
+                .unwrap_or_default();
             return Err(error(format!("{host} answered HTTP {status}")));
         }
         parse(&body)
@@ -658,7 +847,10 @@ impl OAuth {
 
     async fn post(&self, url: &str, body: String, headers: &[(&str, String)]) -> Result<Value> {
         self.endpoint(url)?;
-        let host = Url::parse(url).ok().and_then(|u| u.host_str().map(str::to_string)).unwrap_or_default();
+        let host = Url::parse(url)
+            .ok()
+            .and_then(|u| u.host_str().map(str::to_string))
+            .unwrap_or_default();
         let refused = |body: &str| {
             let details: Value = serde_json::from_str(body).unwrap_or_else(|_| json!({}));
             let reason = truthy(details.get("error_description")).or(details.get("error"));
@@ -668,9 +860,13 @@ impl OAuth {
         for (name, value) in headers {
             request = request.header(*name, value);
         }
-        let Ok(response) = request.send().await else { return Err(refused("")) };
+        let Ok(response) = request.send().await else {
+            return Err(refused(""));
+        };
         let status = response.status().as_u16();
-        let Ok(body) = response.text().await else { return Err(refused("")) };
+        let Ok(body) = response.text().await else {
+            return Err(refused(""));
+        };
         if status >= 400 {
             return Err(refused(&body));
         }
@@ -689,18 +885,30 @@ impl OAuth {
 }
 
 fn parse(body: &str) -> Result<Value> {
-    serde_json::from_str(body).map_err(|_| error("The authorization server did not answer with JSON"))
+    serde_json::from_str(body)
+        .map_err(|_| error("The authorization server did not answer with JSON"))
 }
 
 fn check_callback(pending: &Map<String, Value>, params: &HashMap<String, String>) -> Result<()> {
-    if pending.get("expires_at").and_then(Value::as_i64).unwrap_or(0) < now() {
+    if pending
+        .get("expires_at")
+        .and_then(Value::as_i64)
+        .unwrap_or(0)
+        < now()
+    {
         return Err(error("The authorization expired; start again"));
     }
     match params.get("iss") {
         Some(issuer) if Some(issuer.as_str()) != pending.get("issuer").and_then(Value::as_str) => {
-            return Err(error("The authorization response came from the wrong issuer"));
+            return Err(error(
+                "The authorization response came from the wrong issuer",
+            ));
         }
-        None if pending.get("server").and_then(|s| s.get("authorization_response_iss_parameter_supported")) == Some(&Value::Bool(true)) => {
+        None if pending
+            .get("server")
+            .and_then(|s| s.get("authorization_response_iss_parameter_supported"))
+            == Some(&Value::Bool(true)) =>
+        {
             return Err(error("The authorization server did not identify itself"));
         }
         _ => {}
@@ -728,15 +936,30 @@ pub(crate) struct Authorizer {
 }
 
 impl Authorizer {
-    pub(crate) fn new(name: String, url: String, settings: OAuthSettings, config: Arc<Config>) -> Authorizer {
-        Authorizer { name, url, settings, config, oauth: Mutex::new(None), challenge: Mutex::new(None) }
+    pub(crate) fn new(
+        name: String,
+        url: String,
+        settings: OAuthSettings,
+        config: Arc<Config>,
+    ) -> Authorizer {
+        Authorizer {
+            name,
+            url,
+            settings,
+            config,
+            oauth: Mutex::new(None),
+            challenge: Mutex::new(None),
+        }
     }
 
     /// `MCP#oauth`: raises when a declared owner resolves to nothing.
     pub(crate) fn oauth(&self) -> Result<Arc<OAuth>> {
         let owner = self.settings.owner.as_ref().map(|owner| owner());
         if matches!(owner, Some(None)) {
-            return Err(Error::Argument(format!("{} needs an owner for OAuth credentials", self.name)));
+            return Err(Error::Argument(format!(
+                "{} needs an owner for OAuth credentials",
+                self.name
+            )));
         }
         let mut slot = lock(&self.oauth);
         if let Some(oauth) = slot.as_ref() {
@@ -763,14 +986,22 @@ impl Authorizer {
 #[async_trait]
 impl Authorization for Authorizer {
     async fn authorization(&self) -> Result<Option<String>> {
-        Ok(self.oauth()?.access_token().await?.map(|token| format!("Bearer {token}")))
+        Ok(self
+            .oauth()?
+            .access_token()
+            .await?
+            .map(|token| format!("Bearer {token}")))
     }
 
     /// `MCP#unauthorized`: keeps the challenge, and refreshes the token on a 401.
     async fn unauthorized(&self, header: Option<&str>, status: u16) -> bool {
         *lock(&self.challenge) = Some(OAuth::challenge(header));
-        let Ok(oauth) = self.oauth() else { return false };
-        status == 401 && oauth.is_authorized().await.unwrap_or(false) && oauth.refresh().await.unwrap_or(false)
+        let Ok(oauth) = self.oauth() else {
+            return false;
+        };
+        status == 401
+            && oauth.is_authorized().await.unwrap_or(false)
+            && oauth.refresh().await.unwrap_or(false)
     }
 }
 
@@ -781,11 +1012,17 @@ mod tests {
     // spec: mcp/oauth_spec.rb:182 reads WWW-Authenticate challenges
     #[test]
     fn reads_www_authenticate_challenges() {
-        let challenge = OAuth::challenge(Some(r#"Bearer error="insufficient_scope", scope="a b", resource_metadata="https://x.test/m?a=1""#));
-        let expected: Challenge = [("error", "insufficient_scope"), ("scope", "a b"), ("resource_metadata", "https://x.test/m?a=1")]
-            .into_iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect();
+        let challenge = OAuth::challenge(Some(
+            r#"Bearer error="insufficient_scope", scope="a b", resource_metadata="https://x.test/m?a=1""#,
+        ));
+        let expected: Challenge = [
+            ("error", "insufficient_scope"),
+            ("scope", "a b"),
+            ("resource_metadata", "https://x.test/m?a=1"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
         assert_eq!(challenge, expected);
         assert!(OAuth::challenge(None).is_empty());
     }

@@ -22,7 +22,7 @@ use super::{Models, bundled_models, models, registry};
 use crate::config::Config;
 use crate::error::{Error, Result};
 use crate::instrumentation::{Event, payload};
-use crate::model::{Model, ModelType, Modalities};
+use crate::model::{Modalities, Model, ModelType};
 use crate::providers::{ALL, Provider};
 use crate::transport::Connection;
 
@@ -45,7 +45,16 @@ const MODELS_DEV_PROVIDER_MAP: &[(&str, &str)] = &[
     ("xai", "xai"),
 ];
 const MODELS_DEV_INPUT_MODALITIES: &[&str] = &["text", "image", "audio", "pdf", "video", "file"];
-const MODELS_DEV_OUTPUT_MODALITIES: &[&str] = &["text", "image", "audio", "video", "embeddings", "moderation", "rerank", "judgment"];
+const MODELS_DEV_OUTPUT_MODALITIES: &[&str] = &[
+    "text",
+    "image",
+    "audio",
+    "video",
+    "embeddings",
+    "moderation",
+    "rerank",
+    "judgment",
+];
 /// models.dev's catalog. `config.set("models_dev_url", ...)` points it elsewhere.
 pub const MODELS_DEV_URL: &str = "https://models.dev/api.json";
 
@@ -57,12 +66,16 @@ pub struct ProviderFailure {
     pub error: String,
 }
 
-static LAST_PROVIDER_FAILURES: LazyLock<Mutex<Vec<ProviderFailure>>> = LazyLock::new(Default::default);
+static LAST_PROVIDER_FAILURES: LazyLock<Mutex<Vec<ProviderFailure>>> =
+    LazyLock::new(Default::default);
 
 /// `Models.last_provider_failures`: the providers the last refresh could not list. Their previous
 /// models were kept.
 pub fn last_provider_failures() -> Vec<ProviderFailure> {
-    LAST_PROVIDER_FAILURES.lock().map(|f| f.clone()).unwrap_or_default()
+    LAST_PROVIDER_FAILURES
+        .lock()
+        .map(|f| f.clone())
+        .unwrap_or_default()
 }
 
 /// What `fetch_provider_models` found.
@@ -87,7 +100,9 @@ pub async fn refresh(remote_only: bool) -> Result<Arc<Models>> {
 
 /// `refresh` with an explicit configuration (`context.models.refresh`).
 pub async fn refresh_with_config(config: Arc<Config>, remote_only: bool) -> Result<Arc<Models>> {
-    let mut event = Event::start(&config, "models.refresh.rust_llm", || payload([("remote_only", remote_only.into())]));
+    let mut event = Event::start(&config, "models.refresh.rust_llm", || {
+        payload([("remote_only", remote_only.into())])
+    });
     let result = async {
         let file = file_store(&config)?;
         let published = fetch_published_models(&config, file.as_ref()).await?;
@@ -118,12 +133,22 @@ pub async fn refresh_from_providers(remote_only: bool) -> Result<Arc<Models>> {
 
 /// `Models.fetch_merged_models`.
 pub async fn fetch_merged_models(config: &Arc<Config>, remote_only: bool) -> Vec<Model> {
-    let mut event = Event::start(config, "models.refresh.rust_llm", || payload([("remote_only", remote_only.into())]));
+    let mut event = Event::start(config, "models.refresh.rust_llm", || {
+        payload([("remote_only", remote_only.into())])
+    });
     let existing = read_existing_models();
     let provider_fetch = fetch_provider_models(config, remote_only).await;
     record_failures(&provider_fetch);
     log_provider_fetch(&provider_fetch);
-    event.set("failed_providers", || json!(provider_fetch.failed.iter().map(|f| f.slug.clone()).collect::<Vec<_>>()));
+    event.set("failed_providers", || {
+        json!(
+            provider_fetch
+                .failed
+                .iter()
+                .map(|f| f.slug.clone())
+                .collect::<Vec<_>>()
+        )
+    });
     let models_dev = fetch_models_dev_models(config, &existing).await;
     let merged = merge_with_existing(&existing, &provider_fetch, &models_dev);
     event.set("model_count", || merged.len().into());
@@ -134,7 +159,11 @@ pub async fn fetch_merged_models(config: &Arc<Config>, remote_only: bool) -> Vec
 /// `Models.read_existing_models`.
 fn read_existing_models() -> Vec<Model> {
     let current = models();
-    if current.all().is_empty() { super::load_models() } else { current.all().into_iter().cloned().collect() }
+    if current.all().is_empty() {
+        super::load_models()
+    } else {
+        current.all().into_iter().cloned().collect()
+    }
 }
 
 fn record_failures(fetch: &ProviderFetch) {
@@ -146,17 +175,29 @@ fn record_failures(fetch: &ProviderFetch) {
 /// `Models.fetch_provider_models(remote_only:)`: lists every configured provider. A failure or an
 /// empty answer is recorded, not raised, so the refresh keeps that provider's previous models.
 pub async fn fetch_provider_models(config: &Arc<Config>, remote_only: bool) -> ProviderFetch {
-    let providers: Vec<Provider> =
-        ALL.iter().copied().filter(|p| p.is_configured(config) && !(remote_only && p.is_local())).collect();
-    let mut result = ProviderFetch { configured_names: providers.iter().map(|p| p.display().to_string()).collect(), ..Default::default() };
+    let providers: Vec<Provider> = ALL
+        .iter()
+        .copied()
+        .filter(|p| p.is_configured(config) && !(remote_only && p.is_local()))
+        .collect();
+    let mut result = ProviderFetch {
+        configured_names: providers.iter().map(|p| p.display().to_string()).collect(),
+        ..Default::default()
+    };
     for provider in providers {
         match list_models(provider, config.clone()).await {
-            Ok(models) if models.is_empty() => result.empty.push((provider.display().into(), provider.slug().into())),
+            Ok(models) if models.is_empty() => result
+                .empty
+                .push((provider.display().into(), provider.slug().into())),
             Ok(models) => {
                 result.models.extend(models);
                 result.fetched_providers.push(provider.slug().into());
             }
-            Err(e) => result.failed.push(ProviderFailure { name: provider.display().into(), slug: provider.slug().into(), error: e.to_string() }),
+            Err(e) => result.failed.push(ProviderFailure {
+                name: provider.display().into(),
+                slug: provider.slug().into(),
+                error: e.to_string(),
+            }),
         }
     }
     result
@@ -164,9 +205,16 @@ pub async fn fetch_provider_models(config: &Arc<Config>, remote_only: bool) -> P
 
 /// `Models.log_provider_fetch`.
 fn log_provider_fetch(fetch: &ProviderFetch) {
-    tracing::info!("Fetching models from providers: {}", fetch.configured_names.join(", "));
+    tracing::info!(
+        "Fetching models from providers: {}",
+        fetch.configured_names.join(", ")
+    );
     for f in &fetch.failed {
-        tracing::warn!("Failed to fetch {} models ({}). Keeping existing.", f.name, f.error);
+        tracing::warn!(
+            "Failed to fetch {} models ({}). Keeping existing.",
+            f.name,
+            f.error
+        );
     }
     for (name, _) in &fetch.empty {
         tracing::warn!("{name} listed no models. Keeping existing.");
@@ -183,37 +231,62 @@ pub struct ModelsDevFetch {
 /// `Models.fetch_models_dev_models`: on any failure, keeps the models.dev entries already held.
 pub async fn fetch_models_dev_models(config: &Config, existing: &[Model]) -> ModelsDevFetch {
     tracing::info!("Fetching models from models.dev API...");
-    let url = config.get("models_dev_url").unwrap_or(MODELS_DEV_URL).to_string();
+    let url = config
+        .get("models_dev_url")
+        .unwrap_or(MODELS_DEV_URL)
+        .to_string();
     let fetched = async {
-        let client = reqwest::Client::builder().timeout(config.request_timeout).build().map_err(|e| e.to_string())?;
+        let client = reqwest::Client::builder()
+            .timeout(config.request_timeout)
+            .build()
+            .map_err(|e| e.to_string())?;
         let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
         if !resp.status().is_success() {
-            return Err(format!("the server responded with status {}", resp.status().as_u16()));
+            return Err(format!(
+                "the server responded with status {}",
+                resp.status().as_u16()
+            ));
         }
         let body: Value = resp.json().await.map_err(|e| e.to_string())?;
         parse_models_dev_catalog(&body)
     }
     .await;
     match fetched {
-        Ok(models) => ModelsDevFetch { models, fetched: true },
+        Ok(models) => ModelsDevFetch {
+            models,
+            fetched: true,
+        },
         Err(e) => {
             tracing::warn!("Failed to fetch models.dev ({e}). Keeping existing.");
             tracing::warn!("Using cached models.dev data due to fetch failure.");
-            ModelsDevFetch { models: models_dev_entries(existing), fetched: false }
+            ModelsDevFetch {
+                models: models_dev_entries(existing),
+                fetched: false,
+            }
         }
     }
 }
 
 fn models_dev_entries(models: &[Model]) -> Vec<Model> {
-    models.iter().filter(|m| m.metadata.get("source").and_then(Value::as_str) == Some("models.dev")).cloned().collect()
+    models
+        .iter()
+        .filter(|m| m.metadata.get("source").and_then(Value::as_str) == Some("models.dev"))
+        .cloned()
+        .collect()
 }
 
 /// `Models.parse_models_dev_catalog`: only a catalog carrying models may overrule the registry.
 pub fn parse_models_dev_catalog(body: &Value) -> std::result::Result<Vec<Model>, String> {
     let Some(catalog) = body.as_object() else {
-        return Err(format!("models.dev returned {} instead of a catalog", json_type(body)));
+        return Err(format!(
+            "models.dev returned {} instead of a catalog",
+            json_type(body)
+        ));
     };
-    let models: Vec<Model> = catalog.iter().flat_map(|(key, data)| models_dev_provider_models(key, data)).collect();
+    let models: Vec<Model> = catalog
+        .iter()
+        .flat_map(|(key, data)| models_dev_provider_models(key, data))
+        .collect();
     if models.is_empty() {
         return Err("models.dev returned no models RustLLM knows a provider for".into());
     }
@@ -232,9 +305,16 @@ fn json_type(v: &Value) -> &'static str {
 }
 
 fn models_dev_provider_models(key: &str, data: &Value) -> Vec<Model> {
-    let Some(&(_, slug)) = MODELS_DEV_PROVIDER_MAP.iter().find(|(k, _)| *k == key) else { return Vec::new() };
-    let Some(entries) = data.get("models").and_then(Value::as_object) else { return Vec::new() };
-    entries.values().filter_map(|m| models_dev_model(m, slug, key)).collect()
+    let Some(&(_, slug)) = MODELS_DEV_PROVIDER_MAP.iter().find(|(k, _)| *k == key) else {
+        return Vec::new();
+    };
+    let Some(entries) = data.get("models").and_then(Value::as_object) else {
+        return Vec::new();
+    };
+    entries
+        .values()
+        .filter_map(|m| models_dev_model(m, slug, key))
+        .collect()
 }
 
 /// `Models.models_dev_model_attributes`.
@@ -249,13 +329,23 @@ fn models_dev_model(data: &Value, slug: &str, key: &str) -> Option<Model> {
         .find(|v| !v.trim().is_empty());
     let mut model = Model {
         id: models_dev_model_id(raw_id, slug),
-        name: data.get("name").and_then(Value::as_str).unwrap_or(raw_id).to_string(),
+        name: data
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or(raw_id)
+            .to_string(),
         provider: slug.to_string(),
-        family: data.get("family").and_then(Value::as_str).map(str::to_string),
+        family: data
+            .get("family")
+            .and_then(Value::as_str)
+            .map(str::to_string),
         created_at: created.and_then(iso_date_prefix_to_utc_midnight),
         context_window: data.pointer("/limit/context").and_then(Value::as_i64),
         max_output_tokens: data.pointer("/limit/output").and_then(Value::as_i64),
-        knowledge_cutoff: data.get("knowledge").and_then(Value::as_str).and_then(normalize_models_dev_knowledge),
+        knowledge_cutoff: data
+            .get("knowledge")
+            .and_then(Value::as_str)
+            .and_then(normalize_models_dev_knowledge),
         modalities,
         capabilities,
         pricing: serde_json::from_value(models_dev_pricing(data.get("cost"))).unwrap_or_default(),
@@ -268,7 +358,11 @@ fn models_dev_model(data: &Value, slug: &str, key: &str) -> Option<Model> {
 
 /// `Provider.models_dev_model_id`: Vertex AI drops the `@version` pin models.dev adds.
 fn models_dev_model_id(id: &str, slug: &str) -> String {
-    if slug == "vertexai" { id.split('@').next().unwrap_or(id).to_string() } else { id.to_string() }
+    if slug == "vertexai" {
+        id.split('@').next().unwrap_or(id).to_string()
+    } else {
+        id.to_string()
+    }
 }
 
 /// `Support::Utils.iso_date_prefix_to_utc_midnight_string`.
@@ -295,21 +389,35 @@ pub fn normalize_models_dev_knowledge(value: &str) -> Option<String> {
 pub fn normalize_models_dev_modalities(modalities: Option<&Value>) -> Modalities {
     let pick = |key: &str, allowed: &[&str]| -> Vec<String> {
         let mut out: Vec<String> = Vec::new();
-        for v in modalities.and_then(|m| m.get(key)).and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str) {
+        for v in modalities
+            .and_then(|m| m.get(key))
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+        {
             if allowed.contains(&v) && !out.iter().any(|o| o == v) {
                 out.push(v.to_string());
             }
         }
         out
     };
-    Modalities { input: pick("input", MODELS_DEV_INPUT_MODALITIES), output: pick("output", MODELS_DEV_OUTPUT_MODALITIES) }
+    Modalities {
+        input: pick("input", MODELS_DEV_INPUT_MODALITIES),
+        output: pick("output", MODELS_DEV_OUTPUT_MODALITIES),
+    }
 }
 
 fn truthy(v: Option<&Value>) -> bool {
     !matches!(v, None | Some(Value::Null) | Some(Value::Bool(false)))
 }
 
-fn models_dev_capabilities(data: &Value, modalities: &Modalities, slug: &str, raw_id: &str) -> Vec<String> {
+fn models_dev_capabilities(
+    data: &Value,
+    modalities: &Modalities,
+    slug: &str,
+    raw_id: &str,
+) -> Vec<String> {
     let mut caps: Vec<String> = Vec::new();
     if truthy(data.get("tool_call")) {
         caps.push("function_calling".into());
@@ -320,7 +428,11 @@ fn models_dev_capabilities(data: &Value, modalities: &Modalities, slug: &str, ra
     if truthy(data.get("reasoning")) || truthy(data.get("reasoning_options")) {
         caps.push("reasoning".into());
     }
-    if modalities.input.iter().any(|m| ["image", "video", "pdf"].contains(&m.as_str())) {
+    if modalities
+        .input
+        .iter()
+        .any(|m| ["image", "video", "pdf"].contains(&m.as_str()))
+    {
         caps.push("vision".into());
     }
     if modalities.input.iter().any(|m| m == "video") {
@@ -331,9 +443,19 @@ fn models_dev_capabilities(data: &Value, modalities: &Modalities, slug: &str, ra
 
 /// `Models.models_dev_pricing`.
 pub fn models_dev_pricing(cost: Option<&Value>) -> Value {
-    let Some(cost) = cost.filter(|c| c.is_object()) else { return json!({}) };
+    let Some(cost) = cost.filter(|c| c.is_object()) else {
+        return json!({});
+    };
     let rates = |pairs: &[(&str, &str)], source: &Value| -> Map<String, Value> {
-        pairs.iter().filter_map(|(from, to)| source.get(*from).and_then(Value::as_f64).map(|v| (to.to_string(), v.into()))).collect()
+        pairs
+            .iter()
+            .filter_map(|(from, to)| {
+                source
+                    .get(*from)
+                    .and_then(Value::as_f64)
+                    .map(|v| (to.to_string(), v.into()))
+            })
+            .collect()
     };
     const TEXT: &[(&str, &str)] = &[
         ("input", "input_per_million"),
@@ -343,15 +465,28 @@ pub fn models_dev_pricing(cost: Option<&Value>) -> Value {
         ("reasoning", "reasoning_output_per_million"),
     ];
     let text = rates(TEXT, cost);
-    let audio = rates(&[("input_audio", "input_per_million"), ("output_audio", "output_per_million")], cost);
+    let audio = rates(
+        &[
+            ("input_audio", "input_per_million"),
+            ("output_audio", "output_per_million"),
+        ],
+        cost,
+    );
     let mut pricing = Map::new();
     // `PricingCategory.long_context_from_cost`: a `context` tier, or the older `context_over_200k`.
     let long = cost
         .get("tiers")
         .and_then(Value::as_array)
-        .and_then(|t| t.iter().find(|e| e.pointer("/tier/type").and_then(Value::as_str) == Some("context")))
+        .and_then(|t| {
+            t.iter()
+                .find(|e| e.pointer("/tier/type").and_then(Value::as_str) == Some("context"))
+        })
         .map(|e| (e, e.pointer("/tier/size").and_then(Value::as_i64)))
-        .or_else(|| cost.get("context_over_200k").filter(|c| c.is_object()).map(|e| (e, Some(200_000))))
+        .or_else(|| {
+            cost.get("context_over_200k")
+                .filter(|c| c.is_object())
+                .map(|e| (e, Some(200_000)))
+        })
         .map(|(e, threshold)| (rates(TEXT, e), threshold))
         .filter(|(r, _)| !r.is_empty());
     if !text.is_empty() || long.is_some() {
@@ -378,8 +513,19 @@ fn models_dev_metadata(data: &Value, key: &str) -> Map<String, Value> {
     m.insert("source".into(), "models.dev".into());
     m.insert("provider_id".into(), key.into());
     for field in [
-        "open_weights", "attachment", "temperature", "last_updated", "status", "interleaved", "tool_call",
-        "structured_output", "reasoning", "reasoning_options", "cost", "limit", "knowledge",
+        "open_weights",
+        "attachment",
+        "temperature",
+        "last_updated",
+        "status",
+        "interleaved",
+        "tool_call",
+        "structured_output",
+        "reasoning",
+        "reasoning_options",
+        "cost",
+        "limit",
+        "knowledge",
     ] {
         if let Some(v) = data.get(field).filter(|v| !v.is_null()) {
             m.insert(field.into(), v.clone());
@@ -407,8 +553,17 @@ pub fn merge_models(provider_models: &[Model], models_dev_models: &[Model]) -> V
     let provider_by_key = index_by_key(provider_models);
     let mut provider_by_alias: std::collections::HashMap<String, &Model> = Default::default();
     for m in provider_models {
-        for alias in m.metadata.get("aliases").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str) {
-            provider_by_alias.entry(format!("{}:{alias}", m.provider)).or_insert(m);
+        for alias in m
+            .metadata
+            .get("aliases")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+        {
+            provider_by_alias
+                .entry(format!("{}:{alias}", m.provider))
+                .or_insert(m);
         }
     }
     let mut keys: Vec<String> = Vec::new();
@@ -420,7 +575,10 @@ pub fn merge_models(provider_models: &[Model], models_dev_models: &[Model]) -> V
     let mut merged: Vec<Model> = keys
         .iter()
         .filter_map(|key| {
-            let provider_model = provider_by_key.get(key).or_else(|| provider_by_alias.get(key)).copied();
+            let provider_model = provider_by_key
+                .get(key)
+                .or_else(|| provider_by_alias.get(key))
+                .copied();
             let dev_model = find_models_dev_model(key, &dev_by_key, provider_model);
             match (dev_model, provider_model) {
                 (Some(dev), Some(p)) => Some(add_provider_metadata(&dev, p)),
@@ -464,12 +622,19 @@ mod indexed {
 }
 
 /// `Models.find_models_dev_model`: a direct hit, else the provider's `models_dev_alias`.
-fn find_models_dev_model(key: &str, dev_by_key: &indexed::Map, provider_model: Option<&Model>) -> Option<Model> {
+fn find_models_dev_model(
+    key: &str,
+    dev_by_key: &indexed::Map,
+    provider_model: Option<&Model>,
+) -> Option<Model> {
     if let Some(m) = dev_by_key.get(key) {
         return Some((*m).clone());
     }
     let (provider, model_id) = key.split_once(':')?;
-    let with_id = |source: &Model| Model { id: model_id.to_string(), ..source.clone() };
+    let with_id = |source: &Model| Model {
+        id: model_id.to_string(),
+        ..source.clone()
+    };
     match provider {
         "openai" => {
             // `OpenAI::Models.models_dev_alias`: a snapshot reuses its base entry.
@@ -481,8 +646,12 @@ fn find_models_dev_model(key: &str, dev_by_key: &indexed::Map, provider_model: O
             let (base, date) = model_id.rsplit_once('-').and_then(|(rest, day)| {
                 let (rest, month) = rest.rsplit_once('-')?;
                 let (base, year) = rest.rsplit_once('-')?;
-                let dated = year.len() == 4 && month.len() == 2 && day.len() == 2
-                    && [year, month, day].iter().all(|p| p.chars().all(|c| c.is_ascii_digit()));
+                let dated = year.len() == 4
+                    && month.len() == 2
+                    && day.len() == 2
+                    && [year, month, day]
+                        .iter()
+                        .all(|p| p.chars().all(|c| c.is_ascii_digit()));
                 dated.then(|| (base, format!("{year}-{month}-{day}")))
             })?;
             let source = dev_by_key.get(&format!("openai:{base}"))?;
@@ -496,7 +665,12 @@ fn find_models_dev_model(key: &str, dev_by_key: &indexed::Map, provider_model: O
             .filter_map(Value::as_str)
             .find_map(|a| dev_by_key.get(&format!("mistral:{a}")))
             .map(|source| with_id(source)),
-        "vertexai" => dev_by_key.get(&format!("gemini:{model_id}")).map(|s| Model { provider: "vertexai".into(), ..(*s).clone() }),
+        "vertexai" => dev_by_key
+            .get(&format!("gemini:{model_id}"))
+            .map(|s| Model {
+                provider: "vertexai".into(),
+                ..(*s).clone()
+            }),
         _ => None,
     }
 }
@@ -533,9 +707,20 @@ fn to_h(model: &Model) -> Map<String, Value> {
 pub fn add_provider_metadata(dev: &Model, provider_model: &Model) -> Model {
     let mut data = to_h(dev);
     let provided = to_h(provider_model);
-    for key in ["name", "family", "created_at", "context_window", "max_output_tokens", "knowledge_cutoff", "modalities"] {
+    for key in [
+        "name",
+        "family",
+        "created_at",
+        "context_window",
+        "max_output_tokens",
+        "knowledge_cutoff",
+        "modalities",
+    ] {
         if data.get(key).is_none_or(is_blank) {
-            data.insert(key.into(), provided.get(key).cloned().unwrap_or(Value::Null));
+            data.insert(
+                key.into(),
+                provided.get(key).cloned().unwrap_or(Value::Null),
+            );
         }
     }
     if dev.model_type() == ModelType::Chat && provider_model.model_type() != ModelType::Chat {
@@ -547,7 +732,8 @@ pub fn add_provider_metadata(dev: &Model, provider_model: &Model) -> Model {
     let mut metadata = provider_model.metadata.clone();
     metadata.extend(dev.metadata.clone());
     data.insert("metadata".into(), Value::Object(metadata));
-    let mut merged: Model = serde_json::from_value(Value::Object(data)).unwrap_or_else(|_| dev.clone());
+    let mut merged: Model =
+        serde_json::from_value(Value::Object(data)).unwrap_or_else(|_| dev.clone());
     merged.capabilities = merge_capabilities(dev, provider_model, &merged.modalities);
     normalize_embedding_modalities(&merged.id.clone(), &mut merged.modalities);
     merged
@@ -556,14 +742,22 @@ pub fn add_provider_metadata(dev: &Model, provider_model: &Model) -> Model {
 /// `Models.merge_capabilities`: models.dev only overrules the capabilities it reports on.
 fn merge_capabilities(dev: &Model, provider_model: &Model, modalities: &Modalities) -> Vec<String> {
     let reported = models_dev_reported_capabilities(dev);
-    let denied: Vec<&String> = reported.iter().filter(|c| !dev.capabilities.contains(c)).collect();
+    let denied: Vec<&String> = reported
+        .iter()
+        .filter(|c| !dev.capabilities.contains(c))
+        .collect();
     let mut caps: Vec<String> = Vec::new();
     for c in dev.capabilities.iter().chain(&provider_model.capabilities) {
         if !caps.contains(c) && !denied.contains(&c) {
             caps.push(c.clone());
         }
     }
-    augment_capabilities(&provider_model.provider, caps, &provider_model.id, modalities)
+    augment_capabilities(
+        &provider_model.provider,
+        caps,
+        &provider_model.id,
+        modalities,
+    )
 }
 
 fn models_dev_reported_capabilities(dev: &Model) -> Vec<String> {
@@ -586,8 +780,16 @@ fn models_dev_reported_capabilities(dev: &Model) -> Vec<String> {
 }
 
 fn augment_model_capabilities(model: &Model) -> Model {
-    let caps = augment_capabilities(&model.provider, model.capabilities.clone(), &model.id, &model.modalities);
-    Model { capabilities: caps, ..model.clone() }
+    let caps = augment_capabilities(
+        &model.provider,
+        model.capabilities.clone(),
+        &model.id,
+        &model.modalities,
+    );
+    Model {
+        capabilities: caps,
+        ..model.clone()
+    }
 }
 
 fn union(mut caps: Vec<String>, additions: &[&str]) -> Vec<String> {
@@ -600,45 +802,106 @@ fn union(mut caps: Vec<String>, additions: &[&str]) -> Vec<String> {
 }
 
 const OPENAI_CHAT_MODELS: &[&str] = &["gpt-5-chat-latest", "gpt-5.1-chat-latest"];
-const OPENAI_CODEX_MODELS: &[&str] = &["gpt-5-codex", "gpt-5.1-codex", "gpt-5.1-codex-max", "gpt-5.1-codex-mini", "gpt-5.2-codex"];
-const OPENAI_SEARCH_MODELS: &[&str] = &[
-    "gpt-4o-mini-search-preview", "gpt-4o-mini-search-preview-2025-03-11", "gpt-4o-search-preview",
-    "gpt-4o-search-preview-2025-03-11", "gpt-5-search-api", "gpt-5-search-api-2025-10-14",
+const OPENAI_CODEX_MODELS: &[&str] = &[
+    "gpt-5-codex",
+    "gpt-5.1-codex",
+    "gpt-5.1-codex-max",
+    "gpt-5.1-codex-mini",
+    "gpt-5.2-codex",
 ];
-const OPENAI_DEEP_RESEARCH_MODELS: &[&str] =
-    &["o3-deep-research", "o3-deep-research-2025-06-26", "o4-mini-deep-research", "o4-mini-deep-research-2025-06-26"];
+const OPENAI_SEARCH_MODELS: &[&str] = &[
+    "gpt-4o-mini-search-preview",
+    "gpt-4o-mini-search-preview-2025-03-11",
+    "gpt-4o-search-preview",
+    "gpt-4o-search-preview-2025-03-11",
+    "gpt-5-search-api",
+    "gpt-5-search-api-2025-10-14",
+];
+const OPENAI_DEEP_RESEARCH_MODELS: &[&str] = &[
+    "o3-deep-research",
+    "o3-deep-research-2025-06-26",
+    "o4-mini-deep-research",
+    "o4-mini-deep-research-2025-06-26",
+];
 const OPENAI_MODERATION_MODELS: &[&str] = &["omni-moderation-2024-09-26", "omni-moderation-latest"];
 const OPENAI_TRANSCRIPTION_MODELS: &[&str] = &[
-    "gpt-live-transcribe", "gpt-realtime-whisper", "gpt-transcribe", "gpt-4o-mini-transcribe",
-    "gpt-4o-mini-transcribe-2025-03-20", "gpt-4o-mini-transcribe-2025-12-15", "gpt-4o-transcribe",
-    "gpt-4o-transcribe-diarize", "whisper-1",
+    "gpt-live-transcribe",
+    "gpt-realtime-whisper",
+    "gpt-transcribe",
+    "gpt-4o-mini-transcribe",
+    "gpt-4o-mini-transcribe-2025-03-20",
+    "gpt-4o-mini-transcribe-2025-12-15",
+    "gpt-4o-transcribe",
+    "gpt-4o-transcribe-diarize",
+    "whisper-1",
 ];
 
 /// `Provider.capabilities.augment`: the narrow per-provider additions from
 /// `providers/*/capabilities.rb`. Providers without an augmenter keep what they have.
-pub fn augment_capabilities(slug: &str, caps: Vec<String>, model_id: &str, modalities: &Modalities) -> Vec<String> {
+pub fn augment_capabilities(
+    slug: &str,
+    caps: Vec<String>,
+    model_id: &str,
+    modalities: &Modalities,
+) -> Vec<String> {
     let has = |c: &Vec<String>, name: &str| c.iter().any(|x| x == name);
     let tools = ["tool_choice", "parallel_tool_calls"];
     match slug {
         "openai" => {
             let groups: [(&str, Vec<&[&str]>); 6] = [
-                ("function_calling", vec![OPENAI_CHAT_MODELS, OPENAI_CODEX_MODELS]),
-                ("structured_output", vec![OPENAI_CHAT_MODELS, OPENAI_CODEX_MODELS, OPENAI_SEARCH_MODELS]),
-                ("vision", vec![OPENAI_CHAT_MODELS, OPENAI_CODEX_MODELS, OPENAI_DEEP_RESEARCH_MODELS, OPENAI_MODERATION_MODELS]),
-                ("reasoning", vec![OPENAI_CODEX_MODELS, OPENAI_DEEP_RESEARCH_MODELS]),
+                (
+                    "function_calling",
+                    vec![OPENAI_CHAT_MODELS, OPENAI_CODEX_MODELS],
+                ),
+                (
+                    "structured_output",
+                    vec![
+                        OPENAI_CHAT_MODELS,
+                        OPENAI_CODEX_MODELS,
+                        OPENAI_SEARCH_MODELS,
+                    ],
+                ),
+                (
+                    "vision",
+                    vec![
+                        OPENAI_CHAT_MODELS,
+                        OPENAI_CODEX_MODELS,
+                        OPENAI_DEEP_RESEARCH_MODELS,
+                        OPENAI_MODERATION_MODELS,
+                    ],
+                ),
+                (
+                    "reasoning",
+                    vec![OPENAI_CODEX_MODELS, OPENAI_DEEP_RESEARCH_MODELS],
+                ),
                 ("transcription", vec![OPENAI_TRANSCRIPTION_MODELS]),
                 ("citations", vec![OPENAI_SEARCH_MODELS]),
             ];
-            let additions: Vec<&str> =
-                groups.iter().filter(|(_, lists)| lists.iter().any(|l| l.contains(&model_id))).map(|(c, _)| *c).collect();
+            let additions: Vec<&str> = groups
+                .iter()
+                .filter(|(_, lists)| lists.iter().any(|l| l.contains(&model_id)))
+                .map(|(c, _)| *c)
+                .collect();
             let caps = union(caps, &additions);
-            if has(&caps, "function_calling") { union(caps, &tools) } else { caps }
+            if has(&caps, "function_calling") {
+                union(caps, &tools)
+            } else {
+                caps
+            }
         }
         "anthropic" if has(&caps, "function_calling") => union(caps, &tools),
         "deepseek" if has(&caps, "function_calling") => union(caps, &["tool_choice"]),
         "mistral" => {
-            let caps = if has(&caps, "function_calling") { union(caps, &tools) } else { caps };
-            if ["mistral-small-2603", "mistral-small-latest"].contains(&model_id) { union(caps, &["structured_output"]) } else { caps }
+            let caps = if has(&caps, "function_calling") {
+                union(caps, &tools)
+            } else {
+                caps
+            };
+            if ["mistral-small-2603", "mistral-small-latest"].contains(&model_id) {
+                union(caps, &["structured_output"])
+            } else {
+                caps
+            }
         }
         "gemini" => {
             let mut additions = Vec::new();
@@ -654,55 +917,107 @@ pub fn augment_capabilities(slug: &str, caps: Vec<String>, model_id: &str, modal
         }
         "xai" if modalities.output.iter().any(|m| m == "text") => {
             let caps = union(caps, &["streaming"]);
-            if model_id == "grok-4.3" { union(caps, &tools) } else { caps }
+            if model_id == "grok-4.3" {
+                union(caps, &tools)
+            } else {
+                caps
+            }
         }
         "vertexai" if !model_id.contains("embedding") => {
             let mut additions = Vec::new();
             if model_id == "gemini-2.5-flash" {
                 additions.push("tool_choice");
             }
-            if modalities.input.iter().any(|m| m == "audio") && modalities.output.iter().any(|m| m == "text") {
+            if modalities.input.iter().any(|m| m == "audio")
+                && modalities.output.iter().any(|m| m == "text")
+            {
                 additions.push("transcription");
             }
             union(caps, &additions)
         }
         "azure" if model_id == "grok-4-1-fast-non-reasoning" => union(caps, &tools),
-        "bedrock" if ["amazon.nova-2-lite-v1:0", "us.amazon.nova-2-lite-v1:0"].contains(&model_id) => union(caps, &["tool_choice"]),
+        "bedrock"
+            if ["amazon.nova-2-lite-v1:0", "us.amazon.nova-2-lite-v1:0"].contains(&model_id) =>
+        {
+            union(caps, &["tool_choice"])
+        }
         _ => caps,
     }
 }
 
 /// `Models.merge_with_existing`: a provider that answered replaces its own models; the rest keep
 /// theirs, and a failed models.dev fetch keeps the models.dev entries already held.
-pub fn merge_with_existing(existing: &[Model], provider_fetch: &ProviderFetch, models_dev: &ModelsDevFetch) -> Vec<Model> {
+pub fn merge_with_existing(
+    existing: &[Model],
+    provider_fetch: &ProviderFetch,
+    models_dev: &ModelsDevFetch,
+) -> Vec<Model> {
     let mut provider_models = provider_fetch.models.clone();
-    provider_models.extend(existing.iter().filter(|m| !provider_fetch.fetched_providers.contains(&m.provider)).cloned());
-    let dev = if models_dev.fetched { models_dev.models.clone() } else { models_dev_entries(existing) };
+    provider_models.extend(
+        existing
+            .iter()
+            .filter(|m| !provider_fetch.fetched_providers.contains(&m.provider))
+            .cloned(),
+    );
+    let dev = if models_dev.fetched {
+        models_dev.models.clone()
+    } else {
+        models_dev_entries(existing)
+    };
     merge_models(&provider_models, &dev)
 }
 
 /// `Models#merge_discovered_models`: providers that answered replace their own models, the
 /// published catalog replaces what it covers, and everything else survives.
-async fn merge_discovered_models(config: &Arc<Config>, current: &Models, published: &[Model], remote_only: bool) -> Vec<Model> {
+async fn merge_discovered_models(
+    config: &Arc<Config>,
+    current: &Models,
+    published: &[Model],
+    remote_only: bool,
+) -> Vec<Model> {
     let fetch = fetch_provider_models(config, remote_only).await;
     record_failures(&fetch);
     log_provider_fetch(&fetch);
-    let covered: Vec<&str> = fetch.fetched_providers.iter().map(String::as_str).chain(published.iter().map(|m| m.provider.as_str())).collect();
+    let covered: Vec<&str> = fetch
+        .fetched_providers
+        .iter()
+        .map(String::as_str)
+        .chain(published.iter().map(|m| m.provider.as_str()))
+        .collect();
     let failed: Vec<&str> = fetch.failed.iter().map(|f| f.slug.as_str()).collect();
     let preserved = |provider: &str| failed.contains(&provider) || !covered.contains(&provider);
     let mut provider_models = fetch.models.clone();
-    provider_models.extend(current.all().into_iter().filter(|m| preserved(&m.provider)).cloned());
+    provider_models.extend(
+        current
+            .all()
+            .into_iter()
+            .filter(|m| preserved(&m.provider))
+            .cloned(),
+    );
     merge_models(&provider_models, published)
 }
 
 fn file_store(config: &Config) -> Result<Option<registry::FileStore>> {
-    config.model_registry_file.as_ref().map(registry::FileStore::new).transpose()
+    config
+        .model_registry_file
+        .as_ref()
+        .map(registry::FileStore::new)
+        .transpose()
 }
 
 /// `Models#fetch_published_models`: revalidates with the saved ETag only while the catalog behind
 /// it is still on disk, and fetches everything again when a 304 leaves nothing to use.
-async fn fetch_published_models(config: &Config, file: Option<&registry::FileStore>) -> Result<registry::Published> {
-    let cached = file.and_then(|f| registry::read(&registry::suffixed(&f.path, ".published.json")).ok().flatten()).filter(|m| !m.is_empty());
+async fn fetch_published_models(
+    config: &Config,
+    file: Option<&registry::FileStore>,
+) -> Result<registry::Published> {
+    let cached = file
+        .and_then(|f| {
+            registry::read(&registry::suffixed(&f.path, ".published.json"))
+                .ok()
+                .flatten()
+        })
+        .filter(|m| !m.is_empty());
     let etag = match (&cached, file) {
         (Some(_), Some(f)) => f.etag()?,
         _ => None,
@@ -711,23 +1026,37 @@ async fn fetch_published_models(config: &Config, file: Option<&registry::FileSto
     if result.models.is_none() {
         result.models = cached;
     }
-    if result.models.is_some() { Ok(result) } else { registry::fetch_published(config, None).await }
+    if result.models.is_some() {
+        Ok(result)
+    } else {
+        registry::fetch_published(config, None).await
+    }
 }
 
 /// `Models#persist_registry!`: writes the published snapshot and the merged registry with its ETag.
-fn persist(file: Option<&registry::FileStore>, models: &[Model], published: &registry::Published) -> Result<()> {
-    let file = file.ok_or_else(|| Error::ModelRegistry("No writable model registry store is configured".into()))?;
+fn persist(
+    file: Option<&registry::FileStore>,
+    models: &[Model],
+    published: &registry::Published,
+) -> Result<()> {
+    let file = file.ok_or_else(|| {
+        Error::ModelRegistry("No writable model registry store is configured".into())
+    })?;
     let write = || -> Result<()> {
         if !published.not_modified {
             let snapshot: Vec<&Model> = published.models.iter().flatten().collect();
-            registry::FileStore::new(registry::suffixed(&file.path, ".published.json"))?.write(&snapshot, None)?;
+            registry::FileStore::new(registry::suffixed(&file.path, ".published.json"))?
+                .write(&snapshot, None)?;
         }
         let listed: Vec<&Model> = models.iter().filter(|m| !m.is_unlisted()).collect();
         file.write(&listed, published.etag.as_deref())
     };
     write().map_err(|e| match e {
         Error::ModelRegistry(_) => e,
-        other => Error::ModelRegistry(format!("Could not save the model registry to {}: {other}", file.path.display())),
+        other => Error::ModelRegistry(format!(
+            "Could not save the model registry to {}: {other}",
+            file.path.display()
+        )),
     })
 }
 
@@ -760,7 +1089,10 @@ pub async fn list_models(provider: Provider, config: Arc<Config>) -> Result<Vec<
                 if body.get("has_more").and_then(Value::as_bool) != Some(true) {
                     break;
                 }
-                after = body.get("last_id").and_then(Value::as_str).map(str::to_string);
+                after = body
+                    .get("last_id")
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
                 if after.is_none() {
                     break;
                 }
@@ -777,14 +1109,20 @@ pub async fn list_models(provider: Provider, config: Arc<Config>) -> Result<Vec<
                 };
                 let body = conn.get(&path, &[]).await?.body;
                 models.extend(parse_gemini_models(&body, slug));
-                token = body.get("nextPageToken").and_then(Value::as_str).map(str::to_string);
+                token = body
+                    .get("nextPageToken")
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
                 if token.is_none() {
                     break;
                 }
             }
             Ok(models)
         }
-        Provider::Mistral => Ok(parse_mistral_models(&conn.get("models", &[]).await?.body, slug)),
+        Provider::Mistral => Ok(parse_mistral_models(
+            &conn.get("models", &[]).await?.body,
+            slug,
+        )),
         Provider::XAI => {
             let mut models = parse_openai_models(&conn.get("models", &[]).await?.body, slug, true);
             models.extend(xai_audio_models(slug));
@@ -804,18 +1142,35 @@ pub async fn list_models(provider: Provider, config: Arc<Config>) -> Result<Vec<
         Provider::Perplexity => match conn.get("v1/models", &[]).await {
             Ok(raw) => Ok(parse_perplexity_models(&raw.body, slug)),
             Err(e) if !matches!(e, Error::Timeout(_) | Error::ConnectionFailed(_)) => {
-                tracing::warn!("Perplexity models endpoint failed ({e}). Using the static model list.");
-                Ok(perplexity_static_models(slug, PERPLEXITY_STATIC_IDS.iter().copied()))
+                tracing::warn!(
+                    "Perplexity models endpoint failed ({e}). Using the static model list."
+                );
+                Ok(perplexity_static_models(
+                    slug,
+                    PERPLEXITY_STATIC_IDS.iter().copied(),
+                ))
             }
             Err(e) => Err(e),
         },
         Provider::Ollama | Provider::OllamaCloud => {
             let body = conn.get("models", &[]).await?.body;
             let base = provider.api_base(conn.config())?;
-            let show = format!("{}/api/show", base.trim_end_matches('/').rsplit_once('/').map(|(p, _)| p).unwrap_or(&base));
+            let show = format!(
+                "{}/api/show",
+                base.trim_end_matches('/')
+                    .rsplit_once('/')
+                    .map(|(p, _)| p)
+                    .unwrap_or(&base)
+            );
             let mut details = std::collections::HashMap::new();
-            for id in data(&body).iter().filter_map(|m| m.get("id").and_then(Value::as_str)) {
-                let reported = match conn.post(&show, &json!({ "model": id }), &[], &mut |_| {}).await {
+            for id in data(&body)
+                .iter()
+                .filter_map(|m| m.get("id").and_then(Value::as_str))
+            {
+                let reported = match conn
+                    .post(&show, &json!({ "model": id }), &[], &mut |_| {})
+                    .await
+                {
                     Ok(raw) => strings(raw.body.get("capabilities")),
                     Err(e) => {
                         tracing::debug!("Ollama did not report capabilities for {id} ({e}).");
@@ -824,32 +1179,61 @@ pub async fn list_models(provider: Provider, config: Arc<Config>) -> Result<Vec<
                 };
                 details.insert(id.to_string(), reported);
             }
-            Ok(parse_ollama_models(&body, slug, &details, provider == Provider::OllamaCloud))
+            Ok(parse_ollama_models(
+                &body,
+                slug,
+                &details,
+                provider == Provider::OllamaCloud,
+            ))
         }
         Provider::GPUStack => {
             let mut entries: Vec<(String, Value, Vec<String>)> = Vec::new();
             for category in GPUSTACK_CATEGORIES {
-                let body = conn.get(&format!("models?with_meta=true&categories={category}"), &[]).await?.body;
+                let body = conn
+                    .get(&format!("models?with_meta=true&categories={category}"), &[])
+                    .await?
+                    .body;
                 for m in data(&body) {
-                    let Some(id) = m.get("id").and_then(Value::as_str) else { continue };
+                    let Some(id) = m.get("id").and_then(Value::as_str) else {
+                        continue;
+                    };
                     match entries.iter_mut().find(|(i, _, _)| i == id) {
                         Some(entry) => entry.2.push(category.to_string()),
-                        None => entries.push((id.to_string(), m.clone(), vec![category.to_string()])),
+                        None => {
+                            entries.push((id.to_string(), m.clone(), vec![category.to_string()]))
+                        }
                     }
                 }
             }
-            Ok(entries.into_iter().map(|(_, m, cats)| gpustack_model(&m, &cats, slug)).collect())
+            Ok(entries
+                .into_iter()
+                .map(|(_, m, cats)| gpustack_model(&m, &cats, slug))
+                .collect())
         }
-        _ => Ok(parse_openai_models(&conn.get("models", &[]).await?.body, slug, false)),
+        _ => Ok(parse_openai_models(
+            &conn.get("models", &[]).await?.body,
+            slug,
+            false,
+        )),
     }
 }
 
 fn data(body: &Value) -> Vec<Value> {
-    body.get("data").and_then(Value::as_array).cloned().unwrap_or_default()
+    body.get("data")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
 }
 
 fn strings(v: Option<&Value>) -> Vec<String> {
-    v.and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect()).unwrap_or_default()
+    v.and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// A bare model the way `Model.new` builds one from the few fields a listing gives.
@@ -879,7 +1263,11 @@ fn unix_time(v: Option<&Value>) -> Option<String> {
 
 fn parse_time(v: Option<&Value>) -> Option<String> {
     let t = chrono::DateTime::parse_from_rfc3339(v?.as_str()?).ok()?;
-    Some(t.with_timezone(&chrono::Utc).format("%Y-%m-%d %H:%M:%S UTC").to_string())
+    Some(
+        t.with_timezone(&chrono::Utc)
+            .format("%Y-%m-%d %H:%M:%S UTC")
+            .to_string(),
+    )
 }
 
 /// `ChatCompletions::Models.parse_list_models_response` (and xAI's, which compacts its metadata).
@@ -905,16 +1293,28 @@ pub fn parse_openai_models(body: &Value, slug: &str, compact: bool) -> Vec<Model
 }
 
 fn xai_audio_models(slug: &str) -> Vec<Model> {
-    [("grok-tts", "Grok TTS", ["text"], ["audio"], None), ("grok-stt", "Grok STT", ["audio"], ["text"], Some("transcription"))]
-        .into_iter()
-        .map(|(id, name, input, output, cap)| {
-            let mut m = bare(id, name, slug);
-            m.family = Some("grok".into());
-            m.modalities = Modalities { input: input.map(String::from).to_vec(), output: output.map(String::from).to_vec() };
-            m.capabilities = cap.map(String::from).into_iter().collect();
-            m
-        })
-        .collect()
+    [
+        ("grok-tts", "Grok TTS", ["text"], ["audio"], None),
+        (
+            "grok-stt",
+            "Grok STT",
+            ["audio"],
+            ["text"],
+            Some("transcription"),
+        ),
+    ]
+    .into_iter()
+    .map(|(id, name, input, output, cap)| {
+        let mut m = bare(id, name, slug);
+        m.family = Some("grok".into());
+        m.modalities = Modalities {
+            input: input.map(String::from).to_vec(),
+            output: output.map(String::from).to_vec(),
+        };
+        m.capabilities = cap.map(String::from).into_iter().collect();
+        m
+    })
+    .collect()
 }
 
 /// `Anthropic::Models.parse_list_models_response`.
@@ -930,7 +1330,11 @@ pub fn parse_anthropic_models(body: &Value, slug: &str) -> Vec<Model> {
         .iter()
         .filter_map(|m| {
             let id = m.get("id").and_then(Value::as_str)?;
-            let mut model = bare(id, m.get("display_name").and_then(Value::as_str).unwrap_or(id), slug);
+            let mut model = bare(
+                id,
+                m.get("display_name").and_then(Value::as_str).unwrap_or(id),
+                slug,
+            );
             model.created_at = parse_time(m.get("created_at"));
             model.context_window = m.get("max_input_tokens").and_then(Value::as_i64);
             model.max_output_tokens = m.get("max_tokens").and_then(Value::as_i64);
@@ -938,7 +1342,12 @@ pub fn parse_anthropic_models(body: &Value, slug: &str) -> Vec<Model> {
                 model.capabilities = reported
                     .iter()
                     .filter(|(_, d)| d.get("supported").and_then(Value::as_bool) == Some(true))
-                    .filter_map(|(name, _)| REPORTED.iter().find(|(k, _)| k == name).map(|(_, c)| c.to_string()))
+                    .filter_map(|(name, _)| {
+                        REPORTED
+                            .iter()
+                            .find(|(k, _)| k == name)
+                            .map(|(_, c)| c.to_string())
+                    })
                     .collect();
             }
             Some(model)
@@ -953,14 +1362,24 @@ pub fn parse_gemini_models(body: &Value, slug: &str) -> Vec<Model> {
         .into_iter()
         .flatten()
         .filter_map(|m| {
-            let id = m.get("name").and_then(Value::as_str)?.replace("models/", "");
+            let id = m
+                .get("name")
+                .and_then(Value::as_str)?
+                .replace("models/", "");
             let methods = strings(m.get("supportedGenerationMethods"));
             let has = |x: &str| methods.iter().any(|mm| mm == x);
-            let mut model = bare(&id, m.get("displayName").and_then(Value::as_str).unwrap_or(&id), slug);
+            let mut model = bare(
+                &id,
+                m.get("displayName").and_then(Value::as_str).unwrap_or(&id),
+                slug,
+            );
             model.context_window = m.get("inputTokenLimit").and_then(Value::as_i64);
             model.max_output_tokens = m.get("outputTokenLimit").and_then(Value::as_i64);
             if has("embedContent") {
-                model.modalities = Modalities { input: vec!["text".into()], output: vec!["embeddings".into()] };
+                model.modalities = Modalities {
+                    input: vec!["text".into()],
+                    output: vec!["embeddings".into()],
+                };
             }
             if has("batchGenerateContent") || has("asyncBatchEmbedContent") {
                 model.capabilities.push("batch".into());
@@ -969,11 +1388,21 @@ pub fn parse_gemini_models(body: &Value, slug: &str) -> Vec<Model> {
                 model.capabilities.push("caching".into());
             }
             if has("bidiGenerateContent") {
-                model.capabilities.extend(["streaming".into(), "realtime".into()]);
+                model
+                    .capabilities
+                    .extend(["streaming".into(), "realtime".into()]);
             }
-            model.metadata.insert("version".into(), m.get("version").cloned().unwrap_or(Value::Null));
-            model.metadata.insert("description".into(), m.get("description").cloned().unwrap_or(Value::Null));
-            model.metadata.insert("supported_generation_methods".into(), json!(methods));
+            model.metadata.insert(
+                "version".into(),
+                m.get("version").cloned().unwrap_or(Value::Null),
+            );
+            model.metadata.insert(
+                "description".into(),
+                m.get("description").cloned().unwrap_or(Value::Null),
+            );
+            model
+                .metadata
+                .insert("supported_generation_methods".into(), json!(methods));
             Some(model)
         })
         .collect()
@@ -992,7 +1421,8 @@ pub fn parse_mistral_models(body: &Value, slug: &str) -> Vec<Model> {
         ("audio_transcription_realtime", "realtime"),
         ("audio_speech", "speech_generation"),
     ];
-    let embed = regex::Regex::new(r"(?i)(?:\A|[-_ ])embed(?:ding)?(?:\z|[-_ ])").expect("valid regex");
+    let embed =
+        regex::Regex::new(r"(?i)(?:\A|[-_ ])embed(?:ding)?(?:\z|[-_ ])").expect("valid regex");
     data(body)
         .iter()
         .filter_map(|m| {
@@ -1001,7 +1431,11 @@ pub fn parse_mistral_models(body: &Value, slug: &str) -> Vec<Model> {
             let on = |f: &str| truthy(flags.get(f));
             let mut model = bare(id, id, slug);
             model.context_window = m.get("max_context_length").and_then(Value::as_i64);
-            model.capabilities = FLAGS.iter().filter(|(f, _)| on(f)).map(|(_, c)| c.to_string()).collect();
+            model.capabilities = FLAGS
+                .iter()
+                .filter(|(f, _)| on(f))
+                .map(|(_, c)| c.to_string())
+                .collect();
             let described: Vec<String> = [m.get("id"), m.get("description")]
                 .into_iter()
                 .flatten()
@@ -1010,9 +1444,15 @@ pub fn parse_mistral_models(body: &Value, slug: &str) -> Vec<Model> {
                 .chain(strings(m.get("aliases")))
                 .collect();
             model.modalities = if described.iter().any(|v| embed.is_match(v)) {
-                Modalities { input: vec!["text".into()], output: vec!["embeddings".into()] }
+                Modalities {
+                    input: vec!["text".into()],
+                    output: vec!["embeddings".into()],
+                }
             } else if on("audio_transcription") {
-                Modalities { input: vec!["audio".into()], output: vec!["text".into()] }
+                Modalities {
+                    input: vec!["audio".into()],
+                    output: vec!["text".into()],
+                }
             } else {
                 let mut input = vec!["text".to_string()];
                 if on("vision") || on("ocr") {
@@ -1024,8 +1464,18 @@ pub fn parse_mistral_models(body: &Value, slug: &str) -> Vec<Model> {
                 }
                 Modalities { input, output }
             };
-            for key in ["object", "owned_by", "description", "aliases", "deprecation", "deprecation_replacement_model"] {
-                if let Some(v) = m.get(key).filter(|v| !is_blank(v) || matches!(v, Value::Bool(_) | Value::Number(_))) {
+            for key in [
+                "object",
+                "owned_by",
+                "description",
+                "aliases",
+                "deprecation",
+                "deprecation_replacement_model",
+            ] {
+                if let Some(v) = m
+                    .get(key)
+                    .filter(|v| !is_blank(v) || matches!(v, Value::Bool(_) | Value::Number(_)))
+                {
                     model.metadata.insert(key.into(), v.clone());
                 }
             }
@@ -1049,7 +1499,10 @@ pub fn parse_openrouter_models(body: &Value, slug: &str) -> Vec<Model> {
         ("function_calling", &["tools", "tool_choice"]),
         ("tool_choice", &["tool_choice"]),
         ("parallel_tool_calls", &["parallel_tool_calls"]),
-        ("structured_output", &["response_format", "structured_outputs"]),
+        (
+            "structured_output",
+            &["response_format", "structured_outputs"],
+        ),
         ("batch", &["batch"]),
     ];
     data(body)
@@ -1068,13 +1521,25 @@ pub fn parse_openrouter_models(body: &Value, slug: &str) -> Vec<Model> {
                     mapped.push(v.to_string());
                 }
             }
-            let mut model = bare(id, m.get("name").and_then(Value::as_str).unwrap_or(id), slug);
+            let mut model = bare(
+                id,
+                m.get("name").and_then(Value::as_str).unwrap_or(id),
+                slug,
+            );
             model.family = id.split('/').next().map(str::to_string);
             model.created_at = unix_time(m.get("created"));
             model.context_window = m.get("context_length").and_then(Value::as_i64);
-            model.max_output_tokens = m.pointer("/top_provider/max_completion_tokens").and_then(Value::as_i64);
-            model.knowledge_cutoff = m.get("knowledge_cutoff").and_then(Value::as_str).map(str::to_string);
-            model.modalities = Modalities { input: strings(m.pointer("/architecture/input_modalities")), output: mapped };
+            model.max_output_tokens = m
+                .pointer("/top_provider/max_completion_tokens")
+                .and_then(Value::as_i64);
+            model.knowledge_cutoff = m
+                .get("knowledge_cutoff")
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            model.modalities = Modalities {
+                input: strings(m.pointer("/architecture/input_modalities")),
+                output: mapped,
+            };
             let mut standard = Map::new();
             for (source, target) in [
                 ("prompt", "input_per_million"),
@@ -1083,19 +1548,29 @@ pub fn parse_openrouter_models(body: &Value, slug: &str) -> Vec<Model> {
                 ("input_cache_write", "cache_write_input_per_million"),
                 ("internal_reasoning", "reasoning_output_per_million"),
             ] {
-                let v = m.pointer(&format!("/pricing/{source}")).map(to_f).unwrap_or(0.0);
+                let v = m
+                    .pointer(&format!("/pricing/{source}"))
+                    .map(to_f)
+                    .unwrap_or(0.0);
                 if v > 0.0 {
                     standard.insert(target.into(), (v * 1_000_000.0).into());
                 }
             }
             if !standard.is_empty() {
-                model.pricing = serde_json::from_value(json!({ "text_tokens": { "standard": standard } })).unwrap_or_default();
+                model.pricing =
+                    serde_json::from_value(json!({ "text_tokens": { "standard": standard } }))
+                        .unwrap_or_default();
             }
             let mut caps: Vec<String> = Vec::new();
             if let Some(params) = m.get("supported_parameters").and_then(Value::as_array) {
                 let p: Vec<&str> = params.iter().filter_map(Value::as_str).collect();
                 caps.push("streaming".into());
-                caps.extend(PARAMS.iter().filter(|(_, ps)| ps.iter().any(|x| p.contains(x))).map(|(c, _)| c.to_string()));
+                caps.extend(
+                    PARAMS
+                        .iter()
+                        .filter(|(_, ps)| ps.iter().any(|x| p.contains(x)))
+                        .map(|(c, _)| c.to_string()),
+                );
                 if p.contains(&"logit_bias") && p.contains(&"top_k") {
                     caps.push("predicted_outputs".into());
                 }
@@ -1118,7 +1593,10 @@ pub fn parse_openrouter_models(body: &Value, slug: &str) -> Vec<Model> {
                 ("supported_parameters", "/supported_parameters"),
                 ("expiration_date", "/expiration_date"),
             ] {
-                model.metadata.insert(key.into(), m.pointer(pointer).cloned().unwrap_or(Value::Null));
+                model.metadata.insert(
+                    key.into(),
+                    m.pointer(pointer).cloned().unwrap_or(Value::Null),
+                );
             }
             Some(model)
         })
@@ -1127,19 +1605,37 @@ pub fn parse_openrouter_models(body: &Value, slug: &str) -> Vec<Model> {
 
 /// Ruby's `to_f` on a JSON price, which OpenRouter sends as a string.
 fn to_f(v: &Value) -> f64 {
-    v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse().ok())).unwrap_or(0.0)
+    v.as_f64()
+        .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+        .unwrap_or(0.0)
 }
 
-const PERPLEXITY_SEARCH_IDS: &[&str] = &["sonar", "sonar-pro", "sonar-reasoning-pro", "sonar-deep-research"];
+const PERPLEXITY_SEARCH_IDS: &[&str] = &[
+    "sonar",
+    "sonar-pro",
+    "sonar-reasoning-pro",
+    "sonar-deep-research",
+];
 const PERPLEXITY_PRESET_IDS: &[&str] = &["fast", "low", "medium", "high", "xhigh", "wide-research"];
 const PERPLEXITY_EMBEDDING_IDS: &[&str] = &["pplx-embed-v1-0.6b", "pplx-embed-v1-4b"];
 static PERPLEXITY_STATIC_IDS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
-    PERPLEXITY_SEARCH_IDS.iter().chain(PERPLEXITY_PRESET_IDS).chain(PERPLEXITY_EMBEDDING_IDS).copied().collect()
+    PERPLEXITY_SEARCH_IDS
+        .iter()
+        .chain(PERPLEXITY_PRESET_IDS)
+        .chain(PERPLEXITY_EMBEDDING_IDS)
+        .copied()
+        .collect()
 });
 
 /// One `Perplexity::Models::STATIC_MODEL_DATA` entry: (context window, input, output, reasoning
 /// prices, capabilities).
-type StaticModel = (Option<i64>, Option<f64>, Option<f64>, Option<f64>, &'static [&'static str]);
+type StaticModel = (
+    Option<i64>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    &'static [&'static str],
+);
 
 fn perplexity_static(id: &str) -> StaticModel {
     const SEARCH: &[&str] = &["streaming", "structured_output", "citations"];
@@ -1151,7 +1647,18 @@ fn perplexity_static(id: &str) -> StaticModel {
         "sonar-deep-research" => (Some(128_000), Some(2.0), Some(8.0), Some(3.0), REASONING),
         "pplx-embed-v1-0.6b" => (Some(32_768), Some(0.004), None, None, &[]),
         "pplx-embed-v1-4b" => (Some(32_768), Some(0.03), None, None, &[]),
-        p if PERPLEXITY_PRESET_IDS.contains(&p) => (None, None, None, None, &["streaming", "structured_output", "citations", "function_calling"]),
+        p if PERPLEXITY_PRESET_IDS.contains(&p) => (
+            None,
+            None,
+            None,
+            None,
+            &[
+                "streaming",
+                "structured_output",
+                "citations",
+                "function_calling",
+            ],
+        ),
         _ => (None, None, None, None, &[]),
     }
 }
@@ -1172,9 +1679,14 @@ fn perplexity_model(id: &str, slug: &str, pricing: Option<Value>) -> Model {
         }
         Some(json!({ "text_tokens": { "standard": standard } }))
     });
-    model.pricing = pricing.and_then(|p| serde_json::from_value(p).ok()).unwrap_or_default();
+    model.pricing = pricing
+        .and_then(|p| serde_json::from_value(p).ok())
+        .unwrap_or_default();
     if PERPLEXITY_EMBEDDING_IDS.contains(&id) {
-        model.modalities = Modalities { input: vec!["text".into()], output: vec!["embeddings".into()] };
+        model.modalities = Modalities {
+            input: vec!["text".into()],
+            output: vec!["embeddings".into()],
+        };
     }
     model
 }
@@ -1197,21 +1709,33 @@ pub fn parse_perplexity_models(body: &Value, slug: &str) -> Vec<Model> {
                 ("cache_write", "cache_write_input_per_million"),
             ]
             .iter()
-            .filter_map(|(k, t)| m.pointer(&format!("/pricing/{k}")).filter(|v| !v.is_null()).map(|v| (t.to_string(), v.clone())))
+            .filter_map(|(k, t)| {
+                m.pointer(&format!("/pricing/{k}"))
+                    .filter(|v| !v.is_null())
+                    .map(|v| (t.to_string(), v.clone()))
+            })
             .collect();
             let pricing = (m.get("pricing").is_some_and(Value::is_object) && !standard.is_empty())
                 .then(|| json!({ "text_tokens": { "standard": standard } }));
             Some(perplexity_model(id, slug, pricing))
         })
         .collect();
-    let missing = PERPLEXITY_STATIC_IDS.iter().copied().filter(|id| !listed.iter().any(|m| m.id == *id));
+    let missing = PERPLEXITY_STATIC_IDS
+        .iter()
+        .copied()
+        .filter(|id| !listed.iter().any(|m| m.id == *id));
     let mut models = perplexity_static_models(slug, missing);
     models.extend(listed);
     models
 }
 
 /// `Ollama::Models.parse_list_models_response`; Ollama Cloud drops `structured_output`.
-fn parse_ollama_models(body: &Value, slug: &str, details: &std::collections::HashMap<String, Vec<String>>, cloud: bool) -> Vec<Model> {
+fn parse_ollama_models(
+    body: &Value,
+    slug: &str,
+    details: &std::collections::HashMap<String, Vec<String>>,
+    cloud: bool,
+) -> Vec<Model> {
     data(body)
         .iter()
         .filter_map(|m| {
@@ -1222,28 +1746,53 @@ fn parse_ollama_models(body: &Value, slug: &str, details: &std::collections::Has
             model.family = Some("ollama".into());
             model.created_at = unix_time(m.get("created"));
             if has("embedding") {
-                model.modalities = Modalities { input: vec!["text".into()], output: vec!["embeddings".into()] };
+                model.modalities = Modalities {
+                    input: vec!["text".into()],
+                    output: vec!["embeddings".into()],
+                };
             } else {
                 let mut input = vec!["text".to_string()];
                 if has("vision") {
                     input.push("image".into());
                 }
-                model.modalities = Modalities { input, output: vec!["text".into()] };
-                let base: &[&str] = if cloud { &["streaming"] } else { &["streaming", "structured_output"] };
+                model.modalities = Modalities {
+                    input,
+                    output: vec!["text".into()],
+                };
+                let base: &[&str] = if cloud {
+                    &["streaming"]
+                } else {
+                    &["streaming", "structured_output"]
+                };
                 model.capabilities = base.iter().map(|c| c.to_string()).collect();
-                for (native, cap) in [("tools", "function_calling"), ("vision", "vision"), ("thinking", "reasoning")] {
+                for (native, cap) in [
+                    ("tools", "function_calling"),
+                    ("vision", "vision"),
+                    ("thinking", "reasoning"),
+                ] {
                     if has(native) {
                         model.capabilities.push(cap.into());
                     }
                 }
             }
-            model.metadata.insert("owned_by".into(), m.get("owned_by").cloned().unwrap_or(Value::Null));
+            model.metadata.insert(
+                "owned_by".into(),
+                m.get("owned_by").cloned().unwrap_or(Value::Null),
+            );
             Some(model)
         })
         .collect()
 }
 
-const GPUSTACK_CATEGORIES: &[&str] = &["llm", "embedding", "image", "reranker", "speech_to_text", "text_to_speech", "unknown"];
+const GPUSTACK_CATEGORIES: &[&str] = &[
+    "llm",
+    "embedding",
+    "image",
+    "reranker",
+    "speech_to_text",
+    "text_to_speech",
+    "unknown",
+];
 
 /// `GPUStack::Models#build_model`.
 pub fn gpustack_model(m: &Value, categories: &[String], slug: &str) -> Model {
@@ -1255,12 +1804,22 @@ pub fn gpustack_model(m: &Value, categories: &[String], slug: &str) -> Model {
     let mut model = bare(id, id, slug);
     model.family = Some("gpustack".into());
     model.created_at = unix_time(m.get("created"));
-    let context = meta.get("n_ctx").filter(|v| !v.is_null()).or_else(|| meta.get("max_model_len")).and_then(Value::as_i64);
+    let context = meta
+        .get("n_ctx")
+        .filter(|v| !v.is_null())
+        .or_else(|| meta.get("max_model_len"))
+        .and_then(Value::as_i64);
     model.context_window = context;
     model.max_output_tokens = context;
     if cat("llm") {
-        model.capabilities = ["streaming", "structured_output", "json_mode"].map(String::from).to_vec();
-        for (k, c) in [("support_tool_calls", "function_calling"), ("support_vision", "vision"), ("support_reasoning", "reasoning")] {
+        model.capabilities = ["streaming", "structured_output", "json_mode"]
+            .map(String::from)
+            .to_vec();
+        for (k, c) in [
+            ("support_tool_calls", "function_calling"),
+            ("support_vision", "vision"),
+            ("support_reasoning", "reasoning"),
+        ] {
             if flag(k) {
                 model.capabilities.push(c.into());
             }
@@ -1280,14 +1839,25 @@ pub fn gpustack_model(m: &Value, categories: &[String], slug: &str) -> Model {
     if any(&["llm", "speech_to_text", "reranker"]) {
         output.push("text".to_string());
     }
-    for (c, o) in [("embedding", "embeddings"), ("image", "image"), ("text_to_speech", "audio")] {
+    for (c, o) in [
+        ("embedding", "embeddings"),
+        ("image", "image"),
+        ("text_to_speech", "audio"),
+    ] {
         if cat(c) {
             output.push(o.into());
         }
     }
     model.modalities = Modalities { input, output };
-    model.metadata.insert("owned_by".into(), m.get("owned_by").cloned().unwrap_or(Value::Null));
-    model.metadata.insert("categories".into(), json!(categories));
-    model.metadata.insert("meta".into(), m.get("meta").cloned().unwrap_or(Value::Null));
+    model.metadata.insert(
+        "owned_by".into(),
+        m.get("owned_by").cloned().unwrap_or(Value::Null),
+    );
+    model
+        .metadata
+        .insert("categories".into(), json!(categories));
+    model
+        .metadata
+        .insert("meta".into(), m.get("meta").cloned().unwrap_or(Value::Null));
     model
 }

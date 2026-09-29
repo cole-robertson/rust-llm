@@ -49,9 +49,18 @@ pub struct Cost {
 
 impl Cost {
     pub fn new(tokens: &Tokens, model: Option<&Model>, tier: Tier) -> Cost {
-        let text = model.and_then(|m| m.pricing.text_tokens.clone()).unwrap_or_default();
-        let pricer = Pricer { tokens, text: &text, tier };
-        let mut cost = Cost { complete: true, ..Default::default() };
+        let text = model
+            .and_then(|m| m.pricing.text_tokens.clone())
+            .unwrap_or_default();
+        let pricer = Pricer {
+            tokens,
+            text: &text,
+            tier,
+        };
+        let mut cost = Cost {
+            complete: true,
+            ..Default::default()
+        };
         for component in COMPONENTS {
             cost.set(component, pricer.amount_for(component));
             if pricer.missing(component) {
@@ -59,14 +68,19 @@ impl Cost {
             }
         }
         cost.reported_total = tokens.reported_cost;
-        cost.reported = COMPONENTS.iter().any(|&c| pricer.tokens_for(c).is_some()) || tokens.reported_cost.is_some();
+        cost.reported = COMPONENTS.iter().any(|&c| pricer.tokens_for(c).is_some())
+            || tokens.reported_cost.is_some();
         cost
     }
 
     /// `Cost.aggregate`: sum of the parts, and incomplete if any part is.
     pub fn aggregate<'a>(costs: impl IntoIterator<Item = &'a Cost>, complete: bool) -> Cost {
         let costs: Vec<&Cost> = costs.into_iter().filter(|c| c.reported).collect();
-        let mut out = Cost { complete, reported: !costs.is_empty(), ..Default::default() };
+        let mut out = Cost {
+            complete,
+            reported: !costs.is_empty(),
+            ..Default::default()
+        };
         for component in COMPONENTS {
             let missing = costs.iter().any(|c| c.missing.contains(&component));
             if missing {
@@ -85,13 +99,19 @@ impl Cost {
 
     /// `Cost.from_h`: a cost as it was recorded (e.g. the stored usage columns), not re-priced.
     /// Without a recorded total, a component with tokens but no amount makes the total unknown.
-    pub fn from_recorded(
-        amounts: [Option<f64>; 5],
-        total: Option<f64>,
-        tokens: &Tokens,
-    ) -> Cost {
-        let mut cost = Cost { complete: true, reported_total: total, ..Default::default() };
-        let counts = [tokens.input, tokens.output, tokens.cache_read, tokens.cache_write, tokens.thinking];
+    pub fn from_recorded(amounts: [Option<f64>; 5], total: Option<f64>, tokens: &Tokens) -> Cost {
+        let mut cost = Cost {
+            complete: true,
+            reported_total: total,
+            ..Default::default()
+        };
+        let counts = [
+            tokens.input,
+            tokens.output,
+            tokens.cache_read,
+            tokens.cache_write,
+            tokens.thinking,
+        ];
         for (i, component) in COMPONENTS.into_iter().enumerate() {
             cost.set(component, amounts[i]);
             if total.is_none() && counts[i].unwrap_or(0) > 0 && amounts[i].is_none() {
@@ -109,13 +129,19 @@ impl Cost {
     pub fn from_h(h: &serde_json::Value, tokens: Option<&Tokens>) -> Cost {
         let amount = |c: Component| h.get(c.as_key()).and_then(serde_json::Value::as_f64);
         let total_recorded = h.get("total").is_some();
-        let mut cost = Cost { complete: true, reported_total: h.get("total").and_then(serde_json::Value::as_f64), ..Default::default() };
+        let mut cost = Cost {
+            complete: true,
+            reported_total: h.get("total").and_then(serde_json::Value::as_f64),
+            ..Default::default()
+        };
         for component in COMPONENTS {
             cost.set(component, amount(component));
             let missing = match tokens {
                 _ if total_recorded => false,
                 None => amount(component).is_none(),
-                Some(t) => Pricer::count(t, component).unwrap_or(0) > 0 && amount(component).is_none(),
+                Some(t) => {
+                    Pricer::count(t, component).unwrap_or(0) > 0 && amount(component).is_none()
+                }
             };
             if missing {
                 cost.missing.push(component);
@@ -169,8 +195,17 @@ impl Cost {
     }
 
     /// `Cost.new(amounts:, missing:, reported:)`: already-priced components, e.g. at batch rates.
-    pub fn from_amounts(amounts: [Option<f64>; 5], missing: Vec<Component>, reported: bool) -> Cost {
-        let mut cost = Cost { complete: true, reported, missing, ..Default::default() };
+    pub fn from_amounts(
+        amounts: [Option<f64>; 5],
+        missing: Vec<Component>,
+        reported: bool,
+    ) -> Cost {
+        let mut cost = Cost {
+            complete: true,
+            reported,
+            missing,
+            ..Default::default()
+        };
         for (i, component) in COMPONENTS.into_iter().enumerate() {
             cost.set(component, amounts[i]);
         }
@@ -189,27 +224,61 @@ impl Cost {
 
     /// `Cost.new(category: :images, input_details:)`: output uses the image output price (text
     /// as fallback); input splits into text and image tokens when the provider reports both.
-    pub fn images(tokens: &Tokens, model: Option<&Model>, input_details: Option<&serde_json::Value>) -> Cost {
+    pub fn images(
+        tokens: &Tokens,
+        model: Option<&Model>,
+        input_details: Option<&serde_json::Value>,
+    ) -> Cost {
         let mut cost = Cost::new(tokens, model, Tier::Standard);
-        let text = model.and_then(|m| m.pricing.text_tokens.clone()).unwrap_or_default();
-        let images = model.and_then(|m| m.pricing.images.clone()).unwrap_or_default();
-        let prompt = tokens.input.unwrap_or(0) + tokens.cache_read.unwrap_or(0) + tokens.cache_write.unwrap_or(0);
-        let text_input = text.tier_for(prompt).and_then(|t| t.input_per_million).or_else(|| text.input());
-        let per = |count: i64, price: Option<f64>| if count == 0 { Some(0.0) } else { price.map(|p| count as f64 * p / PER_MILLION) };
+        let text = model
+            .and_then(|m| m.pricing.text_tokens.clone())
+            .unwrap_or_default();
+        let images = model
+            .and_then(|m| m.pricing.images.clone())
+            .unwrap_or_default();
+        let prompt = tokens.input.unwrap_or(0)
+            + tokens.cache_read.unwrap_or(0)
+            + tokens.cache_write.unwrap_or(0);
+        let text_input = text
+            .tier_for(prompt)
+            .and_then(|t| t.input_per_million)
+            .or_else(|| text.input());
+        let per = |count: i64, price: Option<f64>| {
+            if count == 0 {
+                Some(0.0)
+            } else {
+                price.map(|p| count as f64 * p / PER_MILLION)
+            }
+        };
 
         if let (Some(output), Some(price)) = (tokens.output, images.output()) {
             cost.output = per(output, Some(price));
             cost.missing.retain(|c| *c != Component::Output);
         }
-        let detail = |key: &str| input_details.and_then(|d| d.get(key)).and_then(serde_json::Value::as_i64);
-        let parts = [(detail("text_tokens"), text_input), (detail("image_tokens"), images.input().or(text_input))];
+        let detail = |key: &str| {
+            input_details
+                .and_then(|d| d.get(key))
+                .and_then(serde_json::Value::as_i64)
+        };
+        let parts = [
+            (detail("text_tokens"), text_input),
+            (detail("image_tokens"), images.input().or(text_input)),
+        ];
         if parts.iter().any(|(count, _)| count.is_some()) {
             cost.missing.retain(|c| *c != Component::Input);
-            if parts.iter().any(|(count, price)| count.unwrap_or(0) > 0 && price.is_none()) {
+            if parts
+                .iter()
+                .any(|(count, price)| count.unwrap_or(0) > 0 && price.is_none())
+            {
                 cost.input = None;
                 cost.missing.push(Component::Input);
             } else {
-                cost.input = Some(parts.iter().filter_map(|(count, price)| per(count.unwrap_or(0), *price)).sum());
+                cost.input = Some(
+                    parts
+                        .iter()
+                        .filter_map(|(count, price)| per(count.unwrap_or(0), *price))
+                        .sum(),
+                );
             }
         }
         cost
@@ -219,13 +288,24 @@ impl Cost {
     /// model's audio token prices, falling back to its text prices; cache and thinking stay text.
     pub fn audio(tokens: &Tokens, model: Option<&Model>) -> Cost {
         let mut cost = Cost::new(tokens, model, Tier::Standard);
-        let audio = model.and_then(|m| m.pricing.audio_tokens.clone()).unwrap_or_default();
+        let audio = model
+            .and_then(|m| m.pricing.audio_tokens.clone())
+            .unwrap_or_default();
         for (component, count, price) in [
             (Component::Input, tokens.input, audio.input()),
             (Component::Output, tokens.output, audio.output()),
         ] {
-            let (Some(count), Some(price)) = (count, price) else { continue };
-            cost.set(component, Some(if count == 0 { 0.0 } else { count as f64 * price / PER_MILLION }));
+            let (Some(count), Some(price)) = (count, price) else {
+                continue;
+            };
+            cost.set(
+                component,
+                Some(if count == 0 {
+                    0.0
+                } else {
+                    count as f64 * price / PER_MILLION
+                }),
+            );
             cost.missing.retain(|c| *c != component);
         }
         cost
@@ -282,7 +362,10 @@ impl Pricer<'_> {
         else {
             return false;
         };
-        match tier.and_then(|t| t.output_per_million).or_else(|| self.text.output()) {
+        match tier
+            .and_then(|t| t.output_per_million)
+            .or_else(|| self.text.output())
+        {
             None => true,
             Some(output) => reasoning != output,
         }
@@ -294,19 +377,33 @@ impl Pricer<'_> {
             Component::Output => self.tokens.output,
             Component::CacheRead => self.tokens.cache_read,
             Component::CacheWrite => self.tokens.cache_write,
-            Component::Thinking => self.thinking_priced_separately().then_some(self.tokens.thinking).flatten(),
+            Component::Thinking => self
+                .thinking_priced_separately()
+                .then_some(self.tokens.thinking)
+                .flatten(),
         }
     }
 
     fn price_for(&self, component: Component) -> Option<f64> {
         let tier = self.applicable_tier();
-        let pick = |f: fn(&PricingTier) -> Option<f64>, standard: Option<f64>| tier.and_then(f).or(standard);
+        let pick = |f: fn(&PricingTier) -> Option<f64>, standard: Option<f64>| {
+            tier.and_then(f).or(standard)
+        };
         match component {
             Component::Input => pick(|t| t.input_per_million, self.text.input()),
             Component::Output => pick(|t| t.output_per_million, self.text.output()),
-            Component::CacheRead => pick(|t| t.cache_read_input_per_million, self.text.cache_read_input()),
-            Component::CacheWrite => pick(|t| t.cache_write_input_per_million, self.text.cache_write_input()),
-            Component::Thinking => pick(|t| t.reasoning_output_per_million, self.text.reasoning_output()),
+            Component::CacheRead => pick(
+                |t| t.cache_read_input_per_million,
+                self.text.cache_read_input(),
+            ),
+            Component::CacheWrite => pick(
+                |t| t.cache_write_input_per_million,
+                self.text.cache_write_input(),
+            ),
+            Component::Thinking => pick(
+                |t| t.reasoning_output_per_million,
+                self.text.reasoning_output(),
+            ),
         }
     }
 
@@ -350,14 +447,22 @@ mod tests {
     // chat_spec.rb: "keeps manually added messages out of the conversation totals" prices 1k in / 2k out at $0.005.
     #[test]
     fn prices_input_and_output_per_million() {
-        let tokens = Tokens { input: Some(1_000), output: Some(2_000), ..Default::default() };
+        let tokens = Tokens {
+            input: Some(1_000),
+            output: Some(2_000),
+            ..Default::default()
+        };
         let cost = Cost::new(&tokens, Some(&priced(1.0, 2.0)), Tier::Standard);
         assert!((cost.total().unwrap() - 0.005).abs() < 1e-12);
     }
 
     #[test]
     fn an_unpriced_component_with_tokens_makes_the_total_unknown() {
-        let tokens = Tokens { input: Some(1_000), cache_read: Some(500), ..Default::default() };
+        let tokens = Tokens {
+            input: Some(1_000),
+            cache_read: Some(500),
+            ..Default::default()
+        };
         let cost = Cost::new(&tokens, Some(&priced(1.0, 2.0)), Tier::Standard);
         assert_eq!(cost.missing(), &[Component::CacheRead]);
         assert_eq!(cost.total(), None);
@@ -365,6 +470,9 @@ mod tests {
 
     #[test]
     fn no_usage_means_no_total() {
-        assert_eq!(Cost::new(&Tokens::default(), None, Tier::Standard).total(), None);
+        assert_eq!(
+            Cost::new(&Tokens::default(), None, Tier::Standard).total(),
+            None
+        );
     }
 }

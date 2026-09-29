@@ -147,9 +147,14 @@ impl Model {
                 input: vec!["text".into(), "image".into()],
                 output: vec!["text".into()],
             },
-            capabilities: ["function_calling", "streaming", "vision", "structured_output"]
-                .map(String::from)
-                .to_vec(),
+            capabilities: [
+                "function_calling",
+                "streaming",
+                "vision",
+                "structured_output",
+            ]
+            .map(String::from)
+            .to_vec(),
             pricing: Pricing::default(),
             metadata,
             unlisted_at: None,
@@ -165,7 +170,11 @@ impl Model {
     }
 
     pub fn label(&self) -> String {
-        format!("{} - {}", crate::providers::display_name(&self.provider), self.name)
+        format!(
+            "{} - {}",
+            crate::providers::display_name(&self.provider),
+            self.name
+        )
     }
 
     /// Reasoning controls the model accepts (`metadata.reasoning_options`).
@@ -188,7 +197,11 @@ impl Model {
             .and_then(|o| o.get("values").and_then(Value::as_array).cloned())
             .map(|v| {
                 v.iter()
-                    .map(|x| x.as_str().map(str::to_string).unwrap_or_else(|| x.to_string()))
+                    .map(|x| {
+                        x.as_str()
+                            .map(str::to_string)
+                            .unwrap_or_else(|| x.to_string())
+                    })
                     .collect()
             })
             .unwrap_or_default()

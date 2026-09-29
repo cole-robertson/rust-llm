@@ -68,7 +68,11 @@ pub mod messages {
 
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
     pub enum Relation {
-        #[sea_orm(belongs_to = "super::chats::Entity", from = "Column::ChatId", to = "super::chats::Column::Id")]
+        #[sea_orm(
+            belongs_to = "super::chats::Entity",
+            from = "Column::ChatId",
+            to = "super::chats::Column::Id"
+        )]
         Chat,
     }
 

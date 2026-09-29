@@ -24,7 +24,9 @@ pub struct Connection {
 
 impl std::fmt::Debug for Connection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Connection").field("provider", &self.provider.slug()).finish()
+        f.debug_struct("Connection")
+            .field("provider", &self.provider.slug())
+            .finish()
     }
 }
 
@@ -55,7 +57,10 @@ impl SseParser {
             }
             if line.is_empty() {
                 if !self.data.is_empty() {
-                    events.push(SseEvent { event: self.event.take(), data: self.data.join("\n") });
+                    events.push(SseEvent {
+                        event: self.event.take(),
+                        data: self.data.join("\n"),
+                    });
                     self.data.clear();
                 }
                 self.event = None;
@@ -80,7 +85,10 @@ impl SseParser {
     pub(crate) fn finish(&mut self) -> Vec<SseEvent> {
         let mut events = self.feed("\n\n");
         if !self.data.is_empty() {
-            events.push(SseEvent { event: self.event.take(), data: self.data.join("\n") });
+            events.push(SseEvent {
+                event: self.event.take(),
+                data: self.data.join("\n"),
+            });
             self.data.clear();
         }
         events
@@ -90,7 +98,11 @@ impl SseParser {
 impl Connection {
     pub fn new(provider: Provider, config: std::sync::Arc<Config>) -> Result<Connection> {
         let client = basic(&config)?;
-        Ok(Connection { client, provider, config })
+        Ok(Connection {
+            client,
+            provider,
+            config,
+        })
     }
 
     pub fn client(&self) -> &reqwest::Client {
@@ -106,7 +118,11 @@ impl Connection {
             return Ok(path.to_string());
         }
         let base = self.provider.api_base(&self.config)?;
-        Ok(format!("{}/{}", base.trim_end_matches('/'), path.trim_start_matches('/')))
+        Ok(format!(
+            "{}/{}",
+            base.trim_end_matches('/'),
+            path.trim_start_matches('/')
+        ))
     }
 
     /// `additional_headers.merge(req.headers)`: request headers (a chat's `with_headers`, betas)
@@ -114,13 +130,21 @@ impl Connection {
     /// is case-insensitive like Faraday's header hash.
     fn merged_headers(&self, extra: &[(String, String)]) -> Vec<(String, String)> {
         let provider = self.provider.headers(&self.config);
-        let mut headers: Vec<(String, String)> =
-            extra.iter().filter(|(k, _)| !provider.iter().any(|(p, _)| p.eq_ignore_ascii_case(k))).cloned().collect();
+        let mut headers: Vec<(String, String)> = extra
+            .iter()
+            .filter(|(k, _)| !provider.iter().any(|(p, _)| p.eq_ignore_ascii_case(k)))
+            .cloned()
+            .collect();
         headers.extend(provider);
         headers
     }
 
-    fn request(&self, url: &str, payload: &Value, extra: &[(String, String)]) -> reqwest::RequestBuilder {
+    fn request(
+        &self,
+        url: &str,
+        payload: &Value,
+        extra: &[(String, String)],
+    ) -> reqwest::RequestBuilder {
         let mut req = self.client.post(url).json(payload);
         for (k, v) in self.merged_headers(extra) {
             req = req.header(k, v);
@@ -131,9 +155,13 @@ impl Connection {
     /// faraday-retry's `calculate_sleep_amount`: a `Retry-After` longer than `retry_max_interval`
     /// means "don't retry" (`None`); otherwise wait the longer of it and the jittered backoff.
     fn backoff(&self, attempt: u32, retry_after: Option<f64>) -> Option<Duration> {
-        let current = (self.config.retry_interval * self.config.retry_backoff_factor.powi(attempt as i32))
-            .min(self.config.retry_max_interval);
-        let interval = current + rand::random::<f64>() * self.config.retry_interval_randomness * self.config.retry_interval;
+        let current = (self.config.retry_interval
+            * self.config.retry_backoff_factor.powi(attempt as i32))
+        .min(self.config.retry_max_interval);
+        let interval = current
+            + rand::random::<f64>()
+                * self.config.retry_interval_randomness
+                * self.config.retry_interval;
         match retry_after {
             Some(after) if after > self.config.retry_max_interval => None,
             Some(after) if after >= interval => Some(Duration::from_secs_f64(after)),
@@ -142,7 +170,12 @@ impl Connection {
     }
 
     /// Whether to retry after `error` on attempt `attempt`, and how long to wait first.
-    fn retry_delay(&self, error: &Error, attempt: u32, retry_after: Option<f64>) -> Option<Duration> {
+    fn retry_delay(
+        &self,
+        error: &Error,
+        attempt: u32,
+        retry_after: Option<f64>,
+    ) -> Option<Duration> {
         if !error.retryable() || attempt >= self.config.max_retries {
             return None;
         }
@@ -156,7 +189,8 @@ impl Connection {
         extra: &[(String, String)],
         on_attempt: &mut (dyn FnMut(Option<&Error>) + Send),
     ) -> Result<reqwest::Response> {
-        self.send_built(&|| self.request(url, payload, extra), true, on_attempt).await
+        self.send_built(&|| self.request(url, payload, extra), true, on_attempt)
+            .await
     }
 
     /// Sends the request `build` makes, retrying it under the rules above when `retry` is set.
@@ -167,15 +201,26 @@ impl Connection {
         on_attempt: &mut (dyn FnMut(Option<&Error>) + Send),
     ) -> Result<reqwest::Response> {
         // `instrument_request`: one `request.rust_llm` around the call and its retries.
-        let mut event = crate::instrumentation::Event::start(&self.config, "request.rust_llm", || {
-            let request = build().build().ok();
-            crate::instrumentation::payload([
-                ("provider", self.provider.slug().into()),
-                ("method", request.as_ref().map(|r| r.method().as_str().to_lowercase()).into()),
-                ("url", request.as_ref().map(|r| r.url().to_string()).into()),
-            ])
-        });
-        let result = tracing::Instrument::instrument(self.send_attempts(build, retry, on_attempt), event.span()).await;
+        let mut event =
+            crate::instrumentation::Event::start(&self.config, "request.rust_llm", || {
+                let request = build().build().ok();
+                crate::instrumentation::payload([
+                    ("provider", self.provider.slug().into()),
+                    (
+                        "method",
+                        request
+                            .as_ref()
+                            .map(|r| r.method().as_str().to_lowercase())
+                            .into(),
+                    ),
+                    ("url", request.as_ref().map(|r| r.url().to_string()).into()),
+                ])
+            });
+        let result = tracing::Instrument::instrument(
+            self.send_attempts(build, retry, on_attempt),
+            event.span(),
+        )
+        .await;
         let status = match &result {
             Ok(resp) => Some(resp.status().as_u16()),
             Err(e) => e.response().map(|r| r.status),
@@ -206,14 +251,27 @@ impl Connection {
                     apply_retry_delay(Some(self.provider), status, &mut headers);
                     let body = resp.text().await.unwrap_or_default();
                     let message = self.provider.parse_error(&body);
-                    (error_for_status_message(status, &body, message), retry_after_secs(&headers))
+                    (
+                        error_for_status_message(status, &body, message),
+                        retry_after_secs(&headers),
+                    )
                 }
                 Err(e) if e.is_timeout() => (Error::Timeout(e.to_string()), None),
                 Err(e) => (Error::ConnectionFailed(e.to_string()), None),
             };
-            let delay = if retry { self.retry_delay(&error, attempt, retry_after) } else { None };
-            let Some(delay) = delay else { return Err(error) };
-            tracing::debug!(provider = self.provider.slug(), attempt, "retrying after {error}");
+            let delay = if retry {
+                self.retry_delay(&error, attempt, retry_after)
+            } else {
+                None
+            };
+            let Some(delay) = delay else {
+                return Err(error);
+            };
+            tracing::debug!(
+                provider = self.provider.slug(),
+                attempt,
+                "retrying after {error}"
+            );
             tokio::time::sleep(delay).await;
             previous = Some(error);
             attempt += 1;
@@ -230,15 +288,28 @@ impl Connection {
         on_attempt: &mut (dyn FnMut(Option<&Error>) + Send),
     ) -> Result<RawResponse> {
         let url = self.url(path)?;
-        let resp = self.send_with_retry(&url, payload, extra, on_attempt).await?;
+        let resp = self
+            .send_with_retry(&url, payload, extra, on_attempt)
+            .await?;
         let status = resp.status().as_u16();
         let headers = header_pairs(&resp);
-        let text = resp.text().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| Error::ConnectionFailed(e.to_string()))?;
         if text.trim().is_empty() {
-            return Err(Error::Api("Provider returned an empty response body".into(), None));
+            return Err(Error::Api(
+                "Provider returned an empty response body".into(),
+                None,
+            ));
         }
         let body: Value = serde_json::from_str(&text).unwrap_or(Value::String(text));
-        Ok(RawResponse { status, headers, body, request_body: payload.to_string().into() })
+        Ok(RawResponse {
+            status,
+            headers,
+            body,
+            request_body: payload.to_string().into(),
+        })
     }
 
     /// `Connection#post` with a multipart body, for Files and Batches uploads. `form` builds a fresh
@@ -252,30 +323,56 @@ impl Connection {
         extra: &[(String, String)],
         idempotent: bool,
     ) -> Result<RawResponse> {
-        let resp = self.send(reqwest::Method::POST, path, extra, idempotent, &|req| req.multipart(form())).await?;
+        let resp = self
+            .send(reqwest::Method::POST, path, extra, idempotent, &|req| {
+                req.multipart(form())
+            })
+            .await?;
         json_response(resp, Value::Null).await
     }
 
     /// `Connection#get`, parsing a JSON response. GETs retry like any idempotent request.
     pub async fn get(&self, path: &str, extra: &[(String, String)]) -> Result<RawResponse> {
-        let resp = self.send(reqwest::Method::GET, path, extra, true, &|req| req).await?;
+        let resp = self
+            .send(reqwest::Method::GET, path, extra, true, &|req| req)
+            .await?;
         json_response(resp, Value::Null).await
     }
 
     /// `Connection#get` for a binary body, such as a file download.
     pub async fn get_bytes(&self, path: &str, extra: &[(String, String)]) -> Result<Vec<u8>> {
-        let resp = self.send(reqwest::Method::GET, path, extra, true, &|req| req).await?;
-        Ok(resp.bytes().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?.to_vec())
+        let resp = self
+            .send(reqwest::Method::GET, path, extra, true, &|req| req)
+            .await?;
+        Ok(resp
+            .bytes()
+            .await
+            .map_err(|e| Error::ConnectionFailed(e.to_string()))?
+            .to_vec())
     }
 
     /// `Connection#delete`, parsing a JSON response if there is one.
     pub async fn delete(&self, path: &str, extra: &[(String, String)]) -> Result<RawResponse> {
-        let resp = self.send(reqwest::Method::DELETE, path, extra, true, &|req| req).await?;
+        let resp = self
+            .send(reqwest::Method::DELETE, path, extra, true, &|req| req)
+            .await?;
         let status = resp.status().as_u16();
         let headers = header_pairs(&resp);
-        let text = resp.text().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
-        let body = if text.trim().is_empty() { Value::Null } else { serde_json::from_str(&text).unwrap_or(Value::String(text)) };
-        Ok(RawResponse { status, headers, body, request_body: Default::default() })
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| Error::ConnectionFailed(e.to_string()))?;
+        let body = if text.trim().is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_str(&text).unwrap_or(Value::String(text))
+        };
+        Ok(RawResponse {
+            status,
+            headers,
+            body,
+            request_body: Default::default(),
+        })
     }
 
     /// Any request with the provider's headers plus `extra`, with errors mapped like `post`.
@@ -288,7 +385,8 @@ impl Connection {
         retry: bool,
         body: &(dyn Fn(reqwest::RequestBuilder) -> reqwest::RequestBuilder + Send + Sync),
     ) -> Result<reqwest::Response> {
-        self.send_tracked(method, path, extra, retry, body, &mut |_| {}).await
+        self.send_tracked(method, path, extra, retry, body, &mut |_| {})
+            .await
     }
 
     /// `send` with `on_attempt` firing before every attempt, like `post`, so the usage ledger can
@@ -331,17 +429,36 @@ impl Connection {
         let mut stream_error: Option<Error> = None;
         loop {
             let mut first = stream_error.take();
-            let mut forward = |previous: Option<&Error>| on_attempt(previous.or(first.take().as_ref()));
-            let resp = self.send_with_retry(&url, payload, extra, &mut forward).await?;
+            let mut forward =
+                |previous: Option<&Error>| on_attempt(previous.or(first.take().as_ref()));
+            let resp = self
+                .send_with_retry(&url, payload, extra, &mut forward)
+                .await?;
             let status = resp.status().as_u16();
             let headers = header_pairs(&resp);
             let mut delivered = false;
-            match self.read_stream(resp, on_event, streaming_error, &mut delivered).await {
-                Ok(()) => return Ok(RawResponse { status, headers, body: Value::Null, request_body: payload.to_string().into() }),
+            match self
+                .read_stream(resp, on_event, streaming_error, &mut delivered)
+                .await
+            {
+                Ok(()) => {
+                    return Ok(RawResponse {
+                        status,
+                        headers,
+                        body: Value::Null,
+                        request_body: payload.to_string().into(),
+                    });
+                }
                 Err(error) if delivered => return Err(error),
                 Err(error) => {
-                    let Some(delay) = self.retry_delay(&error, attempt, None) else { return Err(error) };
-                    tracing::debug!(provider = self.provider.slug(), attempt, "retrying stream after {error}");
+                    let Some(delay) = self.retry_delay(&error, attempt, None) else {
+                        return Err(error);
+                    };
+                    tracing::debug!(
+                        provider = self.provider.slug(),
+                        attempt,
+                        "retrying stream after {error}"
+                    );
                     tokio::time::sleep(delay).await;
                     stream_error = Some(error);
                     attempt += 1;
@@ -372,7 +489,11 @@ impl Connection {
                 || data.get("type").and_then(Value::as_str) == Some("error");
             if is_error {
                 let code = streaming_error(&event.data).unwrap_or(500);
-                return Err(error_for_status_message(code, &event.data, self.provider.parse_error(&event.data)));
+                return Err(error_for_status_message(
+                    code,
+                    &event.data,
+                    self.provider.parse_error(&event.data),
+                ));
             }
             *delivered = true;
             on_event(event, data)
@@ -391,22 +512,45 @@ impl Connection {
 }
 
 /// Reads a JSON body the way `post` does: an empty body is an error, a non-JSON one a string.
-pub(crate) async fn json_response(resp: reqwest::Response, request_body: Value) -> Result<RawResponse> {
-    let request_body: std::sync::Arc<str> = if request_body.is_null() { "".into() } else { request_body.to_string().into() };
+pub(crate) async fn json_response(
+    resp: reqwest::Response,
+    request_body: Value,
+) -> Result<RawResponse> {
+    let request_body: std::sync::Arc<str> = if request_body.is_null() {
+        "".into()
+    } else {
+        request_body.to_string().into()
+    };
     let status = resp.status().as_u16();
     let headers = header_pairs(&resp);
-    let text = resp.text().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| Error::ConnectionFailed(e.to_string()))?;
     if text.trim().is_empty() {
-        return Err(Error::Api("Provider returned an empty response body".into(), None));
+        return Err(Error::Api(
+            "Provider returned an empty response body".into(),
+            None,
+        ));
     }
     let body: Value = serde_json::from_str(&text).unwrap_or(Value::String(text));
-    Ok(RawResponse { status, headers, body, request_body })
+    Ok(RawResponse {
+        status,
+        headers,
+        body,
+        request_body,
+    })
 }
 
 fn header_pairs(resp: &reqwest::Response) -> Vec<(String, String)> {
     resp.headers()
         .iter()
-        .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap_or_default().to_string()))
+        .map(|(k, v)| {
+            (
+                k.as_str().to_string(),
+                v.to_str().unwrap_or_default().to_string(),
+            )
+        })
         .collect()
 }
 
@@ -415,21 +559,35 @@ fn header_pairs(resp: &reqwest::Response) -> Vec<(String, String)> {
 /// (attachment URLs, hosted images and videos), each with the configuration it came from.
 pub fn basic(config: &Config) -> Result<reqwest::Client> {
     let mut builder = reqwest::Client::builder().timeout(config.request_timeout);
-    if let Some(proxy) = config.http_proxy.as_deref().filter(|p| !p.trim().is_empty()) {
-        builder = builder.proxy(reqwest::Proxy::all(proxy).map_err(|e| Error::Configuration(e.to_string()))?);
+    if let Some(proxy) = config
+        .http_proxy
+        .as_deref()
+        .filter(|p| !p.trim().is_empty())
+    {
+        builder = builder
+            .proxy(reqwest::Proxy::all(proxy).map_err(|e| Error::Configuration(e.to_string()))?);
     }
-    builder.build().map_err(|e| Error::Configuration(e.to_string()))
+    builder
+        .build()
+        .map_err(|e| Error::Configuration(e.to_string()))
 }
 
 fn header<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str> {
-    headers.iter().find(|(k, _)| k.eq_ignore_ascii_case(name)).map(|(_, v)| v.as_str())
+    headers
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case(name))
+        .map(|(_, v)| v.as_str())
 }
 
 /// `ErrorMiddleware#apply_retry_delay` (`transport/error_middleware.rb`): the retry loop only
 /// reads the standard `Retry-After`, so on a failed response (status >= 400) without one, a
 /// `retry-after-ms` delay (finite, not negative) or else, on a 429, the provider's own reset hint
 /// (`Provider#retry_delay`) is written into `Retry-After` as seconds (`Float#to_s`).
-pub fn apply_retry_delay(provider: Option<Provider>, status: u16, headers: &mut Vec<(String, String)>) {
+pub fn apply_retry_delay(
+    provider: Option<Provider>,
+    status: u16,
+    headers: &mut Vec<(String, String)>,
+) {
     if status < 400 || header(headers, "retry-after").is_some() {
         return;
     }
@@ -437,7 +595,13 @@ pub fn apply_retry_delay(provider: Option<Provider>, status: u16, headers: &mut 
         .and_then(|v| v.trim().parse::<f64>().ok())
         .filter(|ms| ms.is_finite() && *ms >= 0.0)
         .map(|ms| ms / 1000.0);
-    let delay = millis.or_else(|| if status == 429 { provider.and_then(|p| p.retry_delay(headers)) } else { None });
+    let delay = millis.or_else(|| {
+        if status == 429 {
+            provider.and_then(|p| p.retry_delay(headers))
+        } else {
+            None
+        }
+    });
     if let Some(delay) = delay {
         headers.push(("Retry-After".into(), format!("{delay:?}")));
     }
@@ -450,7 +614,10 @@ fn retry_after_secs(headers: &[(String, String)]) -> Option<f64> {
         .iter()
         .filter_map(|name| header(headers, name))
         .map(|v| match chrono::DateTime::parse_from_rfc2822(v.trim()) {
-            Ok(at) => (at.with_timezone(&chrono::Utc) - chrono::Utc::now()).num_milliseconds() as f64 / 1000.0,
+            Ok(at) => {
+                (at.with_timezone(&chrono::Utc) - chrono::Utc::now()).num_milliseconds() as f64
+                    / 1000.0
+            }
             Err(_) => v.trim().parse::<f64>().unwrap_or(0.0),
         })
         .reduce(f64::max)

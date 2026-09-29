@@ -9,10 +9,16 @@ mod support;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use rust_llm::batch::{batch_cost, mistral_batch_endpoint, openai_batch_protocol_for_endpoint, openai_batch_protocol_name_for};
+use rust_llm::batch::{
+    batch_cost, mistral_batch_endpoint, openai_batch_protocol_for_endpoint,
+    openai_batch_protocol_name_for,
+};
 use rust_llm::cost::Component;
 use rust_llm::model::{Pricing, PricingCategory, PricingTier};
-use rust_llm::{Batch, BatchStatus, Chat, Config, EmbedOptions, Error, Model, ProtocolName, Provider, Tokens, Vectors, embed_later};
+use rust_llm::{
+    Batch, BatchStatus, Chat, Config, EmbedOptions, Error, Model, ProtocolName, Provider, Tokens,
+    Vectors, embed_later,
+};
 use serde_json::{Value, json};
 use support::{Cassette, config_for};
 use wiremock::matchers::{method, path};
@@ -21,23 +27,37 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 // ---- helpers ------------------------------------------------------------------------------------
 
 fn tier(input: Option<f64>, output: Option<f64>) -> PricingTier {
-    PricingTier { input_per_million: input, output_per_million: output, ..Default::default() }
+    PricingTier {
+        input_per_million: input,
+        output_per_million: output,
+        ..Default::default()
+    }
 }
 
 /// `RubyLLM::Model.new(id:, name:, provider:, pricing: { text_tokens: category })`.
 fn model_with(id: &str, provider: &str, category: PricingCategory) -> Model {
     let mut model = Model::default_for(id, provider);
-    model.pricing = Pricing { text_tokens: Some(category), ..Default::default() };
+    model.pricing = Pricing {
+        text_tokens: Some(category),
+        ..Default::default()
+    };
     model
 }
 
 /// The spec's `let(:pricing)`: $1 in / $5 out per million.
 fn standard_pricing() -> PricingCategory {
-    PricingCategory { standard: Some(tier(Some(1.0), Some(5.0))), ..Default::default() }
+    PricingCategory {
+        standard: Some(tier(Some(1.0), Some(5.0))),
+        ..Default::default()
+    }
 }
 
 fn tokens(input: i64, output: i64) -> Tokens {
-    Tokens { input: Some(input), output: Some(output), ..Default::default() }
+    Tokens {
+        input: Some(input),
+        output: Some(output),
+        ..Default::default()
+    }
 }
 
 fn close(actual: Option<f64>, expected: f64) -> bool {
@@ -48,7 +68,10 @@ fn close(actual: Option<f64>, expected: f64) -> bool {
 fn config(server: &MockServer) -> Arc<Config> {
     let mut c = Config::default();
     for provider in ["openai", "mistral", "xai"] {
-        c.set(format!("{provider}_api_base"), format!("{}/v1", server.uri()));
+        c.set(
+            format!("{provider}_api_base"),
+            format!("{}/v1", server.uri()),
+        );
         c.set(format!("{provider}_api_key"), "test-key");
     }
     c.max_retries = 0;
@@ -56,7 +79,11 @@ fn config(server: &MockServer) -> Arc<Config> {
 }
 
 async fn get(server: &MockServer, at: &str, body: Value) {
-    Mock::given(method("GET")).and(path(at)).respond_with(ResponseTemplate::new(200).set_body_json(body)).mount(server).await;
+    Mock::given(method("GET"))
+        .and(path(at))
+        .respond_with(ResponseTemplate::new(200).set_body_json(body))
+        .mount(server)
+        .await;
 }
 
 async fn received(server: &MockServer, verb: &str, at: &str) -> Vec<wiremock::Request> {
@@ -70,16 +97,21 @@ async fn received(server: &MockServer, verb: &str, at: &str) -> Vec<wiremock::Re
 }
 
 fn content(message: &Option<rust_llm::Message>) -> String {
-    message.as_ref().map(|m| m.content().to_string()).unwrap_or_default()
+    message
+        .as_ref()
+        .map(|m| m.content().to_string())
+        .unwrap_or_default()
 }
-
 
 // ---- provider_spec.rb #batch_cost ---------------------------------------------------------------
 
 // spec: provider_spec.rb:211 #batch_cost > prices thinking billed as output at the batch rate
 #[test]
 fn prices_thinking_billed_as_output_at_the_batch_rate() {
-    let thinking_tokens = Tokens { thinking: Some(500), ..tokens(1_000, 2_000) };
+    let thinking_tokens = Tokens {
+        thinking: Some(500),
+        ..tokens(1_000, 2_000)
+    };
     let model = model_with("test-model", "openai", standard_pricing());
 
     let cost = batch_cost(Provider::OpenAI, &thinking_tokens, &model);
@@ -91,22 +123,37 @@ fn prices_thinking_billed_as_output_at_the_batch_rate() {
 // spec: provider_spec.rb:222 #batch_cost > prices thinking billed as output at an explicit batch rate
 #[test]
 fn prices_thinking_billed_as_output_at_an_explicit_batch_rate() {
-    let explicit = PricingCategory { batch: Some(tier(Some(0.4), Some(2.0))), ..standard_pricing() };
+    let explicit = PricingCategory {
+        batch: Some(tier(Some(0.4), Some(2.0))),
+        ..standard_pricing()
+    };
     let model = model_with("test-model", "openai", explicit);
-    let thinking_tokens = Tokens { thinking: Some(500), ..tokens(1_000, 2_000) };
+    let thinking_tokens = Tokens {
+        thinking: Some(500),
+        ..tokens(1_000, 2_000)
+    };
 
-    assert!(close(batch_cost(Provider::OpenAI, &thinking_tokens, &model).total(), 0.0044));
+    assert!(close(
+        batch_cost(Provider::OpenAI, &thinking_tokens, &model).total(),
+        0.0044
+    ));
 }
 
 // spec: provider_spec.rb:236 #batch_cost > prices separately billed thinking at the batch rate
 #[test]
 fn prices_separately_billed_thinking_at_the_batch_rate() {
     let reasoning = PricingCategory {
-        standard: Some(PricingTier { reasoning_output_per_million: Some(10.0), ..tier(Some(1.0), Some(5.0)) }),
+        standard: Some(PricingTier {
+            reasoning_output_per_million: Some(10.0),
+            ..tier(Some(1.0), Some(5.0))
+        }),
         ..Default::default()
     };
     let model = model_with("test-model", "openai", reasoning);
-    let thinking_tokens = Tokens { thinking: Some(500), ..tokens(1_000, 2_000) };
+    let thinking_tokens = Tokens {
+        thinking: Some(500),
+        ..tokens(1_000, 2_000)
+    };
 
     let cost = batch_cost(Provider::OpenAI, &thinking_tokens, &model);
 
@@ -118,7 +165,10 @@ fn prices_separately_billed_thinking_at_the_batch_rate() {
 #[test]
 fn does_not_count_unused_components_as_missing_when_no_batch_rate_applies() {
     let model = model_with("test-model", "xai", standard_pricing());
-    let tokens = Tokens { cache_read: Some(0), ..tokens(1_000, 2_000) };
+    let tokens = Tokens {
+        cache_read: Some(0),
+        ..tokens(1_000, 2_000)
+    };
 
     let cost = batch_cost(Provider::XAI, &tokens, &model);
 
@@ -129,7 +179,10 @@ fn does_not_count_unused_components_as_missing_when_no_batch_rate_applies() {
 // spec: provider_spec.rb:273 #batch_cost > does not present a partial component sum as a complete batch cost
 #[test]
 fn does_not_present_a_partial_component_sum_as_a_complete_batch_cost() {
-    let partial = PricingCategory { standard: Some(tier(Some(1.0), None)), ..Default::default() };
+    let partial = PricingCategory {
+        standard: Some(tier(Some(1.0), None)),
+        ..Default::default()
+    };
     let model = model_with("test-model", "openai", partial);
 
     let cost = batch_cost(Provider::OpenAI, &tokens(1_000, 2_000), &model);
@@ -142,9 +195,15 @@ fn does_not_present_a_partial_component_sum_as_a_complete_batch_cost() {
 // spec: provider_spec.rb:291 #batch_cost > does not combine Gemini batch and context-cache discounts
 #[test]
 fn does_not_combine_gemini_batch_and_context_cache_discounts() {
-    let cached_tokens = Tokens { cache_read: Some(3_000), ..tokens(1_000, 2_000) };
+    let cached_tokens = Tokens {
+        cache_read: Some(3_000),
+        ..tokens(1_000, 2_000)
+    };
     let cached = PricingCategory {
-        standard: Some(PricingTier { cache_read_input_per_million: Some(0.1), ..tier(Some(1.0), Some(5.0)) }),
+        standard: Some(PricingTier {
+            cache_read_input_per_million: Some(0.1),
+            ..tier(Some(1.0), Some(5.0))
+        }),
         ..Default::default()
     };
     let model = model_with("gemini-test", "gemini", cached);
@@ -165,7 +224,6 @@ fn applies_the_batch_modifier_to_long_context_rates() {
         batch: Some(tier(Some(0.5), Some(2.5))),
         long_context: Some(tier(Some(2.0), Some(8.0))),
         long_context_threshold: Some(1_000),
-        ..Default::default()
     };
     let model = model_with("test-model", "anthropic", long_context);
 
@@ -204,7 +262,10 @@ async fn stored_openai_batch(endpoint: Option<&str>, line: Value) -> MockServer 
     get(&server, "/v1/batches/batch_1", batch).await;
     Mock::given(method("GET"))
         .and(path("/v1/files/file-out/content"))
-        .respond_with(ResponseTemplate::new(200).set_body_raw(format!("{line}\n"), "application/octet-stream"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_raw(format!("{line}\n"), "application/octet-stream"),
+        )
         .mount(&server)
         .await;
     server
@@ -217,38 +278,69 @@ async fn uses_responses_as_the_default_batch_protocol() {
     let mut config = (*config(&server)).clone();
     config.set("openai_protocol", "chat_completions");
 
-    let mut batch = Batch::find_with_config(Arc::new(config), "batch_1", Some("openai")).await.unwrap();
+    let mut batch = Batch::find_with_config(Arc::new(config), "batch_1", Some("openai"))
+        .await
+        .unwrap();
 
     // A batch with no endpoint on record reads its results as Responses, not the chat default.
-    assert_eq!(content(&batch.messages().await.unwrap()[0]), "From Responses");
+    assert_eq!(
+        content(&batch.messages().await.unwrap()[0]),
+        "From Responses"
+    );
 }
 
 // spec: provider_spec.rb:625 protocol resolution > routes OpenAI batches by rendered payload shape
 #[tokio::test]
 async fn routes_openai_batches_by_rendered_payload_shape() {
-    assert_eq!(openai_batch_protocol_name_for(&json!({ "input": [{ "role": "user", "content": "hi" }] })).unwrap(), "responses");
-    assert_eq!(openai_batch_protocol_name_for(&json!({ "messages": [] })).unwrap(), "chat_completions");
-    assert_eq!(openai_batch_protocol_name_for(&json!({ "model": "text-embedding-3-small", "input": "hi" })).unwrap(), "embeddings");
+    assert_eq!(
+        openai_batch_protocol_name_for(&json!({ "input": [{ "role": "user", "content": "hi" }] }))
+            .unwrap(),
+        "responses"
+    );
+    assert_eq!(
+        openai_batch_protocol_name_for(&json!({ "messages": [] })).unwrap(),
+        "chat_completions"
+    );
+    assert_eq!(
+        openai_batch_protocol_name_for(
+            &json!({ "model": "text-embedding-3-small", "input": "hi" })
+        )
+        .unwrap(),
+        "embeddings"
+    );
 
     // A Responses chat and a Chat Completions chat in one submission.
     let server = MockServer::start().await;
     let config = config(&server);
-    let mut responses = Chat::with_config(config.clone(), Some("gpt-5-nano"), Some("openai"), false).unwrap();
+    let mut responses =
+        Chat::with_config(config.clone(), Some("gpt-5-nano"), Some("openai"), false).unwrap();
     responses.ask_later("hi").unwrap();
-    let mut chat_completions =
-        Chat::with_config(config, Some("gpt-5-nano"), Some("openai"), false).unwrap().with_protocol(ProtocolName::ChatCompletions);
+    let mut chat_completions = Chat::with_config(config, Some("gpt-5-nano"), Some("openai"), false)
+        .unwrap()
+        .with_protocol(ProtocolName::ChatCompletions);
     chat_completions.ask_later("hi").unwrap();
 
-    let err = rust_llm::batch(vec![responses, chat_completions]).await.unwrap_err();
+    let err = rust_llm::batch(vec![responses, chat_completions])
+        .await
+        .unwrap_err();
 
     assert!(err.to_string().contains("one endpoint"), "{err}");
-    assert!(server.received_requests().await.unwrap_or_default().is_empty());
+    assert!(
+        server
+            .received_requests()
+            .await
+            .unwrap_or_default()
+            .is_empty()
+    );
 }
 
 // spec: providers/openai_batches_spec.rb:16 #batch_protocol_name_for > reads a Chat Completions payload
 #[test]
 fn reads_a_chat_completions_payload() {
-    assert_eq!(openai_batch_protocol_name_for(&json!({ "messages": [] })).unwrap(), "chat_completions");
+    assert_eq!(
+        openai_batch_protocol_name_for(&json!({ "messages": [] })).unwrap(),
+        "chat_completions"
+    );
 }
 
 // spec: providers/openai_batches_spec.rb:28 #batch_protocol_name_for > refuses a payload it cannot route
@@ -256,7 +348,10 @@ fn reads_a_chat_completions_payload() {
 fn refuses_a_payload_it_cannot_route() {
     let err = openai_batch_protocol_name_for(&json!({ "prompt": "hi" })).unwrap_err();
     assert!(matches!(&err, Error::Api(..)), "{err:?}");
-    assert_eq!(err.to_string(), "openai batch requests only support chat, responses, or embedding payloads");
+    assert_eq!(
+        err.to_string(),
+        "openai batch requests only support chat, responses, or embedding payloads"
+    );
 }
 
 // spec: providers/openai_batches_spec.rb:36 #batch_protocol_for_endpoint > routes both spellings of each batch endpoint
@@ -270,43 +365,73 @@ fn routes_both_spellings_of_each_batch_endpoint() {
         ("/v1/embeddings", "embeddings"),
         ("embeddings", "embeddings"),
     ] {
-        assert_eq!(openai_batch_protocol_for_endpoint(Some(endpoint)), Some(protocol), "{endpoint}");
+        assert_eq!(
+            openai_batch_protocol_for_endpoint(Some(endpoint)),
+            Some(protocol),
+            "{endpoint}"
+        );
     }
 }
 
 // spec: providers/openai_batches_spec.rb:49 #batch_protocol_for_endpoint > is nil for an endpoint it does not know
 #[test]
 fn is_none_for_an_endpoint_it_does_not_know() {
-    assert_eq!(openai_batch_protocol_for_endpoint(Some("/v1/moderations")), None);
+    assert_eq!(
+        openai_batch_protocol_for_endpoint(Some("/v1/moderations")),
+        None
+    );
     assert_eq!(openai_batch_protocol_for_endpoint(None), None);
 }
 
 // spec: providers/openai_batches_spec.rb:56 #batch_protocol_for_stored_batch > falls back to the default protocol when the endpoint is unknown
 #[tokio::test]
 async fn falls_back_to_the_default_protocol_when_the_endpoint_is_unknown() {
-    let server = stored_openai_batch(Some("/v1/moderations"), responses_line("0", "Read as Responses")).await;
+    let server = stored_openai_batch(
+        Some("/v1/moderations"),
+        responses_line("0", "Read as Responses"),
+    )
+    .await;
 
-    let mut batch = Batch::find_with_config(config(&server), "batch_1", Some("openai")).await.unwrap();
+    let mut batch = Batch::find_with_config(config(&server), "batch_1", Some("openai"))
+        .await
+        .unwrap();
 
     assert_eq!(batch.batch_protocol(), None);
-    assert_eq!(content(&batch.messages().await.unwrap()[0]), "Read as Responses");
+    assert_eq!(
+        content(&batch.messages().await.unwrap()[0]),
+        "Read as Responses"
+    );
 }
 
 // spec: providers/openai_batches_spec.rb:66 #batch_protocol_for_stored_batch > reads the protocol out of the stored endpoint
 #[tokio::test]
 async fn reads_the_protocol_out_of_the_stored_endpoint() {
-    let server = stored_openai_batch(Some("/v1/chat/completions"), chat_completions_line("0", "Read as Chat Completions")).await;
+    let server = stored_openai_batch(
+        Some("/v1/chat/completions"),
+        chat_completions_line("0", "Read as Chat Completions"),
+    )
+    .await;
 
-    let mut batch = Batch::find_with_config(config(&server), "batch_1", Some("openai")).await.unwrap();
+    let mut batch = Batch::find_with_config(config(&server), "batch_1", Some("openai"))
+        .await
+        .unwrap();
 
     assert_eq!(batch.batch_protocol(), Some("chat_completions"));
-    assert_eq!(content(&batch.messages().await.unwrap()[0]), "Read as Chat Completions");
+    assert_eq!(
+        content(&batch.messages().await.unwrap()[0]),
+        "Read as Chat Completions"
+    );
 }
 
 // ---- providers/mistral/chat_completions/batches_spec.rb -----------------------------------------
 
 fn mistral_options(config: &Arc<Config>) -> EmbedOptions<'static> {
-    EmbedOptions { model: Some("mistral-embed"), provider: Some("mistral"), config: Some(config.clone()), ..Default::default() }
+    EmbedOptions {
+        model: Some("mistral-embed"),
+        provider: Some("mistral"),
+        config: Some(config.clone()),
+        ..Default::default()
+    }
 }
 
 // spec: providers/mistral/chat_completions/batches_spec.rb:32 #create_batch > sends embedding jobs to the embeddings endpoint
@@ -315,7 +440,10 @@ async fn sends_embedding_jobs_to_the_embeddings_endpoint() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/v1/batch/jobs"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "id": "job_123", "status": "QUEUED" })))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "id": "job_123", "status": "QUEUED" })),
+        )
         .mount(&server)
         .await;
     let config = config(&server);
@@ -338,7 +466,8 @@ async fn sends_embedding_jobs_to_the_embeddings_endpoint() {
 // spec: providers/mistral/chat_completions/batches_spec.rb:50 #create_batch > rejects mixed chat and embedding requests
 #[test]
 fn rejects_mixed_chat_and_embedding_requests() {
-    let err = mistral_batch_endpoint(&[json!({ "input": "Ruby" }), json!({ "messages": [] })]).unwrap_err();
+    let err = mistral_batch_endpoint(&[json!({ "input": "Ruby" }), json!({ "messages": [] })])
+        .unwrap_err();
     assert!(matches!(&err, Error::Api(..)), "{err:?}");
     assert!(err.to_string().contains("cannot mix"), "{err}");
 }
@@ -349,7 +478,8 @@ async fn rejects_mixed_model_mistral_jobs() {
     let server = MockServer::start().await;
     let config = config(&server);
     let chats = ["mistral-small-latest", "mistral-large-latest"].map(|model| {
-        let mut chat = Chat::with_config(config.clone(), Some(model), Some("mistral"), false).unwrap();
+        let mut chat =
+            Chat::with_config(config.clone(), Some(model), Some("mistral"), false).unwrap();
         chat.ask_later("Hi").unwrap();
         chat
     });
@@ -358,16 +488,29 @@ async fn rejects_mixed_model_mistral_jobs() {
 
     assert!(matches!(&err, Error::Api(..)), "{err:?}");
     assert!(err.to_string().contains("one model"), "{err}");
-    assert!(server.received_requests().await.unwrap_or_default().is_empty());
+    assert!(
+        server
+            .received_requests()
+            .await
+            .unwrap_or_default()
+            .is_empty()
+    );
 }
 
 // spec: providers/mistral/chat_completions/batches_spec.rb:96 #parse_batch_response > leaves cancellation requests running
 #[tokio::test]
 async fn leaves_cancellation_requests_running() {
     let server = MockServer::start().await;
-    get(&server, "/v1/batch/jobs/job_123", json!({ "id": "job_123", "status": "CANCELLATION_REQUESTED" })).await;
+    get(
+        &server,
+        "/v1/batch/jobs/job_123",
+        json!({ "id": "job_123", "status": "CANCELLATION_REQUESTED" }),
+    )
+    .await;
 
-    let batch = Batch::find_with_config(config(&server), "job_123", Some("mistral")).await.unwrap();
+    let batch = Batch::find_with_config(config(&server), "job_123", Some("mistral"))
+        .await
+        .unwrap();
 
     assert!(!batch.is_complete());
     assert_eq!(batch.raw_status(), Some("CANCELLATION_REQUESTED"));
@@ -393,30 +536,52 @@ fn missing_job() -> ResponseTemplate {
 #[tokio::test]
 async fn retries_an_initial_missing_job_while_a_new_submission_becomes_visible() {
     let server = MockServer::start().await;
-    let found = ResponseTemplate::new(200).set_body_json(json!({ "id": "job_123", "status": "QUEUED" }));
+    let found =
+        ResponseTemplate::new(200).set_body_json(json!({ "id": "job_123", "status": "QUEUED" }));
     mistral_job_responses(&server, vec![missing_job(), found]).await;
     let started = Instant::now();
 
-    let batch = Batch::find_with_config(config(&server), "job_123", Some("mistral")).await.unwrap();
+    let batch = Batch::find_with_config(config(&server), "job_123", Some("mistral"))
+        .await
+        .unwrap();
 
     assert_eq!(batch.id(), "job_123");
     assert!(!batch.is_complete());
-    assert_eq!(received(&server, "GET", "/v1/batch/jobs/job_123").await.len(), 2);
+    assert_eq!(
+        received(&server, "GET", "/v1/batch/jobs/job_123")
+            .await
+            .len(),
+        2
+    );
     // `sleep(0.5)` before the one retry.
     let waited = started.elapsed();
-    assert!(waited >= Duration::from_millis(500) && waited < Duration::from_millis(1_500), "{waited:?}");
+    assert!(
+        waited >= Duration::from_millis(500) && waited < Duration::from_millis(1_500),
+        "{waited:?}"
+    );
 }
 
 // spec: providers/mistral/chat_completions/batches_spec.rb:126 #find_batch > raises when the job remains missing after bounded retries
 #[tokio::test]
 async fn raises_when_the_job_remains_missing_after_bounded_retries() {
     let server = MockServer::start().await;
-    Mock::given(method("GET")).and(path("/v1/batch/jobs/job_123")).respond_with(missing_job()).mount(&server).await;
+    Mock::given(method("GET"))
+        .and(path("/v1/batch/jobs/job_123"))
+        .respond_with(missing_job())
+        .mount(&server)
+        .await;
 
-    let err = Batch::find_with_config(config(&server), "job_123", Some("mistral")).await.unwrap_err();
+    let err = Batch::find_with_config(config(&server), "job_123", Some("mistral"))
+        .await
+        .unwrap_err();
 
     assert_eq!(err.response().map(|r| r.status), Some(404));
-    assert_eq!(received(&server, "GET", "/v1/batch/jobs/job_123").await.len(), 3);
+    assert_eq!(
+        received(&server, "GET", "/v1/batch/jobs/job_123")
+            .await
+            .len(),
+        3
+    );
 }
 
 // spec: providers/mistral/chat_completions/batches_spec.rb:134 #find_batch > does not retry permission errors
@@ -430,11 +595,21 @@ async fn does_not_retry_permission_errors() {
         .await;
     let started = Instant::now();
 
-    let err = Batch::find_with_config(config(&server), "job_123", Some("mistral")).await.unwrap_err();
+    let err = Batch::find_with_config(config(&server), "job_123", Some("mistral"))
+        .await
+        .unwrap_err();
 
     assert!(matches!(&err, Error::Forbidden(..)), "{err:?}");
-    assert_eq!(received(&server, "GET", "/v1/batch/jobs/job_123").await.len(), 1);
-    assert!(started.elapsed() < Duration::from_millis(500), "no sleep before giving up");
+    assert_eq!(
+        received(&server, "GET", "/v1/batch/jobs/job_123")
+            .await
+            .len(),
+        1
+    );
+    assert!(
+        started.elapsed() < Duration::from_millis(500),
+        "no sleep before giving up"
+    );
 }
 
 // spec: providers/mistral/chat_completions/batches_spec.rb:144 #parse_batch_result > preserves scalar and one-element array embedding shapes after reloading a job
@@ -449,7 +624,9 @@ async fn preserves_scalar_and_one_element_array_embedding_shapes_after_reloading
     get(&server, "/v1/batch/jobs/job_123", job).await;
 
     // Reloaded by id: the job's own custom ids are all that say which input was an array.
-    let mut batch = Batch::find_with_config(config(&server), "job_123", Some("mistral")).await.unwrap();
+    let mut batch = Batch::find_with_config(config(&server), "job_123", Some("mistral"))
+        .await
+        .unwrap();
     let results = batch.results().await.unwrap();
 
     let scalar = results[0].as_ref().and_then(|r| r.as_embedding()).unwrap();
@@ -469,7 +646,9 @@ async fn keeps_a_failed_embedding_request_in_its_original_slot() {
     ] });
     get(&server, "/v1/batch/jobs/job_123", job).await;
 
-    let mut batch = Batch::find_with_config(config(&server), "job_123", Some("mistral")).await.unwrap();
+    let mut batch = Batch::find_with_config(config(&server), "job_123", Some("mistral"))
+        .await
+        .unwrap();
     let results = batch.results().await.unwrap();
 
     assert!(results.iter().all(Option::is_none));
@@ -479,9 +658,11 @@ async fn keeps_a_failed_embedding_request_in_its_original_slot() {
 // spec: providers/mistral/chat_completions/batches_spec.rb:184 submits, reloads, and cancels an embedding batch
 #[tokio::test]
 async fn submits_reloads_and_cancels_an_embedding_batch() {
-    let cassette = Cassette::start("providers_mistral_chatcompletions_batches_submits_reloads_and_cancels_an_embedding_batch")
-        .await
-        .expect("cassette");
+    let cassette = Cassette::start(
+        "providers_mistral_chatcompletions_batches_submits_reloads_and_cancels_an_embedding_batch",
+    )
+    .await
+    .expect("cassette");
     let config = config_for(&cassette, "mistral");
     let requests = vec![
         embed_later("Ruby", mistral_options(&config)).unwrap(),
@@ -489,10 +670,15 @@ async fn submits_reloads_and_cancels_an_embedding_batch() {
     ];
     let mut batch = rust_llm::batch(requests).await.expect("submit");
 
-    let found = Batch::find_with_config(config, batch.id(), Some("mistral")).await.expect("find");
+    let found = Batch::find_with_config(config, batch.id(), Some("mistral"))
+        .await
+        .expect("find");
 
     assert_eq!(found.id(), batch.id());
-    assert_eq!(found.request_counts().and_then(|c| c.get("total")), Some(&json!(2)));
+    assert_eq!(
+        found.request_counts().and_then(|c| c.get("total")),
+        Some(&json!(2))
+    );
     if !batch.is_complete() {
         batch.cancel().await.expect("cancel");
     }
@@ -502,7 +688,12 @@ async fn submits_reloads_and_cancels_an_embedding_batch() {
 // ---- providers/xai/chat_completions/batches_spec.rb ---------------------------------------------
 
 async fn xai_batch(server: &MockServer, state: Value) {
-    get(server, "/v1/batches/batch_1", json!({ "batch_id": "batch_1", "state": state })).await;
+    get(
+        server,
+        "/v1/batches/batch_1",
+        json!({ "batch_id": "batch_1", "state": state }),
+    )
+    .await;
 }
 
 // spec: providers/xai/chat_completions/batches_spec.rb:43 #xai_batch_request > keeps the model per request so mixed-model batches remain request-scoped
@@ -522,8 +713,9 @@ async fn keeps_the_model_per_request_so_mixed_model_batches_remain_request_scope
     xai_batch(&server, json!({ "num_requests": 2, "num_pending": 2 })).await;
     let config = config(&server);
     let chats = ["grok-4.3", "grok-4.1"].map(|model| {
-        let mut chat =
-            Chat::with_config(config.clone(), Some(model), Some("xai"), true).unwrap().with_protocol(ProtocolName::ChatCompletions);
+        let mut chat = Chat::with_config(config.clone(), Some(model), Some("xai"), true)
+            .unwrap()
+            .with_protocol(ProtocolName::ChatCompletions);
         chat.ask_later("Hi").unwrap();
         chat
     });
@@ -536,7 +728,11 @@ async fn keeps_the_model_per_request_so_mixed_model_batches_remain_request_scope
         .as_array()
         .unwrap()
         .iter()
-        .map(|r| r.pointer("/batch_request/chat_get_completion/model").and_then(Value::as_str).unwrap_or_default())
+        .map(|r| {
+            r.pointer("/batch_request/chat_get_completion/model")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+        })
         .collect();
     assert_eq!(models, ["grok-4.3", "grok-4.1"]);
 }
@@ -547,7 +743,9 @@ async fn reports_a_state_carrying_an_error_as_failed_and_still_running() {
     let server = MockServer::start().await;
     get(&server, "/v1/batches/batch_1", json!({ "id": "batch_1", "state": { "num_requests": 2, "num_pending": 1, "error": "boom" } })).await;
 
-    let batch = Batch::find_with_config(config(&server), "batch_1", Some("xai")).await.unwrap();
+    let batch = Batch::find_with_config(config(&server), "batch_1", Some("xai"))
+        .await
+        .unwrap();
 
     assert_eq!(batch.raw_status(), Some("failed"));
     assert!(!batch.is_complete());
@@ -557,9 +755,16 @@ async fn reports_a_state_carrying_an_error_as_failed_and_still_running() {
 #[tokio::test]
 async fn falls_back_to_a_plain_status_field() {
     let server = MockServer::start().await;
-    get(&server, "/v1/batches/batch_1", json!({ "id": "batch_1", "status": "queued" })).await;
+    get(
+        &server,
+        "/v1/batches/batch_1",
+        json!({ "id": "batch_1", "status": "queued" }),
+    )
+    .await;
 
-    let batch = Batch::find_with_config(config(&server), "batch_1", Some("xai")).await.unwrap();
+    let batch = Batch::find_with_config(config(&server), "batch_1", Some("xai"))
+        .await
+        .unwrap();
 
     assert_eq!(batch.raw_status(), Some("queued"));
     assert!(!batch.is_complete());
@@ -569,7 +774,12 @@ async fn falls_back_to_a_plain_status_field() {
 async fn finished_xai_batch(count: i64, results: Value) -> MockServer {
     let server = MockServer::start().await;
     xai_batch(&server, json!({ "num_requests": count, "num_pending": 0 })).await;
-    get(&server, "/v1/batches/batch_1/results", json!({ "results": results })).await;
+    get(
+        &server,
+        "/v1/batches/batch_1/results",
+        json!({ "results": results }),
+    )
+    .await;
     server
 }
 
@@ -580,7 +790,9 @@ async fn reads_a_result_nested_directly_under_response() {
         "model": "grok-4.3", "choices": [{ "message": { "role": "assistant", "content": "Hi" } }] } } }]))
     .await;
 
-    let mut batch = Batch::find_with_config(config(&server), "batch_1", Some("xai")).await.unwrap();
+    let mut batch = Batch::find_with_config(config(&server), "batch_1", Some("xai"))
+        .await
+        .unwrap();
     let messages = batch.messages().await.unwrap();
 
     assert_eq!(content(&messages[3]), "Hi");
@@ -592,15 +804,24 @@ async fn reads_a_result_nested_directly_under_response() {
 // (batch_helpers_spec.rb:185); asserting it here too raced with parallel tests' tracing state.
 #[tokio::test]
 async fn warns_and_returns_no_message_for_a_failed_row() {
-    let server = finished_xai_batch(5, json!([{ "batch_request_id": "4", "error": "rate limited" }])).await;
-    let mut batch = Batch::find_with_config(config(&server), "batch_1", Some("xai")).await.unwrap();
+    let server = finished_xai_batch(
+        5,
+        json!([{ "batch_request_id": "4", "error": "rate limited" }]),
+    )
+    .await;
+    let mut batch = Batch::find_with_config(config(&server), "batch_1", Some("xai"))
+        .await
+        .unwrap();
 
     let messages = batch.messages().await.unwrap();
 
     assert!(messages[4].is_none());
     assert_eq!(batch.statuses()[4], Some(BatchStatus::Failed));
     assert_eq!(
-        rust_llm::batch::batch_error_message(&json!({ "batch_request_id": "4", "error": "rate limited" })).as_deref(),
+        rust_llm::batch::batch_error_message(
+            &json!({ "batch_request_id": "4", "error": "rate limited" })
+        )
+        .as_deref(),
         Some("rate limited"),
         "the failure detail the warning reports"
     );

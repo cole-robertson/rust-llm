@@ -37,15 +37,30 @@ pub struct InputRequest {
 impl InputRequest {
     pub fn new(key: impl Into<String>, params: Value) -> InputRequest {
         let s = |k: &str| params.get(k).and_then(Value::as_str).map(str::to_string);
-        let url = if s("mode").as_deref() == Some("url") { s("url") } else { None };
+        let url = if s("mode").as_deref() == Some("url") {
+            s("url")
+        } else {
+            None
+        };
         let fields = fields_from(params.get("requestedSchema").unwrap_or(&Value::Null));
-        InputRequest { key: key.into(), message: s("message"), url, fields, params, response: None, tool_call: None }
+        InputRequest {
+            key: key.into(),
+            message: s("message"),
+            url,
+            fields,
+            params,
+            response: None,
+            tool_call: None,
+        }
     }
 
     /// `InputRequest.from_h`.
     pub fn from_h(data: &Value, tool_call: Option<ToolCall>) -> InputRequest {
         let key = data.get("key").and_then(Value::as_str).unwrap_or("");
-        let mut request = InputRequest::new(key, data.get("params").cloned().unwrap_or_else(|| json!({})));
+        let mut request = InputRequest::new(
+            key,
+            data.get("params").cloned().unwrap_or_else(|| json!({})),
+        );
         request.response = data.get("response").filter(|r| !r.is_null()).cloned();
         request.tool_call = tool_call;
         request
@@ -92,8 +107,16 @@ impl InputRequest {
 }
 
 fn fields_from(schema: &Value) -> Vec<Field> {
-    let required: Vec<&str> = schema.get("required").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).collect();
-    let Some(properties) = schema.get("properties").and_then(Value::as_object) else { return Vec::new() };
+    let required: Vec<&str> = schema
+        .get("required")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect();
+    let Some(properties) = schema.get("properties").and_then(Value::as_object) else {
+        return Vec::new();
+    };
     properties
         .iter()
         .map(|(name, property)| {
@@ -137,7 +160,8 @@ pub struct InputState {
 impl InputState {
     /// `InputRequiredError#to_h`: serializes to JSON for persistence.
     pub fn to_h(&self) -> Value {
-        let mut h = json!({ "requests": self.requests.iter().map(InputRequest::to_h).collect::<Vec<_>>() });
+        let mut h =
+            json!({ "requests": self.requests.iter().map(InputRequest::to_h).collect::<Vec<_>>() });
         if let Some(state) = &self.request_state {
             h["request_state"] = state.clone();
         }
@@ -145,8 +169,17 @@ impl InputState {
     }
 
     pub fn from_h(data: &Value) -> InputState {
-        let requests = data.get("requests").and_then(Value::as_array).into_iter().flatten().map(|r| InputRequest::from_h(r, None)).collect();
-        InputState { requests, request_state: data.get("request_state").filter(|s| !s.is_null()).cloned() }
+        let requests = data
+            .get("requests")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .map(|r| InputRequest::from_h(r, None))
+            .collect();
+        InputState {
+            requests,
+            request_state: data.get("request_state").filter(|s| !s.is_null()).cloned(),
+        }
     }
 }
 
@@ -165,14 +198,27 @@ impl InputRequiredError {
             .requests
             .iter()
             .filter(|r| !r.is_answered())
-            .map(|r| [r.message.as_deref(), r.url.as_deref()].into_iter().flatten().collect::<Vec<_>>().join(" "))
+            .map(|r| {
+                [r.message.as_deref(), r.url.as_deref()]
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            })
             .collect();
-        InputRequiredError { message: format!("{server} needs input from the user: {}", asks.join("; ")), input }
+        InputRequiredError {
+            message: format!("{server} needs input from the user: {}", asks.join("; ")),
+            input,
+        }
     }
 
     /// `requests`: the unanswered requests.
     pub fn requests(&self) -> Vec<&InputRequest> {
-        self.input.requests.iter().filter(|r| !r.is_answered()).collect()
+        self.input
+            .requests
+            .iter()
+            .filter(|r| !r.is_answered())
+            .collect()
     }
 }
 

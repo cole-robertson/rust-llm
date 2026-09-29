@@ -7,7 +7,9 @@ use std::sync::Arc;
 
 use rust_llm::message::Operation;
 use rust_llm::model::{Pricing, PricingCategory, PricingTier};
-use rust_llm::{Attachment, Config, Cost, Error, Image, Images, Model, PaintOptions, Tokens, UsageStatus, paint};
+use rust_llm::{
+    Attachment, Config, Cost, Error, Image, Images, Model, PaintOptions, Tokens, UsageStatus, paint,
+};
 use serde_json::json;
 use support::{Cassette, config_for};
 
@@ -18,7 +20,9 @@ fn image_path() -> String {
 }
 
 async fn start(name: &str) -> Cassette {
-    Cassette::start(name).await.unwrap_or_else(|| panic!("missing cassette {name}; run bin/convert-cassettes 'image_*'"))
+    Cassette::start(name)
+        .await
+        .unwrap_or_else(|| panic!("missing cassette {name}; run bin/convert-cassettes 'image_*'"))
 }
 
 /// `save_and_verify_image`: `save` returns the path it was given and writes more than 1KB.
@@ -28,18 +32,30 @@ async fn saves_a_real_image(image: &Image) {
     assert_eq!(saved, path);
     let size = std::fs::metadata(&path).expect("saved file").len();
     std::fs::remove_file(&path).ok();
-    assert!(size > 1000, "a real image is larger than 1KB, saved {size} bytes");
+    assert!(
+        size > 1000,
+        "a real image is larger than 1KB, saved {size} bytes"
+    );
 }
 
 /// Hosted images are downloaded from the provider's CDN; send that request to the replay server.
 fn hosted_on(image: &mut Image, cassette: &Cassette) {
     let url = image.url.clone().expect("hosted image url");
-    let path = url.split_once("://").and_then(|(_, rest)| rest.split_once('/')).map(|(_, p)| p).unwrap_or("");
+    let path = url
+        .split_once("://")
+        .and_then(|(_, rest)| rest.split_once('/'))
+        .map(|(_, p)| p)
+        .unwrap_or("");
     image.url = Some(format!("{}/{path}", cassette.server.uri()));
 }
 
 fn options<'a>(model: &'a str, provider: Option<&'a str>, config: Arc<Config>) -> PaintOptions<'a> {
-    PaintOptions { model: Some(model), provider, config: Some(config), ..Default::default() }
+    PaintOptions {
+        model: Some(model),
+        provider,
+        config: Some(config),
+        ..Default::default()
+    }
 }
 
 /// The ledger records one `image` operation for the call, carrying the image's usage.
@@ -59,7 +75,13 @@ fn billed_once_as_image(image: &Image, provider: &str, model: &str) {
 async fn openai_gpt_image_1_can_paint_images() {
     let cassette = start("image_basic_functionality_openai_gpt-image-1_can_paint_images").await;
     let config = config_for(&cassette, "openai");
-    let image = paint("a siamese cat", options("gpt-image-1", Some("openai"), config)).await.unwrap().into_image();
+    let image = paint(
+        "a siamese cat",
+        options("gpt-image-1", Some("openai"), config),
+    )
+    .await
+    .unwrap()
+    .into_image();
     assert!(image.mime_type.as_deref().unwrap().contains("image"));
     assert_eq!(image.model, "gpt-image-1");
     assert!(image.is_base64());
@@ -72,10 +94,15 @@ async fn openai_gpt_image_1_can_paint_images() {
 
 #[tokio::test]
 async fn gemini_can_paint_images() {
-    let cassette = start("image_basic_functionality_gemini_gemini-3_1-flash-lite-image_can_paint_images").await;
+    let cassette =
+        start("image_basic_functionality_gemini_gemini-3_1-flash-lite-image_can_paint_images")
+            .await;
     let config = config_for(&cassette, "gemini");
     let model = "gemini-3.1-flash-lite-image";
-    let image = paint("a siamese cat", options(model, Some("gemini"), config)).await.unwrap().into_image();
+    let image = paint("a siamese cat", options(model, Some("gemini"), config))
+        .await
+        .unwrap()
+        .into_image();
     assert_eq!(image.mime_type.as_deref(), Some("image/jpeg"));
     assert_eq!(image.model, model);
     // promptTokenCount 5, candidatesTokenCount 1529.
@@ -88,11 +115,16 @@ async fn gemini_can_paint_images() {
 
 #[tokio::test]
 async fn openrouter_can_paint_images() {
-    let cassette =
-        start("image_basic_functionality_openrouter_google_gemini-3_1-flash-lite-image_can_paint_images").await;
+    let cassette = start(
+        "image_basic_functionality_openrouter_google_gemini-3_1-flash-lite-image_can_paint_images",
+    )
+    .await;
     let config = config_for(&cassette, "openrouter");
     let model = "google/gemini-3.1-flash-lite-image";
-    let image = paint("a siamese cat", options(model, Some("openrouter"), config)).await.unwrap().into_image();
+    let image = paint("a siamese cat", options(model, Some("openrouter"), config))
+        .await
+        .unwrap()
+        .into_image();
     assert_eq!(image.mime_type.as_deref(), Some("image/jpeg"));
     assert_eq!(image.model, model);
     assert_eq!(image.tokens().reported_cost, Some(0.033601));
@@ -106,8 +138,13 @@ async fn openrouter_can_paint_images() {
 async fn xai_can_paint_images_and_downloads_the_hosted_file() {
     let cassette = start("image_basic_functionality_xai_grok-imagine-image_can_paint_images").await;
     let config = config_for(&cassette, "xai");
-    let mut image =
-        paint("a siamese cat", options("grok-imagine-image", Some("xai"), config)).await.unwrap().into_image();
+    let mut image = paint(
+        "a siamese cat",
+        options("grok-imagine-image", Some("xai"), config),
+    )
+    .await
+    .unwrap()
+    .into_image();
     assert_eq!(image.mime_type.as_deref(), Some("image/jpeg"));
     assert_eq!(image.model, "grok-imagine-image");
     assert!(!image.is_base64());
@@ -119,11 +156,17 @@ async fn xai_can_paint_images_and_downloads_the_hosted_file() {
 
 #[tokio::test]
 async fn openai_paints_several_images_in_one_request() {
-    let cassette = start("image_basic_functionality_openai_gpt-image-1_5_paints_several_images_in_one_request").await;
+    let cassette = start(
+        "image_basic_functionality_openai_gpt-image-1_5_paints_several_images_in_one_request",
+    )
+    .await;
     let config = config_for(&cassette, "openai");
     let images = paint(
         "a siamese cat",
-        PaintOptions { count: Some(2), ..options("gpt-image-1.5", Some("openai"), config) },
+        PaintOptions {
+            count: Some(2),
+            ..options("gpt-image-1.5", Some("openai"), config)
+        },
     )
     .await
     .unwrap();
@@ -144,13 +187,23 @@ async fn openai_paints_several_images_in_one_request() {
 
 #[tokio::test]
 async fn validates_model_existence() {
-    let err = paint("a cat", PaintOptions { model: Some("invalid-model"), ..Default::default() }).await.unwrap_err();
+    let err = paint(
+        "a cat",
+        PaintOptions {
+            model: Some("invalid-model"),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap_err();
     assert!(matches!(err, Error::ModelNotFound(_)), "{err:?}");
 }
 
 #[tokio::test]
 async fn gpt_image_1_5_supports_image_edits_with_multiple_images() {
-    let cassette = start("image_basic_functionality_gpt-image-1_5_supports_image_edits_with_multiple_images").await;
+    let cassette =
+        start("image_basic_functionality_gpt-image-1_5_supports_image_edits_with_multiple_images")
+            .await;
     let config = config_for(&cassette, "openai");
     let image = paint(
         PROMPT,
@@ -174,12 +227,21 @@ async fn gpt_image_1_5_supports_image_edits_with_multiple_images() {
 
 #[tokio::test]
 async fn supports_image_edits_with_a_valid_local_png() {
-    let cassette = start("image_edit_functionality_with_local_files_supports_image_edits_with_a_valid_local_png").await;
+    let cassette = start(
+        "image_edit_functionality_with_local_files_supports_image_edits_with_a_valid_local_png",
+    )
+    .await;
     let config = config_for(&cassette, "openai");
-    let image = paint(PROMPT, PaintOptions { with: vec![Attachment::new(image_path())], ..options("gpt-image-1.5", None, config) })
-        .await
-        .unwrap()
-        .into_image();
+    let image = paint(
+        PROMPT,
+        PaintOptions {
+            with: vec![Attachment::new(image_path())],
+            ..options("gpt-image-1.5", None, config)
+        },
+    )
+    .await
+    .unwrap()
+    .into_image();
     assert!(image.is_base64());
     assert!(!image.data.as_deref().unwrap().is_empty());
     assert_eq!(image.mime_type.as_deref(), Some("image/png"));
@@ -194,11 +256,21 @@ async fn rejects_edits_with_a_non_png_local_file() {
     let wav = Attachment::from_bytes(b"RIFF\0\0\0\0WAVE".to_vec(), "ruby.wav", None);
     let mut config = Config::default();
     config.openai_api_key("test-key");
-    let err = paint(PROMPT, PaintOptions { with: vec![wav], ..options("gpt-image-1.5", None, Arc::new(config)) })
-        .await
-        .unwrap_err();
+    let err = paint(
+        PROMPT,
+        PaintOptions {
+            with: vec![wav],
+            ..options("gpt-image-1.5", None, Arc::new(config))
+        },
+    )
+    .await
+    .unwrap_err();
     assert!(matches!(err, Error::UnsupportedAttachment(_)), "{err:?}");
-    assert!(err.to_string().contains("Unsupported attachment type: audio/wav"), "{err}");
+    assert!(
+        err.to_string()
+            .contains("Unsupported attachment type: audio/wav"),
+        "{err}"
+    );
 }
 
 #[tokio::test]
@@ -228,10 +300,16 @@ async fn openrouter_edits_images_passed_via_with() {
     let cassette = start("image_edit_functionality_with_openrouter_reference_images_openrouter_google_gemini-3_1-flash-lite-image_edits_images_passed_via_with").await;
     let config = config_for(&cassette, "openrouter");
     let model = "google/gemini-3.1-flash-lite-image";
-    let image = paint(PROMPT, PaintOptions { with: vec![Attachment::new(image_path())], ..options(model, Some("openrouter"), config) })
-        .await
-        .unwrap()
-        .into_image();
+    let image = paint(
+        PROMPT,
+        PaintOptions {
+            with: vec![Attachment::new(image_path())],
+            ..options(model, Some("openrouter"), config)
+        },
+    )
+    .await
+    .unwrap()
+    .into_image();
     assert!(image.is_base64());
     assert!(image.mime_type.as_deref().unwrap().contains("image"));
     let reported = image.tokens().reported_cost.unwrap();
@@ -245,8 +323,18 @@ async fn openrouter_edits_images_passed_via_with() {
 async fn rejects_edits_with_a_url_having_invalid_content_type() {
     let cassette = start("image_edit_functionality_with_remote_urls_rejects_edits_with_a_url_having_invalid_content_type").await;
     let config = config_for(&cassette, "openai");
-    let with = vec![Attachment::new("https://rubyllm.com/assets/images/logotype.svg")];
-    let err = paint(PROMPT, PaintOptions { with, ..options("gpt-image-1.5", None, config) }).await.unwrap_err();
+    let with = vec![Attachment::new(
+        "https://rubyllm.com/assets/images/logotype.svg",
+    )];
+    let err = paint(
+        PROMPT,
+        PaintOptions {
+            with,
+            ..options("gpt-image-1.5", None, config)
+        },
+    )
+    .await
+    .unwrap_err();
     assert!(matches!(err, Error::BadRequest(..)), "{err:?}");
     assert!(err.to_string().contains("Invalid image data"), "{err}");
     cassette.assert_all_matched().await;
@@ -254,10 +342,23 @@ async fn rejects_edits_with_a_url_having_invalid_content_type() {
 
 #[tokio::test]
 async fn rejects_edits_with_a_url_that_returns_404() {
-    let cassette = start("image_edit_functionality_with_remote_urls_rejects_edits_with_a_url_that_returns_404").await;
+    let cassette = start(
+        "image_edit_functionality_with_remote_urls_rejects_edits_with_a_url_that_returns_404",
+    )
+    .await;
     let config = config_for(&cassette, "openai");
-    let with = vec![Attachment::new("https://rubyllm.com/some-asset-that-does-not-exist.png")];
-    let err = paint(PROMPT, PaintOptions { with, ..options("gpt-image-1.5", None, config) }).await.unwrap_err();
+    let with = vec![Attachment::new(
+        "https://rubyllm.com/some-asset-that-does-not-exist.png",
+    )];
+    let err = paint(
+        PROMPT,
+        PaintOptions {
+            with,
+            ..options("gpt-image-1.5", None, config)
+        },
+    )
+    .await
+    .unwrap_err();
     assert!(matches!(err, Error::BadRequest(..)), "{err:?}");
     assert!(err.to_string().contains("404"), "{err}");
     cassette.assert_all_matched().await;
@@ -335,10 +436,18 @@ async fn xai_rejects_masks() {
 fn cost_splits_image_input_by_modality_like_chat_costs() {
     let mut model = Model::default_for("gpt-image-1.5", "openai");
     let tier = |input: f64, output: Option<f64>| PricingCategory {
-        standard: Some(PricingTier { input_per_million: Some(input), output_per_million: output, ..Default::default() }),
+        standard: Some(PricingTier {
+            input_per_million: Some(input),
+            output_per_million: output,
+            ..Default::default()
+        }),
         ..Default::default()
     };
-    model.pricing = Pricing { text_tokens: Some(tier(5.0, None)), images: Some(tier(10.0, Some(40.0))), ..Default::default() };
+    model.pricing = Pricing {
+        text_tokens: Some(tier(5.0, None)),
+        images: Some(tier(10.0, Some(40.0))),
+        ..Default::default()
+    };
     let image = Image::new(
         "gpt-image-1.5",
         json!({ "input_tokens": 350, "input_tokens_details": { "text_tokens": 100, "image_tokens": 250 }, "output_tokens": 50 }),
@@ -346,7 +455,11 @@ fn cost_splits_image_input_by_modality_like_chat_costs() {
     let tokens = image.tokens();
     assert_eq!(tokens.input, Some(350));
     assert_eq!(tokens.output, Some(50));
-    let cost = Cost::images(&tokens, Some(&model), Some(&json!({ "text_tokens": 100, "image_tokens": 250 })));
+    let cost = Cost::images(
+        &tokens,
+        Some(&model),
+        Some(&json!({ "text_tokens": 100, "image_tokens": 250 })),
+    );
     assert!((cost.input.unwrap() - 0.003).abs() < 1e-10);
     assert!((cost.output.unwrap() - 0.002).abs() < 1e-10);
     assert!((cost.total().unwrap() - 0.005).abs() < 1e-10);

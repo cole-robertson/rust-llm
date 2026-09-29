@@ -60,19 +60,37 @@ pub struct Config {
 
 /// Provider options RubyLLM reads, and the environment variable each falls back to.
 const PROVIDER_OPTIONS: &[&str] = &[
-    "openai_api_key", "openai_api_base", "openai_organization_id", "openai_project_id", "openai_use_system_role",
-    "anthropic_api_key", "anthropic_api_base",
-    "gemini_api_key", "gemini_api_base",
-    "deepseek_api_key", "deepseek_api_base",
-    "mistral_api_key", "mistral_api_base",
-    "openrouter_api_key", "openrouter_api_base", "openrouter_app_url", "openrouter_app_name",
-    "xai_api_key", "xai_api_base",
-    "perplexity_api_key", "perplexity_api_base",
-    "ollama_api_base", "ollama_api_key",
-    "ollama_cloud_api_key", "ollama_cloud_api_base",
-    "gpustack_api_base", "gpustack_api_key",
-    "hetzner_api_key", "hetzner_api_base",
-    "typesafe_api_key", "typesafe_api_base",
+    "openai_api_key",
+    "openai_api_base",
+    "openai_organization_id",
+    "openai_project_id",
+    "openai_use_system_role",
+    "anthropic_api_key",
+    "anthropic_api_base",
+    "gemini_api_key",
+    "gemini_api_base",
+    "deepseek_api_key",
+    "deepseek_api_base",
+    "mistral_api_key",
+    "mistral_api_base",
+    "openrouter_api_key",
+    "openrouter_api_base",
+    "openrouter_app_url",
+    "openrouter_app_name",
+    "xai_api_key",
+    "xai_api_base",
+    "perplexity_api_key",
+    "perplexity_api_base",
+    "ollama_api_base",
+    "ollama_api_key",
+    "ollama_cloud_api_key",
+    "ollama_cloud_api_base",
+    "gpustack_api_base",
+    "gpustack_api_key",
+    "hetzner_api_key",
+    "hetzner_api_base",
+    "typesafe_api_key",
+    "typesafe_api_base",
 ];
 
 impl Default for Config {
@@ -115,9 +133,10 @@ impl Config {
         let mut config = Config::default();
         for option in PROVIDER_OPTIONS {
             if let Ok(value) = std::env::var(option.to_uppercase())
-                && !value.is_empty() {
-                    config.values.insert(option.to_string(), value);
-                }
+                && !value.is_empty()
+            {
+                config.values.insert(option.to_string(), value);
+            }
         }
         if let Ok(model) = std::env::var("RUST_LLM_DEFAULT_MODEL") {
             config.default_model = model;
@@ -127,7 +146,10 @@ impl Config {
 
     pub fn get(&self, option: &str) -> Option<&str> {
         // `normalize_blank`: a whitespace-only value is unset, like `value.strip.empty?`.
-        self.values.get(option).map(String::as_str).filter(|v| !v.trim().is_empty())
+        self.values
+            .get(option)
+            .map(String::as_str)
+            .filter(|v| !v.trim().is_empty())
     }
 
     pub fn set(&mut self, option: impl Into<String>, value: impl Into<String>) -> &mut Self {
@@ -155,7 +177,8 @@ impl Config {
     }
 }
 
-static CONFIG: LazyLock<RwLock<Arc<Config>>> = LazyLock::new(|| RwLock::new(Arc::new(Config::from_env())));
+static CONFIG: LazyLock<RwLock<Arc<Config>>> =
+    LazyLock::new(|| RwLock::new(Arc::new(Config::from_env())));
 
 /// `RubyLLM.configure { |config| ... }`.
 pub fn configure(f: impl FnOnce(&mut Config)) {

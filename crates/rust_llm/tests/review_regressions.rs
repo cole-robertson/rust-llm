@@ -17,7 +17,11 @@ fn anthropic_ok() -> serde_json::Value {
 
 fn config(server: &MockServer, provider: &str, retries: u32) -> Arc<rust_llm::Config> {
     let mut c = rust_llm::Config::default();
-    let base = if provider == "openai" { format!("{}/v1", server.uri()) } else { server.uri() };
+    let base = if provider == "openai" {
+        format!("{}/v1", server.uri())
+    } else {
+        server.uri()
+    };
     c.set(format!("{provider}_api_base"), base);
     c.set(format!("{provider}_api_key"), "k");
     c.max_retries = retries;
@@ -30,13 +34,27 @@ fn config(server: &MockServer, provider: &str, retries: u32) -> Arc<rust_llm::Co
 async fn a_retry_after_beyond_the_max_interval_is_not_retried() {
     let server = MockServer::start().await;
     Mock::given(matchers::method("POST"))
-        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "3600").set_body_string(r#"{"error":{"message":"rate limit"}}"#))
+        .respond_with(
+            ResponseTemplate::new(429)
+                .insert_header("retry-after", "3600")
+                .set_body_string(r#"{"error":{"message":"rate limit"}}"#),
+        )
         .mount(&server)
         .await;
-    let mut chat = Chat::with_config(config(&server, "anthropic", 3), Some("claude-haiku-4-5"), Some("anthropic"), false).unwrap();
+    let mut chat = Chat::with_config(
+        config(&server, "anthropic", 3),
+        Some("claude-haiku-4-5"),
+        Some("anthropic"),
+        false,
+    )
+    .unwrap();
     let err = chat.ask("hi").await.unwrap_err();
     assert_eq!(err.kind(), rust_llm::ErrorKind::RateLimit);
-    assert_eq!(server.received_requests().await.unwrap().len(), 1, "no pointless retries");
+    assert_eq!(
+        server.received_requests().await.unwrap().len(),
+        1,
+        "no pointless retries"
+    );
 }
 
 // Tracker#failure_tokens: a refused (4xx) attempt is billed as zero, so a retried 429 followed by
@@ -45,20 +63,39 @@ async fn a_retry_after_beyond_the_max_interval_is_not_retried() {
 async fn a_retried_429_keeps_the_cost_known_and_links_to_the_answer() {
     let server = MockServer::start().await;
     Mock::given(matchers::method("POST"))
-        .respond_with(ResponseTemplate::new(429).set_body_string(r#"{"error":{"message":"rate limit"}}"#))
+        .respond_with(
+            ResponseTemplate::new(429).set_body_string(r#"{"error":{"message":"rate limit"}}"#),
+        )
         .up_to_n_times(1)
         .with_priority(1)
         .mount(&server)
         .await;
-    Mock::given(matchers::method("POST")).respond_with(ResponseTemplate::new(200).set_body_json(anthropic_ok())).with_priority(2).mount(&server).await;
-    let mut chat = Chat::with_config(config(&server, "anthropic", 3), Some("claude-haiku-4-5"), Some("anthropic"), false).unwrap();
+    Mock::given(matchers::method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(anthropic_ok()))
+        .with_priority(2)
+        .mount(&server)
+        .await;
+    let mut chat = Chat::with_config(
+        config(&server, "anthropic", 3),
+        Some("claude-haiku-4-5"),
+        Some("anthropic"),
+        false,
+    )
+    .unwrap();
     let answer = chat.ask("hi").await.unwrap();
 
     let statuses: Vec<UsageStatus> = chat.usage_entries().iter().map(|e| e.status).collect();
     assert_eq!(statuses, [UsageStatus::Failed, UsageStatus::Succeeded]);
     assert_eq!(chat.usage_entries()[0].tokens.input, Some(0));
-    assert!(chat.cost().total().is_some(), "a refused retry must not make the total unknown");
-    assert_eq!(answer.usage_entries.len(), 2, "link_completion_usage links the retry to the answer");
+    assert!(
+        chat.cost().total().is_some(),
+        "a refused retry must not make the total unknown"
+    );
+    assert_eq!(
+        answer.usage_entries.len(),
+        2,
+        "link_completion_usage links the retry to the answer"
+    );
 }
 
 // protocol/streaming.rb: an error event before any chunk is delivered is retried.
@@ -79,8 +116,18 @@ async fn an_error_event_before_any_chunk_is_retried() {
         .with_priority(1)
         .mount(&server)
         .await;
-    Mock::given(matchers::method("POST")).respond_with(ResponseTemplate::new(200).set_body_raw(ok, "text/event-stream")).with_priority(2).mount(&server).await;
-    let mut chat = Chat::with_config(config(&server, "anthropic", 3), Some("claude-haiku-4-5"), Some("anthropic"), false).unwrap();
+    Mock::given(matchers::method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(ok, "text/event-stream"))
+        .with_priority(2)
+        .mount(&server)
+        .await;
+    let mut chat = Chat::with_config(
+        config(&server, "anthropic", 3),
+        Some("claude-haiku-4-5"),
+        Some("anthropic"),
+        false,
+    )
+    .unwrap();
     let answer = chat.ask_stream("hi", |_| {}).await.unwrap();
     assert_eq!(answer.content(), "hello");
     assert_eq!(server.received_requests().await.unwrap().len(), 2);
@@ -94,15 +141,27 @@ async fn an_error_after_a_delivered_chunk_is_not_retried() {
         "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"usage\":{\"input_tokens\":50000,\"output_tokens\":1}}}\n\n",
         "event: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}\n\n",
     );
-    Mock::given(matchers::method("POST")).respond_with(ResponseTemplate::new(200).set_body_raw(partial, "text/event-stream")).mount(&server).await;
-    let mut chat = Chat::with_config(config(&server, "anthropic", 3), Some("claude-haiku-4-5"), Some("anthropic"), false).unwrap();
+    Mock::given(matchers::method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(partial, "text/event-stream"))
+        .mount(&server)
+        .await;
+    let mut chat = Chat::with_config(
+        config(&server, "anthropic", 3),
+        Some("claude-haiku-4-5"),
+        Some("anthropic"),
+        false,
+    )
+    .unwrap();
     let mut chunks = 0;
     let err = chat.ask_stream("hi", |_| chunks += 1).await.unwrap_err();
     assert_eq!(err.kind(), rust_llm::ErrorKind::Overloaded);
     assert_eq!(server.received_requests().await.unwrap().len(), 1);
     // Tracker#observe: tokens reported before the failure are billed, not dropped.
     let failed = chat.usage_entries().last().unwrap();
-    assert_eq!((failed.status, failed.tokens.input), (UsageStatus::Failed, Some(50000)));
+    assert_eq!(
+        (failed.status, failed.tokens.input),
+        (UsageStatus::Failed, Some(50000))
+    );
 }
 
 // stream_accumulator.rb: an empty-string id still starts a call (with a generated id); a fragment
@@ -117,8 +176,15 @@ async fn streamed_tool_calls_with_empty_ids_and_stray_fragments() {
         json!({"model":"m","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"rust\"}"}}]}}]}),
         json!({"model":"m","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}),
     ];
-    let body: String = events.iter().map(|e| format!("data: {e}\n\n")).collect::<String>() + "data: [DONE]\n\n";
-    Mock::given(matchers::method("POST")).respond_with(ResponseTemplate::new(200).set_body_raw(body, "text/event-stream")).mount(&server).await;
+    let body: String = events
+        .iter()
+        .map(|e| format!("data: {e}\n\n"))
+        .collect::<String>()
+        + "data: [DONE]\n\n";
+    Mock::given(matchers::method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(body, "text/event-stream"))
+        .mount(&server)
+        .await;
     let mut c = rust_llm::Config::default();
     c.set("ollama_api_base", format!("{}/v1", server.uri()));
     c.max_retries = 0;
@@ -127,6 +193,9 @@ async fn streamed_tool_calls_with_empty_ids_and_stray_fragments() {
     let message = chat.step_stream(|_| {}).await.unwrap().unwrap();
     let calls = message.tool_calls.expect("tool call kept");
     let call = calls.values().next().unwrap();
-    assert!(!call.id.is_empty(), "empty id replaced with a generated one");
+    assert!(
+        !call.id.is_empty(),
+        "empty id replaced with a generated one"
+    );
     assert_eq!(call.arguments()["q"], "rust");
 }

@@ -38,12 +38,24 @@ impl ModerationResult {
         let categories: Vec<String> = data
             .get("categories")
             .and_then(Value::as_object)
-            .map(|c| c.iter().filter(|(_, flagged)| truthy(flagged)).map(|(name, _)| name.clone()).collect())
+            .map(|c| {
+                c.iter()
+                    .filter(|(_, flagged)| truthy(flagged))
+                    .map(|(name, _)| name.clone())
+                    .collect()
+            })
             .unwrap_or_default();
         ModerationResult {
-            flagged: data.get("flagged").map(truthy).unwrap_or(!categories.is_empty()),
+            flagged: data
+                .get("flagged")
+                .map(truthy)
+                .unwrap_or(!categories.is_empty()),
             categories,
-            category_scores: data.get("category_scores").and_then(Value::as_object).cloned().unwrap_or_default(),
+            category_scores: data
+                .get("category_scores")
+                .and_then(Value::as_object)
+                .cloned()
+                .unwrap_or_default(),
         }
     }
 
@@ -169,19 +181,39 @@ pub struct ModerateOptions<'a> {
 }
 
 /// `RubyLLM.moderate(input, model:, with:, provider:, assume_model_exists:, provider_options:)`.
-pub async fn moderate(input: impl Into<ModerationInput>, options: ModerateOptions<'_>) -> Result<Moderation> {
+pub async fn moderate(
+    input: impl Into<ModerationInput>,
+    options: ModerateOptions<'_>,
+) -> Result<Moderation> {
     let input = input.into();
-    let ModerateOptions { model, provider, assume_model_exists, mut with, provider_options, config } = options;
+    let ModerateOptions {
+        model,
+        provider,
+        assume_model_exists,
+        mut with,
+        provider_options,
+        config,
+    } = options;
     if matches!(input, ModerationInput::None) && with.is_empty() {
-        return Err(Error::Argument("must provide input text, image attachment, or both".into()));
+        return Err(Error::Argument(
+            "must provide input text, image attachment, or both".into(),
+        ));
     }
     let config = config.unwrap_or_else(crate::config);
-    let model_id = model.unwrap_or(&config.default_moderation_model).to_string();
+    let model_id = model
+        .unwrap_or(&config.default_moderation_model)
+        .to_string();
     let (model, provider) = resolve_model(&model_id, provider, assume_model_exists)?;
     provider.ensure_configured(&config)?;
     // `ChatCompletions::Moderation` reaches every protocol built on Chat Completions.
-    if !matches!(provider.resolve_protocol(None, &model, &config), Ok(ProtocolName::ChatCompletions | ProtocolName::Responses)) {
-        return Err(Error::Api(format!("{} doesn't support moderation", provider.display()), None));
+    if !matches!(
+        provider.resolve_protocol(None, &model, &config),
+        Ok(ProtocolName::ChatCompletions | ProtocolName::Responses)
+    ) {
+        return Err(Error::Api(
+            format!("{} doesn't support moderation", provider.display()),
+            None,
+        ));
     }
     let connection = Connection::new(provider, config.clone())?;
     for a in with.iter_mut().filter(|a| !a.is_url()) {
@@ -196,7 +228,9 @@ pub async fn moderate(input: impl Into<ModerationInput>, options: ModerateOption
             retried.push(failure_tokens(e, None));
         }
     };
-    let raw = connection.post("moderations", &payload, &[], &mut on_attempt).await?;
+    let raw = connection
+        .post("moderations", &payload, &[], &mut on_attempt)
+        .await?;
     let mut moderation = parse_response(&raw.body, &model.id)?;
     let entry = |status, tokens: Tokens| UsageEntry {
         id: UsageEntry::next_id(),
@@ -207,7 +241,10 @@ pub async fn moderate(input: impl Into<ModerationInput>, options: ModerateOption
         cost: Cost::new(&tokens, Some(&model), Tier::Standard),
         tokens,
     };
-    let mut entries: Vec<UsageEntry> = retried.into_iter().map(|t| entry(UsageStatus::Failed, t)).collect();
+    let mut entries: Vec<UsageEntry> = retried
+        .into_iter()
+        .map(|t| entry(UsageStatus::Failed, t))
+        .collect();
     // The response reports no usage, so the billed attempt carries empty tokens, as in Ruby.
     entries.push(entry(UsageStatus::Succeeded, Tokens::default()));
     moderation.usage_entries = entries;
@@ -215,7 +252,12 @@ pub async fn moderate(input: impl Into<ModerationInput>, options: ModerateOption
 }
 
 /// `render_moderation_payload`.
-fn render_payload(input: &ModerationInput, model: &str, with: &[Attachment], provider_options: &Value) -> Result<Value> {
+fn render_payload(
+    input: &ModerationInput,
+    model: &str,
+    with: &[Attachment],
+    provider_options: &Value,
+) -> Result<Value> {
     let input = if with.is_empty() {
         input.to_value().unwrap_or(Value::Null)
     } else {
@@ -227,7 +269,8 @@ fn render_payload(input: &ModerationInput, model: &str, with: &[Attachment], pro
             if a.kind() != AttachmentType::Image {
                 return Err(Error::UnsupportedAttachment(unsupported(&a.mime_type)));
             }
-            parts.push(json!({ "type": "image_url", "image_url": { "url": a.url_or_data_uri()? } }));
+            parts
+                .push(json!({ "type": "image_url", "image_url": { "url": a.url_or_data_uri()? } }));
         }
         Value::Array(parts)
     };
@@ -263,7 +306,8 @@ mod tests {
 
     #[test]
     fn flagged_categories_come_from_true_entries_and_flagged_defaults_to_any() {
-        let result = ModerationResult::from_h(&json!({ "categories": { "hate": false, "violence": true } }));
+        let result =
+            ModerationResult::from_h(&json!({ "categories": { "hate": false, "violence": true } }));
         assert_eq!(result.categories, vec!["violence"]);
         assert!(result.is_flagged());
     }
@@ -278,7 +322,13 @@ mod tests {
             "omni-moderation-latest",
         )
         .unwrap();
-        assert_eq!(moderation.category_scores(), json!({ "hate": 0.9, "violence": 0.5 }).as_object().unwrap().clone());
+        assert_eq!(
+            moderation.category_scores(),
+            json!({ "hate": 0.9, "violence": 0.5 })
+                .as_object()
+                .unwrap()
+                .clone()
+        );
         assert!(moderation.is_flagged());
         assert_eq!(moderation.flagged_categories(), vec!["hate"]);
     }

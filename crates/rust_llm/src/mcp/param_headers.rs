@@ -7,16 +7,26 @@ use serde_json::{Map, Value};
 const TYPES: &[&str] = &["string", "integer", "boolean"];
 
 fn is_token(header: &str) -> bool {
-    !header.is_empty() && header.chars().all(|c| c.is_ascii_alphanumeric() || "!#$%&'*+-.^_`|~".contains(c))
+    !header.is_empty()
+        && header
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "!#$%&'*+-.^_`|~".contains(c))
 }
 
 /// `ParamHeaders.valid?`.
 pub fn is_valid(definition: &Value) -> bool {
     let declared = declarations(definition);
     let valid = declared.iter().all(|(_, header, schema)| {
-        header.as_str().is_some_and(is_token) && schema.get("type").and_then(Value::as_str).is_some_and(|t| TYPES.contains(&t))
+        header.as_str().is_some_and(is_token)
+            && schema
+                .get("type")
+                .and_then(Value::as_str)
+                .is_some_and(|t| TYPES.contains(&t))
     });
-    let mut names: Vec<String> = declared.iter().map(|(_, header, _)| header_text(header).to_lowercase()).collect();
+    let mut names: Vec<String> = declared
+        .iter()
+        .map(|(_, header, _)| header_text(header).to_lowercase())
+        .collect();
     let count = names.len();
     names.sort();
     names.dedup();
@@ -51,7 +61,12 @@ fn header_text(header: &Value) -> String {
 }
 
 fn declarations(definition: &Value) -> Vec<(String, Value, Value)> {
-    let Some(properties) = definition.pointer("/inputSchema/properties").and_then(Value::as_object) else { return Vec::new() };
+    let Some(properties) = definition
+        .pointer("/inputSchema/properties")
+        .and_then(Value::as_object)
+    else {
+        return Vec::new();
+    };
     properties
         .iter()
         .filter_map(|(property, schema)| {
@@ -82,15 +97,24 @@ mod tests {
         let arguments = json!({ "region": "us-west1", "verbose": false, "query": "SELECT 1" });
         assert_eq!(
             headers_for(&definition, arguments.as_object().unwrap()),
-            vec![("Region".to_string(), "us-west1".to_string()), ("Verbose".to_string(), "false".to_string())]
+            vec![
+                ("Region".to_string(), "us-west1".to_string()),
+                ("Verbose".to_string(), "false".to_string())
+            ]
         );
     }
 
     #[test]
     fn rejects_tools_with_invalid_declarations() {
-        assert!(is_valid(&tool(json!({ "a": { "type": "string", "x-mcp-header": "Region" } }))));
-        assert!(!is_valid(&tool(json!({ "a": { "type": "number", "x-mcp-header": "Price" } }))));
-        assert!(!is_valid(&tool(json!({ "a": { "type": "string", "x-mcp-header": "Bad Name" } }))));
+        assert!(is_valid(&tool(
+            json!({ "a": { "type": "string", "x-mcp-header": "Region" } })
+        )));
+        assert!(!is_valid(&tool(
+            json!({ "a": { "type": "number", "x-mcp-header": "Price" } })
+        )));
+        assert!(!is_valid(&tool(
+            json!({ "a": { "type": "string", "x-mcp-header": "Bad Name" } })
+        )));
         assert!(!is_valid(&tool(json!({
             "a": { "type": "string", "x-mcp-header": "Region" },
             "b": { "type": "string", "x-mcp-header": "region" }

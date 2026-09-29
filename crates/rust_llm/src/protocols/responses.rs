@@ -3,8 +3,13 @@
 
 use serde_json::{Map, Value, json};
 
-use super::chat_completions::{empty_parameters_schema, parse_root_citations, parse_search_results, schema_strict};
-use super::{Caching, Request, StreamState, ToolCalls, ToolChoice, char_slice, deep_merge, int, normalize_finish_reason, str_of, tool_call_map};
+use super::chat_completions::{
+    empty_parameters_schema, parse_root_citations, parse_search_results, schema_strict,
+};
+use super::{
+    Caching, Request, StreamState, ToolCalls, ToolChoice, char_slice, deep_merge, int,
+    normalize_finish_reason, str_of, tool_call_map,
+};
 use crate::attachment::{Attachment, AttachmentType};
 use crate::error::{Error, Result};
 use crate::message::{Citation, Message, RawResponse, Role, ServerToolCall, Thinking, ToolCall};
@@ -12,18 +17,28 @@ use crate::providers::Provider;
 use crate::thinking::Display;
 use crate::tool::{Tool, tool_schema};
 
-const FINISH_REASONS: &[(&str, &str)] =
-    &[("completed", "stop"), ("max_output_tokens", "max_tokens"), ("content_filter", "content_filter")];
+const FINISH_REASONS: &[(&str, &str)] = &[
+    ("completed", "stop"),
+    ("max_output_tokens", "max_tokens"),
+    ("content_filter", "content_filter"),
+];
 
 const PERPLEXITY_PRESETS: &[&str] = &["fast", "low", "medium", "high", "xhigh", "wide-research"];
-const SONAR_PRESETS: &[(&str, &str)] =
-    &[("sonar", "fast"), ("sonar-pro", "low"), ("sonar-reasoning-pro", "medium"), ("sonar-deep-research", "high")];
+const SONAR_PRESETS: &[(&str, &str)] = &[
+    ("sonar", "fast"),
+    ("sonar-pro", "low"),
+    ("sonar-reasoning-pro", "medium"),
+    ("sonar-deep-research", "high"),
+];
 
 pub fn render_payload(req: &Request) -> Result<Value> {
     let boundaries = Caching::boundaries(req.caching);
     let mut payload = Map::new();
     payload.insert("model".into(), req.model.id.clone().into());
-    payload.insert("input".into(), Value::Array(format_input(req.provider, req.messages, boundaries)?));
+    payload.insert(
+        "input".into(),
+        Value::Array(format_input(req.provider, req.messages, boundaries)?),
+    );
     if let Some(instructions) = format_instructions(req.messages, boundaries) {
         payload.insert("instructions".into(), instructions.into());
     }
@@ -34,14 +49,22 @@ pub fn render_payload(req: &Request) -> Result<Value> {
         payload.insert("temperature".into(), t.into());
     }
     let max_output = req.max_output_tokens.or_else(|| {
-        (req.provider == Provider::Perplexity && req.model.id.starts_with("anthropic/"))
-            .then(|| req.model.max_output_tokens.unwrap_or(super::anthropic::DEFAULT_MAX_OUTPUT_TOKENS))
+        (req.provider == Provider::Perplexity && req.model.id.starts_with("anthropic/")).then(
+            || {
+                req.model
+                    .max_output_tokens
+                    .unwrap_or(super::anthropic::DEFAULT_MAX_OUTPUT_TOKENS)
+            },
+        )
     });
     if let Some(max) = max_output {
         payload.insert("max_output_tokens".into(), max.into());
     }
     if !req.tools.is_empty() {
-        payload.insert("tools".into(), Value::Array(req.tools.iter().map(|t| tool_for(t.as_ref())).collect()));
+        payload.insert(
+            "tools".into(),
+            Value::Array(req.tools.iter().map(|t| tool_for(t.as_ref())).collect()),
+        );
         if let Some(choice) = &req.tool_prefs.choice {
             payload.insert(
                 "tool_choice".into(),
@@ -54,7 +77,10 @@ pub fn render_payload(req: &Request) -> Result<Value> {
             );
         }
         if let Some(calls) = req.tool_prefs.calls {
-            payload.insert("parallel_tool_calls".into(), (calls == ToolCalls::Many).into());
+            payload.insert(
+                "parallel_tool_calls".into(),
+                (calls == ToolCalls::Many).into(),
+            );
         }
     }
     if let Some(schema) = req.schema {
@@ -132,7 +158,8 @@ pub(crate) fn prompt_cache_params(options: &Map<String, Value>) -> Map<String, V
 /// `system_input_item?`: system messages marked as cache boundaries, or carrying attachments,
 /// ride along as input items, because `instructions` is a plain string.
 fn system_input_item(msg: &Message, boundaries: bool) -> bool {
-    msg.role == Role::System && ((boundaries && msg.cache_until_here) || !msg.attachments.is_empty())
+    msg.role == Role::System
+        && ((boundaries && msg.cache_until_here) || !msg.attachments.is_empty())
 }
 
 fn format_instructions(messages: &[Message], boundaries: bool) -> Option<String> {
@@ -176,10 +203,17 @@ fn compaction_output(msg: &Message) -> Option<&Vec<Value>> {
 }
 
 /// `Compaction#render_compaction_payload`: model, input, and instructions, with no cache boundaries.
-pub(crate) fn render_compaction_payload(provider: Provider, model: &str, messages: &[Message]) -> Result<Value> {
+pub(crate) fn render_compaction_payload(
+    provider: Provider,
+    model: &str,
+    messages: &[Message],
+) -> Result<Value> {
     let mut payload = Map::new();
     payload.insert("model".into(), model.into());
-    payload.insert("input".into(), Value::Array(format_input(provider, messages, false)?));
+    payload.insert(
+        "input".into(),
+        Value::Array(format_input(provider, messages, false)?),
+    );
     if let Some(instructions) = format_instructions(messages, false) {
         payload.insert("instructions".into(), instructions.into());
     }
@@ -188,10 +222,19 @@ pub(crate) fn render_compaction_payload(provider: Provider, model: &str, message
 
 /// `Compaction#parse_compaction_response`: an empty assistant message carrying the compacted
 /// context as `raw_content`, with the pass's usage.
-pub(crate) fn parse_compaction_response(provider: Provider, model: &str, raw: RawResponse) -> Result<Message> {
+pub(crate) fn parse_compaction_response(
+    provider: Provider,
+    model: &str,
+    raw: RawResponse,
+) -> Result<Message> {
     let body = raw.body.clone();
-    if body.get("object").and_then(Value::as_str) != Some("response.compaction") || !body.get("output").is_some_and(Value::is_array) {
-        return Err(Error::Api("The provider returned an invalid compaction response".into(), None));
+    if body.get("object").and_then(Value::as_str) != Some("response.compaction")
+        || !body.get("output").is_some_and(Value::is_array)
+    {
+        return Err(Error::Api(
+            "The provider returned an invalid compaction response".into(),
+            None,
+        ));
     }
     let mut m = Message::assistant("");
     m.model = Some(model.to_string());
@@ -205,14 +248,20 @@ pub(crate) fn parse_compaction_response(provider: Provider, model: &str, raw: Ra
 fn with_cache_breakpoint(mut item: Value) -> Value {
     let parts = match item.get("content") {
         Some(Value::Array(parts)) => Some(parts.clone()),
-        Some(Value::String(s)) if !s.is_empty() => Some(vec![json!({ "type": "input_text", "text": s })]),
+        Some(Value::String(s)) if !s.is_empty() => {
+            Some(vec![json!({ "type": "input_text", "text": s })])
+        }
         _ => None,
     };
     if let Some(mut parts) = parts
-        && let Some(Value::Object(last)) = parts.last_mut() {
-            last.insert("prompt_cache_breakpoint".into(), json!({ "mode": "explicit" }));
-            item["content"] = Value::Array(parts);
-        }
+        && let Some(Value::Object(last)) = parts.last_mut()
+    {
+        last.insert(
+            "prompt_cache_breakpoint".into(),
+            json!({ "mode": "explicit" }),
+        );
+        item["content"] = Value::Array(parts);
+    }
     item
 }
 
@@ -221,13 +270,19 @@ fn format_item(provider: Provider, msg: &Message, boundaries: bool) -> Result<Ve
         Role::System | Role::User => {
             let role = msg.role.as_str();
             let item = json!({ "role": role, "content": format_content(provider, msg.content.as_deref(), &msg.attachments)? });
-            vec![if boundaries && msg.cache_until_here { with_cache_breakpoint(item) } else { item }]
+            vec![if boundaries && msg.cache_until_here {
+                with_cache_breakpoint(item)
+            } else {
+                item
+            }]
         }
         Role::Tool => {
             // `DeepSeek::Responses#format_tool_items`: attachments ride inside the output itself.
             if provider == Provider::DeepSeek {
                 let output = format_content(provider, msg.content.as_deref(), &msg.attachments)?;
-                return Ok(vec![json!({ "type": "function_call_output", "call_id": msg.tool_call_id, "output": output })]);
+                return Ok(vec![
+                    json!({ "type": "function_call_output", "call_id": msg.tool_call_id, "output": output }),
+                ]);
             }
             if let Some(Value::Array(raw)) = &msg.raw_content {
                 return Ok(raw.clone());
@@ -238,7 +293,9 @@ fn format_item(provider: Provider, msg: &Message, boundaries: bool) -> Result<Ve
                 "output": msg.content.clone().unwrap_or_default(),
             })];
             if !msg.attachments.is_empty() {
-                let mut parts = vec![json!({ "type": "input_text", "text": format!("Attachments from tool call {}:", msg.tool_call_id.as_deref().unwrap_or("")) })];
+                let mut parts = vec![
+                    json!({ "type": "input_text", "text": format!("Attachments from tool call {}:", msg.tool_call_id.as_deref().unwrap_or("")) }),
+                ];
                 if let Value::Array(more) = format_content(provider, None, &msg.attachments)? {
                     parts.extend(more);
                 }
@@ -253,7 +310,11 @@ fn format_item(provider: Provider, msg: &Message, boundaries: bool) -> Result<Ve
                 if provider == Provider::Perplexity {
                     return Ok(raw
                         .iter()
-                        .filter(|i| i.get("type").and_then(Value::as_str).is_none_or(|t| CLIENT_OUTPUT_ITEM_TYPES.contains(&t)))
+                        .filter(|i| {
+                            i.get("type")
+                                .and_then(Value::as_str)
+                                .is_none_or(|t| CLIENT_OUTPUT_ITEM_TYPES.contains(&t))
+                        })
                         .cloned()
                         .collect());
                 }
@@ -265,12 +326,24 @@ fn format_item(provider: Provider, msg: &Message, boundaries: bool) -> Result<Ve
             let mut items = Vec::new();
             // `DeepSeek::Responses#format_assistant_items`: DeepSeek reads its reasoning back as
             // `reasoning_text` parts, signed or not; its `format_reasoning_item` overrides the base one.
-            let deepseek_text = provider == Provider::DeepSeek && msg.thinking.as_ref().is_some_and(|t| t.text.as_deref().is_some_and(|x| !x.is_empty()));
-            if let Some(t) = msg.thinking.as_ref().filter(|t| t.signature.is_some() || deepseek_text) {
+            let deepseek_text = provider == Provider::DeepSeek
+                && msg
+                    .thinking
+                    .as_ref()
+                    .is_some_and(|t| t.text.as_deref().is_some_and(|x| !x.is_empty()));
+            if let Some(t) = msg
+                .thinking
+                .as_ref()
+                .filter(|t| t.signature.is_some() || deepseek_text)
+            {
                 if provider == Provider::DeepSeek {
                     items.push(json!({ "type": "reasoning", "content": [{ "type": "reasoning_text", "text": t.text }] }));
                 } else {
-                    let summary = t.text.as_ref().map(|text| json!([{ "type": "summary_text", "text": text }])).unwrap_or_else(|| json!([]));
+                    let summary = t
+                        .text
+                        .as_ref()
+                        .map(|text| json!([{ "type": "summary_text", "text": text }]))
+                        .unwrap_or_else(|| json!([]));
                     items.push(json!({ "type": "reasoning", "summary": summary, "encrypted_content": t.signature }));
                 }
             }
@@ -292,9 +365,15 @@ fn format_item(provider: Provider, msg: &Message, boundaries: bool) -> Result<Ve
 
 /// `Responses::Media.format_content`. DeepSeek (`providers/deepseek/responses.rb`) reads uploaded
 /// images as `input_image` references and rejects documents, inline or uploaded.
-fn format_content(provider: Provider, content: Option<&str>, attachments: &[Attachment]) -> Result<Value> {
+fn format_content(
+    provider: Provider,
+    content: Option<&str>,
+    attachments: &[Attachment],
+) -> Result<Value> {
     if attachments.is_empty() {
-        return Ok(content.map(|c| Value::String(c.into())).unwrap_or(Value::Null));
+        return Ok(content
+            .map(|c| Value::String(c.into()))
+            .unwrap_or(Value::Null));
     }
     let mut parts = Vec::new();
     if let Some(c) = content {
@@ -309,7 +388,9 @@ fn format_content(provider: Provider, content: Option<&str>, attachments: &[Atta
             } else if a.kind() == AttachmentType::Image {
                 parts.push(json!({ "type": "input_image", "file_id": file_id }));
             } else {
-                return Err(Error::UnsupportedAttachment(super::anthropic::unsupported(&a.mime_type)));
+                return Err(Error::UnsupportedAttachment(super::anthropic::unsupported(
+                    &a.mime_type,
+                )));
             }
             continue;
         }
@@ -317,19 +398,32 @@ fn format_content(provider: Provider, content: Option<&str>, attachments: &[Atta
             AttachmentType::Image => {
                 let mut part = json!({ "type": "input_image", "image_url": a.url_or_data_uri()? });
                 if let Some(res) = a.resolution {
-                    part["detail"] = if res == crate::attachment::Resolution::Low { "low" } else { "high" }.into();
+                    part["detail"] = if res == crate::attachment::Resolution::Low {
+                        "low"
+                    } else {
+                        "high"
+                    }
+                    .into();
                 }
                 part
             }
             // `Perplexity::Agent#format_document`: the Agent API takes no documents.
-            AttachmentType::Pdf | AttachmentType::Document if deepseek || provider == Provider::Perplexity => {
-                return Err(Error::UnsupportedAttachment(super::anthropic::unsupported(&a.mime_type)));
+            AttachmentType::Pdf | AttachmentType::Document
+                if deepseek || provider == Provider::Perplexity =>
+            {
+                return Err(Error::UnsupportedAttachment(super::anthropic::unsupported(
+                    &a.mime_type,
+                )));
             }
             AttachmentType::Pdf | AttachmentType::Document => {
                 json!({ "type": "input_file", "filename": a.filename, "file_data": a.for_llm()? })
             }
             AttachmentType::Text => json!({ "type": "input_text", "text": a.for_llm()? }),
-            _ => return Err(Error::UnsupportedAttachment(super::anthropic::unsupported(&a.mime_type))),
+            _ => {
+                return Err(Error::UnsupportedAttachment(super::anthropic::unsupported(
+                    &a.mime_type,
+                )));
+            }
         });
     }
     Ok(Value::Array(parts))
@@ -353,15 +447,24 @@ fn tool_for(tool: &dyn Tool) -> Value {
 fn parse_usage(provider: Provider, message: &mut Message, usage: &Value) {
     let mut usage = usage.clone();
     if provider == Provider::Perplexity {
-        let details = usage.get("input_tokens_details").cloned().unwrap_or_else(|| json!({}));
-        let mut merged = json!({ "cache_write_tokens": details.get("cache_creation_input_tokens") });
+        let details = usage
+            .get("input_tokens_details")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+        let mut merged =
+            json!({ "cache_write_tokens": details.get("cache_creation_input_tokens") });
         deep_merge(&mut merged, &details);
         usage["input_tokens_details"] = merged;
     }
-    let details = usage.get("input_tokens_details").or_else(|| usage.get("prompt_tokens_details")).cloned().unwrap_or_else(|| json!({}));
+    let details = usage
+        .get("input_tokens_details")
+        .or_else(|| usage.get("prompt_tokens_details"))
+        .cloned()
+        .unwrap_or_else(|| json!({}));
     let cached = int(details.get("cached_tokens"));
     let writes = int(details.get("cache_write_tokens"));
-    message.tokens.input = int(usage.get("input_tokens")).map(|i| (i - cached.unwrap_or(0) - writes.unwrap_or(0)).max(0));
+    message.tokens.input = int(usage.get("input_tokens"))
+        .map(|i| (i - cached.unwrap_or(0) - writes.unwrap_or(0)).max(0));
     message.tokens.output = int(usage.get("output_tokens"));
     message.tokens.cache_read = cached;
     message.tokens.cache_write = writes;
@@ -375,14 +478,22 @@ fn parse_usage(provider: Provider, message: &mut Message, usage: &Value) {
                 }
             }
             message.tokens.server_tool_use = (!counters.is_empty()).then_some(counters);
-            message.tokens.reported_cost = usage.get("cost_in_usd_ticks").and_then(Value::as_f64).map(|t| t * 1e-10);
+            message.tokens.reported_cost = usage
+                .get("cost_in_usd_ticks")
+                .and_then(Value::as_f64)
+                .map(|t| t * 1e-10);
         }
-        Provider::Perplexity => message.tokens.reported_cost = usage.pointer("/cost/total_cost").and_then(Value::as_f64),
+        Provider::Perplexity => {
+            message.tokens.reported_cost = usage.pointer("/cost/total_cost").and_then(Value::as_f64)
+        }
         // `OpenRouter::Responses#parse_usage`: the billed cost and the hosted tool counters.
         Provider::OpenRouter => {
             message.tokens.reported_cost = super::chat_completions::reported_cost(provider, &usage);
-            message.tokens.server_tool_use =
-                usage.get("server_tool_use").or_else(|| usage.get("server_tool_use_details")).and_then(Value::as_object).cloned();
+            message.tokens.server_tool_use = usage
+                .get("server_tool_use")
+                .or_else(|| usage.get("server_tool_use_details"))
+                .and_then(Value::as_object)
+                .cloned();
         }
         _ => {}
     }
@@ -393,16 +504,32 @@ const CLIENT_OUTPUT_ITEM_TYPES: &[&str] = &["message", "reasoning", "function_ca
 fn server_tool_items(output: &[Value]) -> Vec<ServerToolCall> {
     output
         .iter()
-        .filter(|i| !CLIENT_OUTPUT_ITEM_TYPES.contains(&i.get("type").and_then(Value::as_str).unwrap_or("")))
+        .filter(|i| {
+            !CLIENT_OUTPUT_ITEM_TYPES.contains(&i.get("type").and_then(Value::as_str).unwrap_or(""))
+        })
         .map(|item| ServerToolCall {
             kind: str_of(item.get("type")).unwrap_or_default(),
             name: str_of(item.get("name")),
             id: str_of(item.get("id")),
-            input: item.get("action").or_else(|| item.get("arguments")).or_else(|| item.get("code")).cloned(),
+            input: item
+                .get("action")
+                .or_else(|| item.get("arguments"))
+                .or_else(|| item.get("code"))
+                .cloned(),
             // `server_tool_result`: the first key whose value is truthy (a `null` output is no result).
-            result: ["result", "results", "outputs", "output", "encrypted_content"]
-                .iter()
-                .find_map(|k| item.get(*k).filter(|v| !v.is_null() && **v != Value::Bool(false)).cloned()),
+            result: [
+                "result",
+                "results",
+                "outputs",
+                "output",
+                "encrypted_content",
+            ]
+            .iter()
+            .find_map(|k| {
+                item.get(*k)
+                    .filter(|v| !v.is_null() && **v != Value::Bool(false))
+                    .cloned()
+            }),
             raw: item.clone(),
         })
         .collect()
@@ -418,16 +545,24 @@ fn gpustack_server_tool_history(item: &Value) -> Vec<Value> {
     }
     let (name, id, output) = (item.get("name"), item.get("id"), item.get("output"));
     if kind == Some("mcp_call")
-        && let (Some(name), Some(id), Some(output)) =
-            (name.filter(|v| !v.is_null()), id.filter(|v| !v.is_null()), output.filter(|v| !v.is_null()))
+        && let (Some(name), Some(id), Some(output)) = (
+            name.filter(|v| !v.is_null()),
+            id.filter(|v| !v.is_null()),
+            output.filter(|v| !v.is_null()),
+        )
     {
-        let output = output.as_str().map(str::to_string).unwrap_or_else(|| output.to_string());
+        let output = output
+            .as_str()
+            .map(str::to_string)
+            .unwrap_or_else(|| output.to_string());
         return vec![
             json!({ "type": "function_call", "call_id": id, "name": name, "arguments": item.get("arguments") }),
             json!({ "type": "function_call_output", "call_id": id, "output": output }),
         ];
     }
-    vec![json!({ "role": "assistant", "content": [{ "type": "output_text", "text": item.to_string() }] })]
+    vec![
+        json!({ "role": "assistant", "content": [{ "type": "output_text", "text": item.to_string() }] }),
+    ]
 }
 
 fn text_key(part_type: &str) -> Option<&'static str> {
@@ -442,7 +577,12 @@ fn parse_output_text(output: &[Value]) -> Option<String> {
     let texts: Vec<String> = output
         .iter()
         .filter(|i| i.get("type").and_then(Value::as_str) == Some("message"))
-        .flat_map(|m| m.get("content").and_then(Value::as_array).cloned().unwrap_or_default())
+        .flat_map(|m| {
+            m.get("content")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default()
+        })
         .filter_map(|part| {
             let key = text_key(part.get("type").and_then(Value::as_str).unwrap_or(""))?;
             str_of(part.get(key))
@@ -498,21 +638,50 @@ fn offset(c: Citation, by: i64, content: Option<&str>) -> Citation {
         (Some(content), Some(s), Some(e)) => char_slice(content, s, e),
         _ => None,
     };
-    Citation { start_index: start, end_index: end, text, ..c }
+    Citation {
+        start_index: start,
+        end_index: end,
+        text,
+        ..c
+    }
 }
 
-fn parse_citations(provider: Provider, data: &Value, output: &[Value], content: Option<&str>) -> Vec<Citation> {
+fn parse_citations(
+    provider: Provider,
+    data: &Value,
+    output: &[Value],
+    content: Option<&str>,
+) -> Vec<Citation> {
     let mut offset_by = 0i64;
     let mut citations = Vec::new();
-    for message in output.iter().filter(|i| i.get("type").and_then(Value::as_str) == Some("message")) {
-        for part in message.get("content").and_then(Value::as_array).into_iter().flatten() {
-            let Some(key) = text_key(part.get("type").and_then(Value::as_str).unwrap_or("")) else { continue };
-            for a in part.get("annotations").and_then(Value::as_array).into_iter().flatten() {
+    for message in output
+        .iter()
+        .filter(|i| i.get("type").and_then(Value::as_str) == Some("message"))
+    {
+        for part in message
+            .get("content")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let Some(key) = text_key(part.get("type").and_then(Value::as_str).unwrap_or("")) else {
+                continue;
+            };
+            for a in part
+                .get("annotations")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+            {
                 if let Some(c) = parse_annotation(a, None) {
                     citations.push(offset(c, offset_by, content));
                 }
             }
-            offset_by += part.get(key).and_then(Value::as_str).map(|s| s.chars().count() as i64).unwrap_or(0);
+            offset_by += part
+                .get(key)
+                .and_then(Value::as_str)
+                .map(|s| s.chars().count() as i64)
+                .unwrap_or(0);
         }
     }
     if !citations.is_empty() {
@@ -525,7 +694,12 @@ fn parse_citations(provider: Provider, data: &Value, output: &[Value], content: 
     let results: Vec<Value> = output
         .iter()
         .filter(|i| i.get("type").and_then(Value::as_str) == Some("search_results"))
-        .flat_map(|i| i.get("results").and_then(Value::as_array).cloned().unwrap_or_default())
+        .flat_map(|i| {
+            i.get("results")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default()
+        })
         .collect();
     parse_search_results(&results)
 }
@@ -534,7 +708,11 @@ fn parse_finish_reason(data: &Value) -> Option<crate::message::FinishReason> {
     let reason = data
         .pointer("/incomplete_details/reason")
         .and_then(Value::as_str)
-        .or_else(|| data.get("status").and_then(Value::as_str).filter(|s| *s == "completed"));
+        .or_else(|| {
+            data.get("status")
+                .and_then(Value::as_str)
+                .filter(|s| *s == "completed")
+        });
     normalize_finish_reason(reason, FINISH_REASONS)
 }
 
@@ -545,7 +723,9 @@ fn parse_tool_calls(output: &[Value], finish: Option<&str>) -> Result<Vec<ToolCa
         let parse = |args: Option<&Value>| -> Result<Map<String, Value>> {
             match args {
                 Some(Value::Object(m)) => Ok(m.clone()),
-                Some(Value::String(s)) if !s.is_empty() => serde_json::from_str(s).map_err(|_| Error::tool_call_parse(finish)),
+                Some(Value::String(s)) if !s.is_empty() => {
+                    serde_json::from_str(s).map_err(|_| Error::tool_call_parse(finish))
+                }
                 _ => Ok(Map::new()),
             }
         };
@@ -571,12 +751,20 @@ fn parse_tool_calls(output: &[Value], finish: Option<&str>) -> Result<Vec<ToolCa
 }
 
 fn reasoning(output: &[Value], provider: Provider) -> Option<Thinking> {
-    let items: Vec<&Value> = output.iter().filter(|i| i.get("type").and_then(Value::as_str) == Some("reasoning")).collect();
+    let items: Vec<&Value> = output
+        .iter()
+        .filter(|i| i.get("type").and_then(Value::as_str) == Some("reasoning"))
+        .collect();
     let mut texts: Vec<String> = Vec::new();
     if provider == Provider::DeepSeek {
         texts = items
             .iter()
-            .flat_map(|i| i.get("content").and_then(Value::as_array).cloned().unwrap_or_default())
+            .flat_map(|i| {
+                i.get("content")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default()
+            })
             .filter(|p| p.get("type").and_then(Value::as_str) == Some("reasoning_text"))
             .filter_map(|p| str_of(p.get("text")))
             .collect();
@@ -584,7 +772,12 @@ fn reasoning(output: &[Value], provider: Provider) -> Option<Thinking> {
     if texts.is_empty() {
         texts = items
             .iter()
-            .flat_map(|i| i.get("summary").and_then(Value::as_array).cloned().unwrap_or_default())
+            .flat_map(|i| {
+                i.get("summary")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default()
+            })
             .filter_map(|p| str_of(p.get("text")))
             .collect();
     }
@@ -593,22 +786,37 @@ fn reasoning(output: &[Value], provider: Provider) -> Option<Thinking> {
     if texts.is_empty() && provider == Provider::GPUStack {
         let text: String = items
             .iter()
-            .flat_map(|i| i.get("content").and_then(Value::as_array).cloned().unwrap_or_default())
+            .flat_map(|i| {
+                i.get("content")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default()
+            })
             .filter_map(|p| str_of(p.get("text")))
             .collect();
         if !text.is_empty() {
             texts.push(text);
         }
     }
-    let signature = items.first().and_then(|i| str_of(i.get("encrypted_content")));
+    let signature = items
+        .first()
+        .and_then(|i| str_of(i.get("encrypted_content")));
     Thinking::build((!texts.is_empty()).then(|| texts.join("\n")), signature)
 }
 
-pub fn parse_completion_body(provider: Provider, data: &Value, raw: RawResponse) -> Result<Message> {
+pub fn parse_completion_body(
+    provider: Provider,
+    data: &Value,
+    raw: RawResponse,
+) -> Result<Message> {
     if let Some(msg) = data.pointer("/error/message").and_then(Value::as_str) {
         return Err(Error::Api(msg.into(), None));
     }
-    let output = data.get("output").and_then(Value::as_array).cloned().unwrap_or_default();
+    let output = data
+        .get("output")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     let content = parse_output_text(&output);
     let finish = parse_finish_reason(data);
     let server_calls = server_tool_items(&output);
@@ -616,7 +824,10 @@ pub fn parse_completion_body(provider: Provider, data: &Value, raw: RawResponse)
     m.citations = parse_citations(provider, data, &output, content.as_deref());
     m.content = content;
     m.thinking = reasoning(&output, provider);
-    m.tool_calls = tool_call_map(parse_tool_calls(&output, finish.as_ref().map(|f| f.as_str()))?);
+    m.tool_calls = tool_call_map(parse_tool_calls(
+        &output,
+        finish.as_ref().map(|f| f.as_str()),
+    )?);
     m.raw_content = (!server_calls.is_empty()).then(|| Value::Array(output.clone()));
     m.server_tool_calls = server_calls;
     m.model = str_of(data.get("model"));
@@ -629,18 +840,27 @@ pub fn parse_completion_body(provider: Provider, data: &Value, raw: RawResponse)
 pub fn build_chunk(provider: Provider, state: &mut StreamState, data: &Value) -> Result<Message> {
     let mut chunk = Message::chunk();
     let kind = data.get("type").and_then(Value::as_str).unwrap_or("");
-    let position = (int(data.get("output_index")).unwrap_or(0), int(data.get("content_index")).unwrap_or(0));
+    let position = (
+        int(data.get("output_index")).unwrap_or(0),
+        int(data.get("content_index")).unwrap_or(0),
+    );
     match kind {
         "response.output_text.delta" | "response.refusal.delta" => {
             let delta = str_of(data.get("delta")).unwrap_or_default();
             let len = delta.chars().count();
-            match state.citation_lengths.iter_mut().find(|(p, _)| *p == position) {
+            match state
+                .citation_lengths
+                .iter_mut()
+                .find(|(p, _)| *p == position)
+            {
                 Some((_, l)) => *l += len,
                 None => state.citation_lengths.push((position, len)),
             }
             chunk.content = Some(delta);
         }
-        "response.reasoning_summary_text.delta" => chunk.thinking = Thinking::build(str_of(data.get("delta")), None),
+        "response.reasoning_summary_text.delta" => {
+            chunk.thinking = Thinking::build(str_of(data.get("delta")), None)
+        }
         "response.reasoning_text.delta" if provider == Provider::DeepSeek => {
             chunk.thinking = Thinking::build(str_of(data.get("delta")), None)
         }
@@ -650,28 +870,48 @@ pub fn build_chunk(provider: Provider, state: &mut StreamState, data: &Value) ->
             }
         }
         "response.output_text.annotation.added" => {
-            let by: usize = state.citation_lengths.iter().filter(|(p, _)| *p < position).map(|(_, l)| *l).sum();
-            if let Some(c) = data.get("annotation").and_then(|a| parse_annotation(a, None)) {
+            let by: usize = state
+                .citation_lengths
+                .iter()
+                .filter(|(p, _)| *p < position)
+                .map(|(_, l)| *l)
+                .sum();
+            if let Some(c) = data
+                .get("annotation")
+                .and_then(|a| parse_annotation(a, None))
+            {
                 chunk.citations = vec![offset(c, by as i64, None)];
             }
         }
         "response.output_item.added" => {
             let item = &data["item"];
-            if item.get("type").and_then(Value::as_str) == Some("function_call") && provider != Provider::Perplexity {
+            if item.get("type").and_then(Value::as_str) == Some("function_call")
+                && provider != Provider::Perplexity
+            {
                 let key = position.0.to_string();
                 chunk.tool_calls = Some(
-                    [(key, ToolCall::opening(str_of(item.get("call_id")).unwrap_or_default(), str_of(item.get("name")).unwrap_or_default(), String::new()))]
-                        .into_iter()
-                        .collect(),
+                    [(
+                        key,
+                        ToolCall::opening(
+                            str_of(item.get("call_id")).unwrap_or_default(),
+                            str_of(item.get("name")).unwrap_or_default(),
+                            String::new(),
+                        ),
+                    )]
+                    .into_iter()
+                    .collect(),
                 );
             }
         }
         "response.function_call_arguments.delta" => {
             let key = position.0.to_string();
             chunk.tool_calls = Some(
-                [(key, ToolCall::fragment(str_of(data.get("delta")).unwrap_or_default()))]
-                    .into_iter()
-                    .collect(),
+                [(
+                    key,
+                    ToolCall::fragment(str_of(data.get("delta")).unwrap_or_default()),
+                )]
+                .into_iter()
+                .collect(),
             );
         }
         "response.output_item.done" => {
@@ -685,9 +925,16 @@ pub fn build_chunk(provider: Provider, state: &mut StreamState, data: &Value) ->
                 Some("function_call") if provider == Provider::Perplexity => {
                     let key = position.0.to_string();
                     chunk.tool_calls = Some(
-                        [(key, ToolCall::opening(str_of(item.get("call_id")).unwrap_or_default(), str_of(item.get("name")).unwrap_or_default(), str_of(item.get("arguments")).unwrap_or_default()))]
-                            .into_iter()
-                            .collect(),
+                        [(
+                            key,
+                            ToolCall::opening(
+                                str_of(item.get("call_id")).unwrap_or_default(),
+                                str_of(item.get("name")).unwrap_or_default(),
+                                str_of(item.get("arguments")).unwrap_or_default(),
+                            ),
+                        )]
+                        .into_iter()
+                        .collect(),
                     );
                 }
                 _ => {}
@@ -695,12 +942,17 @@ pub fn build_chunk(provider: Provider, state: &mut StreamState, data: &Value) ->
         }
         "response.completed" | "response.incomplete" => {
             let response = data.get("response").cloned().unwrap_or_else(|| json!({}));
-            let output = response.get("output").and_then(Value::as_array).cloned().unwrap_or_default();
+            let output = response
+                .get("output")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
             let finish = parse_finish_reason(&response);
-            let approvals: Vec<ToolCall> = parse_tool_calls(&output, finish.as_ref().map(|f| f.as_str()))?
-                .into_iter()
-                .filter(|c| c.remote)
-                .collect();
+            let approvals: Vec<ToolCall> =
+                parse_tool_calls(&output, finish.as_ref().map(|f| f.as_str()))?
+                    .into_iter()
+                    .filter(|c| c.remote)
+                    .collect();
             chunk.tool_calls = tool_call_map(approvals);
             chunk.model = str_of(response.get("model"));
             chunk.citations = parse_citations(provider, &response, &output, None);
@@ -708,7 +960,11 @@ pub fn build_chunk(provider: Provider, state: &mut StreamState, data: &Value) ->
             chunk.raw_content = (!server_calls.is_empty()).then(|| Value::Array(output.clone()));
             chunk.server_tool_calls = server_calls;
             chunk.finish_reason = finish;
-            parse_usage(provider, &mut chunk, response.get("usage").unwrap_or(&json!({})));
+            parse_usage(
+                provider,
+                &mut chunk,
+                response.get("usage").unwrap_or(&json!({})),
+            );
         }
         // `OpenRouter::Responses#build_chunk`: the finished arguments of a remote MCP call.
         "response.mcp_call_arguments.done" if provider == Provider::OpenRouter => {
@@ -723,7 +979,8 @@ pub fn build_chunk(provider: Provider, state: &mut StreamState, data: &Value) ->
         }
         "response.failed" => {
             return Err(Error::Api(
-                str_of(data.pointer("/response/error/message")).unwrap_or_else(|| "response failed".into()),
+                str_of(data.pointer("/response/error/message"))
+                    .unwrap_or_else(|| "response failed".into()),
                 None,
             ));
         }

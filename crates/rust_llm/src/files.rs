@@ -37,7 +37,14 @@ use crate::transport::Connection;
 pub const ANTHROPIC_FILES_BETA: &str = "files-api-2025-04-14";
 
 /// `OpenAI::Files::UPLOAD_PURPOSES`.
-const OPENAI_UPLOAD_PURPOSES: &[&str] = &["assistants", "batch", "fine-tune", "vision", "user_data", "evals"];
+const OPENAI_UPLOAD_PURPOSES: &[&str] = &[
+    "assistants",
+    "batch",
+    "fine-tune",
+    "vision",
+    "user_data",
+    "evals",
+];
 /// `DeepSeek::Files::IMAGE_TYPES` and `MAX_FILE_SIZE`.
 const DEEPSEEK_IMAGE_TYPES: &[&str] = &["image/jpeg", "image/png", "image/gif", "image/webp"];
 const DEEPSEEK_MAX_FILE_SIZE: usize = 64 * 1024 * 1024;
@@ -117,7 +124,10 @@ pub struct FileOptions<'a> {
 }
 
 /// `RubyLLM.upload`.
-pub async fn upload(file: impl Into<Attachment>, options: UploadOptions<'_>) -> Result<UploadedFile> {
+pub async fn upload(
+    file: impl Into<Attachment>,
+    options: UploadOptions<'_>,
+) -> Result<UploadedFile> {
     UploadedFile::upload(file, options).await
 }
 
@@ -129,11 +139,15 @@ pub async fn download(id: &str, options: FileOptions<'_>) -> Result<DownloadedFi
 impl UploadedFile {
     /// `expired?`: the retention window has passed or ends within the next minute.
     pub fn is_expired(&self) -> bool {
-        self.expires_at.is_some_and(|t| t <= Utc::now() + chrono::Duration::seconds(EXPIRY_MARGIN))
+        self.expires_at
+            .is_some_and(|t| t <= Utc::now() + chrono::Duration::seconds(EXPIRY_MARGIN))
     }
 
     /// `UploadedFile.upload`. Without `provider`, the default model's provider is used.
-    pub async fn upload(file: impl Into<Attachment>, options: UploadOptions<'_>) -> Result<UploadedFile> {
+    pub async fn upload(
+        file: impl Into<Attachment>,
+        options: UploadOptions<'_>,
+    ) -> Result<UploadedFile> {
         let config = options.config.clone().unwrap_or_else(crate::config);
         let provider = provider_for(options.provider, &config)?;
         let connection = Connection::new(provider, config)?;
@@ -151,7 +165,9 @@ impl UploadedFile {
     pub async fn download(id: &str, options: FileOptions<'_>) -> Result<DownloadedFile> {
         let config = options.config.clone().unwrap_or_else(crate::config);
         let provider = provider_for(options.provider, &config)?;
-        download_file(&Connection::new(provider, config)?, provider, id).await.map(DownloadedFile)
+        download_file(&Connection::new(provider, config)?, provider, id)
+            .await
+            .map(DownloadedFile)
     }
 }
 
@@ -184,11 +200,18 @@ fn ensure_files_supported(provider: Provider) -> Result<()> {
     if supports_files(provider) {
         return Ok(());
     }
-    Err(Error::Api(format!("{} doesn't support file uploads", provider.slug()), None))
+    Err(Error::Api(
+        format!("{} doesn't support file uploads", provider.slug()),
+        None,
+    ))
 }
 
 fn files_url(provider: Provider) -> &'static str {
-    if provider == Provider::Anthropic { "v1/files" } else { "files" }
+    if provider == Provider::Anthropic {
+        "v1/files"
+    } else {
+        "files"
+    }
 }
 
 /// `file_headers` / `upload_headers`: only Anthropic's Files API is a beta.
@@ -207,7 +230,11 @@ fn file_content_type(attachment: &Attachment) -> String {
         .as_deref()
         .and_then(|f| Path::new(f).extension())
         .is_some_and(|e| e.eq_ignore_ascii_case("jsonl"));
-    if jsonl { "application/jsonl".into() } else { attachment.mime_type.clone() }
+    if jsonl {
+        "application/jsonl".into()
+    } else {
+        attachment.mime_type.clone()
+    }
 }
 
 /// `Provider#upload_file` → `Files#upload`.
@@ -219,7 +246,10 @@ pub(crate) async fn upload_file(
 ) -> Result<UploadedFile> {
     ensure_files_supported(provider)?;
     if provider == Provider::Perplexity {
-        return Err(Error::Api("Perplexity Agent only supports downloading generated response files".into(), None));
+        return Err(Error::Api(
+            "Perplexity Agent only supports downloading generated response files".into(),
+            None,
+        ));
     }
     // `file_attachment(file, filename:)`
     let mut attachment = match options.filename {
@@ -254,9 +284,14 @@ pub(crate) async fn upload_file(
             .file_name(filename.clone())
             .mime_str(&content_type)
             .expect("content type validated above");
-        fields.iter().fold(reqwest::multipart::Form::new().part("file", part), |form, (k, v)| form.text(k.clone(), v.clone()))
+        fields.iter().fold(
+            reqwest::multipart::Form::new().part("file", part),
+            |form, (k, v)| form.text(k.clone(), v.clone()),
+        )
     };
-    let raw = connection.post_multipart(files_url(provider), form, &file_headers(provider), false).await?;
+    let raw = connection
+        .post_multipart(files_url(provider), form, &file_headers(provider), false)
+        .await?;
     parse_file_response(provider, &raw.body)
 }
 
@@ -279,13 +314,19 @@ fn upload_fields(
         Provider::OpenAI | Provider::DeepSeek => {
             let purpose = if provider == Provider::DeepSeek {
                 if !DEEPSEEK_IMAGE_TYPES.contains(&attachment.mime_type.as_str()) {
-                    return Err(Error::UnsupportedAttachment(crate::protocols::anthropic::unsupported(&attachment.mime_type)));
+                    return Err(Error::UnsupportedAttachment(
+                        crate::protocols::anthropic::unsupported(&attachment.mime_type),
+                    ));
                 }
                 if attachment.bytes()?.len() > DEEPSEEK_MAX_FILE_SIZE {
-                    return Err(Error::Argument("DeepSeek image uploads cannot exceed 64 MiB".into()));
+                    return Err(Error::Argument(
+                        "DeepSeek image uploads cannot exceed 64 MiB".into(),
+                    ));
                 }
                 if purpose.as_deref().is_some_and(|p| p != "user_data") {
-                    return Err(Error::Argument("DeepSeek file uploads require purpose: user_data".into()));
+                    return Err(Error::Argument(
+                        "DeepSeek file uploads require purpose: user_data".into(),
+                    ));
                 }
                 Some("user_data".to_string())
             } else {
@@ -306,7 +347,10 @@ fn upload_fields(
         }
         Provider::Mistral => {
             push("purpose", purpose);
-            push("expiry", options.expires_in.map(|s| s.div_ceil(3600).to_string()));
+            push(
+                "expiry",
+                options.expires_in.map(|s| s.div_ceil(3600).to_string()),
+            );
             push("visibility", visibility);
         }
         Provider::XAI => {
@@ -319,7 +363,11 @@ fn upload_fields(
 }
 
 /// `Gemini::Files#upload`: a resumable upload in two requests, then waiting for processing.
-async fn gemini_upload(connection: &Connection, attachment: &Attachment, display_name: Option<String>) -> Result<UploadedFile> {
+async fn gemini_upload(
+    connection: &Connection,
+    attachment: &Attachment,
+    display_name: Option<String>,
+) -> Result<UploadedFile> {
     let provider = Provider::Gemini;
     let bytes = attachment.bytes()?.to_vec();
     let display_name = display_name.or_else(|| attachment.filename.clone());
@@ -333,15 +381,30 @@ async fn gemini_upload(connection: &Connection, attachment: &Attachment, display
         base.to_string()
     };
     let start_headers = vec![
-        ("X-Goog-Upload-Protocol".to_string(), "resumable".to_string()),
+        (
+            "X-Goog-Upload-Protocol".to_string(),
+            "resumable".to_string(),
+        ),
         ("X-Goog-Upload-Command".to_string(), "start".to_string()),
-        ("X-Goog-Upload-Header-Content-Length".to_string(), bytes.len().to_string()),
-        ("X-Goog-Upload-Header-Content-Type".to_string(), file_content_type(attachment)),
+        (
+            "X-Goog-Upload-Header-Content-Length".to_string(),
+            bytes.len().to_string(),
+        ),
+        (
+            "X-Goog-Upload-Header-Content-Type".to_string(),
+            file_content_type(attachment),
+        ),
     ];
     let body = json!({ "file": { "display_name": display_name } });
     // `gemini_connection` is a basic Faraday connection: no retries.
     let resp = connection
-        .send(reqwest::Method::POST, &format!("{upload_base}/files"), &start_headers, false, &|req| req.json(&body))
+        .send(
+            reqwest::Method::POST,
+            &format!("{upload_base}/files"),
+            &start_headers,
+            false,
+            &|req| req.json(&body),
+        )
         .await?;
     let upload_url = resp
         .headers()
@@ -352,67 +415,113 @@ async fn gemini_upload(connection: &Connection, attachment: &Attachment, display
 
     let upload_headers = vec![
         ("X-Goog-Upload-Offset".to_string(), "0".to_string()),
-        ("X-Goog-Upload-Command".to_string(), "upload, finalize".to_string()),
+        (
+            "X-Goog-Upload-Command".to_string(),
+            "upload, finalize".to_string(),
+        ),
     ];
     let resp = connection
-        .send(reqwest::Method::POST, &upload_url, &upload_headers, false, &|req| req.body(bytes.clone()))
+        .send(
+            reqwest::Method::POST,
+            &upload_url,
+            &upload_headers,
+            false,
+            &|req| req.body(bytes.clone()),
+        )
         .await?;
     let raw = crate::transport::json_response(resp, Value::Null).await?;
-    let data = raw.body.get("file").ok_or_else(|| Error::Api("gemini upload response has no file".into(), None))?;
+    let data = raw
+        .body
+        .get("file")
+        .ok_or_else(|| Error::Api("gemini upload response has no file".into(), None))?;
     let mut file = parse_file_response(provider, data)?;
 
     // `await_active`: Gemini rejects a file reference until processing finishes.
     let deadline = Utc::now() + chrono::Duration::seconds(GEMINI_PROCESSING_TIMEOUT);
     while file.status.as_deref() == Some("PROCESSING") {
         if Utc::now() >= deadline {
-            return Err(Error::Api(format!("gemini is still processing {}", file.id), None));
+            return Err(Error::Api(
+                format!("gemini is still processing {}", file.id),
+                None,
+            ));
         }
         tokio::time::sleep(Duration::from_secs(GEMINI_POLL_INTERVAL)).await;
         file = find_file(connection, provider, &file.id).await?;
     }
     if file.status.as_deref() == Some("FAILED") {
-        return Err(Error::Api(format!("gemini failed to process {}", file.id), None));
+        return Err(Error::Api(
+            format!("gemini failed to process {}", file.id),
+            None,
+        ));
     }
     Ok(file)
 }
 
 fn gemini_file_name(id: &str) -> String {
-    if id.starts_with("files/") { id.to_string() } else { format!("files/{id}") }
+    if id.starts_with("files/") {
+        id.to_string()
+    } else {
+        format!("files/{id}")
+    }
 }
 
 /// `Perplexity::Files#split_resource_id`.
 fn split_perplexity_id(id: &str) -> Result<(String, String)> {
-    let re = regex::Regex::new(r"\A([A-Za-z0-9_-]+)/files/([A-Za-z0-9_-]+)\z").map_err(|e| Error::Argument(e.to_string()))?;
+    let re = regex::Regex::new(r"\A([A-Za-z0-9_-]+)/files/([A-Za-z0-9_-]+)\z")
+        .map_err(|e| Error::Argument(e.to_string()))?;
     let caps = re.captures(id).ok_or_else(|| {
-        Error::Argument("Perplexity file IDs must include their response: response_id/files/file_id".into())
+        Error::Argument(
+            "Perplexity file IDs must include their response: response_id/files/file_id".into(),
+        )
     })?;
     Ok((caps[1].to_string(), caps[2].to_string()))
 }
 
 /// `Provider#find_file` → `Files#find`.
-pub(crate) async fn find_file(connection: &Connection, provider: Provider, id: &str) -> Result<UploadedFile> {
+pub(crate) async fn find_file(
+    connection: &Connection,
+    provider: Provider,
+    id: &str,
+) -> Result<UploadedFile> {
     ensure_files_supported(provider)?;
     if provider == Provider::Perplexity {
         let (response_id, file_id) = split_perplexity_id(id)?;
-        let raw = connection.get(&format!("v1/agent/{response_id}/files"), &[]).await?;
+        let raw = connection
+            .get(&format!("v1/agent/{response_id}/files"), &[])
+            .await?;
         let data = raw
             .body
             .get("data")
             .and_then(Value::as_array)
-            .and_then(|items| items.iter().find(|i| i.get("id").and_then(Value::as_str) == Some(file_id.as_str())))
+            .and_then(|items| {
+                items
+                    .iter()
+                    .find(|i| i.get("id").and_then(Value::as_str) == Some(file_id.as_str()))
+            })
             .ok_or_else(|| Error::Api("Perplexity response file was not found".into(), None))?;
         return parse_perplexity_file(&response_id, data);
     }
-    let path = if provider == Provider::Gemini { gemini_file_name(id) } else { format!("{}/{id}", files_url(provider)) };
+    let path = if provider == Provider::Gemini {
+        gemini_file_name(id)
+    } else {
+        format!("{}/{id}", files_url(provider))
+    };
     let raw = connection.get(&path, &file_headers(provider)).await?;
     parse_file_response(provider, &raw.body)
 }
 
 /// `Provider#download_file` → `Files#download`.
-pub(crate) async fn download_file(connection: &Connection, provider: Provider, id: &str) -> Result<Vec<u8>> {
+pub(crate) async fn download_file(
+    connection: &Connection,
+    provider: Provider,
+    id: &str,
+) -> Result<Vec<u8>> {
     ensure_files_supported(provider)?;
     match provider {
-        Provider::DeepSeek => Err(Error::Api("DeepSeek does not support downloading uploaded files".into(), None)),
+        Provider::DeepSeek => Err(Error::Api(
+            "DeepSeek does not support downloading uploaded files".into(),
+            None,
+        )),
         Provider::Gemini => {
             let file = find_file(connection, provider, id).await?;
             let uri = file
@@ -420,8 +529,14 @@ pub(crate) async fn download_file(connection: &Connection, provider: Provider, i
                 .get("downloadUri")
                 .and_then(Value::as_str)
                 .ok_or_else(|| Error::Api("gemini file has no download URI".into(), None))?;
-            let resp = connection.send(reqwest::Method::GET, uri, &[], false, &|req| req).await?;
-            Ok(resp.bytes().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?.to_vec())
+            let resp = connection
+                .send(reqwest::Method::GET, uri, &[], false, &|req| req)
+                .await?;
+            Ok(resp
+                .bytes()
+                .await
+                .map_err(|e| Error::ConnectionFailed(e.to_string()))?
+                .to_vec())
         }
         _ => {
             let path = if provider == Provider::Perplexity {
@@ -442,7 +557,9 @@ fn timestamp(value: Option<&Value>) -> Result<Option<DateTime<Utc>>> {
     let secs = match value {
         None | Some(Value::Null) => return Ok(None),
         Some(Value::Number(n)) => n.as_i64(),
-        Some(Value::String(s)) if !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()) => s.parse().ok(),
+        Some(Value::String(s)) if !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()) => {
+            s.parse().ok()
+        }
         Some(Value::String(s)) => {
             return DateTime::parse_from_rfc3339(s)
                 .map(|t| Some(t.with_timezone(&Utc)))
@@ -459,7 +576,8 @@ fn string(data: &Value, key: &str) -> Option<String> {
 
 fn size(data: &Value, key: &str) -> Option<u64> {
     let v = data.get(key)?;
-    v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+    v.as_u64()
+        .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
 }
 
 /// Each provider's `parse_file_response`.
@@ -501,7 +619,11 @@ fn parse_file_response(provider: Provider, data: &Value) -> Result<UploadedFile>
             file.expires_at = timestamp(data.get("expires_at"))?;
             file.mime_type = string(data, "mimetype");
             file.purpose = string(data, "purpose");
-            file.status = data.get("deleted").and_then(Value::as_bool).filter(|d| *d).map(|_| "deleted".to_string());
+            file.status = data
+                .get("deleted")
+                .and_then(Value::as_bool)
+                .filter(|d| *d)
+                .map(|_| "deleted".to_string());
         }
         // OpenAI, DeepSeek (an OpenAI subclass), and xAI.
         _ => {
@@ -522,7 +644,9 @@ fn parse_file_response(provider: Provider, data: &Value) -> Result<UploadedFile>
 
 /// `Perplexity::Files#parse_response_file`.
 fn parse_perplexity_file(response_id: &str, data: &Value) -> Result<UploadedFile> {
-    let file_id = string(data, "file_id").or_else(|| string(data, "id")).unwrap_or_default();
+    let file_id = string(data, "file_id")
+        .or_else(|| string(data, "id"))
+        .unwrap_or_default();
     let id = format!("{response_id}/files/{file_id}");
     split_perplexity_id(&id)?;
     let mut metadata = data.clone();
@@ -610,7 +734,9 @@ fn auto_upload_rules(protocol: ProtocolName, provider: Provider) -> Option<AutoU
         }),
         ProtocolName::ChatCompletions => None,
         // `Protocol#supports_provider_file_references?` is false for these.
-        ProtocolName::Interactions | ProtocolName::Conversations | ProtocolName::RouterChatCompletions => None,
+        ProtocolName::Interactions
+        | ProtocolName::Conversations
+        | ProtocolName::RouterChatCompletions => None,
     }
 }
 
@@ -643,7 +769,9 @@ pub(crate) async fn preprocess_messages(
     if !config.auto_upload_large_files || !supports_files(provider) {
         return Ok(());
     }
-    let Some(rules) = auto_upload_rules(protocol, provider) else { return Ok(()) };
+    let Some(rules) = auto_upload_rules(protocol, provider) else {
+        return Ok(());
+    };
     for message in messages.iter_mut().filter(|m| m.role == Role::User) {
         for attachment in message.attachments.iter_mut() {
             if attachment.is_provider_file() {
@@ -665,7 +793,8 @@ pub(crate) async fn preprocess_messages(
                     None,
                 ));
             }
-            let uploaded = provider_upload(attachment, &rules, provider, config, connection).await?;
+            let uploaded =
+                provider_upload(attachment, &rules, provider, config, connection).await?;
             let resolution = attachment.resolution;
             let mut replacement = Attachment::from_uploaded(uploaded);
             replacement.resolution = resolution;
@@ -685,26 +814,51 @@ async fn provider_upload(
 ) -> Result<UploadedFile> {
     let scope = provider_upload_scope(provider, config);
     let memo = attachment.provider_uploads().clone();
-    let existing = memo.0.lock().map_err(|_| Error::Api("provider upload memo poisoned".into(), None))?.get(&scope).cloned();
+    let existing = memo
+        .0
+        .lock()
+        .map_err(|_| Error::Api("provider upload memo poisoned".into(), None))?
+        .get(&scope)
+        .cloned();
     if let Some(upload) = existing.filter(|u| !u.is_expired()) {
         return Ok(upload);
     }
-    let options = UploadOptions { purpose: rules.purpose, ..Default::default() };
+    let options = UploadOptions {
+        purpose: rules.purpose,
+        ..Default::default()
+    };
     let uploaded = upload_file(connection, provider, attachment.clone(), &options).await?;
-    memo.0.lock().map_err(|_| Error::Api("provider upload memo poisoned".into(), None))?.insert(scope, uploaded.clone());
+    memo.0
+        .lock()
+        .map_err(|_| Error::Api("provider upload memo poisoned".into(), None))?
+        .insert(scope, uploaded.clone());
     Ok(uploaded)
 }
 
 /// `Anthropic#apply_files_beta`: a request that references an uploaded file (a block whose
 /// `source.type` is `file`) carries the Files API beta, joined to any beta already set.
-pub(crate) fn apply_files_beta(protocol: ProtocolName, payload: &Value, headers: &mut Vec<(String, String)>) {
+pub(crate) fn apply_files_beta(
+    protocol: ProtocolName,
+    payload: &Value,
+    headers: &mut Vec<(String, String)>,
+) {
     if protocol != ProtocolName::Anthropic {
         return;
     }
     let is_file = |b: &Value| b.pointer("/source/type").and_then(Value::as_str) == Some("file");
-    let messages = payload.get("messages").and_then(Value::as_array).into_iter().flatten();
-    let mut blocks = messages.filter_map(|m| m.get("content").and_then(Value::as_array)).flatten();
-    let system = payload.get("system").and_then(Value::as_array).into_iter().flatten();
+    let messages = payload
+        .get("messages")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten();
+    let mut blocks = messages
+        .filter_map(|m| m.get("content").and_then(Value::as_array))
+        .flatten();
+    let system = payload
+        .get("system")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten();
     if !blocks.any(is_file) && !system.clone().any(is_file) {
         return;
     }
@@ -714,7 +868,12 @@ pub(crate) fn apply_files_beta(protocol: ProtocolName, payload: &Value, headers:
         if !k.eq_ignore_ascii_case("anthropic-beta") {
             return true;
         }
-        betas.extend(v.split(',').map(str::trim).filter(|b| !b.is_empty()).map(str::to_string));
+        betas.extend(
+            v.split(',')
+                .map(str::trim)
+                .filter(|b| !b.is_empty())
+                .map(str::to_string),
+        );
         false
     });
     betas.push(ANTHROPIC_FILES_BETA.to_string());
@@ -733,10 +892,27 @@ mod tests {
 
     #[test]
     fn timestamps_parse_epoch_digit_strings_and_iso8601() {
-        assert_eq!(timestamp(Some(&json!(1789683302))).unwrap().unwrap().timestamp(), 1789683302);
-        assert_eq!(timestamp(Some(&json!("1789683302"))).unwrap().unwrap().timestamp(), 1789683302);
-        let t = timestamp(Some(&json!("2026-09-19T22:15:08.647110897Z"))).unwrap().unwrap();
-        assert_eq!(t.to_rfc3339_opts(chrono::SecondsFormat::Secs, true), "2026-09-19T22:15:08Z");
+        assert_eq!(
+            timestamp(Some(&json!(1789683302)))
+                .unwrap()
+                .unwrap()
+                .timestamp(),
+            1789683302
+        );
+        assert_eq!(
+            timestamp(Some(&json!("1789683302")))
+                .unwrap()
+                .unwrap()
+                .timestamp(),
+            1789683302
+        );
+        let t = timestamp(Some(&json!("2026-09-19T22:15:08.647110897Z")))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            t.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+            "2026-09-19T22:15:08Z"
+        );
         assert!(timestamp(Some(&Value::Null)).unwrap().is_none());
         assert!(timestamp(Some(&json!("not a date"))).is_err());
     }
@@ -754,19 +930,40 @@ mod tests {
     #[test]
     fn mistral_rounds_expiry_up_to_whole_hours() {
         let a = Attachment::from_bytes(b"x".to_vec(), "a.pdf", None);
-        let options = UploadOptions { purpose: Some("ocr"), expires_in: Some(3601), ..Default::default() };
+        let options = UploadOptions {
+            purpose: Some("ocr"),
+            expires_in: Some(3601),
+            ..Default::default()
+        };
         let fields = upload_fields(Provider::Mistral, &a, &options, Some("user".into())).unwrap();
-        assert_eq!(fields, vec![("purpose".into(), "ocr".into()), ("expiry".into(), "2".into()), ("visibility".into(), "user".into())]);
+        assert_eq!(
+            fields,
+            vec![
+                ("purpose".into(), "ocr".into()),
+                ("expiry".into(), "2".into()),
+                ("visibility".into(), "user".into())
+            ]
+        );
     }
 
     #[test]
     fn openai_requires_a_purpose_and_nests_expires_after() {
         let a = Attachment::from_bytes(b"{}".to_vec(), "batch.jsonl", None);
         let err = upload_fields(Provider::OpenAI, &a, &UploadOptions::default(), None).unwrap_err();
-        assert_eq!(err.to_string(), "OpenAI file uploads require purpose: assistants, batch, fine-tune, vision, user_data, evals");
-        let options = UploadOptions { purpose: Some("batch"), expires_in: Some(86400), ..Default::default() };
+        assert_eq!(
+            err.to_string(),
+            "OpenAI file uploads require purpose: assistants, batch, fine-tune, vision, user_data, evals"
+        );
+        let options = UploadOptions {
+            purpose: Some("batch"),
+            expires_in: Some(86400),
+            ..Default::default()
+        };
         let fields = upload_fields(Provider::OpenAI, &a, &options, None).unwrap();
-        assert_eq!(fields[1], ("expires_after[anchor]".into(), "created_at".into()));
+        assert_eq!(
+            fields[1],
+            ("expires_after[anchor]".into(), "created_at".into())
+        );
         assert_eq!(fields[2], ("expires_after[seconds]".into(), "86400".into()));
         assert_eq!(file_content_type(&a), "application/jsonl");
     }
@@ -774,9 +971,13 @@ mod tests {
     #[test]
     fn deepseek_only_uploads_images() {
         let pdf = Attachment::from_bytes(b"%PDF".to_vec(), "a.pdf", None);
-        assert!(matches!(upload_fields(Provider::DeepSeek, &pdf, &UploadOptions::default(), None), Err(Error::UnsupportedAttachment(_))));
+        assert!(matches!(
+            upload_fields(Provider::DeepSeek, &pdf, &UploadOptions::default(), None),
+            Err(Error::UnsupportedAttachment(_))
+        ));
         let png = Attachment::from_bytes(b"png".to_vec(), "a.png", None);
-        let fields = upload_fields(Provider::DeepSeek, &png, &UploadOptions::default(), None).unwrap();
+        let fields =
+            upload_fields(Provider::DeepSeek, &png, &UploadOptions::default(), None).unwrap();
         assert_eq!(fields, vec![("purpose".into(), "user_data".into())]);
     }
 
@@ -785,9 +986,18 @@ mod tests {
         let payload = json!({ "messages": [{ "role": "user", "content": [
             { "type": "document", "source": { "type": "file", "file_id": "file_1" } }
         ]}]});
-        let mut headers = vec![("anthropic-beta".to_string(), "compact-2026-01-12".to_string())];
+        let mut headers = vec![(
+            "anthropic-beta".to_string(),
+            "compact-2026-01-12".to_string(),
+        )];
         apply_files_beta(ProtocolName::Anthropic, &payload, &mut headers);
-        assert_eq!(headers, vec![("anthropic-beta".to_string(), format!("compact-2026-01-12,{ANTHROPIC_FILES_BETA}"))]);
+        assert_eq!(
+            headers,
+            vec![(
+                "anthropic-beta".to_string(),
+                format!("compact-2026-01-12,{ANTHROPIC_FILES_BETA}")
+            )]
+        );
 
         let inline = json!({ "messages": [{ "role": "user", "content": [{ "type": "text", "text": "hi" }] }] });
         let mut headers = Vec::new();
@@ -797,7 +1007,10 @@ mod tests {
 
     #[test]
     fn perplexity_ids_must_name_their_response() {
-        assert_eq!(split_perplexity_id("resp_1/files/f_2").unwrap(), ("resp_1".into(), "f_2".into()));
+        assert_eq!(
+            split_perplexity_id("resp_1/files/f_2").unwrap(),
+            ("resp_1".into(), "f_2".into())
+        );
         assert!(split_perplexity_id("f_2").is_err());
     }
 }

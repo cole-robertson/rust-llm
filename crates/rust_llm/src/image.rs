@@ -138,13 +138,26 @@ impl Image {
                 .decode(data.trim())
                 .map_err(|e| Error::Argument(format!("image data is not valid Base64: {e}")));
         }
-        let url = self.url.as_deref().ok_or_else(|| Error::Argument("image has neither data nor a url".into()))?;
+        let url = self
+            .url
+            .as_deref()
+            .ok_or_else(|| Error::Argument("image has neither data nor a url".into()))?;
         let client = crate::transport::basic(&self.config())?;
-        let response = client.get(url).send().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
+        let response = client
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| Error::ConnectionFailed(e.to_string()))?;
         let status = response.status();
-        let bytes = response.bytes().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| Error::ConnectionFailed(e.to_string()))?;
         if !status.is_success() {
-            return Err(error_for_status(status.as_u16(), &String::from_utf8_lossy(&bytes)));
+            return Err(error_for_status(
+                status.as_u16(),
+                &String::from_utf8_lossy(&bytes),
+            ));
         }
         Ok(bytes.to_vec())
     }
@@ -176,7 +189,11 @@ impl Image {
             let complete = self.usage_entries.iter().all(UsageEntry::cost_available);
             return Cost::aggregate(self.usage_entries.iter().map(|e| &e.cost), complete);
         }
-        Cost::images(&self.tokens(), self.model_info().as_ref(), self.raw_usage.get("input_tokens_details"))
+        Cost::images(
+            &self.tokens(),
+            self.model_info().as_ref(),
+            self.raw_usage.get("input_tokens_details"),
+        )
     }
 
     /// The registry model for `model`, or `None` when it is not in the registry.
@@ -189,8 +206,12 @@ impl Image {
 /// inside an `image.rust_llm` event.
 pub async fn paint(prompt: &str, options: PaintOptions<'_>) -> Result<Images> {
     let config = options.config.clone().unwrap_or_else(crate::config);
-    let model_id = options.model.unwrap_or(&config.default_image_model).to_string();
-    let (model, provider) = resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let model_id = options
+        .model
+        .unwrap_or(&config.default_image_model)
+        .to_string();
+    let (model, provider) =
+        resolve_model(&model_id, options.provider, options.assume_model_exists)?;
     let mut event = crate::instrumentation::Event::start(&config, "image.rust_llm", || {
         let empty = Tokens::default();
         crate::instrumentation::payload([
@@ -202,7 +223,10 @@ pub async fn paint(prompt: &str, options: PaintOptions<'_>) -> Result<Images> {
             ("count", options.count.into()),
             ("provider_options", options.provider_options.clone()),
             ("tokens", crate::instrumentation::tokens_h(&empty)),
-            ("cost", crate::instrumentation::cost_h(&Cost::images(&empty, Some(&model), None))),
+            (
+                "cost",
+                crate::instrumentation::cost_h(&Cost::images(&empty, Some(&model), None)),
+            ),
         ])
     });
     let result = tracing::Instrument::instrument(paint_inner(prompt, options), event.span()).await;
@@ -212,12 +236,18 @@ pub async fn paint(prompt: &str, options: PaintOptions<'_>) -> Result<Images> {
             Images::Many(v) => v.iter().collect(),
         };
         event.set("result", || serde_json::json!(all.iter().map(|i| serde_json::json!({ "url": i.url, "mime_type": i.mime_type, "model": i.model, "revised_prompt": i.revised_prompt })).collect::<Vec<_>>()));
-        event.set("response_model", || all.first().map(|i| i.model.clone()).into());
+        event.set("response_model", || {
+            all.first().map(|i| i.model.clone()).into()
+        });
         let tokens: Vec<Tokens> = all.iter().map(|i| i.tokens()).collect();
-        event.set("tokens", || crate::instrumentation::tokens_h(&Tokens::aggregate(tokens.iter())));
+        event.set("tokens", || {
+            crate::instrumentation::tokens_h(&Tokens::aggregate(tokens.iter()))
+        });
         let costs: Vec<Cost> = all.iter().map(|i| i.cost()).collect();
         let complete = costs.iter().all(|c| c.total().is_some());
-        event.set("cost", || crate::instrumentation::cost_h(&Cost::aggregate(costs.iter(), complete)));
+        event.set("cost", || {
+            crate::instrumentation::cost_h(&Cost::aggregate(costs.iter(), complete))
+        });
     }
     event.finish(result.as_ref().err());
     result
@@ -225,20 +255,39 @@ pub async fn paint(prompt: &str, options: PaintOptions<'_>) -> Result<Images> {
 
 async fn paint_inner(prompt: &str, options: PaintOptions<'_>) -> Result<Images> {
     let config = options.config.clone().unwrap_or_else(crate::config);
-    let model_id = options.model.unwrap_or(&config.default_image_model).to_string();
-    let (model, provider) = resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let model_id = options
+        .model
+        .unwrap_or(&config.default_image_model)
+        .to_string();
+    let (model, provider) =
+        resolve_model(&model_id, options.provider, options.assume_model_exists)?;
     provider.ensure_configured(&config)?;
     let connection = Connection::new(provider, config.clone())?;
     let family = Family::for_provider(provider)?;
 
-    let PaintOptions { size, count, mut with, mut mask, provider_options, .. } = options;
+    let PaintOptions {
+        size,
+        count,
+        mut with,
+        mut mask,
+        provider_options,
+        ..
+    } = options;
     family.validate(&model.id, &with, mask.as_ref())?;
     for a in with.iter_mut().chain(mask.iter_mut()) {
         if family.loads(a) {
             a.load(connection.client()).await?;
         }
     }
-    let (path, payload) = family.render(prompt, &model.id, size, count, &with, mask.as_ref(), &provider_options)?;
+    let (path, payload) = family.render(
+        prompt,
+        &model.id,
+        size,
+        count,
+        &with,
+        mask.as_ref(),
+        &provider_options,
+    )?;
 
     // `track_usage(:image)`: one entry per HTTP attempt.
     let mut retried: Vec<Tokens> = Vec::new();
@@ -254,10 +303,15 @@ async fn paint_inner(prompt: &str, options: PaintOptions<'_>) -> Result<Images> 
         provider: provider.slug().into(),
         model: model.id.clone(),
         status,
-        cost: cost.filter(|c| c.total().is_some()).unwrap_or_else(|| Cost::images(&tokens, Some(&model), None)),
+        cost: cost
+            .filter(|c| c.total().is_some())
+            .unwrap_or_else(|| Cost::images(&tokens, Some(&model), None)),
         tokens,
     };
-    let mut entries: Vec<UsageEntry> = retried.into_iter().map(|t| entry(UsageStatus::Failed, t, None)).collect();
+    let mut entries: Vec<UsageEntry> = retried
+        .into_iter()
+        .map(|t| entry(UsageStatus::Failed, t, None))
+        .collect();
     // A failed paint has no result to attach its entries to; Ruby only reports them to
     // instrumentation, which this port does not have.
     let mut images = match family {
@@ -265,12 +319,20 @@ async fn paint_inner(prompt: &str, options: PaintOptions<'_>) -> Result<Images> 
         _ => result.and_then(|raw| family.parse(&raw.body, &model.id))?,
     };
     let billed = &images[0];
-    entries.push(entry(UsageStatus::Succeeded, billed.tokens(), Some(billed.cost())));
+    entries.push(entry(
+        UsageStatus::Succeeded,
+        billed.tokens(),
+        Some(billed.cost()),
+    ));
     images[0].usage_entries = entries;
     for image in &mut images {
         image.config = Some(config.clone());
     }
-    Ok(if images.len() == 1 { Images::One(images.remove(0)) } else { Images::Many(images) })
+    Ok(if images.len() == 1 {
+        Images::One(images.remove(0))
+    } else {
+        Images::Many(images)
+    })
 }
 
 /// `Conversations::Images#parse_image_responses`: each generated file downloaded from Mistral's
@@ -306,7 +368,10 @@ impl Family {
             Provider::XAI => Ok(Family::XAI),
             Provider::OpenRouter => Ok(Family::OpenRouter),
             Provider::Gemini => Ok(Family::Gemini),
-            Provider::Anthropic => Err(Error::Api("Anthropic doesn't support image generation".into(), None)),
+            Provider::Anthropic => Err(Error::Api(
+                "Anthropic doesn't support image generation".into(),
+                None,
+            )),
             Provider::Mistral => Ok(Family::Mistral),
             _ => Ok(Family::OpenAI),
         }
@@ -321,15 +386,22 @@ impl Family {
     /// `validate_paint_inputs!`.
     fn validate(self, model: &str, with: &[Attachment], mask: Option<&Attachment>) -> Result<()> {
         match self {
-            Family::OpenAI if mask.is_some() && with.is_empty() => {
-                Err(Error::Argument("with: is required when mask: is provided".into()))
+            Family::OpenAI if mask.is_some() && with.is_empty() => Err(Error::Argument(
+                "with: is required when mask: is provided".into(),
+            )),
+            Family::XAI if mask.is_some() => Err(Error::Api(
+                "xAI image editing does not support a mask parameter".into(),
+                None,
+            )),
+            Family::OpenRouter if mask.is_some() => {
+                Err(Error::UnsupportedAttachment(unsupported("image mask")))
             }
-            Family::XAI if mask.is_some() => Err(Error::Api("xAI image editing does not support a mask parameter".into(), None)),
-            Family::OpenRouter if mask.is_some() => Err(Error::UnsupportedAttachment(unsupported("image mask"))),
             Family::Gemini if gemini_image_model(model) && mask.is_some() => {
                 Err(Error::UnsupportedAttachment(unsupported("image mask")))
             }
-            Family::Gemini if !gemini_image_model(model) && (!with.is_empty() || mask.is_some()) => {
+            Family::Gemini
+                if !gemini_image_model(model) && (!with.is_empty() || mask.is_some()) =>
+            {
                 Err(Error::UnsupportedAttachment(unsupported("image reference")))
             }
             _ => Ok(()),
@@ -353,7 +425,14 @@ impl Family {
         match self {
             Family::Mistral => Ok((
                 "conversations".into(),
-                crate::protocols::mistral::render_image_payload(prompt, model, size, count, editing, provider_options)?,
+                crate::protocols::mistral::render_image_payload(
+                    prompt,
+                    model,
+                    size,
+                    count,
+                    editing,
+                    provider_options,
+                )?,
             )),
             Family::OpenAI if editing => {
                 if !(model.starts_with("gpt-image") || model.starts_with("chatgpt-image")) {
@@ -362,8 +441,13 @@ impl Family {
                          gpt-image and chatgpt-image models take JSON image references"
                     )));
                 }
-                let mut payload = json!({ "model": model, "prompt": prompt, "n": count.unwrap_or(1) });
-                payload["images"] = with.iter().map(openai_reference).collect::<Result<Vec<_>>>()?.into();
+                let mut payload =
+                    json!({ "model": model, "prompt": prompt, "n": count.unwrap_or(1) });
+                payload["images"] = with
+                    .iter()
+                    .map(openai_reference)
+                    .collect::<Result<Vec<_>>>()?
+                    .into();
                 if let Some(mask) = mask {
                     payload["mask"] = openai_reference(mask)?;
                 }
@@ -378,7 +462,9 @@ impl Family {
             }
             Family::XAI => {
                 if !editing && let Some(size) = size {
-                    tracing::debug!("Ignoring size {size}. xAI image generation does not support a size parameter.");
+                    tracing::debug!(
+                        "Ignoring size {size}. xAI image generation does not support a size parameter."
+                    );
                 }
                 let mut payload = json!({ "model": model, "prompt": prompt });
                 if editing {
@@ -391,15 +477,23 @@ impl Family {
                 if let Some(count) = count {
                     payload["n"] = count.into();
                 }
-                let path = if editing { "images/edits" } else { "images/generations" };
+                let path = if editing {
+                    "images/edits"
+                } else {
+                    "images/generations"
+                };
                 Ok((path.into(), merge(payload, options)))
             }
             Family::OpenRouter => {
                 if let Some(size) = size {
-                    tracing::debug!("Ignoring size {size}. Use aspect_ratio/resolution provider options instead.");
+                    tracing::debug!(
+                        "Ignoring size {size}. Use aspect_ratio/resolution provider options instead."
+                    );
                 }
                 if count.is_some_and(|c| c > 1) {
-                    tracing::debug!("Ignoring count {count:?}. OpenRouter generates one image per request.");
+                    tracing::debug!(
+                        "Ignoring count {count:?}. OpenRouter generates one image per request."
+                    );
                 }
                 let mut payload = json!({ "model": model, "prompt": prompt });
                 let references = with
@@ -438,7 +532,11 @@ impl Family {
                     json!({ "instances": [{ "prompt": prompt }], "parameters": { "sampleCount": count.unwrap_or(1) } })
                 };
                 deep_merge(&mut payload, &Value::Object(options));
-                let action = if image_model { "generateContent" } else { "predict" };
+                let action = if image_model {
+                    "generateContent"
+                } else {
+                    "predict"
+                };
                 Ok((format!("models/{model}:{action}"), payload))
             }
         }
@@ -446,14 +544,26 @@ impl Family {
 
     /// `parse_image_responses`.
     fn parse(self, data: &Value, model: &str) -> Result<Vec<Image>> {
-        let entries = || data.get("data").and_then(Value::as_array).cloned().unwrap_or_default();
+        let entries = || {
+            data.get("data")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default()
+        };
         let usage = || data.get("usage").cloned().unwrap_or_else(|| json!({}));
         match self {
             Family::OpenAI | Family::XAI => {
                 let entries = entries();
                 if entries.is_empty() {
-                    let name = if matches!(self, Family::XAI) { "xAI" } else { "OpenAI" };
-                    return Err(Error::Api(format!("Unexpected response format from {name} image API"), None));
+                    let name = if matches!(self, Family::XAI) {
+                        "xAI"
+                    } else {
+                        "OpenAI"
+                    };
+                    return Err(Error::Api(
+                        format!("Unexpected response format from {name} image API"),
+                        None,
+                    ));
                 }
                 Ok(entries
                     .iter()
@@ -463,7 +573,9 @@ impl Family {
                         image.url = str_at(entry, "url");
                         image.data = str_at(entry, "b64_json");
                         image.mime_type = Some(match self {
-                            Family::XAI => str_at(entry, "mime_type").unwrap_or_else(|| "image/png".into()),
+                            Family::XAI => {
+                                str_at(entry, "mime_type").unwrap_or_else(|| "image/png".into())
+                            }
                             _ => "image/png".into(),
                         });
                         if matches!(self, Family::OpenAI) {
@@ -474,16 +586,22 @@ impl Family {
                     .collect())
             }
             Family::OpenRouter => {
-                let entry = entries()
-                    .into_iter()
-                    .next()
-                    .ok_or_else(|| Error::Api("Unexpected response format from OpenRouter image API".into(), None))?;
+                let entry = entries().into_iter().next().ok_or_else(|| {
+                    Error::Api(
+                        "Unexpected response format from OpenRouter image API".into(),
+                        None,
+                    )
+                })?;
                 let raw = usage();
                 let mut usage = Map::new();
                 for (key, value) in [
                     ("input_tokens", raw.get("prompt_tokens").cloned()),
                     ("output_tokens", raw.get("completion_tokens").cloned()),
-                    ("cost", chat_completions::reported_cost(Provider::OpenRouter, &raw).map(Value::from)),
+                    (
+                        "cost",
+                        chat_completions::reported_cost(Provider::OpenRouter, &raw)
+                            .map(Value::from),
+                    ),
                 ] {
                     if let Some(value) = value.filter(|v| !v.is_null()) {
                         usage.insert(key.into(), value);
@@ -491,7 +609,8 @@ impl Family {
                 }
                 let mut image = Image::new(model, Value::Object(usage));
                 image.data = str_at(&entry, "b64_json");
-                image.mime_type = Some(str_at(&entry, "media_type").unwrap_or_else(|| "image/png".into()));
+                image.mime_type =
+                    Some(str_at(&entry, "media_type").unwrap_or_else(|| "image/png".into()));
                 Ok(vec![image])
             }
             Family::Gemini if gemini_image_model(model) => {
@@ -501,23 +620,42 @@ impl Family {
                     .into_iter()
                     .flatten()
                     .filter_map(|candidate| {
-                        candidate.pointer("/content/parts")?.as_array()?.iter().filter_map(|p| p.get("inlineData")).find(|inline| {
-                            let mime = inline.get("mimeType").and_then(Value::as_str);
-                            mime.is_none_or(|m| m.starts_with("image/")) && inline.get("data").is_some_and(|d| !d.is_null())
-                        }).cloned()
+                        candidate
+                            .pointer("/content/parts")?
+                            .as_array()?
+                            .iter()
+                            .filter_map(|p| p.get("inlineData"))
+                            .find(|inline| {
+                                let mime = inline.get("mimeType").and_then(Value::as_str);
+                                mime.is_none_or(|m| m.starts_with("image/"))
+                                    && inline.get("data").is_some_and(|d| !d.is_null())
+                            })
+                            .cloned()
                     })
                     .collect();
                 if parts.is_empty() {
-                    return Err(Error::Api("Unexpected response format from Gemini image generation API".into(), None));
+                    return Err(Error::Api(
+                        "Unexpected response format from Gemini image generation API".into(),
+                        None,
+                    ));
                 }
-                let response_model = str_at(data, "modelVersion").unwrap_or_else(|| model.to_string());
+                let response_model =
+                    str_at(data, "modelVersion").unwrap_or_else(|| model.to_string());
                 Ok(parts
                     .iter()
                     .enumerate()
                     .map(|(i, part)| {
-                        let mut image = Image::new(&response_model, if i == 0 { gemini_usage(data) } else { json!({}) });
+                        let mut image = Image::new(
+                            &response_model,
+                            if i == 0 {
+                                gemini_usage(data)
+                            } else {
+                                json!({})
+                            },
+                        );
                         image.data = str_at(part, "data");
-                        image.mime_type = Some(str_at(part, "mimeType").unwrap_or_else(|| "image/png".into()));
+                        image.mime_type =
+                            Some(str_at(part, "mimeType").unwrap_or_else(|| "image/png".into()));
                         image
                     })
                     .collect())
@@ -531,20 +669,27 @@ impl Family {
                     .filter(|p| p.get("bytesBase64Encoded").is_some_and(|b| !b.is_null()))
                     .collect();
                 if predictions.is_empty() {
-                    return Err(Error::Api("Unexpected response format from Gemini image generation API".into(), None));
+                    return Err(Error::Api(
+                        "Unexpected response format from Gemini image generation API".into(),
+                        None,
+                    ));
                 }
                 Ok(predictions
                     .into_iter()
                     .map(|p| {
                         let mut image = Image::new(model, json!({}));
                         image.data = str_at(p, "bytesBase64Encoded");
-                        image.mime_type = Some(str_at(p, "mimeType").unwrap_or_else(|| "image/png".into()));
+                        image.mime_type =
+                            Some(str_at(p, "mimeType").unwrap_or_else(|| "image/png".into()));
                         image
                     })
                     .collect())
             }
             // Mistral's images need a download per file, so `paint` parses them (`mistral_images`).
-            Family::Mistral => Err(Error::Api("Mistral images are parsed with their downloads".into(), None)),
+            Family::Mistral => Err(Error::Api(
+                "Mistral images are parsed with their downloads".into(),
+                None,
+            )),
         }
     }
 }
@@ -562,7 +707,11 @@ fn merge(mut payload: Value, options: Map<String, Value>) -> Value {
 }
 
 fn require_image(a: &Attachment) -> Result<()> {
-    if a.kind() == AttachmentType::Image { Ok(()) } else { Err(Error::UnsupportedAttachment(unsupported(&a.mime_type))) }
+    if a.kind() == AttachmentType::Image {
+        Ok(())
+    } else {
+        Err(Error::UnsupportedAttachment(unsupported(&a.mime_type)))
+    }
 }
 
 /// `ChatCompletions::Images#build_image_reference` / `XAI::Images#image_reference_url`: URLs
@@ -583,12 +732,15 @@ fn openai_reference(a: &Attachment) -> Result<Value> {
 /// everything else is Imagen on `predict`.
 fn gemini_image_model(model: &str) -> bool {
     let id = model.to_lowercase();
-    id.starts_with("nano-banana") || id.starts_with("nanobanana") || (id.starts_with("gemini-") && id.contains("-image"))
+    id.starts_with("nano-banana")
+        || id.starts_with("nanobanana")
+        || (id.starts_with("gemini-") && id.contains("-image"))
 }
 
 const GEMINI_IMAGE_SIZES: &[&str] = &["512", "512P", "512PX", "1K", "2K", "4K"];
 static ASPECT_RATIO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\A\d+:\d+\z").unwrap()); // constant regex
-static PIXEL_DIMENSIONS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\A(\d+)\s*[x×]\s*(\d+)\z").unwrap()); // constant regex
+static PIXEL_DIMENSIONS: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\A(\d+)\s*[x×]\s*(\d+)\z").unwrap()); // constant regex
 
 /// `Gemini::Images#build_image_config`: Gemini sizes by aspect ratio and resolution tier, so
 /// `WxH` becomes the ratio it reduces to.
@@ -610,13 +762,17 @@ fn gemini_image_config(size: Option<&str>) -> Result<Option<Value>> {
             GEMINI_IMAGE_SIZES.join(", ")
         ))
     };
-    let captures = PIXEL_DIMENSIONS.captures(value).ok_or_else(|| unsupported(size.unwrap_or("")))?;
+    let captures = PIXEL_DIMENSIONS
+        .captures(value)
+        .ok_or_else(|| unsupported(size.unwrap_or("")))?;
     let (width, height): (u64, u64) = match (captures[1].parse(), captures[2].parse()) {
         (Ok(w), Ok(h)) if w > 0 && h > 0 => (w, h),
         _ => return Err(unsupported(&format!("{}x{}", &captures[1], &captures[2]))),
     };
     let divisor = gcd(width, height);
-    Ok(Some(json!({ "aspectRatio": format!("{}:{}", width / divisor, height / divisor) })))
+    Ok(Some(
+        json!({ "aspectRatio": format!("{}:{}", width / divisor, height / divisor) }),
+    ))
 }
 
 fn gcd(a: u64, b: u64) -> u64 {
@@ -643,11 +799,23 @@ mod tests {
 
     #[test]
     fn gemini_reduces_pixel_sizes_to_aspect_ratios() {
-        assert_eq!(gemini_image_config(Some("1792x1024")).unwrap(), Some(json!({ "aspectRatio": "7:4" })));
-        assert_eq!(gemini_image_config(Some("2k")).unwrap(), Some(json!({ "imageSize": "2K" })));
-        assert_eq!(gemini_image_config(Some("16:9")).unwrap(), Some(json!({ "aspectRatio": "16:9" })));
+        assert_eq!(
+            gemini_image_config(Some("1792x1024")).unwrap(),
+            Some(json!({ "aspectRatio": "7:4" }))
+        );
+        assert_eq!(
+            gemini_image_config(Some("2k")).unwrap(),
+            Some(json!({ "imageSize": "2K" }))
+        );
+        assert_eq!(
+            gemini_image_config(Some("16:9")).unwrap(),
+            Some(json!({ "aspectRatio": "16:9" }))
+        );
         assert_eq!(gemini_image_config(None).unwrap(), None);
-        assert!(matches!(gemini_image_config(Some("huge")), Err(Error::Argument(_))));
+        assert!(matches!(
+            gemini_image_config(Some("huge")),
+            Err(Error::Argument(_))
+        ));
     }
 
     #[test]

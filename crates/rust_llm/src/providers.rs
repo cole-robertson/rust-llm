@@ -106,7 +106,13 @@ impl Provider {
     pub fn resolve_or_err(slug: &str) -> Result<Provider> {
         Provider::resolve(slug).ok_or_else(|| {
             let known: Vec<&str> = ALL.iter().map(|p| p.slug()).collect();
-            Error::Api(format!("Unknown provider: {slug:?}. Available providers: {}", known.join(", ")), None)
+            Error::Api(
+                format!(
+                    "Unknown provider: {slug:?}. Available providers: {}",
+                    known.join(", ")
+                ),
+                None,
+            )
         })
     }
 
@@ -176,7 +182,9 @@ impl Provider {
     }
 
     pub fn is_configured(&self, config: &Config) -> bool {
-        self.configuration_requirements().iter().all(|r| config.get(r).is_some())
+        self.configuration_requirements()
+            .iter()
+            .all(|r| config.get(r).is_some())
     }
 
     /// `Provider#ensure_configured!`.
@@ -188,7 +196,12 @@ impl Provider {
             .configuration_requirements()
             .iter()
             .filter(|r| config.get(r).is_none())
-            .map(|r| format!("    config.set(\"{r}\", std::env::var(\"{}\")?);", r.to_uppercase()))
+            .map(|r| {
+                format!(
+                    "    config.set(\"{r}\", std::env::var(\"{}\")?);",
+                    r.to_uppercase()
+                )
+            })
             .collect();
         Err(Error::Configuration(format!(
             "{} provider is not configured. Add this to your initialization:\n\nrust_llm::configure(|config| {{\n{}\n}});",
@@ -201,7 +214,10 @@ impl Provider {
         let (key, default) = match self {
             Provider::OpenAI => ("openai_api_base", Some("https://api.openai.com/v1")),
             Provider::Anthropic => ("anthropic_api_base", Some("https://api.anthropic.com")),
-            Provider::Gemini => ("gemini_api_base", Some("https://generativelanguage.googleapis.com/v1beta")),
+            Provider::Gemini => (
+                "gemini_api_base",
+                Some("https://generativelanguage.googleapis.com/v1beta"),
+            ),
             Provider::DeepSeek => ("deepseek_api_base", Some("https://api.deepseek.com")),
             Provider::Mistral => ("mistral_api_base", Some("https://api.mistral.ai/v1")),
             Provider::OpenRouter => ("openrouter_api_base", Some("https://openrouter.ai/api/v1")),
@@ -210,7 +226,10 @@ impl Provider {
             Provider::Ollama => ("ollama_api_base", None),
             Provider::OllamaCloud => ("ollama_cloud_api_base", Some("https://ollama.com/v1")),
             Provider::GPUStack => ("gpustack_api_base", None),
-            Provider::Hetzner => ("hetzner_api_base", Some("https://inference.hetzner.com/api/v1")),
+            Provider::Hetzner => (
+                "hetzner_api_base",
+                Some("https://inference.hetzner.com/api/v1"),
+            ),
             Provider::TypeSafe => ("typesafe_api_base", Some("https://api.typesafe.ai")),
         };
         config
@@ -225,13 +244,19 @@ impl Provider {
     pub fn agent_url(&self, config: &Config) -> Result<String> {
         let base = self.api_base(config)?;
         let base = base.strip_suffix('/').unwrap_or(&base);
-        Ok(format!("{}/v1/agent", base.strip_suffix("/v1").unwrap_or(base)))
+        Ok(format!(
+            "{}/v1/agent",
+            base.strip_suffix("/v1").unwrap_or(base)
+        ))
     }
 
     /// `Provider#headers`.
     pub fn headers(&self, config: &Config) -> Vec<(String, String)> {
         let bearer = |key: &str| {
-            config.get(key).map(|v| vec![("Authorization".to_string(), format!("Bearer {v}"))]).unwrap_or_default()
+            config
+                .get(key)
+                .map(|v| vec![("Authorization".to_string(), format!("Bearer {v}"))])
+                .unwrap_or_default()
         };
         match self {
             Provider::OpenAI => {
@@ -245,18 +270,36 @@ impl Provider {
                 h
             }
             Provider::Anthropic => vec![
-                ("x-api-key".into(), config.get("anthropic_api_key").unwrap_or_default().into()),
+                (
+                    "x-api-key".into(),
+                    config.get("anthropic_api_key").unwrap_or_default().into(),
+                ),
                 ("anthropic-version".into(), "2023-06-01".into()),
             ],
             Provider::Gemini => {
-                vec![("x-goog-api-key".into(), config.get("gemini_api_key").unwrap_or_default().into())]
+                vec![(
+                    "x-goog-api-key".into(),
+                    config.get("gemini_api_key").unwrap_or_default().into(),
+                )]
             }
             Provider::DeepSeek => bearer("deepseek_api_key"),
             Provider::Mistral => bearer("mistral_api_key"),
             Provider::OpenRouter => {
                 let mut h = bearer("openrouter_api_key");
-                h.push(("HTTP-Referer".into(), config.get("openrouter_app_url").unwrap_or("https://github.com/cole-robertson/rust_llm").into()));
-                h.push(("X-OpenRouter-Title".into(), config.get("openrouter_app_name").unwrap_or("RustLLM").into()));
+                h.push((
+                    "HTTP-Referer".into(),
+                    config
+                        .get("openrouter_app_url")
+                        .unwrap_or("https://github.com/cole-robertson/rust_llm")
+                        .into(),
+                ));
+                h.push((
+                    "X-OpenRouter-Title".into(),
+                    config
+                        .get("openrouter_app_name")
+                        .unwrap_or("RustLLM")
+                        .into(),
+                ));
                 h
             }
             Provider::XAI => bearer("xai_api_key"),
@@ -282,14 +325,31 @@ impl Provider {
 
     pub fn supports_protocol(&self, protocol: ProtocolName) -> bool {
         match self {
-            Provider::OpenAI | Provider::XAI | Provider::DeepSeek | Provider::OpenRouter | Provider::GPUStack => {
-                matches!(protocol, ProtocolName::ChatCompletions | ProtocolName::Responses)
+            Provider::OpenAI
+            | Provider::XAI
+            | Provider::DeepSeek
+            | Provider::OpenRouter
+            | Provider::GPUStack => {
+                matches!(
+                    protocol,
+                    ProtocolName::ChatCompletions | ProtocolName::Responses
+                )
             }
             Provider::Anthropic => protocol == ProtocolName::Anthropic,
-            Provider::Gemini => matches!(protocol, ProtocolName::Gemini | ProtocolName::Interactions),
-            Provider::Mistral => matches!(protocol, ProtocolName::ChatCompletions | ProtocolName::Conversations),
+            Provider::Gemini => {
+                matches!(protocol, ProtocolName::Gemini | ProtocolName::Interactions)
+            }
+            Provider::Mistral => matches!(
+                protocol,
+                ProtocolName::ChatCompletions | ProtocolName::Conversations
+            ),
             Provider::Perplexity => {
-                matches!(protocol, ProtocolName::ChatCompletions | ProtocolName::Responses | ProtocolName::RouterChatCompletions)
+                matches!(
+                    protocol,
+                    ProtocolName::ChatCompletions
+                        | ProtocolName::Responses
+                        | ProtocolName::RouterChatCompletions
+                )
             }
             // System One answers judgments only (`rust_llm::judge`); it has no chat protocol.
             Provider::TypeSafe => false,
@@ -299,7 +359,12 @@ impl Provider {
 
     /// `Provider#protocol_for` plus `resolve_protocol`: an explicit protocol wins, then the
     /// `<slug>_protocol` config option, then the provider's per-model rule.
-    pub fn resolve_protocol(&self, explicit: Option<ProtocolName>, model: &Model, config: &Config) -> Result<ProtocolName> {
+    pub fn resolve_protocol(
+        &self,
+        explicit: Option<ProtocolName>,
+        model: &Model,
+        config: &Config,
+    ) -> Result<ProtocolName> {
         let configured = match config.get(&format!("{}_protocol", self.slug())) {
             Some(name) => Some(ProtocolName::parse(name).map_err(|_| self.not_a_protocol(name))?),
             None => None,
@@ -318,7 +383,10 @@ impl Provider {
             },
         };
         if *self == Provider::TypeSafe {
-            return Err(Error::Api(format!("{} doesn't support chat", self.display()), None));
+            return Err(Error::Api(
+                format!("{} doesn't support chat", self.display()),
+                None,
+            ));
         }
         if !self.supports_protocol(protocol) {
             return Err(self.not_a_protocol(protocol.name()));
@@ -336,7 +404,12 @@ impl Provider {
             Provider::Mistral => &["chat_completions", "conversations", "files"],
             Provider::OpenRouter => &["chat_completions", "responses", "files"],
             Provider::XAI => &["responses", "chat_completions", "files"],
-            Provider::Perplexity => &["chat_completions", "router_chat_completions", "files", "agent_responses"],
+            Provider::Perplexity => &[
+                "chat_completions",
+                "router_chat_completions",
+                "files",
+                "agent_responses",
+            ],
             Provider::GPUStack => &["chat_completions", "responses"],
             Provider::Ollama | Provider::OllamaCloud | Provider::Hetzner => &["chat_completions"],
             Provider::TypeSafe => &["system_one"],
@@ -346,7 +419,11 @@ impl Provider {
     /// `Provider#fetch_protocol`'s error for a protocol the provider does not register.
     fn not_a_protocol(&self, name: &str) -> Error {
         Error::Api(
-            format!("{name} is not a protocol of {}. Available: {}", self.display(), self.protocol_names().join(", ")),
+            format!(
+                "{name} is not a protocol of {}. Available: {}",
+                self.display(),
+                self.protocol_names().join(", ")
+            ),
             None,
         )
     }
@@ -354,14 +431,23 @@ impl Provider {
     /// `Provider#configuration_options`: every option the provider reads.
     pub fn configuration_options(&self) -> &'static [&'static str] {
         match self {
-            Provider::OpenAI => {
-                &["openai_api_key", "openai_api_base", "openai_organization_id", "openai_project_id", "openai_use_system_role"]
-            }
+            Provider::OpenAI => &[
+                "openai_api_key",
+                "openai_api_base",
+                "openai_organization_id",
+                "openai_project_id",
+                "openai_use_system_role",
+            ],
             Provider::Anthropic => &["anthropic_api_key", "anthropic_api_base"],
             Provider::Gemini => &["gemini_api_key", "gemini_api_base"],
             Provider::DeepSeek => &["deepseek_api_key", "deepseek_api_base"],
             Provider::Mistral => &["mistral_api_key", "mistral_api_base"],
-            Provider::OpenRouter => &["openrouter_api_key", "openrouter_api_base", "openrouter_app_url", "openrouter_app_name"],
+            Provider::OpenRouter => &[
+                "openrouter_api_key",
+                "openrouter_api_base",
+                "openrouter_app_url",
+                "openrouter_app_name",
+            ],
             Provider::XAI => &["xai_api_key", "xai_api_base"],
             Provider::Perplexity => &["perplexity_api_key", "perplexity_api_base"],
             Provider::Ollama => &["ollama_api_base", "ollama_api_key"],
@@ -396,7 +482,9 @@ impl Provider {
     /// OpenRouter's `error.metadata.raw` upstream message. `None` for an empty body.
     pub fn parse_error(&self, body: &str) -> Option<String> {
         match self {
-            Provider::Perplexity => self.strip_html_error(body).or_else(|| crate::error::parse_error_message(body)),
+            Provider::Perplexity => self
+                .strip_html_error(body)
+                .or_else(|| crate::error::parse_error_message(body)),
             Provider::OpenRouter => openrouter_parse_error(body),
             _ => crate::error::parse_error_message(body),
         }
@@ -426,7 +514,14 @@ impl Provider {
         let digits = title.len() - title.trim_start_matches(|c: char| c.is_ascii_digit()).len();
         let rest = &title[digits..];
         let trimmed = rest.trim_start();
-        Some(if digits > 0 && trimmed.len() < rest.len() { trimmed } else { title }.to_string())
+        Some(
+            if digits > 0 && trimmed.len() < rest.len() {
+                trimmed
+            } else {
+                title
+            }
+            .to_string(),
+        )
     }
 }
 
@@ -435,11 +530,20 @@ impl Provider {
 fn parse_reset_duration(value: &str) -> Option<f64> {
     static PART: std::sync::LazyLock<regex::Regex> =
         std::sync::LazyLock::new(|| regex::Regex::new(r"(\d+(?:\.\d+)?)(ms|h|m|s)").unwrap()); // constant pattern
-    let parts: Vec<(&str, &str)> = PART.captures_iter(value).map(|c| {
-        let (_, [amount, unit]) = c.extract();
-        (amount, unit)
-    }).collect();
-    if parts.is_empty() || parts.iter().map(|(a, u)| format!("{a}{u}")).collect::<String>() != value {
+    let parts: Vec<(&str, &str)> = PART
+        .captures_iter(value)
+        .map(|c| {
+            let (_, [amount, unit]) = c.extract();
+            (amount, unit)
+        })
+        .collect();
+    if parts.is_empty()
+        || parts
+            .iter()
+            .map(|(a, u)| format!("{a}{u}"))
+            .collect::<String>()
+            != value
+    {
         return None;
     }
     let seconds = |unit: &str| match unit {
@@ -448,7 +552,12 @@ fn parse_reset_duration(value: &str) -> Option<f64> {
         "s" => 1.0,
         _ => 0.001,
     };
-    Some(parts.iter().map(|(a, u)| a.parse::<f64>().unwrap_or(0.0) * seconds(u)).sum())
+    Some(
+        parts
+            .iter()
+            .map(|(a, u)| a.parse::<f64>().unwrap_or(0.0) * seconds(u))
+            .sum(),
+    )
 }
 
 /// `Providers::OpenRouter#parse_error`: the shared body shapes, plus the upstream provider's own
@@ -458,13 +567,17 @@ fn openrouter_parse_error(body: &str) -> Option<String> {
     if body.is_empty() {
         return None;
     }
-    let try_parse = |s: &str| serde_json::from_str::<Value>(s).unwrap_or_else(|_| Value::String(s.to_string()));
+    let try_parse =
+        |s: &str| serde_json::from_str::<Value>(s).unwrap_or_else(|_| Value::String(s.to_string()));
     // `error_message`: a hash's `message`, a list's messages joined, a scalar as text.
     fn error_message(value: Option<&Value>) -> Option<String> {
         match value? {
             Value::Object(o) => o.get("message").and_then(Value::as_str).map(str::to_string),
             Value::Array(parts) => {
-                let messages: Vec<String> = parts.iter().filter_map(|p| error_message(Some(p))).collect();
+                let messages: Vec<String> = parts
+                    .iter()
+                    .filter_map(|p| error_message(Some(p)))
+                    .collect();
                 (!messages.is_empty()).then(|| messages.join(". "))
             }
             Value::Null => None,
@@ -473,25 +586,41 @@ fn openrouter_parse_error(body: &str) -> Option<String> {
         }
     }
     let part_message = |part: &Value| -> Option<String> {
-        let Value::Object(part) = part else { return error_message(Some(part)) };
+        let Value::Object(part) = part else {
+            return error_message(Some(part));
+        };
         let error = part.get("error");
         let message = error_message(error);
-        let Some(Value::Object(metadata)) = error.and_then(|e| e.get("metadata")) else { return message };
+        let Some(Value::Object(metadata)) = error.and_then(|e| e.get("metadata")) else {
+            return message;
+        };
         let raw = match metadata.get("raw") {
             Some(Value::String(s)) => try_parse(s),
             Some(other) => other.clone(),
             None => Value::Null,
         };
-        let Value::Object(raw) = raw else { return message };
+        let Value::Object(raw) = raw else {
+            return message;
+        };
         match error_message(raw.get("error")) {
-            Some(raw_message) => Some(message.into_iter().chain([raw_message]).collect::<Vec<_>>().join(" - ")),
+            Some(raw_message) => Some(
+                message
+                    .into_iter()
+                    .chain([raw_message])
+                    .collect::<Vec<_>>()
+                    .join(" - "),
+            ),
             None => message,
         }
     };
     match try_parse(body) {
         Value::Object(o) => part_message(&Value::Object(o)),
         Value::Array(parts) => {
-            let messages: Vec<String> = parts.iter().filter_map(part_message).filter(|m| !m.is_empty()).collect();
+            let messages: Vec<String> = parts
+                .iter()
+                .filter_map(part_message)
+                .filter(|m| !m.is_empty())
+                .collect();
             (!messages.is_empty()).then(|| messages.join(". "))
         }
         Value::String(s) => Some(s),
@@ -511,10 +640,16 @@ pub fn remote_providers() -> Vec<Provider> {
 
 /// `Provider.configured_providers(config)`: the providers whose requirements `config` meets.
 pub fn configured_providers(config: &Config) -> Vec<Provider> {
-    ALL.iter().copied().filter(|p| p.is_configured(config)).collect()
+    ALL.iter()
+        .copied()
+        .filter(|p| p.is_configured(config))
+        .collect()
 }
 
 /// `Provider.configured_remote_providers(config)`.
 pub fn configured_remote_providers(config: &Config) -> Vec<Provider> {
-    ALL.iter().copied().filter(|p| p.is_remote() && p.is_configured(config)).collect()
+    ALL.iter()
+        .copied()
+        .filter(|p| p.is_remote() && p.is_configured(config))
+        .collect()
 }

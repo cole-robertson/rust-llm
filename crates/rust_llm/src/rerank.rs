@@ -54,7 +54,11 @@ impl Rerank {
         if !self.usage_entries.is_empty() {
             return Tokens::aggregate(self.usage_entries.iter().map(|e| &e.tokens));
         }
-        Tokens { input: self.input_tokens, reported_cost: self.reported_cost, ..Default::default() }
+        Tokens {
+            input: self.input_tokens,
+            reported_cost: self.reported_cost,
+            ..Default::default()
+        }
     }
 
     /// The rerank cost across every attempt, priced as embeddings.
@@ -75,8 +79,12 @@ impl Rerank {
 /// `Cost.new(category: :embeddings)`: input and output use the embeddings prices, each falling
 /// back to the text price.
 pub(crate) fn embeddings_cost(tokens: &Tokens, model: Option<&Model>) -> Cost {
-    let Some(model) = model else { return Cost::new(tokens, None, Tier::Standard) };
-    let Some(embeddings) = model.pricing.embeddings.as_ref() else { return Cost::new(tokens, Some(model), Tier::Standard) };
+    let Some(model) = model else {
+        return Cost::new(tokens, None, Tier::Standard);
+    };
+    let Some(embeddings) = model.pricing.embeddings.as_ref() else {
+        return Cost::new(tokens, Some(model), Tier::Standard);
+    };
     let mut priced = model.clone();
     let mut text = priced.pricing.text_tokens.clone().unwrap_or_default();
     let mut standard = text.standard.clone().unwrap_or_default();
@@ -102,13 +110,27 @@ pub struct RerankOptions<'a> {
 
 /// `RubyLLM.rerank(query, documents, model:, provider:, top_n:, provider_options:)`. `model` is
 /// required: rerank catalogs are provider-specific.
-pub async fn rerank(query: &str, documents: &[&str], model: &str, options: RerankOptions<'_>) -> Result<Rerank> {
-    let RerankOptions { provider, assume_model_exists, top_n, provider_options, config } = options;
+pub async fn rerank(
+    query: &str,
+    documents: &[&str],
+    model: &str,
+    options: RerankOptions<'_>,
+) -> Result<Rerank> {
+    let RerankOptions {
+        provider,
+        assume_model_exists,
+        top_n,
+        provider_options,
+        config,
+    } = options;
     let config = config.unwrap_or_else(crate::config);
     let (model, provider) = resolve_model(model, provider, assume_model_exists)?;
     provider.ensure_configured(&config)?;
     if !matches!(provider, Provider::OpenRouter | Provider::GPUStack) {
-        return Err(Error::Api(format!("{} doesn't support reranking", provider.display()), None));
+        return Err(Error::Api(
+            format!("{} doesn't support reranking", provider.display()),
+            None,
+        ));
     }
     let connection = Connection::new(provider, config.clone())?;
     let payload = render_payload(query, documents, &model.id, top_n, &provider_options);
@@ -120,7 +142,9 @@ pub async fn rerank(query: &str, documents: &[&str], model: &str, options: Reran
             retried.push(failure_tokens(e, None));
         }
     };
-    let raw = connection.post("rerank", &payload, &[], &mut on_attempt).await?;
+    let raw = connection
+        .post("rerank", &payload, &[], &mut on_attempt)
+        .await?;
     let mut result = parse_response(raw.body, &model.id, documents)?;
     let entry = |status, tokens: Tokens, cost: Option<Cost>| UsageEntry {
         id: UsageEntry::next_id(),
@@ -128,17 +152,32 @@ pub async fn rerank(query: &str, documents: &[&str], model: &str, options: Reran
         provider: provider.slug().into(),
         model: model.id.clone(),
         status,
-        cost: cost.filter(|c| c.total().is_some()).unwrap_or_else(|| embeddings_cost(&tokens, Some(&model))),
+        cost: cost
+            .filter(|c| c.total().is_some())
+            .unwrap_or_else(|| embeddings_cost(&tokens, Some(&model))),
         tokens,
     };
-    let mut entries: Vec<UsageEntry> = retried.into_iter().map(|t| entry(UsageStatus::Failed, t, None)).collect();
-    entries.push(entry(UsageStatus::Succeeded, result.tokens(), Some(result.cost())));
+    let mut entries: Vec<UsageEntry> = retried
+        .into_iter()
+        .map(|t| entry(UsageStatus::Failed, t, None))
+        .collect();
+    entries.push(entry(
+        UsageStatus::Succeeded,
+        result.tokens(),
+        Some(result.cost()),
+    ));
     result.usage_entries = entries;
     Ok(result)
 }
 
 /// `render_rerank_payload`: `top_n` only when given, then provider options.
-fn render_payload(query: &str, documents: &[&str], model: &str, top_n: Option<i64>, provider_options: &Value) -> Value {
+fn render_payload(
+    query: &str,
+    documents: &[&str],
+    model: &str,
+    top_n: Option<i64>,
+    provider_options: &Value,
+) -> Value {
     let mut payload = json!({ "model": model, "query": query, "documents": documents });
     if let Some(top_n) = top_n {
         payload["top_n"] = top_n.into();
@@ -153,13 +192,23 @@ fn render_payload(query: &str, documents: &[&str], model: &str, top_n: Option<i6
 /// the response when present, otherwise from the request.
 fn parse_response(data: Value, model: &str, documents: &[&str]) -> Result<Rerank> {
     let mut results = Vec::new();
-    for result in data.get("results").and_then(Value::as_array).into_iter().flatten() {
+    for result in data
+        .get("results")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
         let index = result
             .get("index")
             .and_then(Value::as_u64)
             .map(|i| i as usize)
             .filter(|i| *i < documents.len())
-            .ok_or_else(|| Error::Api("Rerank endpoint returned an invalid document index".into(), None))?;
+            .ok_or_else(|| {
+                Error::Api(
+                    "Rerank endpoint returned an invalid document index".into(),
+                    None,
+                )
+            })?;
         let document = match result.get("document") {
             Some(Value::Object(d)) => d.get("text").and_then(Value::as_str).map(str::to_string),
             Some(Value::String(s)) => Some(s.clone()),
@@ -174,7 +223,11 @@ fn parse_response(data: Value, model: &str, documents: &[&str]) -> Result<Rerank
     let usage = data.get("usage").cloned().unwrap_or_else(|| json!({}));
     Ok(Rerank {
         results,
-        model: data.get("model").and_then(Value::as_str).unwrap_or(model).to_string(),
+        model: data
+            .get("model")
+            .and_then(Value::as_str)
+            .unwrap_or(model)
+            .to_string(),
         input_tokens: int(usage.get("total_tokens")),
         reported_cost: usage.get("cost").and_then(Value::as_f64),
         raw: data,
@@ -189,7 +242,13 @@ mod tests {
     // rerank_spec.rb: "renders the Jina-style rerank request".
     #[test]
     fn renders_the_jina_style_rerank_request() {
-        let payload = render_payload("what is ruby", &["a", "b"], "voyageai/rerank-2.5-lite", Some(2), &Value::Null);
+        let payload = render_payload(
+            "what is ruby",
+            &["a", "b"],
+            "voyageai/rerank-2.5-lite",
+            Some(2),
+            &Value::Null,
+        );
         assert_eq!(
             payload,
             json!({ "model": "voyageai/rerank-2.5-lite", "query": "what is ruby", "documents": ["a", "b"], "top_n": 2 })
@@ -198,7 +257,12 @@ mod tests {
 
     #[test]
     fn an_out_of_range_index_is_an_error() {
-        let err = parse_response(json!({ "results": [{ "index": 2, "relevance_score": 0.1 }] }), "m", &["a", "b"]).unwrap_err();
+        let err = parse_response(
+            json!({ "results": [{ "index": 2, "relevance_score": 0.1 }] }),
+            "m",
+            &["a", "b"],
+        )
+        .unwrap_err();
         assert!(err.to_string().contains("invalid document index"));
     }
 }

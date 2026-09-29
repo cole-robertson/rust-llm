@@ -2,7 +2,9 @@
 
 use serde_json::{Map, Value, json};
 
-use super::{Caching, Request, StreamState, ToolChoice, int, normalize_finish_reason, str_of, tool_call_map};
+use super::{
+    Caching, Request, StreamState, ToolChoice, int, normalize_finish_reason, str_of, tool_call_map,
+};
 use crate::attachment::{Attachment, AttachmentType, Resolution};
 use crate::error::{Error, Result};
 use crate::message::{Citation, Message, RawResponse, Role, ServerToolCall, Thinking, ToolCall};
@@ -24,15 +26,25 @@ const FINISH_REASONS: &[(&str, &str)] = &[
 ];
 
 pub fn render_payload(req: &Request) -> Result<Value> {
-    let chat: Vec<&Message> = req.messages.iter().filter(|m| m.role != Role::System).collect();
+    let chat: Vec<&Message> = req
+        .messages
+        .iter()
+        .filter(|m| m.role != Role::System)
+        .collect();
     let mut payload = Map::new();
-    payload.insert("contents".into(), Value::Array(format_messages(req.model, &chat)?));
+    payload.insert(
+        "contents".into(),
+        Value::Array(format_messages(req.model, &chat)?),
+    );
     let mut generation = Map::new();
 
     let mut system_parts = Vec::new();
     for m in req.messages.iter().filter(|m| m.role == Role::System) {
         let text = m.content().to_string();
-        system_parts.extend(format_content((!text.is_empty()).then_some(text.as_str()), &m.attachments)?);
+        system_parts.extend(format_content(
+            (!text.is_empty()).then_some(text.as_str()),
+            &m.attachments,
+        )?);
     }
     if !system_parts.is_empty() {
         payload.insert("systemInstruction".into(), json!({ "parts": system_parts }));
@@ -71,8 +83,15 @@ pub fn render_payload(req: &Request) -> Result<Value> {
     }
     payload.insert("generationConfig".into(), Value::Object(generation));
     if !req.tools.is_empty() {
-        let declarations: Vec<Value> = req.tools.iter().map(|t| function_declaration(t.as_ref())).collect();
-        payload.insert("tools".into(), json!([{ "functionDeclarations": declarations }]));
+        let declarations: Vec<Value> = req
+            .tools
+            .iter()
+            .map(|t| function_declaration(t.as_ref()))
+            .collect();
+        payload.insert(
+            "tools".into(),
+            json!([{ "functionDeclarations": declarations }]),
+        );
         if let Some(choice) = &req.tool_prefs.choice {
             let mode = match choice {
                 ToolChoice::Auto => "auto",
@@ -83,17 +102,30 @@ pub fn render_payload(req: &Request) -> Result<Value> {
             if let ToolChoice::Tool(name) = choice {
                 config["allowedFunctionNames"] = json!([name]);
             }
-            payload.insert("toolConfig".into(), json!({ "functionCallingConfig": config }));
+            payload.insert(
+                "toolConfig".into(),
+                json!({ "functionCallingConfig": config }),
+            );
         }
     }
     // `with_caching(id:)` attaches an explicit cache; Gemini caches prefixes implicitly otherwise.
-    if let Some(id) = Caching::options(req.caching).and_then(|o| o.get("id")).and_then(Value::as_str) {
-        let name = if id.contains('/') { id.to_string() } else { format!("cachedContents/{id}") };
+    if let Some(id) = Caching::options(req.caching)
+        .and_then(|o| o.get("id"))
+        .and_then(Value::as_str)
+    {
+        let name = if id.contains('/') {
+            id.to_string()
+        } else {
+            format!("cachedContents/{id}")
+        };
         payload.insert("cachedContent".into(), name.into());
     }
     // `maybe_log_implicit_caching_note` (`protocols/gemini/chat.rb`).
-    let cache_without_id = Caching::options(req.caching).is_some_and(|o| o.get("id").is_none_or(Value::is_null));
-    if Caching::boundaries(req.caching) && (cache_without_id || req.messages.iter().any(|m| m.cache_until_here)) {
+    let cache_without_id =
+        Caching::options(req.caching).is_some_and(|o| o.get("id").is_none_or(Value::is_null));
+    if Caching::boundaries(req.caching)
+        && (cache_without_id || req.messages.iter().any(|m| m.cache_until_here))
+    {
         tracing::debug!(
             "Gemini caches repeated prompt prefixes automatically (implicit caching). For explicit caching, create a cache with RubyLLM.cache and attach it with chat.with_caching(id: cache)."
         );
@@ -130,15 +162,20 @@ fn format_messages(model: &Model, messages: &[&Message]) -> Result<Vec<Value>> {
             let order: Vec<String> = call_names.iter().map(|(id, _)| id.clone()).collect();
             let mut indexed: Vec<(usize, &Message)> = results.into_iter().enumerate().collect();
             indexed.sort_by_key(|(idx, m)| {
-                let pos = order.iter().position(|id| Some(id.as_str()) == m.tool_call_id.as_deref()).unwrap_or(order.len());
+                let pos = order
+                    .iter()
+                    .position(|id| Some(id.as_str()) == m.tool_call_id.as_deref())
+                    .unwrap_or(order.len());
                 (pos, *idx)
             });
             let mut parts = Vec::new();
             for (_, m) in indexed {
-                let name = m
-                    .tool_call_id
-                    .as_ref()
-                    .and_then(|id| call_names.iter().position(|(cid, _)| cid == id).map(|p| call_names.remove(p).1));
+                let name = m.tool_call_id.as_ref().and_then(|id| {
+                    call_names
+                        .iter()
+                        .position(|(cid, _)| cid == id)
+                        .map(|p| call_names.remove(p).1)
+                });
                 parts.extend(format_tool_result(model, m, name)?);
             }
             out.push(json!({ "role": "user", "parts": parts }));
@@ -149,7 +186,11 @@ fn format_messages(model: &Model, messages: &[&Message]) -> Result<Vec<Value>> {
                 call_names.push((id.clone(), call.name.clone()));
             }
         }
-        let role = if msg.role == Role::Assistant { "model" } else { "user" };
+        let role = if msg.role == Role::Assistant {
+            "model"
+        } else {
+            "user"
+        };
         out.push(json!({ "role": role, "parts": format_parts(msg)? }));
         i += 1;
     }
@@ -158,9 +199,10 @@ fn format_messages(model: &Model, messages: &[&Message]) -> Result<Vec<Value>> {
 
 fn format_parts(msg: &Message) -> Result<Value> {
     if msg.role == Role::Assistant
-        && let Some(raw) = &msg.raw_content {
-            return Ok(raw.clone());
-        }
+        && let Some(raw) = &msg.raw_content
+    {
+        return Ok(raw.clone());
+    }
     if let Some(calls) = msg.tool_calls.as_ref().filter(|c| !c.is_empty()) {
         let mut parts = Vec::new();
         if !msg.content().is_empty() {
@@ -179,36 +221,49 @@ fn format_parts(msg: &Message) -> Result<Value> {
     }
     let mut parts = Vec::new();
     if msg.role == Role::Assistant
-        && let Some(t) = &msg.thinking {
-            let mut part = json!({ "thought": true });
-            if let Some(text) = &t.text {
-                part["text"] = text.clone().into();
-            }
-            if let Some(sig) = &t.signature {
-                part["thoughtSignature"] = sig.clone().into();
-            }
-            parts.push(part);
+        && let Some(t) = &msg.thinking
+    {
+        let mut part = json!({ "thought": true });
+        if let Some(text) = &t.text {
+            part["text"] = text.clone().into();
         }
+        if let Some(sig) = &t.signature {
+            part["thoughtSignature"] = sig.clone().into();
+        }
+        parts.push(part);
+    }
     parts.extend(format_content(msg.content.as_deref(), &msg.attachments)?);
     Ok(Value::Array(parts))
 }
 
 fn supports_multimodal_function_responses(model: &Model) -> bool {
     let id = model.id.as_str();
-    let Some(rest) = id.strip_prefix("gemini-") else { return false };
+    let Some(rest) = id.strip_prefix("gemini-") else {
+        return false;
+    };
     if id.ends_with("-latest") {
         return true;
     }
     // `id[/\Agemini-(\d+(?:\.\d+)?)(?:-|\z)/, 1]`: a generation followed by `-` or the end.
     let generation = rest.split('-').next().unwrap_or("");
     let mut numbers = generation.split('.');
-    let major = numbers.next().filter(|m| !m.is_empty() && m.bytes().all(|b| b.is_ascii_digit()));
-    let minor_ok = numbers.next().is_none_or(|m| !m.is_empty() && m.bytes().all(|b| b.is_ascii_digit()));
-    minor_ok && numbers.next().is_none() && major.and_then(|m| m.parse::<u32>().ok()).is_some_and(|major| major >= 3)
+    let major = numbers
+        .next()
+        .filter(|m| !m.is_empty() && m.bytes().all(|b| b.is_ascii_digit()));
+    let minor_ok = numbers
+        .next()
+        .is_none_or(|m| !m.is_empty() && m.bytes().all(|b| b.is_ascii_digit()));
+    minor_ok
+        && numbers.next().is_none()
+        && major
+            .and_then(|m| m.parse::<u32>().ok())
+            .is_some_and(|major| major >= 3)
 }
 
 fn format_tool_result(model: &Model, msg: &Message, name: Option<String>) -> Result<Vec<Value>> {
-    let name = name.or_else(|| msg.tool_call_id.clone()).unwrap_or_default();
+    let name = name
+        .or_else(|| msg.tool_call_id.clone())
+        .unwrap_or_default();
     let mut content = msg.content.clone().filter(|c| !c.is_empty());
     if content.is_none() && msg.attachments.is_empty() {
         content = Some("(no output)".into());
@@ -217,12 +272,19 @@ fn format_tool_result(model: &Model, msg: &Message, name: Option<String>) -> Res
         "name": name,
         "response": { "name": name, "content": format_content(content.as_deref(), &[])? },
     });
-    let parts: Vec<Value> = msg.attachments.iter().map(format_attachment).collect::<Result<_>>()?;
-    let (media, siblings): (Vec<Value>, Vec<Value>) = if supports_multimodal_function_responses(model) {
-        parts.into_iter().partition(|p| p.get("inline_data").is_some())
-    } else {
-        (Vec::new(), parts)
-    };
+    let parts: Vec<Value> = msg
+        .attachments
+        .iter()
+        .map(format_attachment)
+        .collect::<Result<_>>()?;
+    let (media, siblings): (Vec<Value>, Vec<Value>) =
+        if supports_multimodal_function_responses(model) {
+            parts
+                .into_iter()
+                .partition(|p| p.get("inline_data").is_some())
+        } else {
+            (Vec::new(), parts)
+        };
     if !media.is_empty() {
         response["parts"] = Value::Array(media);
     }
@@ -234,9 +296,9 @@ fn format_tool_result(model: &Model, msg: &Message, name: Option<String>) -> Res
 fn format_attachment(a: &Attachment) -> Result<Value> {
     match a.kind() {
         AttachmentType::Text => Ok(json!({ "text": a.for_llm()? })),
-        AttachmentType::Document | AttachmentType::Unknown => {
-            Err(Error::UnsupportedAttachment(super::anthropic::unsupported(&a.mime_type)))
-        }
+        AttachmentType::Document | AttachmentType::Unknown => Err(Error::UnsupportedAttachment(
+            super::anthropic::unsupported(&a.mime_type),
+        )),
         // `format_file_data`: a stored file is referenced by URI.
         _ if a.is_provider_file() => Ok(json!({ "file_data": {
             "mime_type": a.mime_type,
@@ -247,7 +309,10 @@ fn format_attachment(a: &Attachment) -> Result<Value> {
 }
 
 /// `Gemini::Media.format_content`.
-pub(crate) fn format_content(content: Option<&str>, attachments: &[Attachment]) -> Result<Vec<Value>> {
+pub(crate) fn format_content(
+    content: Option<&str>,
+    attachments: &[Attachment],
+) -> Result<Vec<Value>> {
     let mut parts = Vec::new();
     if let Some(text) = content {
         parts.push(json!({ "text": text }));
@@ -255,16 +320,20 @@ pub(crate) fn format_content(content: Option<&str>, attachments: &[Attachment]) 
     for a in attachments {
         let mut part = format_attachment(a)?;
         if let Some(res) = a.resolution
-            && matches!(a.kind(), AttachmentType::Image | AttachmentType::Video | AttachmentType::Pdf) {
-                let level = match res {
-                    Resolution::Low => "LOW",
-                    Resolution::Medium => "MEDIUM",
-                    Resolution::High => "HIGH",
-                    Resolution::UltraHigh if a.kind() != AttachmentType::Image => "HIGH",
-                    Resolution::UltraHigh => "ULTRA_HIGH",
-                };
-                part["media_resolution"] = json!({ "level": format!("MEDIA_RESOLUTION_{level}") });
-            }
+            && matches!(
+                a.kind(),
+                AttachmentType::Image | AttachmentType::Video | AttachmentType::Pdf
+            )
+        {
+            let level = match res {
+                Resolution::Low => "LOW",
+                Resolution::Medium => "MEDIUM",
+                Resolution::High => "HIGH",
+                Resolution::UltraHigh if a.kind() != AttachmentType::Image => "HIGH",
+                Resolution::UltraHigh => "ULTRA_HIGH",
+            };
+            part["media_resolution"] = json!({ "level": format!("MEDIA_RESOLUTION_{level}") });
+        }
         parts.push(part);
     }
     Ok(parts)
@@ -279,7 +348,12 @@ fn part_server_calls(parts: &[Value]) -> Vec<ServerToolCall> {
         .iter()
         .filter(|p| is_server_tool_part(p))
         .map(|p| ServerToolCall {
-            kind: if p.get("executableCode").is_some() { "executable_code" } else { "code_execution_result" }.into(),
+            kind: if p.get("executableCode").is_some() {
+                "executable_code"
+            } else {
+                "code_execution_result"
+            }
+            .into(),
             name: None,
             id: None,
             input: p.get("executableCode").cloned(),
@@ -290,9 +364,15 @@ fn part_server_calls(parts: &[Value]) -> Vec<ServerToolCall> {
 }
 
 fn metadata_server_calls(data: &Value) -> Vec<ServerToolCall> {
-    let candidate = data.pointer("/candidates/0").cloned().unwrap_or_else(|| json!({}));
+    let candidate = data
+        .pointer("/candidates/0")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
     let mut calls = Vec::new();
-    if let Some(queries) = candidate.pointer("/groundingMetadata/webSearchQueries").filter(|q| q.as_array().is_some_and(|a| !a.is_empty())) {
+    if let Some(queries) = candidate
+        .pointer("/groundingMetadata/webSearchQueries")
+        .filter(|q| q.as_array().is_some_and(|a| !a.is_empty()))
+    {
         calls.push(ServerToolCall {
             kind: "google_search".into(),
             name: None,
@@ -303,7 +383,14 @@ fn metadata_server_calls(data: &Value) -> Vec<ServerToolCall> {
         });
     }
     if let Some(meta) = candidate.get("urlContextMetadata") {
-        calls.push(ServerToolCall { kind: "url_context".into(), name: None, id: None, input: None, result: Some(meta.clone()), raw: meta.clone() });
+        calls.push(ServerToolCall {
+            kind: "url_context".into(),
+            name: None,
+            id: None,
+            input: None,
+            result: Some(meta.clone()),
+            raw: meta.clone(),
+        });
     }
     calls
 }
@@ -315,15 +402,35 @@ fn byte_to_char(content: Option<&str>, byte_index: Option<i64>) -> Option<i64> {
 }
 
 fn extract_citations(data: &Value, content: Option<&str>) -> Vec<Citation> {
-    let Some(meta) = data.pointer("/candidates/0/groundingMetadata") else { return Vec::new() };
-    let chunks = meta.get("groundingChunks").and_then(Value::as_array).cloned().unwrap_or_default();
-    let source = |i: usize| chunks.get(i).and_then(|c| c.get("web").or_else(|| c.get("retrievedContext"))).cloned();
-    let supports = meta.get("groundingSupports").and_then(Value::as_array).cloned().unwrap_or_default();
+    let Some(meta) = data.pointer("/candidates/0/groundingMetadata") else {
+        return Vec::new();
+    };
+    let chunks = meta
+        .get("groundingChunks")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let source = |i: usize| {
+        chunks
+            .get(i)
+            .and_then(|c| c.get("web").or_else(|| c.get("retrievedContext")))
+            .cloned()
+    };
+    let supports = meta
+        .get("groundingSupports")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     if supports.is_empty() {
         return (0..chunks.len())
             .filter_map(|i| {
                 let s = source(i)?;
-                Some(Citation { url: str_of(s.get("uri")), title: str_of(s.get("title")), source_index: Some(i as i64), ..Default::default() })
+                Some(Citation {
+                    url: str_of(s.get("uri")),
+                    title: str_of(s.get("title")),
+                    source_index: Some(i as i64),
+                    ..Default::default()
+                })
             })
             .collect();
     }
@@ -332,8 +439,15 @@ fn extract_citations(data: &Value, content: Option<&str>) -> Vec<Citation> {
         let segment = support.get("segment").cloned().unwrap_or_else(|| json!({}));
         let end = int(segment.get("endIndex"));
         let start = int(segment.get("startIndex")).or(end.map(|_| 0));
-        for idx in support.get("groundingChunkIndices").and_then(Value::as_array).into_iter().flatten() {
-            let Some(i) = idx.as_u64().map(|i| i as usize) else { continue };
+        for idx in support
+            .get("groundingChunkIndices")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let Some(i) = idx.as_u64().map(|i| i as usize) else {
+                continue;
+            };
             let Some(s) = source(i) else { continue };
             out.push(Citation {
                 url: str_of(s.get("uri")),
@@ -372,9 +486,13 @@ fn extract_tool_calls(parts: &[Value]) -> Vec<ToolCall> {
             let mut call = ToolCall::new(
                 uuid::Uuid::new_v4().to_string(),
                 str_of(f.get("name")).unwrap_or_default(),
-                f.get("args").and_then(Value::as_object).cloned().unwrap_or_default(),
+                f.get("args")
+                    .and_then(Value::as_object)
+                    .cloned()
+                    .unwrap_or_default(),
             );
-            call.thought_signature = str_of(p.get("thoughtSignature")).or_else(|| str_of(p.get("thought_signature")));
+            call.thought_signature =
+                str_of(p.get("thoughtSignature")).or_else(|| str_of(p.get("thought_signature")));
             Some(call)
         })
         .collect()
@@ -383,11 +501,16 @@ fn extract_tool_calls(parts: &[Value]) -> Vec<ToolCall> {
 fn usage(message: &mut Message, data: &Value, streaming: bool) {
     let meta = data.get("usageMetadata");
     let cached = int(meta.and_then(|m| m.get("cachedContentTokenCount")));
-    message.tokens.input = int(meta.and_then(|m| m.get("promptTokenCount"))).map(|p| (p - cached.unwrap_or(0)).max(0));
+    message.tokens.input =
+        int(meta.and_then(|m| m.get("promptTokenCount"))).map(|p| (p - cached.unwrap_or(0)).max(0));
     let candidates = int(meta.and_then(|m| m.get("candidatesTokenCount"))).unwrap_or(0);
     let thought = int(meta.and_then(|m| m.get("thoughtsTokenCount")));
     let total = candidates + thought.unwrap_or(0);
-    message.tokens.output = if streaming { (total > 0).then_some(total) } else { Some(total) };
+    message.tokens.output = if streaming {
+        (total > 0).then_some(total)
+    } else {
+        Some(total)
+    };
     message.tokens.cache_read = cached;
     message.tokens.thinking = thought;
 }
@@ -403,18 +526,27 @@ fn build_response_content(parts: &[&Value]) -> (Option<String>, Vec<Attachment>)
             text.push_str(t);
         } else if let Some(inline) = part.get("inlineData") {
             // `build_inline_attachment`: skipped without data.
-            let Some(bytes) =
-                inline.get("data").and_then(Value::as_str).and_then(|d| base64::engine::general_purpose::STANDARD.decode(d).ok())
+            let Some(bytes) = inline
+                .get("data")
+                .and_then(Value::as_str)
+                .and_then(|d| base64::engine::general_purpose::STANDARD.decode(d).ok())
             else {
                 continue;
             };
             let mime = inline.get("mimeType").and_then(Value::as_str);
-            attachments.push(Attachment::from_bytes(bytes, attachment_filename(mime, index), mime));
+            attachments.push(Attachment::from_bytes(
+                bytes,
+                attachment_filename(mime, index),
+                mime,
+            ));
         } else if let Some(file) = part.get("fileData") {
             // `build_file_attachment`: skipped without a URI; the response's filename wins.
-            let Some(uri) = file.get("fileUri").and_then(Value::as_str) else { continue };
-            let filename = str_of(file.get("filename"))
-                .unwrap_or_else(|| attachment_filename(file.get("mimeType").and_then(Value::as_str), index));
+            let Some(uri) = file.get("fileUri").and_then(Value::as_str) else {
+                continue;
+            };
+            let filename = str_of(file.get("filename")).unwrap_or_else(|| {
+                attachment_filename(file.get("mimeType").and_then(Value::as_str), index)
+            });
             attachments.push(Attachment::new(uri).with_filename(&filename));
         }
     }
@@ -423,7 +555,9 @@ fn build_response_content(parts: &[&Value]) -> (Option<String>, Vec<Attachment>)
 
 /// `Gemini#attachment_filename`: `gemini_attachment_{n}` plus the MIME subtype, normalized.
 fn attachment_filename(mime_type: Option<&str>, index: usize) -> String {
-    let Some(mime) = mime_type else { return format!("gemini_attachment_{}", index + 1) };
+    let Some(mime) = mime_type else {
+        return format!("gemini_attachment_{}", index + 1);
+    };
     let extension = match mime.rsplit('/').next().unwrap_or("") {
         "jpeg" => "jpg".to_string(),
         "plain" => "txt".to_string(),
@@ -433,11 +567,21 @@ fn attachment_filename(mime_type: Option<&str>, index: usize) -> String {
 }
 
 pub fn parse_completion_body(model: &Model, data: &Value, raw: RawResponse) -> Result<Message> {
-    let parts = data.pointer("/candidates/0/content/parts").and_then(Value::as_array).cloned().unwrap_or_default();
+    let parts = data
+        .pointer("/candidates/0/content/parts")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     // `parse_content`: `''` when there is nothing but thoughts, else `build_response_content`.
-    let non_thought: Vec<&Value> = parts.iter().filter(|p| p.get("thought").and_then(Value::as_bool) != Some(true)).collect();
-    let (content, attachments) =
-        if non_thought.is_empty() { (Some(String::new()), Vec::new()) } else { build_response_content(&non_thought) };
+    let non_thought: Vec<&Value> = parts
+        .iter()
+        .filter(|p| p.get("thought").and_then(Value::as_bool) != Some(true))
+        .collect();
+    let (content, attachments) = if non_thought.is_empty() {
+        (Some(String::new()), Vec::new())
+    } else {
+        build_response_content(&non_thought)
+    };
     let (thought_text, signature) = thoughts(&parts);
     let mut server_calls = part_server_calls(&parts);
     server_calls.extend(metadata_server_calls(data));
@@ -448,11 +592,16 @@ pub fn parse_completion_body(model: &Model, data: &Value, raw: RawResponse) -> R
     m.attachments = attachments;
     m.thinking = Thinking::build(thought_text, signature);
     m.tool_calls = tool_call_map(extract_tool_calls(&parts));
-    m.raw_content = parts.iter().any(is_server_tool_part).then(|| Value::Array(parts.clone()));
+    m.raw_content = parts
+        .iter()
+        .any(is_server_tool_part)
+        .then(|| Value::Array(parts.clone()));
     m.server_tool_calls = server_calls;
     usage(&mut m, data, false);
     m.finish_reason = normalize_finish_reason(
-        data.pointer("/candidates/0/finishReason").or_else(|| data.pointer("/promptFeedback/blockReason")).and_then(Value::as_str),
+        data.pointer("/candidates/0/finishReason")
+            .or_else(|| data.pointer("/promptFeedback/blockReason"))
+            .and_then(Value::as_str),
         FINISH_REASONS,
     );
     m.model = str_of(data.get("modelVersion")).or_else(|| Some(model.id.clone()));
@@ -461,7 +610,11 @@ pub fn parse_completion_body(model: &Model, data: &Value, raw: RawResponse) -> R
 }
 
 pub fn build_chunk(state: &mut StreamState, data: &Value) -> Message {
-    let parts = data.pointer("/candidates/0/content/parts").and_then(Value::as_array).cloned().unwrap_or_default();
+    let parts = data
+        .pointer("/candidates/0/content/parts")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     state.gemini_parts.extend(parts.iter().cloned());
     let text: String = parts
         .iter()
@@ -476,7 +629,9 @@ pub fn build_chunk(state: &mut StreamState, data: &Value) -> Message {
     m.thinking = Thinking::build(thought_text, signature);
     usage(&mut m, data, true);
     m.finish_reason = normalize_finish_reason(
-        data.pointer("/candidates/0/finishReason").or_else(|| data.pointer("/promptFeedback/blockReason")).and_then(Value::as_str),
+        data.pointer("/candidates/0/finishReason")
+            .or_else(|| data.pointer("/promptFeedback/blockReason"))
+            .and_then(Value::as_str),
         FINISH_REASONS,
     );
     let calls = extract_tool_calls(&parts);
@@ -487,7 +642,11 @@ pub fn build_chunk(state: &mut StreamState, data: &Value) -> Message {
         let mut calls = part_server_calls(&state.gemini_parts);
         calls.extend(metadata_server_calls(data));
         if !calls.is_empty() {
-            m.raw_content = state.gemini_parts.iter().any(is_server_tool_part).then(|| Value::Array(state.gemini_parts.clone()));
+            m.raw_content = state
+                .gemini_parts
+                .iter()
+                .any(is_server_tool_part)
+                .then(|| Value::Array(state.gemini_parts.clone()));
             m.server_tool_calls = calls;
         }
     }

@@ -43,22 +43,30 @@ pub struct Http {
 impl Http {
     /// `HTTP.secure?`: HTTPS, or plain HTTP to a loopback address, and no credentials in the URL.
     pub fn is_secure(url: &str) -> bool {
-        let Ok(url) = reqwest::Url::parse(url) else { return false };
+        let Ok(url) = reqwest::Url::parse(url) else {
+            return false;
+        };
         if !url.username().is_empty() || url.password().is_some() {
             return false;
         }
-        url.scheme() == "https" || (url.scheme() == "http" && url.host_str().is_some_and(|h| LOOPBACK_HOSTS.contains(&h)))
+        url.scheme() == "https"
+            || (url.scheme() == "http"
+                && url.host_str().is_some_and(|h| LOOPBACK_HOSTS.contains(&h)))
     }
 
     /// `HTTP.loopback?`.
     pub fn is_loopback(url: &str) -> bool {
-        reqwest::Url::parse(url).ok().is_some_and(|u| u.host_str().is_some_and(|h| LOOPBACK_HOSTS.contains(&h)))
+        reqwest::Url::parse(url)
+            .ok()
+            .is_some_and(|u| u.host_str().is_some_and(|h| LOOPBACK_HOSTS.contains(&h)))
     }
 
     /// Raises `Error::Argument` for insecure URLs, like `HTTP.new`.
     pub fn new(url: &str, headers: HeaderSource, timeout: Duration) -> Result<Http> {
         if !Http::is_secure(url) {
-            return Err(Error::Argument(format!("MCP servers must use HTTPS without credentials in the URL: {url}")));
+            return Err(Error::Argument(format!(
+                "MCP servers must use HTTPS without credentials in the URL: {url}"
+            )));
         }
         let url = reqwest::Url::parse(url).map_err(|e| Error::Argument(e.to_string()))?;
         let client = reqwest::Client::builder()
@@ -66,7 +74,13 @@ impl Http {
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|e| Error::Configuration(e.to_string()))?;
-        Ok(Http { url, headers, client, session: Mutex::new(None), authorization: None })
+        Ok(Http {
+            url,
+            headers,
+            client,
+            session: Mutex::new(None),
+            authorization: None,
+        })
     }
 
     /// `unauthorized:`: OAuth for this server (see [`Authorization`]).
@@ -100,10 +114,16 @@ impl Http {
     ) -> Result<Vec<Value>> {
         let mut retried = false;
         loop {
-            match self.post_once(message, version, timeout, params, on_notification).await? {
+            match self
+                .post_once(message, version, timeout, params, on_notification)
+                .await?
+            {
                 Ok(replies) => return Ok(replies),
                 Err((status, challenge, error)) => {
-                    if !self.is_reauthorized(status, challenge.as_deref(), retried).await {
+                    if !self
+                        .is_reauthorized(status, challenge.as_deref(), retried)
+                        .await
+                    {
                         return Err(error);
                     }
                     retried = true;
@@ -114,7 +134,9 @@ impl Http {
 
     /// `reauthorized?`: a 403 only reports its challenge; a first 401 retries when refreshed.
     async fn is_reauthorized(&self, status: u16, challenge: Option<&str>, retried: bool) -> bool {
-        let Some(authorization) = &self.authorization else { return false };
+        let Some(authorization) = &self.authorization else {
+            return false;
+        };
         if !(status == 403 || (status == 401 && !retried)) {
             return false;
         }
@@ -145,7 +167,9 @@ impl Http {
         if let Some(session) = self.session() {
             request = request.header("Mcp-Session-Id", session);
         }
-        let name = message.pointer("/params/name").or_else(|| message.pointer("/params/uri"));
+        let name = message
+            .pointer("/params/name")
+            .or_else(|| message.pointer("/params/uri"));
         if let Some(name) = name.and_then(|n| header_value(&text_of(n))) {
             request = request.header("Mcp-Name", name);
         }
@@ -166,12 +190,24 @@ impl Http {
             request = request.timeout(timeout);
         }
         let response = request.send().await.map_err(|e| {
-            if e.is_timeout() { Error::Timeout(e.to_string()) } else { Error::ConnectionFailed(e.to_string()) }
+            if e.is_timeout() {
+                Error::Timeout(e.to_string())
+            } else {
+                Error::ConnectionFailed(e.to_string())
+            }
         })?;
         let status = response.status().as_u16();
-        let challenge = response.headers().get("www-authenticate").and_then(|v| v.to_str().ok()).map(str::to_string);
+        let challenge = response
+            .headers()
+            .get("www-authenticate")
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
         if method == "initialize" {
-            let session = response.headers().get("mcp-session-id").and_then(|v| v.to_str().ok()).map(str::to_string);
+            let session = response
+                .headers()
+                .get("mcp-session-id")
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_string);
             self.set_session(session);
         }
         let mut stream = Stream::default();
@@ -187,16 +223,27 @@ impl Http {
         if (200..300).contains(&status) || answered(&replies, message) {
             return Ok(Ok(replies));
         }
-        Ok(Err((status, challenge, self.failure(status, &stream.body, &replies))))
+        Ok(Err((
+            status,
+            challenge,
+            self.failure(status, &stream.body, &replies),
+        )))
     }
 
     fn failure(&self, status: u16, body: &str, replies: &[Value]) -> Error {
-        let response = Some(ErrorResponse { status, body: body.to_string() });
+        let response = Some(ErrorResponse {
+            status,
+            body: body.to_string(),
+        });
         match status {
             401 => Error::Unauthorized(format!("{} requires authorization", self.host()), response),
             403 => Error::Forbidden(format!("{} refused the request", self.host()), response),
             _ => {
-                let error = replies.first().and_then(|r| r.get("error")).cloned().unwrap_or(Value::Null);
+                let error = replies
+                    .first()
+                    .and_then(|r| r.get("error"))
+                    .cloned()
+                    .unwrap_or(Value::Null);
                 McpError {
                     message: error
                         .get("message")
@@ -216,7 +263,9 @@ impl Http {
 /// Some servers, such as Google's Drive preview, send a complete JSON-RPC result with an error
 /// status. The result is the answer.
 fn answered(replies: &[Value], message: &Value) -> bool {
-    replies.iter().any(|r| r.get("id") == message.get("id") && r.get("result").is_some())
+    replies
+        .iter()
+        .any(|r| r.get("id") == message.get("id") && r.get("result").is_some())
 }
 
 fn text_of(value: &Value) -> String {
@@ -233,7 +282,14 @@ fn header_value(value: &str) -> Option<String> {
             && !value.starts_with(' ')
             && !value.ends_with(' ')
             && !(value.starts_with("=?base64?") && value.ends_with("?=")));
-    Some(if safe { value.to_string() } else { format!("=?base64?{}?=", base64::engine::general_purpose::STANDARD.encode(value)) })
+    Some(if safe {
+        value.to_string()
+    } else {
+        format!(
+            "=?base64?{}?=",
+            base64::engine::general_purpose::STANDARD.encode(value)
+        )
+    })
 }
 
 /// Collects the JSON-RPC messages of one response, yielding notifications as they arrive. The
@@ -311,15 +367,22 @@ impl Transport for Http {
         headers: &[(String, String)],
         on_notification: &mut OnNotification<'_>,
     ) -> Result<Value> {
-        let replies = self.post(message, version, timeout, headers, on_notification).await?;
-        replies.into_iter().find(|r| r.get("id") == message.get("id")).ok_or_else(|| {
-            let method = message.get("method").and_then(Value::as_str).unwrap_or("");
-            McpError::new(format!("{} did not answer {method}", self.host())).into()
-        })
+        let replies = self
+            .post(message, version, timeout, headers, on_notification)
+            .await?;
+        replies
+            .into_iter()
+            .find(|r| r.get("id") == message.get("id"))
+            .ok_or_else(|| {
+                let method = message.get("method").and_then(Value::as_str).unwrap_or("");
+                McpError::new(format!("{} did not answer {method}", self.host())).into()
+            })
     }
 
     async fn notify(&self, message: &Value, version: Option<&str>) -> Result<()> {
-        self.post(message, version, None, &[], &mut |_| {}).await.map(|_| ())
+        self.post(message, version, None, &[], &mut |_| {})
+            .await
+            .map(|_| ())
     }
 
     async fn cancel(&self, notification: &Value, version: Option<&str>) -> Result<()> {
@@ -350,9 +413,20 @@ mod tests {
     #[test]
     fn encodes_header_values_that_are_not_plain_ascii() {
         assert_eq!(header_value("search").as_deref(), Some("search"));
-        let encoded = |v: &str| format!("=?base64?{}?=", base64::engine::general_purpose::STANDARD.encode(v));
+        let encoded = |v: &str| {
+            format!(
+                "=?base64?{}?=",
+                base64::engine::general_purpose::STANDARD.encode(v)
+            )
+        };
         assert_eq!(header_value(" us-west1"), Some(encoded(" us-west1")));
-        assert_eq!(header_value("file:///Überblick.md"), Some(encoded("file:///Überblick.md")));
-        assert_eq!(header_value("=?base64?abc?="), Some(encoded("=?base64?abc?=")));
+        assert_eq!(
+            header_value("file:///Überblick.md"),
+            Some(encoded("file:///Überblick.md"))
+        );
+        assert_eq!(
+            header_value("=?base64?abc?="),
+            Some(encoded("=?base64?abc?="))
+        );
     }
 }

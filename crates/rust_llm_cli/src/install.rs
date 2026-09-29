@@ -17,7 +17,10 @@ pub const MIGRATION_SUFFIX: &str = "_create_rust_llm_records";
 /// `rust-llm generate install [--path RUST_LLM_CHECKOUT]`.
 pub fn generate(g: &mut Generator, rust_llm_path: Option<&str>) -> Result<(), String> {
     if !g.exists("Cargo.toml") || !g.exists("migration/src/lib.rs") {
-        return Err("Run this from the root of a Loco app (Cargo.toml and migration/src/lib.rs not found).".into());
+        return Err(
+            "Run this from the root of a Loco app (Cargo.toml and migration/src/lib.rs not found)."
+                .into(),
+        );
     }
     add_dependencies(g, rust_llm_path)?;
     create_migration(g);
@@ -30,9 +33,13 @@ pub fn generate(g: &mut Generator, rust_llm_path: Option<&str>) -> Result<(), St
 
 fn add_dependencies(g: &mut Generator, rust_llm_path: Option<&str>) -> Result<(), String> {
     let spec = |krate: &str| -> Result<String, String> {
-        let Some(root) = rust_llm_path else { return Ok("\"2.0.0\"".to_string()) };
+        let Some(root) = rust_llm_path else {
+            return Ok("\"2.0.0\"".to_string());
+        };
         let dir = Path::new(root).join("crates").join(krate);
-        let dir = dir.canonicalize().map_err(|e| format!("--path {root}: crates/{krate} not found ({e})"))?;
+        let dir = dir
+            .canonicalize()
+            .map_err(|e| format!("--path {root}: crates/{krate} not found ({e})"))?;
         Ok(format!("{{ path = \"{}\" }}", dir.display()))
     };
     let (core, loco) = (spec("rust_llm")?, spec("rust_llm_loco")?);
@@ -54,25 +61,52 @@ fn existing_migration(g: &Generator) -> Option<String> {
 }
 
 fn create_migration(g: &mut Generator) {
-    let module = existing_migration(g)
-        .unwrap_or_else(|| format!("{}{MIGRATION_SUFFIX}", chrono::Utc::now().format("m%Y%m%d_%H%M%S")));
+    let module = existing_migration(g).unwrap_or_else(|| {
+        format!(
+            "{}{MIGRATION_SUFFIX}",
+            chrono::Utc::now().format("m%Y%m%d_%H%M%S")
+        )
+    });
     g.file(&format!("migration/src/{module}.rs"), MIGRATION);
     // Loco's own model generator injects these two lines the same way.
-    g.inject("migration/src/lib.rs", &format!("mod {module};"), Anchor::Before("pub struct Migrator"));
-    g.inject("migration/src/lib.rs", &format!("            Box::new({module}::Migration),"), Anchor::Before("inject-above"));
+    g.inject(
+        "migration/src/lib.rs",
+        &format!("mod {module};"),
+        Anchor::Before("pub struct Migrator"),
+    );
+    g.inject(
+        "migration/src/lib.rs",
+        &format!("            Box::new({module}::Migration),"),
+        Anchor::Before("inject-above"),
+    );
 }
 
 fn create_model_files(g: &mut Generator) {
     g.file("src/models/chats.rs", CHAT_MODEL);
     g.file("src/models/messages.rs", MESSAGE_MODEL);
-    g.inject("src/models/mod.rs", "pub mod chats;", Anchor::Sorted("pub mod "));
-    g.inject("src/models/mod.rs", "pub mod messages;", Anchor::Sorted("pub mod "));
+    g.inject(
+        "src/models/mod.rs",
+        "pub mod chats;",
+        Anchor::Sorted("pub mod "),
+    );
+    g.inject(
+        "src/models/mod.rs",
+        "pub mod messages;",
+        Anchor::Sorted("pub mod "),
+    );
 }
 
 fn create_initializer(g: &mut Generator) {
-    g.module_dir("initializers", "//! Loco initializers (`Hooks::initializers` in `src/app.rs`).\n");
+    g.module_dir(
+        "initializers",
+        "//! Loco initializers (`Hooks::initializers` in `src/app.rs`).\n",
+    );
     g.file("src/initializers/rust_llm.rs", INITIALIZER);
-    g.inject("src/initializers/mod.rs", "pub mod rust_llm;", Anchor::Sorted("pub mod "));
+    g.inject(
+        "src/initializers/mod.rs",
+        "pub mod rust_llm;",
+        Anchor::Sorted("pub mod "),
+    );
     register_initializer(g);
 }
 
@@ -85,14 +119,27 @@ fn register_initializer(g: &mut Generator) {
         let v = f + app[f..].find("vec![")? + "vec![".len();
         Some(!app[v..].trim_start().starts_with(']'))
     });
-    let text = if nonempty == Some(true) { format!("{entry}, ") } else { entry.to_string() };
+    let text = if nonempty == Some(true) {
+        format!("{entry}, ")
+    } else {
+        entry.to_string()
+    };
     g.splice("src/app.rs", entry, &text, &["fn initializers", "vec!["]);
 }
 
 fn create_convention_directories(g: &mut Generator) {
-    g.module_dir("tools", "//! RustLLM tools (`rust-llm generate tool NAME`).\n");
-    g.module_dir("agents", "//! RustLLM agents (`rust-llm generate agent NAME`).\n");
-    g.module_dir("schemas", "//! Structured-output schemas (`rust-llm generate schema NAME`).\n");
+    g.module_dir(
+        "tools",
+        "//! RustLLM tools (`rust-llm generate tool NAME`).\n",
+    );
+    g.module_dir(
+        "agents",
+        "//! RustLLM agents (`rust-llm generate agent NAME`).\n",
+    );
+    g.module_dir(
+        "schemas",
+        "//! Structured-output schemas (`rust-llm generate schema NAME`).\n",
+    );
     if !g.exists("src/prompts") {
         g.file("src/prompts/.gitkeep", "");
     }
@@ -106,5 +153,7 @@ fn show_install_info(g: &mut Generator) {
     g.note("     3. Start chatting: ChatRecord::create(&ctx.db, \"gpt-5.6-luna\", None).await? then record.ask(&ctx.db, &mut chat, \"Hello!\")");
     g.note("     4. Optional UI: rust-llm generate chat_ui");
     g.note("\n  Not ported: Active Storage attachments on persisted messages, and `ruby_llm:load_models`");
-    g.note("  (models come from the bundled registry; rust_llm_models rows are created on first use).");
+    g.note(
+        "  (models come from the bundled registry; rust_llm_models rows are created on first use).",
+    );
 }

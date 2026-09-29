@@ -25,7 +25,11 @@ impl Tool for Weather {
     fn parameters(&self) -> Vec<Parameter> {
         vec![Parameter::new("latitude"), Parameter::new("longitude")]
     }
-    async fn execute(&self, args: Map<String, Value>, _: &ToolCall) -> Result<ToolResult, ToolError> {
+    async fn execute(
+        &self,
+        args: Map<String, Value>,
+        _: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
         Ok(json!({ "latitude": args["latitude"], "longitude": args["longitude"], "temperature_2m": 14.2, "wind_speed_10m": 11.0 }).into())
     }
 }
@@ -81,35 +85,62 @@ async fn main() -> rust_llm::Result<()> {
     });
 
     // RubyLLM.chat.ask "What's the best way to learn Ruby?"
-    let answer = new_chat()?.with_max_output_tokens(200).ask("In one sentence: what's the best way to learn Rust?").await?;
+    let answer = new_chat()?
+        .with_max_output_tokens(200)
+        .ask("In one sentence: what's the best way to learn Rust?")
+        .await?;
     println!("ask       -> {}", answer.content());
 
     // chat.ask("Tell me a story") { |chunk| print chunk.content }
     print!("stream    -> ");
     let mut chat = new_chat()?;
     let streamed = chat
-        .ask_stream("Count from 1 to 5, comma separated, nothing else.", |chunk| {
-            if let Some(text) = &chunk.content {
-                print!("{text}");
-            }
-        })
+        .ask_stream(
+            "Count from 1 to 5, comma separated, nothing else.",
+            |chunk| {
+                if let Some(text) = &chunk.content {
+                    print!("{text}");
+                }
+            },
+        )
         .await?;
-    println!("   [{} in / {} out tokens]", streamed.tokens().input.unwrap_or(0), streamed.tokens().output.unwrap_or(0));
+    println!(
+        "   [{} in / {} out tokens]",
+        streamed.tokens().input.unwrap_or(0),
+        streamed.tokens().output.unwrap_or(0)
+    );
 
     // chat.with_tools(Weather).ask "What's the weather in Berlin?"
-    let mut chat = new_chat()?.with_tool(Weather).before_tool_call(|call| println!("tool      -> {}({})", call.name, Value::Object(call.arguments())));
-    let weather = chat.ask("What's the weather in Berlin (52.52, 13.405)? One sentence.").await?;
+    let mut chat = new_chat()?.with_tool(Weather).before_tool_call(|call| {
+        println!(
+            "tool      -> {}({})",
+            call.name,
+            Value::Object(call.arguments())
+        )
+    });
+    let weather = chat
+        .ask("What's the weather in Berlin (52.52, 13.405)? One sentence.")
+        .await?;
     println!("tools     -> {}", weather.content());
 
     // WeatherAssistant.new.ask "What's the weather in Berlin?"
-    let reply = WeatherAssistant.chat()?.ask("Weather in Paris (48.8575, 2.3514)?").await?;
+    let reply = WeatherAssistant
+        .chat()?
+        .ask("Weather in Paris (48.8575, 2.3514)?")
+        .await?;
     println!("agent     -> {}", reply.content());
 
     // chat.with_schema(ProductSchema).ask "Analyze this product"
     let mut chat = new_chat()?.with_schema_for::<Product>();
-    let product = chat.ask("Invent a product: a mechanical keyboard for Rust programmers.").await?;
+    let product = chat
+        .ask("Invent a product: a mechanical keyboard for Rust programmers.")
+        .await?;
     println!("schema    -> {}", product.parsed()?.unwrap_or_default());
 
-    println!("cost      -> ${:.6} across {} billed requests", chat.cost().total().unwrap_or_default(), chat.usage_entries().len());
+    println!(
+        "cost      -> ${:.6} across {} billed requests",
+        chat.cost().total().unwrap_or_default(),
+        chat.usage_entries().len()
+    );
     Ok(())
 }

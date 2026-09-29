@@ -24,7 +24,11 @@ impl UsageEntry {
     /// `Entry.new(operation:, provider:, model:)`: a pending attempt with unknown tokens and an
     /// unpriced cost. The port stores an absent model (`model: nil`) as `""`; `to_h` reports it
     /// as `null`.
-    pub fn new(operation: Operation, provider: impl Into<String>, model: Option<&str>) -> UsageEntry {
+    pub fn new(
+        operation: Operation,
+        provider: impl Into<String>,
+        model: Option<&str>,
+    ) -> UsageEntry {
         let tokens = Tokens::default();
         UsageEntry {
             id: UsageEntry::next_id(),
@@ -63,9 +67,19 @@ impl UsageEntry {
         let mut h = Map::new();
         h.insert("operation".into(), self.operation.as_str().into());
         h.insert("provider".into(), self.provider.clone().into());
-        h.insert("model".into(), if self.model.is_empty() { Value::Null } else { self.model.clone().into() });
+        h.insert(
+            "model".into(),
+            if self.model.is_empty() {
+                Value::Null
+            } else {
+                self.model.clone().into()
+            },
+        );
         h.insert("status".into(), self.status.as_str().into());
-        h.insert("tokens".into(), crate::instrumentation::tokens_h(&self.tokens));
+        h.insert(
+            "tokens".into(),
+            crate::instrumentation::tokens_h(&self.tokens),
+        );
         h.insert("cost".into(), crate::instrumentation::cost_h(&self.cost));
         Value::Object(h)
     }
@@ -163,7 +177,11 @@ impl Tracker {
 
     /// `start`: records a new pending attempt and returns its id.
     pub fn start(&mut self) -> u64 {
-        let entry = UsageEntry::new(self.operation, self.provider.clone(), self.model_info.as_ref().map(|m| m.id.as_str()));
+        let entry = UsageEntry::new(
+            self.operation,
+            self.provider.clone(),
+            self.model_info.as_ref().map(|m| m.id.as_str()),
+        );
         let id = entry.id;
         self.entries.push(entry);
         self.pending.push(id);
@@ -173,9 +191,13 @@ impl Tracker {
     /// `observe(chunk)`: a streamed chunk's token counts update the attempt in flight; a count
     /// the chunk does not report keeps the earlier value (`merge_stream_tokens`).
     pub fn observe(&mut self, chunk: &Message) {
-        let Some(&id) = self.pending.last() else { return };
+        let Some(&id) = self.pending.last() else {
+            return;
+        };
         let incoming = chunk.tokens();
-        let Some(entry) = self.entry_mut(id) else { return };
+        let Some(entry) = self.entry_mut(id) else {
+            return;
+        };
         entry.tokens.merge_latest(&incoming);
         entry.cost = Cost::new(&entry.tokens, None, Tier::Standard);
     }
@@ -183,8 +205,14 @@ impl Tracker {
     /// `fail_attempt(entry, error)`: ignored unless the attempt is still pending.
     pub fn fail_attempt(&mut self, entry: Option<u64>, error: &Error) {
         let Some(id) = entry else { return };
-        let Some(entry) = self.entry(id).filter(|e| e.is_pending()) else { return };
-        let status = if matches!(error, Error::Cancelled) { UsageStatus::Cancelled } else { UsageStatus::Failed };
+        let Some(entry) = self.entry(id).filter(|e| e.is_pending()) else {
+            return;
+        };
+        let status = if matches!(error, Error::Cancelled) {
+            UsageStatus::Cancelled
+        } else {
+            UsageStatus::Failed
+        };
         let tokens = self.failure_tokens(entry, error);
         self.finish(id, status, tokens, None);
     }
@@ -220,11 +248,16 @@ impl Tracker {
     /// `message_model`: the requested model unless the response echoes a different id this
     /// provider's registry knows.
     fn message_model(&self, message: &Message) -> Option<Model> {
-        let Some(id) = message.model.as_deref() else { return self.model_info.clone() };
+        let Some(id) = message.model.as_deref() else {
+            return self.model_info.clone();
+        };
         if self.model_info.as_ref().is_some_and(|m| m.id == id) {
             return self.model_info.clone();
         }
-        crate::models::models().find(id, Some(&self.provider)).ok().or_else(|| self.model_info.clone())
+        crate::models::models()
+            .find(id, Some(&self.provider))
+            .ok()
+            .or_else(|| self.model_info.clone())
     }
 
     /// `failure_tokens`: without a model the tokens stay as observed; otherwise the rule the chat
@@ -240,8 +273,12 @@ impl Tracker {
     /// `finish`: a supplied cost wins when it has a total; otherwise the tokens are priced for
     /// the operation's category (`CATEGORY_BY_OPERATION`).
     fn finish(&mut self, id: u64, status: UsageStatus, tokens: Tokens, cost: Option<Cost>) {
-        let cost = cost.filter(|c| c.total().is_some()).unwrap_or_else(|| self.price(&tokens));
-        let Some(entry) = self.entries.iter_mut().find(|e| e.id == id) else { return };
+        let cost = cost
+            .filter(|c| c.total().is_some())
+            .unwrap_or_else(|| self.price(&tokens));
+        let Some(entry) = self.entries.iter_mut().find(|e| e.id == id) else {
+            return;
+        };
         entry.status = status;
         entry.tokens = tokens;
         entry.cost = cost;
@@ -259,7 +296,9 @@ impl Tracker {
             Operation::Chat | Operation::Moderation | Operation::Ocr | Operation::Judgment => {
                 Cost::new(tokens, model, Tier::Standard)
             }
-            Operation::Embedding | Operation::Rerank => crate::rerank::embeddings_cost(tokens, model),
+            Operation::Embedding | Operation::Rerank => {
+                crate::rerank::embeddings_cost(tokens, model)
+            }
             Operation::Image => Cost::images(tokens, model, None),
             Operation::Speech | Operation::Transcription => Cost::audio(tokens, model),
         }

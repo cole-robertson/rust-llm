@@ -26,7 +26,10 @@ const TOKEN_MODELS: &[(&str, &str)] = &[
 
 /// `Tokens#to_h`: the components RubyLLM reports (it has no `reported_cost` key).
 fn to_h(tokens: &Tokens) -> Tokens {
-    Tokens { reported_cost: None, ..tokens.clone() }
+    Tokens {
+        reported_cost: None,
+        ..tokens.clone()
+    }
 }
 
 /// `chunks.reduce({}) { |usage, chunk| usage.merge(chunk.tokens.to_h) }`: each component's last
@@ -62,32 +65,72 @@ fn check(ok: bool, what: impl Into<String>) -> Result<(), String> {
 }
 
 /// One replay of the example: a streamed ask, then the same ask on a fresh chat without streaming.
-async fn token_usage_example(cassette: &Cassette, provider: &str, model: &str) -> Result<(), String> {
+async fn token_usage_example(
+    cassette: &Cassette,
+    provider: &str,
+    model: &str,
+) -> Result<(), String> {
     let basic = || {
         let chat = support::chat_for(cassette, provider, model).with_temperature(0.0);
         // DeepSeek ignores temperature while thinking is enabled.
-        if provider == "deepseek" { chat.with_thinking(ThinkingConfig::off()) } else { chat }
+        if provider == "deepseek" {
+            chat.with_thinking(ThinkingConfig::off())
+        } else {
+            chat
+        }
     };
     let prompt = "Reply with exactly: 1, 2, 3";
     let mut chunks = Vec::new();
-    let stream_message = basic().ask_stream(prompt, |c| chunks.push(c.clone())).await.map_err(|e| e.to_string())?;
+    let stream_message = basic()
+        .ask_stream(prompt, |c| chunks.push(c.clone()))
+        .await
+        .map_err(|e| e.to_string())?;
     let sync_message = basic().ask(prompt).await.map_err(|e| e.to_string())?;
 
-    check(stream_message.content().trim() == "1, 2, 3", format!("stream content {:?}", stream_message.content()))?;
-    check(sync_message.content().trim() == stream_message.content().trim(), format!("sync content {:?}", sync_message.content()))?;
+    check(
+        stream_message.content().trim() == "1, 2, 3",
+        format!("stream content {:?}", stream_message.content()),
+    )?;
+    check(
+        sync_message.content().trim() == stream_message.content().trim(),
+        format!("sync content {:?}", sync_message.content()),
+    )?;
     for message in [&stream_message, &sync_message] {
         let t = message.tokens();
-        for (component, count) in [("input", t.input), ("cache_read", t.cache_read), ("cache_write", t.cache_write), ("thinking", t.thinking)] {
-            check(count.is_none_or(|c| c >= 0), format!("{component} {count:?}"))?;
+        for (component, count) in [
+            ("input", t.input),
+            ("cache_read", t.cache_read),
+            ("cache_write", t.cache_write),
+            ("thinking", t.thinking),
+        ] {
+            check(
+                count.is_none_or(|c| c >= 0),
+                format!("{component} {count:?}"),
+            )?;
         }
         check(prompt_token_count(&t) > 0, format!("prompt tokens {t:?}"))?;
         check(t.output.is_some_and(|o| o > 0), format!("output {t:?}"))?;
-        check(t.output.unwrap_or(0) >= t.thinking.unwrap_or(0), format!("output < thinking {t:?}"))?;
+        check(
+            t.output.unwrap_or(0) >= t.thinking.unwrap_or(0),
+            format!("output < thinking {t:?}"),
+        )?;
     }
     let chunk_usage = merged(&chunks);
-    check(to_h(&stream_message.tokens()) == chunk_usage, format!("stream {:?} vs chunks {chunk_usage:?}", stream_message.tokens()))?;
-    if let (Some(sync), Some(stream)) = (visible_output_token_count(&sync_message), visible_output_token_count(&stream_message)) {
-        check((sync - stream).abs() <= 2, format!("visible output {sync} vs {stream}"))?;
+    check(
+        to_h(&stream_message.tokens()) == chunk_usage,
+        format!(
+            "stream {:?} vs chunks {chunk_usage:?}",
+            stream_message.tokens()
+        ),
+    )?;
+    if let (Some(sync), Some(stream)) = (
+        visible_output_token_count(&sync_message),
+        visible_output_token_count(&stream_message),
+    ) {
+        check(
+            (sync - stream).abs() <= 2,
+            format!("visible output {sync} vs {stream}"),
+        )?;
     }
     Ok(())
 }
@@ -100,33 +143,64 @@ async fn reports_token_usage_with_and_without_streaming() {
     let mut ran = 0;
     for &(provider, model) in TOKEN_MODELS {
         let name = support::cassette_name("chat streaming responses", provider, model, it);
-        let Some(cassette) = Cassette::start(&name).await else { continue };
+        let Some(cassette) = Cassette::start(&name).await else {
+            continue;
+        };
         ran += 1;
         if let Err(e) = token_usage_example(&cassette, provider, model).await {
             failures.push(format!("{provider} {model}: {e}"));
             continue;
         }
-        let replay = futures::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(cassette.assert_all_matched())).await;
+        let replay = futures::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(
+            cassette.assert_all_matched(),
+        ))
+        .await;
         if let Err(p) = replay {
-            failures.push(format!("{provider} {model}: {}", p.downcast_ref::<String>().cloned().unwrap_or_default()));
+            failures.push(format!(
+                "{provider} {model}: {}",
+                p.downcast_ref::<String>().cloned().unwrap_or_default()
+            ));
         }
     }
     assert!(ran > 0, "no cassettes for {it}");
-    assert!(failures.is_empty(), "{} of {ran} providers failed:\n{}", failures.len(), failures.join("\n\n"));
+    assert!(
+        failures.is_empty(),
+        "{} of {ran} providers failed:\n{}",
+        failures.len(),
+        failures.join("\n\n")
+    );
     eprintln!("{it}: {ran} providers replayed");
 }
 
 /// `EMBEDDING_MODELS` rows this port implements: (provider, model, cassette slug, dimensions).
 /// `model_info.fetch(:dimensions, 768)`: Mistral declares `nil`, so it skips the dimensions case.
 const EMBEDDING_MODELS: &[(&str, &str, &str, Option<i64>)] = &[
-    ("gemini", "gemini-embedding-001", "gemini-embedding-001", Some(768)),
+    (
+        "gemini",
+        "gemini-embedding-001",
+        "gemini-embedding-001",
+        Some(768),
+    ),
     ("mistral", "mistral-embed", "mistral-embed", None),
-    ("openai", "text-embedding-3-small", "text-embedding-3-small", Some(768)),
-    ("openrouter", "openai/text-embedding-3-small", "openai_text-embedding-3-small", Some(768)),
+    (
+        "openai",
+        "text-embedding-3-small",
+        "text-embedding-3-small",
+        Some(768),
+    ),
+    (
+        "openrouter",
+        "openai/text-embedding-3-small",
+        "openai_text-embedding-3-small",
+        Some(768),
+    ),
 ];
 
-async fn replay_embeddings<F, Fut>(it: &str, rows: impl Iterator<Item = &'static (&'static str, &'static str, &'static str, Option<i64>)>, body: F)
-where
+async fn replay_embeddings<F, Fut>(
+    it: &str,
+    rows: impl Iterator<Item = &'static (&'static str, &'static str, &'static str, Option<i64>)>,
+    body: F,
+) where
     F: Fn(Cassette, &'static str, &'static str, Option<i64>) -> Fut,
     Fut: std::future::Future<Output = Result<Cassette, String>>,
 {
@@ -134,20 +208,33 @@ where
     let mut ran = 0;
     for &(provider, model, slug, dimensions) in rows {
         let name = format!("embedding_basic_functionality_{provider}_{slug}_{it}");
-        let Some(cassette) = Cassette::start(&name).await else { continue };
+        let Some(cassette) = Cassette::start(&name).await else {
+            continue;
+        };
         ran += 1;
         match body(cassette, provider, model, dimensions).await {
             Ok(cassette) => {
-                let replay = futures::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(cassette.assert_all_matched())).await;
+                let replay = futures::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(
+                    cassette.assert_all_matched(),
+                ))
+                .await;
                 if let Err(p) = replay {
-                    failures.push(format!("{provider}: {}", p.downcast_ref::<String>().cloned().unwrap_or_default()));
+                    failures.push(format!(
+                        "{provider}: {}",
+                        p.downcast_ref::<String>().cloned().unwrap_or_default()
+                    ));
                 }
             }
             Err(e) => failures.push(format!("{provider} {model}: {e}")),
         }
     }
     assert!(ran > 0, "no cassettes for {it}");
-    assert!(failures.is_empty(), "{} of {ran} failed:\n{}", failures.len(), failures.join("\n\n"));
+    assert!(
+        failures.is_empty(),
+        "{} of {ran} failed:\n{}",
+        failures.len(),
+        failures.join("\n\n")
+    );
     eprintln!("{it}: {ran} replayed");
 }
 
@@ -155,33 +242,61 @@ where
 #[tokio::test]
 async fn embeds_multiple_texts_with_custom_dimensions() {
     let rows = EMBEDDING_MODELS.iter().filter(|(_, _, _, d)| d.is_some());
-    replay_embeddings("can_handle_multiple_texts_with_custom_dimensions", rows, |cassette, provider, model, dimensions| async move {
-        let texts = vec!["Ruby".to_string(), "Python".into(), "JavaScript".into()];
-        let options = EmbedOptions {
-            model: Some(model),
-            provider: Some(provider),
-            dimensions,
-            config: Some(config_for(&cassette, provider)),
-            ..Default::default()
-        };
-        let e = embed(texts, options).await.map_err(|e| e.to_string())?;
-        let Vectors::Batch(rows) = &e.vectors else { return Err("expected an array of vectors".into()) };
-        let expected = dimensions.unwrap_or_default() as usize;
-        check(rows.iter().all(|v| v.len() == expected), format!("lengths {:?}", rows.iter().map(Vec::len).collect::<Vec<_>>()))?;
-        Ok(cassette)
-    })
+    replay_embeddings(
+        "can_handle_multiple_texts_with_custom_dimensions",
+        rows,
+        |cassette, provider, model, dimensions| async move {
+            let texts = vec!["Ruby".to_string(), "Python".into(), "JavaScript".into()];
+            let options = EmbedOptions {
+                model: Some(model),
+                provider: Some(provider),
+                dimensions,
+                config: Some(config_for(&cassette, provider)),
+                ..Default::default()
+            };
+            let e = embed(texts, options).await.map_err(|e| e.to_string())?;
+            let Vectors::Batch(rows) = &e.vectors else {
+                return Err("expected an array of vectors".into());
+            };
+            let expected = dimensions.unwrap_or_default() as usize;
+            check(
+                rows.iter().all(|v| v.len() == expected),
+                format!(
+                    "lengths {:?}",
+                    rows.iter().map(Vec::len).collect::<Vec<_>>()
+                ),
+            )?;
+            Ok(cassette)
+        },
+    )
     .await;
 }
 
 // spec: embedding_spec.rb:50 #{provider}/#{model} handles single-string arrays consistently
 #[tokio::test]
 async fn handles_single_string_arrays_consistently() {
-    replay_embeddings("handles_single-string_arrays_consistently", EMBEDDING_MODELS.iter(), |cassette, provider, model, _| async move {
-        let options = EmbedOptions { model: Some(model), provider: Some(provider), config: Some(config_for(&cassette, provider)), ..Default::default() };
-        let e = embed(vec!["Ruby is great".to_string()], options).await.map_err(|e| e.to_string())?;
-        let Vectors::Batch(rows) = &e.vectors else { return Err("a one-string array must still give an array of vectors".into()) };
-        check(rows.len() == 1 && !rows[0].is_empty(), format!("{} vectors", rows.len()))?;
-        Ok(cassette)
-    })
+    replay_embeddings(
+        "handles_single-string_arrays_consistently",
+        EMBEDDING_MODELS.iter(),
+        |cassette, provider, model, _| async move {
+            let options = EmbedOptions {
+                model: Some(model),
+                provider: Some(provider),
+                config: Some(config_for(&cassette, provider)),
+                ..Default::default()
+            };
+            let e = embed(vec!["Ruby is great".to_string()], options)
+                .await
+                .map_err(|e| e.to_string())?;
+            let Vectors::Batch(rows) = &e.vectors else {
+                return Err("a one-string array must still give an array of vectors".into());
+            };
+            check(
+                rows.len() == 1 && !rows[0].is_empty(),
+                format!("{} vectors", rows.len()),
+            )?;
+            Ok(cassette)
+        },
+    )
     .await;
 }

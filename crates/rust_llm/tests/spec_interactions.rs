@@ -10,8 +10,8 @@ use async_trait::async_trait;
 use rust_llm::message::indexmap_lite::IndexMap;
 use rust_llm::protocols::interactions;
 use rust_llm::{
-    Attachment, Chat, Config, Error, Message, Model, Parameter, ProtocolName, ProviderTool, Role, ThinkingConfig,
-    ThinkingDisplay, Tool, ToolCall, ToolChoice, ToolError, ToolResult,
+    Attachment, Chat, Config, Error, Message, Model, Parameter, ProtocolName, ProviderTool, Role,
+    ThinkingConfig, ThinkingDisplay, Tool, ToolCall, ToolChoice, ToolError, ToolResult,
 };
 use serde_json::{Map, Value, json};
 use support::{Cassette, config_for};
@@ -30,9 +30,16 @@ impl Tool for Multiply {
         "Multiply two numbers".into()
     }
     fn parameters(&self) -> Vec<Parameter> {
-        vec![Parameter::new("left").kind("integer"), Parameter::new("right").kind("integer")]
+        vec![
+            Parameter::new("left").kind("integer"),
+            Parameter::new("right").kind("integer"),
+        ]
     }
-    async fn execute(&self, args: Map<String, Value>, _: &ToolCall) -> Result<ToolResult, ToolError> {
+    async fn execute(
+        &self,
+        args: Map<String, Value>,
+        _: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
         Ok(json!(args["left"].as_i64().unwrap_or(0) * args["right"].as_i64().unwrap_or(0)).into())
     }
 }
@@ -45,7 +52,9 @@ fn offline_config() -> Arc<Config> {
 
 /// `RubyLLM.chat(model: model_for(:gemini, :mcp), provider: :gemini, protocol: :interactions)`.
 fn chat_with(config: Arc<Config>) -> Chat {
-    Chat::with_config(config, Some(MODEL), Some("gemini"), false).unwrap().with_protocol(ProtocolName::Interactions)
+    Chat::with_config(config, Some(MODEL), Some("gemini"), false)
+        .unwrap()
+        .with_protocol(ProtocolName::Interactions)
 }
 
 fn chat() -> Chat {
@@ -93,34 +102,57 @@ fn round_trip(message: &Message) -> Message {
     restored.tool_calls = message.tool_calls.clone();
     restored.tool_call_id = message.tool_call_id.clone();
     restored.thinking = message.thinking.clone();
-    restored.raw_content = message.raw_content.as_ref().map(|r| serde_json::from_str(&r.to_string()).unwrap());
+    restored.raw_content = message
+        .raw_content
+        .as_ref()
+        .map(|r| serde_json::from_str(&r.to_string()).unwrap());
     restored
 }
 
 // spec: protocols/interactions_spec.rb:36
 #[test]
 fn keeps_generate_content_as_the_default_and_renders_the_opt_in_protocol_through_chat() {
-    assert_eq!(rust_llm::Provider::Gemini.default_protocol(), ProtocolName::Gemini);
+    assert_eq!(
+        rust_llm::Provider::Gemini.default_protocol(),
+        ProtocolName::Gemini
+    );
     let mut chat = chat()
         .with_instructions("Be concise")
         .with_tool(Multiply)
         .with_tool_choice(ToolChoice::Required)
         .unwrap()
-        .with_provider_tools([ProviderTool::with_options("mcp", json!({ "name": "docs", "url": "https://example.com/mcp" }))])
+        .with_provider_tools([ProviderTool::with_options(
+            "mcp",
+            json!({ "name": "docs", "url": "https://example.com/mcp" }),
+        )])
         .with_max_output_tokens(50);
     chat.ask_later("Multiply").unwrap();
     let payload = chat.render().unwrap();
     assert_eq!(payload["store"], json!(false));
     assert_eq!(payload["system_instruction"], json!("Be concise"));
-    assert_eq!(payload["input"], json!([{ "type": "user_input", "content": [{ "type": "text", "text": "Multiply" }] }]));
+    assert_eq!(
+        payload["input"],
+        json!([{ "type": "user_input", "content": [{ "type": "text", "text": "Multiply" }] }])
+    );
     assert_eq!(payload["generation_config"]["max_output_tokens"], json!(50));
     assert_eq!(payload["generation_config"]["tool_choice"], json!("any"));
     let tools = payload["tools"].as_array().unwrap();
-    assert_eq!((tools[0]["type"].as_str(), tools[0]["name"].as_str()), (Some("function"), Some("multiply")));
+    assert_eq!(
+        (tools[0]["type"].as_str(), tools[0]["name"].as_str()),
+        (Some("function"), Some("multiply"))
+    );
     let last = tools.last().unwrap();
     assert_eq!(
-        (last["type"].as_str(), last["name"].as_str(), last["url"].as_str()),
-        (Some("mcp_server"), Some("docs"), Some("https://example.com/mcp"))
+        (
+            last["type"].as_str(),
+            last["name"].as_str(),
+            last["url"].as_str()
+        ),
+        (
+            Some("mcp_server"),
+            Some("docs"),
+            Some("https://example.com/mcp")
+        )
     );
 }
 
@@ -130,20 +162,40 @@ fn normalizes_complete_mcp_output_and_preserves_every_signed_step_for_stateless_
     let message = parse(&body()).unwrap();
     assert_eq!(message.content(), "Ruby docs.");
     assert!(!message.is_tool_call());
-    let kinds: Vec<&str> = message.server_tool_calls.iter().map(|c| c.kind.as_str()).collect();
+    let kinds: Vec<&str> = message
+        .server_tool_calls
+        .iter()
+        .map(|c| c.kind.as_str())
+        .collect();
     assert_eq!(kinds, ["mcp_server_tool_call", "mcp_server_tool_result"]);
-    assert_eq!(message.server_tool_calls.last().unwrap().result, Some(json!("Ruby documentation")));
+    assert_eq!(
+        message.server_tool_calls.last().unwrap().result,
+        Some(json!("Ruby documentation"))
+    );
     let t = &message.tokens;
-    assert_eq!((t.input, t.output, t.thinking, t.cache_read), (Some(46), Some(15), Some(10), Some(4)));
+    assert_eq!(
+        (t.input, t.output, t.thinking, t.cache_read),
+        (Some(46), Some(15), Some(10), Some(4))
+    );
     let mut chat = chat();
     chat.set_messages(vec![round_trip(&message)]);
     chat.ask_later("Continue").unwrap();
     let input = chat.render().unwrap()["input"].as_array().unwrap().clone();
     let steps = steps();
     let steps = steps.as_array().unwrap();
-    assert_eq!(input[..2], [without_signature(&steps[0]), without_signature(&steps[1])]);
+    assert_eq!(
+        input[..2],
+        [without_signature(&steps[0]), without_signature(&steps[1])]
+    );
     assert_eq!(input[2]["signature"], json!("thought-signature"));
-    assert_eq!(message.raw_content.as_ref().unwrap().pointer("/response/steps"), Some(&Value::Array(steps.clone())));
+    assert_eq!(
+        message
+            .raw_content
+            .as_ref()
+            .unwrap()
+            .pointer("/response/steps"),
+        Some(&Value::Array(steps.clone()))
+    );
 }
 
 // spec: protocols/interactions_spec.rb:63
@@ -168,14 +220,24 @@ fn keeps_local_function_calls_separate_from_remote_executions() {
 fn includes_the_function_name_with_a_local_result() {
     let mut chat = chat().with_tool(Multiply);
     let mut calls = IndexMap::new();
-    calls.insert("local1".into(), ToolCall::new("local1", "multiply", Map::new()));
+    calls.insert(
+        "local1".into(),
+        ToolCall::new("local1", "multiply", Map::new()),
+    );
     let mut call = Message::new(Role::Assistant, None);
     call.tool_calls = Some(calls);
     chat.add_message(call);
     chat.add_message(Message::tool_result("local1", "91"));
     let payload = chat.render().unwrap();
     let last = payload["input"].as_array().unwrap().last().unwrap().clone();
-    assert_eq!((last["type"].as_str(), last["call_id"].as_str(), last["name"].as_str()), (Some("function_result"), Some("local1"), Some("multiply")));
+    assert_eq!(
+        (
+            last["type"].as_str(),
+            last["call_id"].as_str(),
+            last["name"].as_str()
+        ),
+        (Some("function_result"), Some("local1"), Some("multiply"))
+    );
 }
 
 // spec: protocols/interactions_spec.rb:82
@@ -193,11 +255,17 @@ fn replays_edited_history_and_signed_results_after_serialization_without_a_remot
     assert_eq!(payload["store"], json!(false));
     assert!(payload.get("previous_interaction_id").is_none());
     let input = payload["input"].as_array().unwrap();
-    assert_eq!(input[0], json!({ "type": "user_input", "content": [{ "type": "text", "text": "Remember orange" }] }));
+    assert_eq!(
+        input[0],
+        json!({ "type": "user_input", "content": [{ "type": "text", "text": "Remember orange" }] })
+    );
     let steps = steps();
     assert!(input.contains(&without_signature(&steps[0])));
     assert!(input.contains(&steps[2]));
-    assert_eq!(input.last().unwrap(), &json!({ "type": "user_input", "content": [{ "type": "text", "text": "What color?" }] }));
+    assert_eq!(
+        input.last().unwrap(),
+        &json!({ "type": "user_input", "content": [{ "type": "text", "text": "What color?" }] })
+    );
 }
 
 // spec: protocols/interactions_spec.rb:98
@@ -225,13 +293,26 @@ async fn replays_a_local_function_call_and_its_named_result_without_provider_sto
 #[test]
 fn renders_json_schema_and_specific_tool_choice_in_the_documented_fields() {
     let schema = json!({ "type": "object", "properties": { "answer": { "type": "integer" } }, "required": ["answer"] });
-    let mut chat = chat().with_schema(schema).with_tool(Multiply).with_tool_choice(ToolChoice::Tool("multiply".into())).unwrap();
+    let mut chat = chat()
+        .with_schema(schema)
+        .with_tool(Multiply)
+        .with_tool_choice(ToolChoice::Tool("multiply".into()))
+        .unwrap();
     chat.ask_later("Multiply").unwrap();
     let payload = chat.render().unwrap();
     assert_eq!(payload["response_format"]["type"], json!("text"));
-    assert_eq!(payload["response_format"]["mime_type"], json!("application/json"));
-    assert_eq!(payload["response_format"]["schema"]["type"], json!("object"));
-    assert_eq!(payload["generation_config"]["tool_choice"], json!({ "allowed_tools": { "mode": "any", "tools": ["multiply"] } }));
+    assert_eq!(
+        payload["response_format"]["mime_type"],
+        json!("application/json")
+    );
+    assert_eq!(
+        payload["response_format"]["schema"]["type"],
+        json!("object")
+    );
+    assert_eq!(
+        payload["generation_config"]["tool_choice"],
+        json!({ "allowed_tools": { "mode": "any", "tools": ["multiply"] } })
+    );
 }
 
 // spec: protocols/interactions_spec.rb:123
@@ -248,27 +329,63 @@ fn converts_citation_byte_offsets_to_characters_across_multiple_output_parts() {
     ] }]);
     let message = parse(&data).unwrap();
     let first = &message.citations[0];
-    assert_eq!((first.start_index, first.end_index, first.text.as_deref()), (Some(12), Some(16), Some("Ruby")));
+    assert_eq!(
+        (first.start_index, first.end_index, first.text.as_deref()),
+        (Some(12), Some(16), Some("Ruby"))
+    );
     let last = message.citations.last().unwrap();
-    assert_eq!((last.title.as_deref(), last.start_page, last.end_page, last.text.as_deref()), (Some("Manual"), Some(2), Some(2), Some("Café")));
+    assert_eq!(
+        (
+            last.title.as_deref(),
+            last.start_page,
+            last.end_page,
+            last.text.as_deref()
+        ),
+        (Some("Manual"), Some(2), Some(2), Some("Café"))
+    );
 }
 
 // spec: protocols/interactions_spec.rb:139
 #[test]
 fn separates_thinking_effort_from_summary_display_and_rejects_an_unsupported_off_control() {
     for effort in ["minimal", "low", "medium", "high"] {
-        let mut chat = chat().with_thinking(ThinkingConfig::effort(effort).with_display(ThinkingDisplay::Summarized));
+        let mut chat = chat().with_thinking(
+            ThinkingConfig::effort(effort).with_display(ThinkingDisplay::Summarized),
+        );
         chat.ask_later("Think").unwrap();
         let config = chat.render().unwrap()["generation_config"].clone();
-        assert_eq!((config["thinking_level"].as_str(), config["thinking_summaries"].as_str()), (Some(effort), Some("auto")));
+        assert_eq!(
+            (
+                config["thinking_level"].as_str(),
+                config["thinking_summaries"].as_str()
+            ),
+            (Some(effort), Some("auto"))
+        );
     }
-    let config = chat().with_thinking(ThinkingConfig::effort("low").with_display(ThinkingDisplay::Omitted)).render().unwrap()["generation_config"].clone();
-    assert_eq!((config["thinking_level"].as_str(), config["thinking_summaries"].as_str()), (Some("low"), Some("none")));
+    let config = chat()
+        .with_thinking(ThinkingConfig::effort("low").with_display(ThinkingDisplay::Omitted))
+        .render()
+        .unwrap()["generation_config"]
+        .clone();
+    assert_eq!(
+        (
+            config["thinking_level"].as_str(),
+            config["thinking_summaries"].as_str()
+        ),
+        (Some("low"), Some("none"))
+    );
     let mut off = ThinkingConfig::default();
     off.enabled = Some(false);
-    for config in [off, ThinkingConfig::effort("none"), ThinkingConfig::budget(0)] {
+    for config in [
+        off,
+        ThinkingConfig::effort("none"),
+        ThinkingConfig::budget(0),
+    ] {
         let err = interactions::render_interaction_thinking(&config).unwrap_err();
-        assert!(matches!(&err, Error::Argument(m) if m.contains("thinking-off")), "{err:?}");
+        assert!(
+            matches!(&err, Error::Argument(m) if m.contains("thinking-off")),
+            "{err:?}"
+        );
     }
     let message = |t: ThinkingConfig| match chat().with_thinking(t).render() {
         Err(Error::Argument(m)) => m,
@@ -276,7 +393,10 @@ fn separates_thinking_effort_from_summary_display_and_rejects_an_unsupported_off
     };
     assert!(message(ThinkingConfig::effort("xhigh")).contains("effort must be"));
     assert!(message(ThinkingConfig::budget(1024)).contains("not a token budget"));
-    assert!(message(ThinkingConfig::default().with_display(ThinkingDisplay::Full)).contains("display must be"));
+    assert!(
+        message(ThinkingConfig::default().with_display(ThinkingDisplay::Full))
+            .contains("display must be")
+    );
 }
 
 // spec: protocols/interactions_spec.rb:155
@@ -284,7 +404,10 @@ fn separates_thinking_effort_from_summary_display_and_rejects_an_unsupported_off
 async fn renders_image_and_pdf_attachments_as_content() {
     let fixtures = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
     let mut chat = chat();
-    let mut attachments = vec![Attachment::new(format!("{fixtures}/ruby.png")), Attachment::new(format!("{fixtures}/sample.pdf"))];
+    let mut attachments = vec![
+        Attachment::new(format!("{fixtures}/ruby.png")),
+        Attachment::new(format!("{fixtures}/sample.pdf")),
+    ];
     for a in &mut attachments {
         a.content().await.unwrap();
     }
@@ -314,7 +437,10 @@ async fn stream(events: Vec<Value>) -> (rust_llm::Result<Message>, Vec<Message>)
     let sink = chunks.clone();
     // One request, like the spec's direct `stream_response` call: a tool call is not run.
     chat.ask_later("Go").unwrap();
-    let result = chat.step_stream(move |c| sink.lock().unwrap().push(c.clone())).await.map(|m| m.expect("a response"));
+    let result = chat
+        .step_stream(move |c| sink.lock().unwrap().push(c.clone()))
+        .await
+        .map(|m| m.expect("a response"));
     let chunks = chunks.lock().unwrap().clone();
     (result, chunks)
 }
@@ -332,7 +458,11 @@ async fn accumulates_streamed_mcp_steps_and_never_yields_remote_result_text_as_a
         start.as_object_mut().unwrap().remove("content");
         start.as_object_mut().unwrap().remove("result");
         events.push(json!({ "event_type": "step.start", "index": index, "step": start }));
-        let delta = if step["type"] == "model_output" { json!({ "type": "text", "text": "Ruby docs." }) } else { step.clone() };
+        let delta = if step["type"] == "model_output" {
+            json!({ "type": "text", "text": "Ruby docs." })
+        } else {
+            step.clone()
+        };
         events.push(json!({ "event_type": "step.delta", "index": index, "delta": delta }));
     }
     let mut completed = body.clone();
@@ -340,9 +470,25 @@ async fn accumulates_streamed_mcp_steps_and_never_yields_remote_result_text_as_a
     events.push(json!({ "event_type": "interaction.completed", "interaction": completed }));
     let (message, chunks) = stream(events).await;
     let message = message.unwrap();
-    assert_eq!(chunks.iter().filter_map(|c| c.content.clone()).collect::<String>(), "Ruby docs.");
-    assert_eq!(message.server_tool_calls.last().unwrap().result, Some(json!("Ruby documentation")));
-    assert_eq!(message.raw_content.as_ref().unwrap().pointer("/response/steps"), Some(&steps()));
+    assert_eq!(
+        chunks
+            .iter()
+            .filter_map(|c| c.content.clone())
+            .collect::<String>(),
+        "Ruby docs."
+    );
+    assert_eq!(
+        message.server_tool_calls.last().unwrap().result,
+        Some(json!("Ruby documentation"))
+    );
+    assert_eq!(
+        message
+            .raw_content
+            .as_ref()
+            .unwrap()
+            .pointer("/response/steps"),
+        Some(&steps())
+    );
     let last = &chunks.last().unwrap().tokens;
     assert_eq!((last.input, last.output), (Some(46), Some(15)));
 }
@@ -350,11 +496,24 @@ async fn accumulates_streamed_mcp_steps_and_never_yields_remote_result_text_as_a
 // spec: protocols/interactions_spec.rb:182
 #[tokio::test]
 async fn rejects_failed_or_truncated_streams_and_unsupported_required_actions() {
-    let (truncated, _) = stream(vec![json!({ "event_type": "interaction.created", "interaction": { "status": "in_progress" } })]).await;
-    assert!(matches!(&truncated, Err(Error::Api(m, _)) if m.contains("ended before")), "{truncated:?}");
+    let (truncated, _) = stream(vec![
+        json!({ "event_type": "interaction.created", "interaction": { "status": "in_progress" } }),
+    ])
+    .await;
+    assert!(
+        matches!(&truncated, Err(Error::Api(m, _)) if m.contains("ended before")),
+        "{truncated:?}"
+    );
     let mut state = interactions::StreamState::default();
-    let failed = interactions::build_chunk(&model(), &mut state, &json!({ "event_type": "error", "error": { "message": "Failed" } }));
-    assert!(matches!(&failed, Err(Error::Api(m, _)) if m == "Failed"), "{failed:?}");
+    let failed = interactions::build_chunk(
+        &model(),
+        &mut state,
+        &json!({ "event_type": "error", "error": { "message": "Failed" } }),
+    );
+    assert!(
+        matches!(&failed, Err(Error::Api(m, _)) if m == "Failed"),
+        "{failed:?}"
+    );
     let mut data = body();
     data["status"] = json!("requires_action");
     assert!(matches!(parse(&data), Err(Error::Api(m, _)) if m.contains("unsupported action")));
@@ -374,52 +533,119 @@ async fn accumulates_local_function_argument_deltas_after_an_empty_object_in_the
         json!({ "event_type": "interaction.completed", "interaction": completed }),
     ];
     let message = stream(events).await.0.unwrap();
-    assert_eq!(Value::Object(message.tool_calls.as_ref().unwrap().get("local1").unwrap().arguments()), json!({ "left": 17, "right": 19 }));
+    assert_eq!(
+        Value::Object(
+            message
+                .tool_calls
+                .as_ref()
+                .unwrap()
+                .get("local1")
+                .unwrap()
+                .arguments()
+        ),
+        json!({ "left": 17, "right": 19 })
+    );
     let mut chat = chat();
     chat.add_message(message);
-    assert_eq!(chat.render().unwrap()["input"].as_array().unwrap().last().unwrap()["arguments"], json!({ "left": 17, "right": 19 }));
+    assert_eq!(
+        chat.render().unwrap()["input"]
+            .as_array()
+            .unwrap()
+            .last()
+            .unwrap()["arguments"],
+        json!({ "left": 17, "right": 19 })
+    );
 }
 
 // ---- live examples, replayed --------------------------------------------------------------------
 
 async fn replay(name: &str) -> (Cassette, Chat) {
-    let cassette = Cassette::start(&format!("protocols_interactions_{name}")).await.unwrap_or_else(|| panic!("missing cassette {name}"));
+    let cassette = Cassette::start(&format!("protocols_interactions_{name}"))
+        .await
+        .unwrap_or_else(|| panic!("missing cassette {name}"));
     let chat = chat_with(config_for(&cassette, "gemini"));
     (cassette, chat)
 }
 
-const MCP_PROMPT: &str = "Use the Microsoft Learn MCP search tool to find the Azure Functions overview. Reply briefly.";
+const MCP_PROMPT: &str =
+    "Use the Microsoft Learn MCP search tool to find the Azure Functions overview. Reply briefly.";
 
 fn microsoft_learn() -> ProviderTool {
-    ProviderTool::with_options("mcp", json!({ "name": "microsoft_learn", "url": "https://learn.microsoft.com/api/mcp" }))
+    ProviderTool::with_options(
+        "mcp",
+        json!({ "name": "microsoft_learn", "url": "https://learn.microsoft.com/api/mcp" }),
+    )
 }
 
 // spec: protocols/interactions_spec.rb:222
 #[tokio::test]
 async fn executes_a_remote_mcp_tool_and_replays_its_signed_results_through_stateless_chat() {
-    let (cassette, chat) = replay("executes_a_remote_mcp_tool_and_replays_its_signed_results_through_stateless_chat").await;
+    let (cassette, chat) =
+        replay("executes_a_remote_mcp_tool_and_replays_its_signed_results_through_stateless_chat")
+            .await;
     let mut chat = chat.with_provider_tools([microsoft_learn()]);
     let message = chat.ask(MCP_PROMPT).await.unwrap();
-    assert!(message.server_tool_calls.iter().any(|c| c.kind == "mcp_server_tool_call"));
-    assert!(message.server_tool_calls.iter().any(|c| c.kind == "mcp_server_tool_result"));
+    assert!(
+        message
+            .server_tool_calls
+            .iter()
+            .any(|c| c.kind == "mcp_server_tool_call")
+    );
+    assert!(
+        message
+            .server_tool_calls
+            .iter()
+            .any(|c| c.kind == "mcp_server_tool_result")
+    );
     assert!(!message.is_tool_call());
-    assert!(message.content().to_lowercase().contains("functions"), "{:?}", message.content);
-    let followup = chat.ask("What Microsoft service did you look up? Answer using the previous results.").await.unwrap();
-    assert!(followup.content().to_lowercase().contains("azure functions"), "{:?}", followup.content);
+    assert!(
+        message.content().to_lowercase().contains("functions"),
+        "{:?}",
+        message.content
+    );
+    let followup = chat
+        .ask("What Microsoft service did you look up? Answer using the previous results.")
+        .await
+        .unwrap();
+    assert!(
+        followup
+            .content()
+            .to_lowercase()
+            .contains("azure functions"),
+        "{:?}",
+        followup.content
+    );
     cassette.assert_all_matched().await;
 }
 
 // spec: protocols/interactions_spec.rb:233
 #[tokio::test]
 async fn streams_remote_mcp_results_and_preserves_the_complete_signed_history() {
-    let (cassette, chat) = replay("streams_remote_mcp_results_and_preserves_the_complete_signed_history").await;
+    let (cassette, chat) =
+        replay("streams_remote_mcp_results_and_preserves_the_complete_signed_history").await;
     let mut chat = chat.with_provider_tools([microsoft_learn()]);
     let mut text = String::new();
-    let message = chat.ask_stream(MCP_PROMPT, |c| text.push_str(c.content())).await.unwrap();
+    let message = chat
+        .ask_stream(MCP_PROMPT, |c| text.push_str(c.content()))
+        .await
+        .unwrap();
     assert_eq!(text, message.content());
-    assert!(message.server_tool_calls.iter().any(|c| c.kind == "mcp_server_tool_result"));
+    assert!(
+        message
+            .server_tool_calls
+            .iter()
+            .any(|c| c.kind == "mcp_server_tool_result")
+    );
     assert!(message.tokens().input.is_some_and(|i| i > 0));
-    let steps = message.raw_content.as_ref().unwrap().pointer("/response/steps").unwrap().as_array().unwrap().clone();
+    let steps = message
+        .raw_content
+        .as_ref()
+        .unwrap()
+        .pointer("/response/steps")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .clone();
     assert!(steps.iter().any(|s| s.get("signature").is_some()));
     cassette.assert_all_matched().await;
 }
@@ -427,23 +653,44 @@ async fn streams_remote_mcp_results_and_preserves_the_complete_signed_history() 
 // spec: protocols/interactions_spec.rb:246
 #[tokio::test]
 async fn executes_local_tools_and_returns_json_schema_output_through_interactions() {
-    let (cassette, chat) = replay("executes_local_tools_and_returns_json_schema_output_through_interactions").await;
+    let (cassette, chat) =
+        replay("executes_local_tools_and_returns_json_schema_output_through_interactions").await;
     let schema = json!({ "type": "object", "properties": { "answer": { "type": "integer" } }, "required": ["answer"] });
     let mut chat = chat.with_tool(Multiply).with_schema(schema);
-    let message = chat.ask("Use multiply to calculate 13 times 7 and return the answer.").await.unwrap();
+    let message = chat
+        .ask("Use multiply to calculate 13 times 7 and return the answer.")
+        .await
+        .unwrap();
     assert_eq!(message.parsed().unwrap(), Some(json!({ "answer": 91 })));
-    assert!(chat.messages().iter().filter(|m| m.is_tool_result()).any(|m| m.content() == "91"));
+    assert!(
+        chat.messages()
+            .iter()
+            .filter(|m| m.is_tool_result())
+            .any(|m| m.content() == "91")
+    );
     cassette.assert_all_matched().await;
 }
 
 // spec: protocols/interactions_spec.rb:254
 #[tokio::test]
 async fn streams_local_function_arguments_and_continues_with_the_actual_tool_result() {
-    let (cassette, chat) = replay("streams_local_function_arguments_and_continues_with_the_actual_tool_result").await;
+    let (cassette, chat) =
+        replay("streams_local_function_arguments_and_continues_with_the_actual_tool_result").await;
     let mut chat = chat.with_tool(Multiply);
-    let response = chat.ask_stream("Use multiply to calculate 17 times 19. State the result.", |_| {}).await.unwrap();
+    let response = chat
+        .ask_stream(
+            "Use multiply to calculate 17 times 19. State the result.",
+            |_| {},
+        )
+        .await
+        .unwrap();
     assert!(response.content().contains("323"), "{:?}", response.content);
-    assert!(chat.messages().iter().filter(|m| m.is_tool_result()).any(|m| m.content() == "323"));
+    assert!(
+        chat.messages()
+            .iter()
+            .filter(|m| m.is_tool_result())
+            .any(|m| m.content() == "323")
+    );
     cassette.assert_all_matched().await;
 }
 
@@ -460,7 +707,10 @@ fn call(arguments: Option<Value>) -> rust_llm::Result<ToolCall> {
 // spec: protocols/interactions/tools_spec.rb:13
 #[test]
 fn parses_a_json_object_string() {
-    assert_eq!(Value::Object(call(Some(json!("{\"tz\":\"UTC\"}"))).unwrap().arguments()), json!({ "tz": "UTC" }));
+    assert_eq!(
+        Value::Object(call(Some(json!("{\"tz\":\"UTC\"}"))).unwrap().arguments()),
+        json!({ "tz": "UTC" })
+    );
 }
 
 // spec: protocols/interactions/tools_spec.rb:17
@@ -478,7 +728,10 @@ fn returns_empty_for_a_missing_arguments_key() {
 // spec: protocols/interactions/tools_spec.rb:25
 #[test]
 fn passes_an_object_through_unchanged() {
-    assert_eq!(Value::Object(call(Some(json!({ "tz": "UTC" }))).unwrap().arguments()), json!({ "tz": "UTC" }));
+    assert_eq!(
+        Value::Object(call(Some(json!({ "tz": "UTC" }))).unwrap().arguments()),
+        json!({ "tz": "UTC" })
+    );
 }
 
 // spec: protocols/interactions/tools_spec.rb:29

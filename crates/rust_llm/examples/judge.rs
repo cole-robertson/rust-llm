@@ -30,10 +30,24 @@ async fn main() -> rust_llm::Result<()> {
         .await?;
 
     println!("model        -> {}", judgment.model);
-    println!("urgent       -> {:.2}", judgment.probability("urgent").unwrap_or_default());
+    println!(
+        "urgent       -> {:.2}",
+        judgment.probability("urgent").unwrap_or_default()
+    );
     let department = judgment.get("department").expect("declared");
-    println!("department   -> {} (confidence {:.2})", department.choice().unwrap_or_default(), department.confidence().unwrap_or_default());
-    println!("frustration  -> {:.2} of 0..2", judgment.score("frustration").unwrap_or_default());
-    println!("tokens       -> {} in / {} out", judgment.tokens().input.unwrap_or(0), judgment.tokens().output.unwrap_or(0));
+    println!(
+        "department   -> {} (confidence {:.2})",
+        department.choice().unwrap_or_default(),
+        department.confidence().unwrap_or_default()
+    );
+    println!(
+        "frustration  -> {:.2} of 0..2",
+        judgment.score("frustration").unwrap_or_default()
+    );
+    println!(
+        "tokens       -> {} in / {} out",
+        judgment.tokens().input.unwrap_or(0),
+        judgment.tokens().output.unwrap_or(0)
+    );
     Ok(())
 }

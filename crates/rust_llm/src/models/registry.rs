@@ -16,15 +16,24 @@ pub const PUBLISHED_URL: &str = "https://rubyllm.com/models.json";
 
 /// `Registry.cache_path`: the platform cache file `model_registry_file` defaults to.
 pub fn cache_path() -> Option<PathBuf> {
-    let home = std::env::var_os("HOME").filter(|h| !h.is_empty()).map(PathBuf::from);
+    let home = std::env::var_os("HOME")
+        .filter(|h| !h.is_empty())
+        .map(PathBuf::from);
     let directory = if cfg!(target_os = "macos") {
         home?.join("Library/Caches/RustLLM")
     } else if cfg!(windows) {
-        let local = std::env::var_os("LOCALAPPDATA").filter(|v| !v.is_empty()).map(PathBuf::from);
-        local.or_else(|| home.map(|h| h.join("AppData/Local")))?.join("RustLLM/Cache")
+        let local = std::env::var_os("LOCALAPPDATA")
+            .filter(|v| !v.is_empty())
+            .map(PathBuf::from);
+        local
+            .or_else(|| home.map(|h| h.join("AppData/Local")))?
+            .join("RustLLM/Cache")
     } else {
-        let xdg = std::env::var_os("XDG_CACHE_HOME").filter(|v| !v.is_empty()).map(PathBuf::from);
-        xdg.or_else(|| home.map(|h| h.join(".cache")))?.join("rust_llm")
+        let xdg = std::env::var_os("XDG_CACHE_HOME")
+            .filter(|v| !v.is_empty())
+            .map(PathBuf::from);
+        xdg.or_else(|| home.map(|h| h.join(".cache")))?
+            .join("rust_llm")
     };
     Some(directory.join("models.json"))
 }
@@ -35,20 +44,30 @@ pub fn read(path: &Path) -> Result<Option<Vec<Model>>> {
         Ok(text) => text,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(e) => {
-            return Err(Error::ModelRegistry(format!("Could not read the model registry from {}: {e}", path.display())));
+            return Err(Error::ModelRegistry(format!(
+                "Could not read the model registry from {}: {e}",
+                path.display()
+            )));
         }
     };
-    let data: Value = serde_json::from_str(&text)
-        .map_err(|e| Error::ModelRegistry(format!("Invalid model registry JSON in {}: {e}", path.display())))?;
+    let data: Value = serde_json::from_str(&text).map_err(|e| {
+        Error::ModelRegistry(format!(
+            "Invalid model registry JSON in {}: {e}",
+            path.display()
+        ))
+    })?;
     models_from_data(data, &path.display().to_string()).map(Some)
 }
 
 /// `Registry.models_from_data`.
 pub fn models_from_data(data: Value, source: &str) -> Result<Vec<Model>> {
     if !data.is_array() {
-        return Err(Error::ModelRegistry(format!("Model registry in {source} must be a JSON array")));
+        return Err(Error::ModelRegistry(format!(
+            "Model registry in {source} must be a JSON array"
+        )));
     }
-    serde_json::from_value(data).map_err(|e| Error::ModelRegistry(format!("Invalid model registry entry in {source}: {e}")))
+    serde_json::from_value(data)
+        .map_err(|e| Error::ModelRegistry(format!("Invalid model registry entry in {source}: {e}")))
 }
 
 /// `Registry.pretty_json`.
@@ -66,7 +85,9 @@ impl FileStore {
     pub fn new(path: impl Into<PathBuf>) -> Result<FileStore> {
         let path = path.into();
         if path.as_os_str().is_empty() {
-            return Err(Error::ModelRegistry("A model registry file path is required".into()));
+            return Err(Error::ModelRegistry(
+                "A model registry file path is required".into(),
+            ));
         }
         Ok(FileStore { path })
     }
@@ -120,8 +141,14 @@ pub(crate) fn suffixed(path: &Path, suffix: &str) -> PathBuf {
 /// A temporary file in the destination's directory, fsynced, then renamed over it. The rename
 /// keeps the destination's mode, so a registry other users can read stays readable.
 fn atomic_write(destination: &Path, contents: &[u8]) -> Result<()> {
-    let directory = destination.parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or(Path::new("."));
-    let name = destination.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let directory = destination
+        .parent()
+        .filter(|d| !d.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let name = destination
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
     let temporary = directory.join(format!(".{name}.{}.tmp", uuid::Uuid::new_v4()));
     let result = (|| -> std::io::Result<()> {
         let mut file = std::fs::File::create(&temporary)?;
@@ -148,26 +175,53 @@ pub struct Published {
 
 /// `PublishedSource#fetch`: GET the catalog, revalidating with `If-None-Match` when `etag` is set.
 pub async fn fetch_published(config: &Config, etag: Option<&str>) -> Result<Published> {
-    let url = config.get("model_registry_url").unwrap_or(PUBLISHED_URL).to_string();
-    let wrap = |message: String| Error::ModelRegistry(format!("Could not refresh the model registry from {url}: {message}"));
-    let client = reqwest::Client::builder().timeout(config.request_timeout).build().map_err(|e| wrap(e.to_string()))?;
+    let url = config
+        .get("model_registry_url")
+        .unwrap_or(PUBLISHED_URL)
+        .to_string();
+    let wrap = |message: String| {
+        Error::ModelRegistry(format!(
+            "Could not refresh the model registry from {url}: {message}"
+        ))
+    };
+    let client = reqwest::Client::builder()
+        .timeout(config.request_timeout)
+        .build()
+        .map_err(|e| wrap(e.to_string()))?;
     let mut request = client.get(&url);
     if let Some(etag) = etag {
         request = request.header("If-None-Match", etag);
     }
     let response = request.send().await.map_err(|e| wrap(e.to_string()))?;
     let status = response.status();
-    let returned_etag = response.headers().get("etag").and_then(|v| v.to_str().ok()).map(str::to_string);
+    let returned_etag = response
+        .headers()
+        .get("etag")
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
     if status == reqwest::StatusCode::NOT_MODIFIED {
-        return Ok(Published { models: None, etag: returned_etag.or(etag.map(str::to_string)), not_modified: true });
+        return Ok(Published {
+            models: None,
+            etag: returned_etag.or(etag.map(str::to_string)),
+            not_modified: true,
+        });
     }
     if !status.is_success() {
-        return Err(wrap(format!("the server responded with status {}", status.as_u16())));
+        return Err(wrap(format!(
+            "the server responded with status {}",
+            status.as_u16()
+        )));
     }
     let body: Value = response.json().await.map_err(|e| wrap(e.to_string()))?;
     let models = models_from_data(body, &url)?;
     if models.is_empty() {
-        return Err(Error::ModelRegistry("Published model registry is empty".into()));
+        return Err(Error::ModelRegistry(
+            "Published model registry is empty".into(),
+        ));
     }
-    Ok(Published { models: Some(models), etag: returned_etag, not_modified: false })
+    Ok(Published {
+        models: Some(models),
+        etag: returned_etag,
+        not_modified: false,
+    })
 }

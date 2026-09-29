@@ -1,3 +1,6 @@
+// Tests here serialize on a process-wide env lock held for the whole test, awaits included.
+#![allow(clippy::await_holding_lock)]
+
 //! The remaining RubyLLM specs with recorded cassettes, replayed against the port:
 //! `chat_thinking_spec.rb` (Mistral hybrid reasoning, DeepSeek thinking control, OpenRouter
 //! reasoning_details round-trip, Gemini token accounting), `chat_streaming_spec.rb` (Gemini token
@@ -12,7 +15,10 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use rust_llm::attachment::AttachmentType;
 use rust_llm::speech::{SpeakOptions, SpeechChunk};
-use rust_llm::{Agent, Attachment, Chat, ErrorKind, Model, Parameter, ThinkingConfig, Tool, ToolCall, ToolError, ToolResult};
+use rust_llm::{
+    Agent, Attachment, Chat, ErrorKind, Model, Parameter, ThinkingConfig, Tool, ToolCall,
+    ToolError, ToolResult,
+};
 use serde_json::{Map, Value, json};
 use support::{Cassette, config_for};
 
@@ -25,11 +31,19 @@ fn fixture(name: &str) -> String {
 }
 
 async fn start(name: &str) -> Cassette {
-    Cassette::start(name).await.unwrap_or_else(|| panic!("missing cassette {name}"))
+    Cassette::start(name)
+        .await
+        .unwrap_or_else(|| panic!("missing cassette {name}"))
 }
 
 fn chat_for(cassette: &Cassette, provider: &str, model: &str) -> Chat {
-    Chat::with_config(config_for(cassette, provider), Some(model), Some(provider), false).expect("chat")
+    Chat::with_config(
+        config_for(cassette, provider),
+        Some(model),
+        Some(provider),
+        false,
+    )
+    .expect("chat")
 }
 
 /// `RubyLLM.chat` with no model: `config.default_model` on OpenAI.
@@ -60,8 +74,17 @@ impl Tool for Weather {
             Parameter::new("longitude").description("Longitude (e.g., 13.4050)"),
         ]
     }
-    async fn execute(&self, args: Map<String, Value>, _: &ToolCall) -> Result<ToolResult, ToolError> {
-        Ok(format!("Current weather at {}, {}: 15°C, Wind: 10 km/h", arg(&args, "latitude"), arg(&args, "longitude")).into())
+    async fn execute(
+        &self,
+        args: Map<String, Value>,
+        _: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
+        Ok(format!(
+            "Current weather at {}, {}: 15°C, Wind: 10 km/h",
+            arg(&args, "latitude"),
+            arg(&args, "longitude")
+        )
+        .into())
     }
 }
 
@@ -88,7 +111,11 @@ impl Tool for ReasoningWeather {
     fn parameters(&self) -> Vec<Parameter> {
         vec![Parameter::new("city").description("City name (e.g., Berlin)")]
     }
-    async fn execute(&self, args: Map<String, Value>, _: &ToolCall) -> Result<ToolResult, ToolError> {
+    async fn execute(
+        &self,
+        args: Map<String, Value>,
+        _: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
         Ok(format!("Current weather in {}: 15°C, cloudy", arg(&args, "city")).into())
     }
 }
@@ -96,17 +123,30 @@ impl Tool for ReasoningWeather {
 // ---- chat_thinking_spec.rb: Mistral hybrid reasoning ------------------------------------------
 
 fn mistral_chat(cassette: &Cassette) -> Chat {
-    chat_for(cassette, "mistral", "mistral-small-latest").with_thinking(ThinkingConfig::effort("high"))
+    chat_for(cassette, "mistral", "mistral-small-latest")
+        .with_thinking(ThinkingConfig::effort("high"))
 }
 
 #[tokio::test]
 async fn mistral_hybrid_reasoning_separates_thinking_from_final_content() {
-    let cassette = start("chat_mistral_hybrid_reasoning_separates_thinking_from_final_content").await;
+    let cassette =
+        start("chat_mistral_hybrid_reasoning_separates_thinking_from_final_content").await;
     let mut chat = mistral_chat(&cassette);
-    let response = chat.ask("What is 12 * 12? Answer with just the number.").await.unwrap();
+    let response = chat
+        .ask("What is 12 * 12? Answer with just the number.")
+        .await
+        .unwrap();
 
-    let thinking = response.thinking.as_ref().and_then(|t| t.text.clone()).unwrap_or_default();
-    assert!(!thinking.trim().is_empty(), "thinking {:?}", response.thinking);
+    let thinking = response
+        .thinking
+        .as_ref()
+        .and_then(|t| t.text.clone())
+        .unwrap_or_default();
+    assert!(
+        !thinking.trim().is_empty(),
+        "thinking {:?}",
+        response.thinking
+    );
     assert!(!response.content().trim().is_empty());
     assert!(!response.content().contains(&thinking));
     cassette.assert_all_matched().await;
@@ -114,20 +154,33 @@ async fn mistral_hybrid_reasoning_separates_thinking_from_final_content() {
 
 #[tokio::test]
 async fn mistral_hybrid_reasoning_replays_thinking_chunks_across_turns() {
-    let cassette = start("chat_mistral_hybrid_reasoning_replays_thinking_chunks_across_turns").await;
+    let cassette =
+        start("chat_mistral_hybrid_reasoning_replays_thinking_chunks_across_turns").await;
     let mut chat = mistral_chat(&cassette);
-    chat.ask("What is 12 * 12? Answer with just the number.").await.unwrap();
+    chat.ask("What is 12 * 12? Answer with just the number.")
+        .await
+        .unwrap();
 
-    let response = chat.ask("Now add 10 to that. Answer with just the number.").await.unwrap();
+    let response = chat
+        .ask("Now add 10 to that. Answer with just the number.")
+        .await
+        .unwrap();
 
     assert!(!response.content().trim().is_empty());
-    assert!(response.thinking.as_ref().and_then(|t| t.text.as_deref()).is_some_and(|t| !t.trim().is_empty()));
+    assert!(
+        response
+            .thinking
+            .as_ref()
+            .and_then(|t| t.text.as_deref())
+            .is_some_and(|t| !t.trim().is_empty())
+    );
     cassette.assert_all_matched().await;
 }
 
 #[tokio::test]
 async fn mistral_hybrid_reasoning_streams_thinking_separately_from_content() {
-    let cassette = start("chat_mistral_hybrid_reasoning_streams_thinking_separately_from_content").await;
+    let cassette =
+        start("chat_mistral_hybrid_reasoning_streams_thinking_separately_from_content").await;
     let mut chat = mistral_chat(&cassette);
     let mut thinking_parts = Vec::new();
     let mut content_parts = Vec::new();
@@ -144,7 +197,10 @@ async fn mistral_hybrid_reasoning_streams_thinking_separately_from_content() {
         .await
         .unwrap();
 
-    assert_eq!(Some(thinking_parts.join("")), response.thinking.as_ref().and_then(|t| t.text.clone()));
+    assert_eq!(
+        Some(thinking_parts.join("")),
+        response.thinking.as_ref().and_then(|t| t.text.clone())
+    );
     assert_eq!(content_parts.join(""), response.content());
     assert!(!response.content().trim().is_empty());
     cassette.assert_all_matched().await;
@@ -155,36 +211,66 @@ async fn mistral_hybrid_reasoning_streams_thinking_separately_from_content() {
 #[tokio::test]
 async fn deepseek_thinking_control_disables_thinking_for_effort_none() {
     let cassette = start("chat_deepseek_thinking_control_disables_thinking_for_effort_none").await;
-    let mut chat = chat_for(&cassette, "deepseek", "deepseek-v4-flash").with_thinking(ThinkingConfig::effort("none"));
+    let mut chat = chat_for(&cassette, "deepseek", "deepseek-v4-flash")
+        .with_thinking(ThinkingConfig::effort("none"));
 
-    let response = chat.ask("What is 2 + 2? Answer with just the number.").await.unwrap();
+    let response = chat
+        .ask("What is 2 + 2? Answer with just the number.")
+        .await
+        .unwrap();
 
     assert!(!response.content().trim().is_empty());
-    assert!(response.thinking.is_none(), "thinking {:?}", response.thinking);
+    assert!(
+        response.thinking.is_none(),
+        "thinking {:?}",
+        response.thinking
+    );
     cassette.assert_all_matched().await;
 }
 
 #[tokio::test]
 async fn deepseek_thinking_control_returns_reasoning_content_for_effort_high() {
-    let cassette = start("chat_deepseek_thinking_control_returns_reasoning_content_for_effort_high").await;
-    let mut chat = chat_for(&cassette, "deepseek", "deepseek-v4-flash").with_thinking(ThinkingConfig::effort("high"));
+    let cassette =
+        start("chat_deepseek_thinking_control_returns_reasoning_content_for_effort_high").await;
+    let mut chat = chat_for(&cassette, "deepseek", "deepseek-v4-flash")
+        .with_thinking(ThinkingConfig::effort("high"));
 
-    let response = chat.ask("What is 2 + 2? Answer with just the number.").await.unwrap();
+    let response = chat
+        .ask("What is 2 + 2? Answer with just the number.")
+        .await
+        .unwrap();
 
     assert!(!response.content().trim().is_empty());
-    assert!(response.thinking.as_ref().and_then(|t| t.text.as_deref()).is_some_and(|t| !t.trim().is_empty()));
+    assert!(
+        response
+            .thinking
+            .as_ref()
+            .and_then(|t| t.text.as_deref())
+            .is_some_and(|t| !t.trim().is_empty())
+    );
     cassette.assert_all_matched().await;
 }
 
 // ---- chat_thinking_spec.rb: OpenRouter reasoning_details round-trip ---------------------------
 
 fn openrouter_chat(cassette: &Cassette) -> Chat {
-    chat_for(cassette, "openrouter", "claude-haiku-4-5").with_thinking(ThinkingConfig::budget(2000)).with_tool(ReasoningWeather)
+    chat_for(cassette, "openrouter", "claude-haiku-4-5")
+        .with_thinking(ThinkingConfig::budget(2000))
+        .with_tool(ReasoningWeather)
 }
 
 fn tool_call_raw_reasoning(chat: &Chat) -> Vec<Value> {
-    let message = chat.messages().iter().find(|m| m.is_tool_call()).expect("a tool call message");
-    message.raw_reasoning.as_ref().and_then(Value::as_array).cloned().unwrap_or_default()
+    let message = chat
+        .messages()
+        .iter()
+        .find(|m| m.is_tool_call())
+        .expect("a tool call message");
+    message
+        .raw_reasoning
+        .as_ref()
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
 }
 
 #[tokio::test]
@@ -192,14 +278,24 @@ async fn openrouter_replays_reasoning_details_across_tool_calls_and_turns() {
     let cassette = start("chat_openrouter_reasoning_details_round-trip_replays_reasoning_details_across_tool_calls_and_turns").await;
     let mut chat = openrouter_chat(&cassette);
 
-    let response = chat.ask("What is the weather in Berlin? Use the reasoning_weather tool.").await.unwrap();
+    let response = chat
+        .ask("What is the weather in Berlin? Use the reasoning_weather tool.")
+        .await
+        .unwrap();
 
     assert!(!response.content().trim().is_empty());
     let details = tool_call_raw_reasoning(&chat);
     assert!(!details.is_empty());
-    assert!(details[0].get("format").is_some() && details[0].get("signature").is_some(), "{}", details[0]);
+    assert!(
+        details[0].get("format").is_some() && details[0].get("signature").is_some(),
+        "{}",
+        details[0]
+    );
 
-    let second = chat.ask("Should I bring an umbrella? Answer briefly.").await.unwrap();
+    let second = chat
+        .ask("Should I bring an umbrella? Answer briefly.")
+        .await
+        .unwrap();
     assert!(!second.content().trim().is_empty());
     cassette.assert_all_matched().await;
 }
@@ -209,12 +305,22 @@ async fn openrouter_accumulates_reasoning_details_while_streaming_tool_calls() {
     let cassette = start("chat_openrouter_reasoning_details_round-trip_accumulates_reasoning_details_while_streaming_tool_calls").await;
     let mut chat = openrouter_chat(&cassette);
 
-    let response = chat.ask_stream("What is the weather in Berlin? Use the reasoning_weather tool.", |_| {}).await.unwrap();
+    let response = chat
+        .ask_stream(
+            "What is the weather in Berlin? Use the reasoning_weather tool.",
+            |_| {},
+        )
+        .await
+        .unwrap();
 
     assert!(!response.content().trim().is_empty());
     let details = tool_call_raw_reasoning(&chat);
     assert!(!details.is_empty());
-    assert!(details.iter().any(|d| d.get("signature").is_some_and(|s| !s.is_null())));
+    assert!(
+        details
+            .iter()
+            .any(|d| d.get("signature").is_some_and(|s| !s.is_null()))
+    );
     cassette.assert_all_matched().await;
 }
 
@@ -222,13 +328,22 @@ async fn openrouter_accumulates_reasoning_details_while_streaming_tool_calls() {
 
 #[tokio::test]
 async fn gemini_token_accounting_sums_candidates_and_thoughts_token_count() {
-    let cassette = start("chat_gemini_token_accounting_correctly_sums_candidatestokencount_and_thoughtstokencount").await;
+    let cassette = start(
+        "chat_gemini_token_accounting_correctly_sums_candidatestokencount_and_thoughtstokencount",
+    )
+    .await;
     let mut chat = chat_for(&cassette, "gemini", "gemini-2.5-flash");
     let response = chat.ask("What is 2+2? Think step by step.").await.unwrap();
 
     let body = &response.raw.as_ref().expect("raw response").body;
-    let candidates = body.pointer("/usageMetadata/candidatesTokenCount").and_then(Value::as_i64).unwrap_or(0);
-    let thoughts = body.pointer("/usageMetadata/thoughtsTokenCount").and_then(Value::as_i64).unwrap_or(0);
+    let candidates = body
+        .pointer("/usageMetadata/candidatesTokenCount")
+        .and_then(Value::as_i64)
+        .unwrap_or(0);
+    let thoughts = body
+        .pointer("/usageMetadata/thoughtsTokenCount")
+        .and_then(Value::as_i64)
+        .unwrap_or(0);
 
     assert_eq!(response.tokens.output, Some(candidates + thoughts));
     cassette.assert_all_matched().await;
@@ -240,7 +355,12 @@ async fn gemini_token_accounting_sums_candidates_and_thoughts_token_count_in_str
     let mut chat = chat_for(&cassette, "gemini", "gemini-2.5-flash");
     let mut chunks = Vec::new();
 
-    let response = chat.ask_stream("What is 2+2? Think step by step.", |chunk| chunks.push(chunk.clone())).await.unwrap();
+    let response = chat
+        .ask_stream("What is 2+2? Think step by step.", |chunk| {
+            chunks.push(chunk.clone())
+        })
+        .await
+        .unwrap();
 
     let final_chunk = chunks.last().expect("chunks");
     if let Some(output) = final_chunk.tokens.output {
@@ -253,12 +373,18 @@ async fn gemini_token_accounting_sums_candidates_and_thoughts_token_count_in_str
 
 #[tokio::test]
 async fn tool_call_callbacks_calls_before_tool_call_when_tools_are_used() {
-    let cassette = start("chat_tool_call_callbacks_calls_before_tool_call_callback_when_tools_are_used").await;
+    let cassette =
+        start("chat_tool_call_callbacks_calls_before_tool_call_callback_when_tools_are_used").await;
     let received: Arc<Mutex<Vec<ToolCall>>> = Arc::default();
     let sink = received.clone();
-    let mut chat = default_chat(&cassette).with_tool(Weather).before_tool_call(move |call| sink.lock().unwrap().push(call.clone()));
+    let mut chat = default_chat(&cassette)
+        .with_tool(Weather)
+        .before_tool_call(move |call| sink.lock().unwrap().push(call.clone()));
 
-    let response = chat.ask("What's the weather in Berlin? (52.5200, 13.4050)").await.unwrap();
+    let response = chat
+        .ask("What's the weather in Berlin? (52.5200, 13.4050)")
+        .await
+        .unwrap();
 
     let received = received.lock().unwrap();
     assert!(!received.is_empty());
@@ -271,12 +397,20 @@ async fn tool_call_callbacks_calls_before_tool_call_when_tools_are_used() {
 
 #[tokio::test]
 async fn tool_call_callbacks_calls_after_tool_result_when_tools_return_results() {
-    let cassette = start("chat_tool_call_callbacks_calls_after_tool_result_callback_when_tools_return_results").await;
+    let cassette = start(
+        "chat_tool_call_callbacks_calls_after_tool_result_callback_when_tools_return_results",
+    )
+    .await;
     let received: Arc<Mutex<Vec<String>>> = Arc::default();
     let sink = received.clone();
-    let mut chat = default_chat(&cassette).with_tool(Weather).after_tool_result(move |r| sink.lock().unwrap().push(r.content.clone()));
+    let mut chat = default_chat(&cassette)
+        .with_tool(Weather)
+        .after_tool_result(move |r| sink.lock().unwrap().push(r.content.clone()));
 
-    let response = chat.ask("What's the weather in Berlin? (52.5200, 13.4050)").await.unwrap();
+    let response = chat
+        .ask("What's the weather in Berlin? (52.5200, 13.4050)")
+        .await
+        .unwrap();
 
     let received = received.lock().unwrap();
     assert!(!received.is_empty());
@@ -302,16 +436,31 @@ async fn tool_call_callbacks_calls_both_callbacks_in_order() {
     assert_eq!(*order.lock().unwrap(), vec!["tool_call", "tool_result"]);
     // `rand(1..6)`: the roll the recording sent back is the one random field.
     let mismatches = cassette.mismatches.lock().unwrap().clone();
-    let real: Vec<_> = mismatches.iter().filter(|m| !m.starts_with("request 1: /input/2/output:")).collect();
-    assert!(real.is_empty(), "request bodies differ from RubyLLM's:\n  {real:?}");
-    assert_eq!(cassette.server.received_requests().await.unwrap_or_default().len(), cassette.count);
+    let real: Vec<_> = mismatches
+        .iter()
+        .filter(|m| !m.starts_with("request 1: /input/2/output:"))
+        .collect();
+    assert!(
+        real.is_empty(),
+        "request bodies differ from RubyLLM's:\n  {real:?}"
+    );
+    assert_eq!(
+        cassette
+            .server
+            .received_requests()
+            .await
+            .unwrap_or_default()
+            .len(),
+        cassette.count
+    );
 }
 
 // ---- chat_content_spec.rb: spreadsheet models -------------------------------------------------
 
 #[tokio::test]
 async fn openai_gpt_5_nano_understands_xlsx_spreadsheets() {
-    let cassette = start("chat_spreadsheet_models_openai_gpt-5-nano_understands_xlsx_spreadsheets").await;
+    let cassette =
+        start("chat_spreadsheet_models_openai_gpt-5-nano_understands_xlsx_spreadsheets").await;
     let mut chat = chat_for(&cassette, "openai", "gpt-5-nano");
 
     let response = chat
@@ -323,7 +472,12 @@ async fn openai_gpt_5_nano_understands_xlsx_spreadsheets() {
         .unwrap();
 
     let content = response.content().to_uppercase();
-    assert!(content.contains("ORCHID-97") || content.contains("ORCHID 97") || content.contains("ORCHID97"), "{content}");
+    assert!(
+        content.contains("ORCHID-97")
+            || content.contains("ORCHID 97")
+            || content.contains("ORCHID97"),
+        "{content}"
+    );
     let attachment = &chat.messages()[0].attachments[0];
     assert_eq!(attachment.filename.as_deref(), Some("sample.xlsx"));
     assert_eq!(attachment.kind(), AttachmentType::Document);
@@ -335,11 +489,19 @@ async fn openai_gpt_5_nano_understands_xlsx_spreadsheets() {
 #[tokio::test]
 async fn assume_model_exists_works_with_models_not_in_registry_but_available_in_api() {
     let _guard = GLOBAL.lock().await;
-    let cassette = start("chat_assume_model_exists_works_with_models_not_in_registry_but_available_in_api").await;
+    let cassette =
+        start("chat_assume_model_exists_works_with_models_not_in_registry_but_available_in_api")
+            .await;
     let config = config_for(&cassette, "openai");
     let real_model = "gpt-4.1-nano";
     let original: Vec<Model> = rust_llm::models().all().into_iter().cloned().collect();
-    rust_llm::models::Models::install(original.iter().filter(|m| m.id != real_model).cloned().collect());
+    rust_llm::models::Models::install(
+        original
+            .iter()
+            .filter(|m| m.id != real_model)
+            .cloned()
+            .collect(),
+    );
 
     let missing = Chat::with_config(config.clone(), Some(real_model), None, false);
     let assumed = Chat::with_config(config, Some(real_model), Some("openai"), true);
@@ -349,7 +511,10 @@ async fn assume_model_exists_works_with_models_not_in_registry_but_available_in_
     };
     rust_llm::models::Models::install(original);
 
-    assert!(matches!(missing.err(), Some(rust_llm::Error::ModelNotFound(_))));
+    assert!(matches!(
+        missing.err(),
+        Some(rust_llm::Error::ModelNotFound(_))
+    ));
     assert!(response.unwrap().content().contains('4'));
     cassette.assert_all_matched().await;
 }
@@ -410,7 +575,10 @@ async fn handles_invalid_api_keys_gracefully() {
 
 #[tokio::test]
 async fn xai_streams_speech_and_retains_the_complete_audio_through_the_public_api() {
-    let cassette = start("providers_xai_speech_streams_speech_and_retains_the_complete_audio_through_the_public_api").await;
+    let cassette = start(
+        "providers_xai_speech_streams_speech_and_retains_the_complete_audio_through_the_public_api",
+    )
+    .await;
     let mut chunks: Vec<SpeechChunk> = Vec::new();
 
     let speech = rust_llm::speech::speak_stream(
@@ -455,9 +623,16 @@ impl Tool for ConcurrentProbe {
         "Records concurrent execution".into()
     }
     fn parameters(&self) -> Vec<Parameter> {
-        vec![Parameter::new("label"), Parameter::new("delay").kind("number").optional()]
+        vec![
+            Parameter::new("label"),
+            Parameter::new("delay").kind("number").optional(),
+        ]
     }
-    async fn execute(&self, args: Map<String, Value>, _: &ToolCall) -> Result<ToolResult, ToolError> {
+    async fn execute(
+        &self,
+        args: Map<String, Value>,
+        _: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
         {
             let mut s = self.state.lock().unwrap();
             s.0 += 1;
@@ -486,8 +661,17 @@ async fn probe_server() -> wiremock::MockServer {
         "content": [{ "type": "text", "text": "done" }], "stop_reason": "end_turn", "usage": { "input_tokens": 1, "output_tokens": 1 }
     });
     let server = MockServer::start().await;
-    Mock::given(matchers::method("POST")).respond_with(ResponseTemplate::new(200).set_body_json(tool_calls)).up_to_n_times(1).with_priority(1).mount(&server).await;
-    Mock::given(matchers::method("POST")).respond_with(ResponseTemplate::new(200).set_body_json(done)).with_priority(2).mount(&server).await;
+    Mock::given(matchers::method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(tool_calls))
+        .up_to_n_times(1)
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    Mock::given(matchers::method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(done))
+        .with_priority(2)
+        .mount(&server)
+        .await;
     server
 }
 
@@ -497,25 +681,47 @@ fn probe_chat(server: &wiremock::MockServer, tool_concurrency: bool) -> Chat {
     config.set("anthropic_api_key", "test-key");
     config.max_retries = 0;
     config.tool_concurrency = tool_concurrency;
-    Chat::with_config(Arc::new(config), Some("claude-haiku-4-5"), Some("anthropic"), false).expect("chat")
+    Chat::with_config(
+        Arc::new(config),
+        Some("claude-haiku-4-5"),
+        Some("anthropic"),
+        false,
+    )
+    .expect("chat")
 }
 
 fn tool_messages(chat: &Chat) -> (Vec<String>, Vec<String>) {
-    let tools: Vec<_> = chat.messages().iter().filter(|m| m.role == rust_llm::Role::Tool).collect();
-    (tools.iter().filter_map(|m| m.tool_call_id.clone()).collect(), tools.iter().map(|m| m.content().to_string()).collect())
+    let tools: Vec<_> = chat
+        .messages()
+        .iter()
+        .filter(|m| m.role == rust_llm::Role::Tool)
+        .collect();
+    (
+        tools
+            .iter()
+            .filter_map(|m| m.tool_call_id.clone())
+            .collect(),
+        tools.iter().map(|m| m.content().to_string()).collect(),
+    )
 }
 
 #[tokio::test]
 async fn executes_multiple_tool_calls_concurrently() {
     let server = probe_server().await;
     let probe = ConcurrentProbe::default();
-    let mut chat = probe_chat(&server, false).with_tool(probe.clone()).with_tool_concurrency(true);
+    let mut chat = probe_chat(&server, false)
+        .with_tool(probe.clone())
+        .with_tool_concurrency(true);
     chat.ask("Run the tools").await.unwrap();
 
     assert_eq!(probe.state.lock().unwrap().1, 2, "both calls ran at once");
     assert!(chat.concurrency());
     let (ids, contents) = tool_messages(&chat);
-    assert_eq!(ids, ["call_2", "call_1"], "results land as each call finishes");
+    assert_eq!(
+        ids,
+        ["call_2", "call_1"],
+        "results land as each call finishes"
+    );
     assert_eq!(contents, ["finished fast", "finished slow"]);
 }
 
@@ -524,7 +730,10 @@ async fn config_tool_concurrency_runs_calls_concurrently() {
     let server = probe_server().await;
     let probe = ConcurrentProbe::default();
     let mut chat = probe_chat(&server, true).with_tool(probe.clone());
-    assert!(chat.concurrency(), "the chat starts from config.tool_concurrency");
+    assert!(
+        chat.concurrency(),
+        "the chat starts from config.tool_concurrency"
+    );
     chat.ask("Run the tools").await.unwrap();
     assert_eq!(probe.state.lock().unwrap().1, 2);
     assert_eq!(tool_messages(&chat).0, ["call_2", "call_1"]);
@@ -567,7 +776,10 @@ async fn adds_concurrent_tool_result_messages_as_each_call_finishes_before_resum
         .filter(|b| b["type"] == "tool_result")
         .filter_map(|b| b["tool_use_id"].as_str())
         .collect();
-    assert_eq!(*events.lock().unwrap(), ["tool_message call_2", "tool_message call_1"]);
+    assert_eq!(
+        *events.lock().unwrap(),
+        ["tool_message call_2", "tool_message call_1"]
+    );
     assert_eq!(results, ["call_2", "call_1"]);
 }
 
@@ -576,9 +788,13 @@ async fn adds_concurrent_tool_result_messages_as_each_call_finishes_before_resum
 #[tokio::test]
 async fn render_applies_before_request_hooks() {
     let server = probe_server().await;
-    let mut chat = probe_chat(&server, false).before_request(|payload| payload["metadata"] = json!({ "user_id": "u-1" }));
+    let mut chat = probe_chat(&server, false)
+        .before_request(|payload| payload["metadata"] = json!({ "user_id": "u-1" }));
     chat.ask_later("Hello").unwrap();
-    assert_eq!(chat.render().unwrap()["metadata"], json!({ "user_id": "u-1" }));
+    assert_eq!(
+        chat.render().unwrap()["metadata"],
+        json!({ "user_id": "u-1" })
+    );
     // A request applies them once, as before.
     chat.complete().await.unwrap();
     let requests = server.received_requests().await.unwrap();

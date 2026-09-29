@@ -25,7 +25,12 @@ pub struct Client {
 
 impl Client {
     pub fn new(transport: Arc<dyn Transport>, capabilities: Value) -> Client {
-        Client { transport, capabilities, server: tokio::sync::Mutex::new(None), version: Mutex::new(None) }
+        Client {
+            transport,
+            capabilities,
+            server: tokio::sync::Mutex::new(None),
+            version: Mutex::new(None),
+        }
     }
 
     /// The protocol version the server agreed to, once connected.
@@ -67,16 +72,24 @@ impl Client {
         on_notification: &mut OnNotification<'_>,
     ) -> Result<Value> {
         self.server().await?;
-        self.call(method, params, None, headers, on_notification).await
+        self.call(method, params, None, headers, on_notification)
+            .await
     }
 
     /// `list(method, key)`: every item across `nextCursor` pages.
     pub async fn list(&self, method: &str, key: &str) -> Result<Vec<Value>> {
-        let items_of = |page: &Value| page.get(key).and_then(Value::as_array).cloned().unwrap_or_default();
+        let items_of = |page: &Value| {
+            page.get(key)
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default()
+        };
         let mut page = self.request(method, json!({}), &[], &mut |_| {}).await?;
         let mut items = items_of(&page);
         while let Some(cursor) = page.get("nextCursor").filter(|c| !c.is_null()).cloned() {
-            page = self.request(method, json!({ "cursor": cursor }), &[], &mut |_| {}).await?;
+            page = self
+                .request(method, json!({ "cursor": cursor }), &[], &mut |_| {})
+                .await?;
             items.extend(items_of(&page));
         }
         Ok(items)
@@ -92,12 +105,25 @@ impl Client {
 
     async fn discover(&self) -> Result<Option<Value>> {
         self.set_version(Some(VERSION.into()));
-        match self.call("server/discover", json!({}), Some(DISCOVERY_TIMEOUT), &[], &mut |_| {}).await {
+        match self
+            .call(
+                "server/discover",
+                json!({}),
+                Some(DISCOVERY_TIMEOUT),
+                &[],
+                &mut |_| {},
+            )
+            .await
+        {
             Ok(result) => {
                 let supported = result.get("supportedVersions").and_then(Value::as_array);
-                Ok(supported.is_some_and(|v| v.iter().any(|v| v == VERSION)).then_some(result))
+                Ok(supported
+                    .is_some_and(|v| v.iter().any(|v| v == VERSION))
+                    .then_some(result))
             }
-            Err(Error::Mcp(e)) if e.code.is_some_and(|c| MODERN_ERRORS.contains(&c)) => Err(Error::Mcp(e)),
+            Err(Error::Mcp(e)) if e.code.is_some_and(|c| MODERN_ERRORS.contains(&c)) => {
+                Err(Error::Mcp(e))
+            }
             Err(Error::Mcp(_)) => Ok(None),
             Err(e) => Err(e),
         }
@@ -106,10 +132,22 @@ impl Client {
     async fn handshake(&self) -> Result<Value> {
         self.set_version(None);
         let params = json!({ "protocolVersion": LEGACY_VERSION, "capabilities": {}, "clientInfo": client_info() });
-        let result = self.call("initialize", params, None, &[], &mut |_| {}).await?;
-        self.set_version(result.get("protocolVersion").and_then(Value::as_str).map(str::to_string));
+        let result = self
+            .call("initialize", params, None, &[], &mut |_| {})
+            .await?;
+        self.set_version(
+            result
+                .get("protocolVersion")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+        );
         let version = self.version();
-        self.transport.notify(&self.message("notifications/initialized", json!({}), None), version.as_deref()).await?;
+        self.transport
+            .notify(
+                &self.message("notifications/initialized", json!({}), None),
+                version.as_deref(),
+            )
+            .await?;
         Ok(result)
     }
 
@@ -124,17 +162,34 @@ impl Client {
         let id = uuid::Uuid::new_v4().to_string();
         let request = self.message(method, params, Some(&id));
         let version = self.version();
-        let response = match self.transport.request(&request, version.as_deref(), timeout, headers, on_notification).await {
+        let response = match self
+            .transport
+            .request(
+                &request,
+                version.as_deref(),
+                timeout,
+                headers,
+                on_notification,
+            )
+            .await
+        {
             Err(Error::Cancelled) => {
-                let cancelled = self.message("notifications/cancelled", json!({ "requestId": id }), None);
-                self.transport.cancel(&cancelled, version.as_deref()).await?;
+                let cancelled =
+                    self.message("notifications/cancelled", json!({ "requestId": id }), None);
+                self.transport
+                    .cancel(&cancelled, version.as_deref())
+                    .await?;
                 return Err(Error::Cancelled);
             }
             other => other?,
         };
         if let Some(error) = response.get("error").filter(|e| !e.is_null()) {
             return Err(McpError {
-                message: error.get("message").and_then(Value::as_str).unwrap_or("").to_string(),
+                message: error
+                    .get("message")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string(),
                 code: error.get("code").and_then(Value::as_i64),
                 data: error.get("data").cloned(),
                 response: None,
@@ -167,9 +222,15 @@ impl Client {
 
     fn meta(&self) -> Map<String, Value> {
         let mut meta = Map::new();
-        meta.insert("io.modelcontextprotocol/protocolVersion".into(), VERSION.into());
+        meta.insert(
+            "io.modelcontextprotocol/protocolVersion".into(),
+            VERSION.into(),
+        );
         meta.insert("io.modelcontextprotocol/clientInfo".into(), client_info());
-        meta.insert("io.modelcontextprotocol/clientCapabilities".into(), self.capabilities.clone());
+        meta.insert(
+            "io.modelcontextprotocol/clientCapabilities".into(),
+            self.capabilities.clone(),
+        );
         meta
     }
 }

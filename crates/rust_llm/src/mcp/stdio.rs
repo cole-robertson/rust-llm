@@ -35,8 +35,19 @@ struct Process {
 }
 
 impl Stdio {
-    pub fn new(command: Vec<String>, env: Vec<(String, String)>, directory: Option<PathBuf>, timeout: Duration) -> Stdio {
-        Stdio { command, env, directory, timeout, process: tokio::sync::Mutex::new(None) }
+    pub fn new(
+        command: Vec<String>,
+        env: Vec<(String, String)>,
+        directory: Option<PathBuf>,
+        timeout: Duration,
+    ) -> Stdio {
+        Stdio {
+            command,
+            env,
+            directory,
+            timeout,
+            process: tokio::sync::Mutex::new(None),
+        }
     }
 
     fn name(&self) -> String {
@@ -49,16 +60,31 @@ impl Stdio {
     }
 
     fn start(&self) -> Result<Process> {
-        let (program, args) = self.command.split_first().ok_or_else(|| Error::Configuration("MCP command is empty".into()))?;
+        let (program, args) = self
+            .command
+            .split_first()
+            .ok_or_else(|| Error::Configuration("MCP command is empty".into()))?;
         let mut command = Command::new(program);
-        command.args(args).envs(self.env.iter().cloned()).stdin(ProcessStdio::piped()).stdout(ProcessStdio::piped()).kill_on_drop(true);
+        command
+            .args(args)
+            .envs(self.env.iter().cloned())
+            .stdin(ProcessStdio::piped())
+            .stdout(ProcessStdio::piped())
+            .kill_on_drop(true);
         if let Some(dir) = &self.directory {
             command.current_dir(dir);
         }
-        let mut child = command.spawn().map_err(|e| McpError::new(format!("{} could not start: {e}", self.name())))?;
+        let mut child = command
+            .spawn()
+            .map_err(|e| McpError::new(format!("{} could not start: {e}", self.name())))?;
         let stdin = child.stdin.take().ok_or_else(|| self.exited())?;
         let stdout = child.stdout.take().ok_or_else(|| self.exited())?;
-        Ok(Process { child, stdin, stdout, buffer: Vec::new() })
+        Ok(Process {
+            child,
+            stdin,
+            stdout,
+            buffer: Vec::new(),
+        })
     }
 
     async fn write(&self, slot: &mut Option<Process>, message: &Value) -> Result<()> {
@@ -69,7 +95,9 @@ impl Stdio {
         if !alive {
             *slot = Some(self.start()?);
         }
-        let Some(process) = slot.as_mut() else { return Err(self.exited()) };
+        let Some(process) = slot.as_mut() else {
+            return Err(self.exited());
+        };
         let mut line = message.to_string();
         line.push('\n');
         let written = async {
@@ -100,19 +128,27 @@ impl Stdio {
 
     async fn next_line(&self, slot: &mut Option<Process>, deadline: Instant) -> Result<Vec<u8>> {
         loop {
-            let Some(process) = slot.as_mut() else { return Err(self.exited()) };
+            let Some(process) = slot.as_mut() else {
+                return Err(self.exited());
+            };
             if let Some(pos) = process.buffer.iter().position(|b| *b == b'\n') {
                 return Ok(process.buffer.drain(..=pos).collect());
             }
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
-                return Err(McpError::new(format!("{} did not answer in time", self.name())).into());
+                return Err(
+                    McpError::new(format!("{} did not answer in time", self.name())).into(),
+                );
             }
             if crate::progress::is_cancelled() {
                 return Err(Error::Cancelled);
             }
             let mut chunk = vec![0u8; 65_536];
-            let read = tokio::time::timeout(remaining.min(CHECK_INTERVAL), process.stdout.read(&mut chunk)).await;
+            let read = tokio::time::timeout(
+                remaining.min(CHECK_INTERVAL),
+                process.stdout.read(&mut chunk),
+            )
+            .await;
             match read {
                 Err(_) => continue,
                 Ok(Ok(0)) | Ok(Err(_)) => {
@@ -137,10 +173,21 @@ impl Stdio {
 }
 
 async fn stop(slot: &mut Option<Process>) {
-    let Some(Process { mut child, stdin, stdout, .. }) = slot.take() else { return };
+    let Some(Process {
+        mut child,
+        stdin,
+        stdout,
+        ..
+    }) = slot.take()
+    else {
+        return;
+    };
     drop(stdin);
     drop(stdout);
-    if tokio::time::timeout(SHUTDOWN_GRACE, child.wait()).await.is_err() {
+    if tokio::time::timeout(SHUTDOWN_GRACE, child.wait())
+        .await
+        .is_err()
+    {
         let _ = child.start_kill();
         let _ = tokio::time::timeout(SHUTDOWN_GRACE, child.wait()).await;
     }

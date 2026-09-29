@@ -51,15 +51,24 @@ impl ToolShape {
     }
 
     /// `fixed_arguments: { name => -> { ... } }`: the value is computed on every call.
-    pub fn fixed_argument_with(mut self, name: impl Into<String>, value: impl Fn() -> Value + Send + Sync + 'static) -> ToolShape {
+    pub fn fixed_argument_with(
+        mut self,
+        name: impl Into<String>,
+        value: impl Fn() -> Value + Send + Sync + 'static,
+    ) -> ToolShape {
         self.fixed_arguments.push((name.into(), Arc::new(value)));
         self
     }
 
     /// `wrap:`: receives the server's result and the model's arguments and returns what the
     /// model sees.
-    pub fn wrap<R: Into<ToolResult>>(mut self, wrap: impl Fn(&McpResult, &Map<String, Value>) -> R + Send + Sync + 'static) -> ToolShape {
-        self.wrap = Some(Arc::new(move |result, arguments| wrap(result, arguments).into()));
+    pub fn wrap<R: Into<ToolResult>>(
+        mut self,
+        wrap: impl Fn(&McpResult, &Map<String, Value>) -> R + Send + Sync + 'static,
+    ) -> ToolShape {
+        self.wrap = Some(Arc::new(move |result, arguments| {
+            wrap(result, arguments).into()
+        }));
         self
     }
 
@@ -70,7 +79,8 @@ impl ToolShape {
         if other.description.is_some() {
             self.description = other.description.clone();
         }
-        self.fixed_arguments.extend(other.fixed_arguments.iter().cloned());
+        self.fixed_arguments
+            .extend(other.fixed_arguments.iter().cloned());
         if other.wrap.is_some() {
             self.wrap = other.wrap.clone();
         }
@@ -110,14 +120,31 @@ impl std::fmt::Debug for McpTool {
 }
 
 impl McpTool {
-    pub(crate) fn new(mcp: Mcp, definition: &Value, prefix: Option<&str>, shape: ToolShape) -> McpTool {
-        let server_name = definition.get("name").and_then(Value::as_str).unwrap_or("").to_string();
+    pub(crate) fn new(
+        mcp: Mcp,
+        definition: &Value,
+        prefix: Option<&str>,
+        shape: ToolShape,
+    ) -> McpTool {
+        let server_name = definition
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
         let name = shape.as_name.clone().unwrap_or_else(|| match prefix {
             Some(prefix) => format!("{prefix}_{server_name}"),
             None => server_name.clone(),
         });
-        let description = shape.description.clone().or_else(|| definition.get("description").and_then(Value::as_str).map(str::to_string));
-        let schema = definition.get("inputSchema").cloned().unwrap_or_else(|| json!({}));
+        let description = shape.description.clone().or_else(|| {
+            definition
+                .get("description")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        });
+        let schema = definition
+            .get("inputSchema")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
         let parameters_schema = model_schema(schema, &shape.fixed_arguments);
         McpTool {
             mcp,
@@ -127,7 +154,10 @@ impl McpTool {
             parameters_schema,
             fixed_arguments: shape.fixed_arguments,
             wrap: shape.wrap,
-            annotations: definition.get("annotations").cloned().unwrap_or_else(|| json!({})),
+            annotations: definition
+                .get("annotations")
+                .cloned()
+                .unwrap_or_else(|| json!({})),
         }
     }
 
@@ -215,12 +245,24 @@ impl Tool for McpTool {
         self.mcp.requires_approval(self)
     }
 
-    async fn execute(&self, arguments: Map<String, Value>, _tool_call: &ToolCall) -> Result<ToolResult, ToolError> {
+    async fn execute(
+        &self,
+        arguments: Map<String, Value>,
+        _tool_call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
         self.mcp.run(self, arguments, None).await.map_err(boxed)
     }
 
     /// `resume(input, arguments)`: resumes a call that paused on input requests, now answered.
-    async fn resume(&self, input: &Value, arguments: Map<String, Value>, _tool_call: &ToolCall) -> Result<ToolResult, ToolError> {
-        self.mcp.run(self, arguments, Some(InputState::from_h(input))).await.map_err(boxed)
+    async fn resume(
+        &self,
+        input: &Value,
+        arguments: Map<String, Value>,
+        _tool_call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
+        self.mcp
+            .run(self, arguments, Some(InputState::from_h(input)))
+            .await
+            .map_err(boxed)
     }
 }

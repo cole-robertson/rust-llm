@@ -9,7 +9,8 @@ use serde_json::{Map, Value, json};
 use super::Mcp;
 use crate::error::Result;
 
-static EXPRESSION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{([+#./;?&]?)([^{}]+)\}").expect("valid regex"));
+static EXPRESSION: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\{([+#./;?&]?)([^{}]+)\}").expect("valid regex"));
 
 /// `RubyLLM::MCP::ResourceTemplate`.
 #[derive(Clone)]
@@ -25,7 +26,10 @@ pub struct ResourceTemplate {
 
 impl std::fmt::Debug for ResourceTemplate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ResourceTemplate").field("uri", &self.uri).field("name", &self.name).finish()
+        f.debug_struct("ResourceTemplate")
+            .field("uri", &self.uri)
+            .field("name", &self.name)
+            .finish()
     }
 }
 
@@ -45,7 +49,12 @@ impl ResourceTemplate {
     /// `suggest(**variables)`: asks the server to complete the first variable's partial value,
     /// with the rest as context.
     pub async fn suggest(&self, variables: &[(&str, &str)]) -> Result<Vec<String>> {
-        self.mcp.suggest(json!({ "type": "ref/resource", "uri": self.uri }), variables).await
+        self.mcp
+            .suggest(
+                json!({ "type": "ref/resource", "uri": self.uri }),
+                variables,
+            )
+            .await
     }
 
     /// `ResourceTemplate.expand`: fills in `template` with `variables` (a JSON object whose values
@@ -76,7 +85,10 @@ fn operator(op: &str) -> (&'static str, bool) {
 
 fn expand_expression(op: &str, specs: &[&str], variables: &Map<String, Value>) -> String {
     let (separator, reserved) = operator(op);
-    let values: Vec<String> = specs.iter().filter_map(|spec| expand_variable(spec, op, separator, reserved, variables)).collect();
+    let values: Vec<String> = specs
+        .iter()
+        .filter_map(|spec| expand_variable(spec, op, separator, reserved, variables))
+        .collect();
     if values.is_empty() {
         return String::new();
     }
@@ -85,7 +97,13 @@ fn expand_expression(op: &str, specs: &[&str], variables: &Map<String, Value>) -
 }
 
 /// Expands one variable with its prefix (`:3`) and explode (`*`) modifiers.
-fn expand_variable(spec: &str, op: &str, separator: &str, reserved: bool, variables: &Map<String, Value>) -> Option<String> {
+fn expand_variable(
+    spec: &str,
+    op: &str,
+    separator: &str,
+    reserved: bool,
+    variables: &Map<String, Value>,
+) -> Option<String> {
     let explode = spec.ends_with('*');
     let spec = spec.trim_end_matches('*');
     let (name, length) = match spec.split_once(':') {
@@ -114,7 +132,17 @@ fn expand_variable(spec: &str, op: &str, separator: &str, reserved: bool, variab
         .collect();
     let named = matches!(op, "?" | "&" | ";");
     Some(if explode {
-        parts.iter().map(|part| if named { format!("{name}={part}") } else { part.clone() }).collect::<Vec<_>>().join(separator)
+        parts
+            .iter()
+            .map(|part| {
+                if named {
+                    format!("{name}={part}")
+                } else {
+                    part.clone()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(separator)
     } else if named {
         format!("{name}={}", parts.join(","))
     } else {
@@ -124,7 +152,9 @@ fn expand_variable(spec: &str, op: &str, separator: &str, reserved: bool, variab
 
 fn encode(value: &str, reserved: bool) -> String {
     let allowed = |c: char| {
-        c.is_ascii_alphanumeric() || "-._~".contains(c) || (reserved && ":/?#[]@!$&'()*+,;=%".contains(c))
+        c.is_ascii_alphanumeric()
+            || "-._~".contains(c)
+            || (reserved && ":/?#[]@!$&'()*+,;=%".contains(c))
     };
     let mut out = String::new();
     for c in value.chars() {
@@ -148,21 +178,49 @@ mod tests {
     #[test]
     fn expands_like_rubyllm() {
         let cases = [
-            ("file:///{path}", json!({ "path": "docs/README.md" }), "file:///docs%2FREADME.md"),
-            ("file:///{+path}", json!({ "path": "docs/README.md" }), "file:///docs/README.md"),
-            ("repo://{owner}/{repo}", json!({ "owner": "crmne", "repo": "ruby llm" }), "repo://crmne/ruby%20llm"),
-            ("search{?q,limit}", json!({ "q": "mcp", "limit": 5 }), "search?q=mcp&limit=5"),
+            (
+                "file:///{path}",
+                json!({ "path": "docs/README.md" }),
+                "file:///docs%2FREADME.md",
+            ),
+            (
+                "file:///{+path}",
+                json!({ "path": "docs/README.md" }),
+                "file:///docs/README.md",
+            ),
+            (
+                "repo://{owner}/{repo}",
+                json!({ "owner": "crmne", "repo": "ruby llm" }),
+                "repo://crmne/ruby%20llm",
+            ),
+            (
+                "search{?q,limit}",
+                json!({ "q": "mcp", "limit": 5 }),
+                "search?q=mcp&limit=5",
+            ),
             ("items{/id}", json!({ "id": 42 }), "items/42"),
             ("file:///{path}", json!({}), "file:///"),
             ("{{name}}", json!({ "name": "x" }), "{x}"),
-            ("file:///{path*}", json!({ "path": "README.md" }), "file:///README.md"),
+            (
+                "file:///{path*}",
+                json!({ "path": "README.md" }),
+                "file:///README.md",
+            ),
             ("items{/path*}", json!({ "path": ["a", "b"] }), "items/a/b"),
             ("items{/path}", json!({ "path": ["a", "b"] }), "items/a,b"),
-            ("search{?tags*}", json!({ "tags": ["x", "y"] }), "search?tags=x&tags=y"),
+            (
+                "search{?tags*}",
+                json!({ "tags": ["x", "y"] }),
+                "search?tags=x&tags=y",
+            ),
             ("id/{id:3}", json!({ "id": "abcdef" }), "id/abc"),
         ];
         for (template, variables, expanded) in cases {
-            assert_eq!(ResourceTemplate::expand(template, &variables), expanded, "{template} with {variables}");
+            assert_eq!(
+                ResourceTemplate::expand(template, &variables),
+                expanded,
+                "{template} with {variables}"
+            );
         }
     }
 }

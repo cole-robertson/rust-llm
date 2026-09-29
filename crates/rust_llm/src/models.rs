@@ -5,7 +5,9 @@
 pub mod refresh;
 pub mod registry;
 
-pub use refresh::{ProviderFailure, last_provider_failures, list_models, refresh, refresh_from_providers};
+pub use refresh::{
+    ProviderFailure, last_provider_failures, list_models, refresh, refresh_from_providers,
+};
 
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, RwLock};
@@ -17,14 +19,30 @@ use crate::model::Model;
 
 /// `Models::PROVIDER_PREFERENCE`: which provider wins when a bare model id exists at several.
 pub const PROVIDER_PREFERENCE: &[&str] = &[
-    "openai", "anthropic", "gemini", "deepseek", "mistral", "cohere", "typesafe", "perplexity", "xai",
-    "vertexai", "bedrock", "openrouter", "azure", "hetzner", "ollama_cloud", "ollama", "gpustack",
+    "openai",
+    "anthropic",
+    "gemini",
+    "deepseek",
+    "mistral",
+    "cohere",
+    "typesafe",
+    "perplexity",
+    "xai",
+    "vertexai",
+    "bedrock",
+    "openrouter",
+    "azure",
+    "hetzner",
+    "ollama_cloud",
+    "ollama",
+    "gpustack",
 ];
 
 static BUNDLED_MODELS: &str = include_str!("../data/models.json");
 static BUNDLED_ALIASES: &str = include_str!("../data/aliases.json");
 
-static REGISTRY: LazyLock<RwLock<Arc<Models>>> = LazyLock::new(|| RwLock::new(Arc::new(Models::new(load_models()))));
+static REGISTRY: LazyLock<RwLock<Arc<Models>>> =
+    LazyLock::new(|| RwLock::new(Arc::new(Models::new(load_models()))));
 
 /// `Models.load_models`: the configured `model_registry_file` when it holds models, else the
 /// bundled registry. An unreadable file is ignored with a warning, as Ruby does.
@@ -34,7 +52,10 @@ pub fn load_models() -> Vec<Model> {
         match registry::read(&file) {
             Ok(Some(models)) if !models.is_empty() => return models,
             Ok(_) => {}
-            Err(e) => tracing::warn!("Ignoring invalid model registry file {}: {e}", file.display()),
+            Err(e) => tracing::warn!(
+                "Ignoring invalid model registry file {}: {e}",
+                file.display()
+            ),
         }
     }
     bundled_models()
@@ -78,13 +99,15 @@ impl Models {
     /// `None`), or the bundled registry when it is missing or invalid.
     pub fn load_from_json(file: Option<&std::path::Path>) -> Models {
         let configured = crate::config().model_registry_file.clone();
-        let models = file.or(configured.as_deref()).and_then(|f| match registry::read(f) {
-            Ok(models) => models.filter(|m| !m.is_empty()),
-            Err(e) => {
-                tracing::warn!("Ignoring invalid model registry file {}: {e}", f.display());
-                None
-            }
-        });
+        let models = file
+            .or(configured.as_deref())
+            .and_then(|f| match registry::read(f) {
+                Ok(models) => models.filter(|m| !m.is_empty()),
+                Err(e) => {
+                    tracing::warn!("Ignoring invalid model registry file {}: {e}", f.display());
+                    None
+                }
+            });
         Models::new(models.unwrap_or_else(bundled_models))
     }
 
@@ -92,7 +115,9 @@ impl Models {
     /// `model_registry_file` when `None`) as pretty-printed JSON.
     pub fn save_to_json(&self, file: Option<&std::path::Path>) -> Result<&Self> {
         let configured = crate::config().model_registry_file.clone();
-        let path = file.or(configured.as_deref()).ok_or_else(|| Error::ModelRegistry("A model registry file path is required".into()))?;
+        let path = file
+            .or(configured.as_deref())
+            .ok_or_else(|| Error::ModelRegistry("A model registry file path is required".into()))?;
         registry::FileStore::new(path)?.write(&self.all(), None)?;
         Ok(self)
     }
@@ -108,7 +133,10 @@ impl Models {
     }
 
     pub fn chat_models(&self) -> Vec<&Model> {
-        self.all().into_iter().filter(|m| m.model_type() == crate::model::ModelType::Chat).collect()
+        self.all()
+            .into_iter()
+            .filter(|m| m.model_type() == crate::model::ModelType::Chat)
+            .collect()
     }
 
     pub fn embedding_models(&self) -> Vec<&Model> {
@@ -119,11 +147,17 @@ impl Models {
     }
 
     pub fn by_provider(&self, provider: &str) -> Vec<&Model> {
-        self.all().into_iter().filter(|m| m.provider == provider).collect()
+        self.all()
+            .into_iter()
+            .filter(|m| m.provider == provider)
+            .collect()
     }
 
     fn candidates(&self, id: &str) -> Vec<&Model> {
-        self.by_id.get(id).map(|ix| ix.iter().map(|&i| &self.models[i]).collect()).unwrap_or_default()
+        self.by_id
+            .get(id)
+            .map(|ix| ix.iter().map(|&i| &self.models[i]).collect())
+            .unwrap_or_default()
     }
 
     /// `Models#find`.
@@ -134,7 +168,11 @@ impl Models {
                 self.candidates(&resolved)
                     .into_iter()
                     .find(|m| m.provider == provider)
-                    .or_else(|| self.candidates(model_id).into_iter().find(|m| m.provider == provider))
+                    .or_else(|| {
+                        self.candidates(model_id)
+                            .into_iter()
+                            .find(|m| m.provider == provider)
+                    })
                     .cloned()
                     .ok_or_else(|| not_found(model_id, Some(provider)))
             }
@@ -144,7 +182,9 @@ impl Models {
                 if resolved != model_id {
                     matches.extend(self.candidates(&resolved));
                 }
-                preferred_match(matches).cloned().ok_or_else(|| not_found(model_id, None))
+                preferred_match(matches)
+                    .cloned()
+                    .ok_or_else(|| not_found(model_id, None))
             }
         }
     }
@@ -155,7 +195,10 @@ fn preferred_match(candidates: Vec<&Model>) -> Option<&Model> {
         return candidates.into_iter().next();
     }
     candidates.into_iter().min_by_key(|m| {
-        let pref = PROVIDER_PREFERENCE.iter().position(|p| *p == m.provider).unwrap_or(PROVIDER_PREFERENCE.len());
+        let pref = PROVIDER_PREFERENCE
+            .iter()
+            .position(|p| *p == m.provider)
+            .unwrap_or(PROVIDER_PREFERENCE.len());
         (m.is_unlisted() as u8, pref)
     })
 }
@@ -172,12 +215,17 @@ fn not_found(model_id: &str, provider: Option<&str>) -> Error {
 
 /// `Models::Aliases.resolve`.
 pub fn resolve_alias(model_id: &str, provider: Option<&str>) -> String {
-    let Some(entry) = ALIASES.get(model_id) else { return model_id.to_string() };
+    let Some(entry) = ALIASES.get(model_id) else {
+        return model_id.to_string();
+    };
     let value = match provider {
         Some(p) => entry.get(p),
         None => entry.values().next(),
     };
-    value.and_then(Value::as_str).unwrap_or(model_id).to_string()
+    value
+        .and_then(Value::as_str)
+        .unwrap_or(model_id)
+        .to_string()
 }
 
 #[cfg(test)]
@@ -193,12 +241,27 @@ mod tests {
     // The cassettes record claude-haiku-4-5 going out as claude-haiku-4-5-20251001.
     #[test]
     fn with_a_provider_an_alias_resolves_to_that_providers_own_id() {
-        assert_eq!(models().find("claude-haiku-4-5", Some("anthropic")).unwrap().id, "claude-haiku-4-5-20251001");
-        assert_eq!(models().find("claude-haiku-4-5", Some("openrouter")).unwrap().id, "anthropic/claude-haiku-4.5");
+        assert_eq!(
+            models()
+                .find("claude-haiku-4-5", Some("anthropic"))
+                .unwrap()
+                .id,
+            "claude-haiku-4-5-20251001"
+        );
+        assert_eq!(
+            models()
+                .find("claude-haiku-4-5", Some("openrouter"))
+                .unwrap()
+                .id,
+            "anthropic/claude-haiku-4.5"
+        );
     }
 
     #[test]
     fn unknown_models_raise_model_not_found() {
-        assert!(matches!(models().find("no-such-model", None), Err(Error::ModelNotFound(_))));
+        assert!(matches!(
+            models().find("no-such-model", None),
+            Err(Error::ModelNotFound(_))
+        ));
     }
 }

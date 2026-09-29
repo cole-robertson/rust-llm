@@ -2,10 +2,14 @@
 
 use serde_json::{Map, Value, json};
 
-use super::{Caching, Request, ToolCalls, ToolChoice, int, normalize_finish_reason, str_of, tool_call_map};
+use super::{
+    Caching, Request, ToolCalls, ToolChoice, int, normalize_finish_reason, str_of, tool_call_map,
+};
 use crate::attachment::{Attachment, AttachmentType};
 use crate::error::{Error, Result};
-use crate::message::{Citation, Message, RawResponse, Role, ServerToolCall, Thinking, ToolArguments, ToolCall};
+use crate::message::{
+    Citation, Message, RawResponse, Role, ServerToolCall, Thinking, ToolArguments, ToolCall,
+};
 use crate::model::Model;
 use crate::thinking::ThinkingConfig;
 use crate::tool::{Tool, tool_schema};
@@ -29,19 +33,32 @@ pub fn merge_turn_segments(mut segments: Vec<Message>) -> Message {
             .flat_map(|s| match &s.raw_content {
                 Some(Value::Array(blocks)) => blocks.clone(),
                 Some(other) => vec![other.clone()],
-                None => format_message(s, false, None).ok().and_then(|m| m["content"].as_array().cloned()).unwrap_or_default(),
+                None => format_message(s, false, None)
+                    .ok()
+                    .and_then(|m| m["content"].as_array().cloned())
+                    .unwrap_or_default(),
             })
             .collect();
         Value::Array(blocks)
     });
     let mut tool_calls = crate::message::indexmap_lite::IndexMap::new();
-    for (id, call) in segments.iter().filter_map(|s| s.tool_calls.as_ref()).flat_map(|c| c.iter()) {
+    for (id, call) in segments
+        .iter()
+        .filter_map(|s| s.tool_calls.as_ref())
+        .flat_map(|c| c.iter())
+    {
         tool_calls.insert(id.clone(), call.clone());
     }
     let tokens = crate::tokens::Tokens::aggregate(segments.iter().map(|s| &s.tokens));
-    let content: String = segments.iter().filter_map(|s| s.content.as_deref()).collect();
+    let content: String = segments
+        .iter()
+        .filter_map(|s| s.content.as_deref())
+        .collect();
     let citations = segments.iter().flat_map(|s| s.citations.clone()).collect();
-    let server_tool_calls = segments.iter().flat_map(|s| s.server_tool_calls.clone()).collect();
+    let server_tool_calls = segments
+        .iter()
+        .flat_map(|s| s.server_tool_calls.clone())
+        .collect();
     let last = segments.pop().unwrap_or_else(Message::chunk);
     let mut merged = Message::assistant(content);
     merged.citations = citations;
@@ -68,7 +85,8 @@ const FINISH_REASONS: &[(&str, &str)] = &[
 const EFFORT_BUDGETS: &[(&str, i64)] = &[("low", 1024), ("medium", 40_000), ("high", 63_999)];
 
 pub fn render_payload(req: &Request) -> Result<Value> {
-    let (system, chat): (Vec<&Message>, Vec<&Message>) = req.messages.iter().partition(|m| m.role == Role::System);
+    let (system, chat): (Vec<&Message>, Vec<&Message>) =
+        req.messages.iter().partition(|m| m.role == Role::System);
     // `prompt_cache_control(caching)`, or `None` when `with_caching(false)` turns boundaries off.
     let cache_options = Caching::checked(req.caching, PROMPT_CACHE_OPTIONS, "Anthropic")?;
     let control = prompt_cache_control(cache_options);
@@ -82,10 +100,16 @@ pub fn render_payload(req: &Request) -> Result<Value> {
         system_content.extend(blocks);
     }
 
-    let max_tokens = req.max_output_tokens.or(req.model.max_output_tokens).unwrap_or(DEFAULT_MAX_OUTPUT_TOKENS);
+    let max_tokens = req
+        .max_output_tokens
+        .or(req.model.max_output_tokens)
+        .unwrap_or(DEFAULT_MAX_OUTPUT_TOKENS);
     let mut payload = Map::new();
     payload.insert("model".into(), req.model.id.clone().into());
-    payload.insert("messages".into(), Value::Array(format_messages(&chat, req.citations, cache)?));
+    payload.insert(
+        "messages".into(),
+        Value::Array(format_messages(&chat, req.citations, cache)?),
+    );
     payload.insert("stream".into(), req.stream.into());
     payload.insert("max_tokens".into(), max_tokens.into());
     add_thinking_fields(&mut payload, req.thinking, req.model, max_tokens);
@@ -144,7 +168,10 @@ pub(crate) fn apply_compaction(payload: &mut Value, compaction: &Map<String, Val
     if compaction.get("pause_after").is_some_and(truthy) {
         edit["pause_after_compaction"] = true.into();
     }
-    super::deep_merge(payload, &json!({ "context_management": { "edits": [edit] } }));
+    super::deep_merge(
+        payload,
+        &json!({ "context_management": { "edits": [edit] } }),
+    );
 }
 
 fn truthy(v: &Value) -> bool {
@@ -158,7 +185,12 @@ pub(crate) fn apply_compaction_headers(headers: &mut Vec<(String, String)>) {
         if !k.eq_ignore_ascii_case(BETA_HEADER) {
             return true;
         }
-        betas.extend(v.split(',').map(str::trim).filter(|b| !b.is_empty()).map(str::to_string));
+        betas.extend(
+            v.split(',')
+                .map(str::trim)
+                .filter(|b| !b.is_empty())
+                .map(str::to_string),
+        );
         false
     });
     betas.push(COMPACTION_BETA.to_string());
@@ -171,7 +203,11 @@ pub(crate) fn apply_compaction_headers(headers: &mut Vec<(String, String)>) {
     headers.push((BETA_HEADER.into(), unique.join(",")));
 }
 
-fn format_messages(messages: &[&Message], citations: bool, cache: Option<&Value>) -> Result<Vec<Value>> {
+fn format_messages(
+    messages: &[&Message],
+    citations: bool,
+    cache: Option<&Value>,
+) -> Result<Vec<Value>> {
     let mut rendered = Vec::new();
     let mut tool_results: Vec<Value> = Vec::new();
     for msg in messages {
@@ -186,7 +222,10 @@ fn format_messages(messages: &[&Message], citations: bool, cache: Option<&Value>
             rendered.push(json!({ "role": "user", "content": std::mem::take(&mut tool_results) }));
         }
         let formatted = format_message(msg, citations, cache.filter(|_| msg.cache_until_here))?;
-        if formatted["content"].as_array().is_some_and(|c| !c.is_empty()) {
+        if formatted["content"]
+            .as_array()
+            .is_some_and(|c| !c.is_empty())
+        {
             rendered.push(formatted);
         }
     }
@@ -199,13 +238,14 @@ fn format_messages(messages: &[&Message], citations: bool, cache: Option<&Value>
 /// `boundary` is the cache control to inject when this message is a cache boundary.
 fn format_message(msg: &Message, citations: bool, boundary: Option<&Value>) -> Result<Value> {
     if msg.role == Role::Assistant
-        && let Some(raw) = &msg.raw_content {
-            let mut blocks = raw.as_array().cloned().unwrap_or_default();
-            if let Some(control) = boundary {
-                inject_cache_control(&mut blocks, control);
-            }
-            return Ok(json!({ "role": "assistant", "content": blocks }));
+        && let Some(raw) = &msg.raw_content
+    {
+        let mut blocks = raw.as_array().cloned().unwrap_or_default();
+        if let Some(control) = boundary {
+            inject_cache_control(&mut blocks, control);
         }
+        return Ok(json!({ "role": "assistant", "content": blocks }));
+    }
     if let Some(calls) = msg.tool_calls.as_ref().filter(|c| !c.is_empty()) {
         let mut blocks = format_thinking_blocks(msg);
         if !msg.content().is_empty() {
@@ -224,8 +264,16 @@ fn format_message(msg: &Message, citations: bool, boundary: Option<&Value>) -> R
         }
         return Ok(json!({ "role": "assistant", "content": blocks }));
     }
-    let mut blocks = if msg.role == Role::Assistant { format_thinking_blocks(msg) } else { Vec::new() };
-    blocks.extend(format_content_with(msg.content.as_deref(), &msg.attachments, citations)?);
+    let mut blocks = if msg.role == Role::Assistant {
+        format_thinking_blocks(msg)
+    } else {
+        Vec::new()
+    };
+    blocks.extend(format_content_with(
+        msg.content.as_deref(),
+        &msg.attachments,
+        citations,
+    )?);
     if let Some(control) = boundary {
         inject_cache_control(&mut blocks, control);
     }
@@ -237,10 +285,17 @@ fn format_message(msg: &Message, citations: bool, boundary: Option<&Value>) -> R
 }
 
 fn format_thinking_blocks(msg: &Message) -> Vec<Value> {
-    if let Some(blocks) = msg.raw_reasoning.as_ref().and_then(|r| r.get("anthropic")).and_then(Value::as_array) {
+    if let Some(blocks) = msg
+        .raw_reasoning
+        .as_ref()
+        .and_then(|r| r.get("anthropic"))
+        .and_then(Value::as_array)
+    {
         return blocks.clone();
     }
-    let Some(thinking) = &msg.thinking else { return Vec::new() };
+    let Some(thinking) = &msg.thinking else {
+        return Vec::new();
+    };
     if let Some(text) = &thinking.text {
         let mut block = json!({ "type": "thinking", "thinking": text });
         if let Some(sig) = &thinking.signature {
@@ -256,15 +311,20 @@ fn format_thinking_blocks(msg: &Message) -> Vec<Value> {
 
 fn inject_cache_control(blocks: &mut [Value], control: &Value) {
     if let Some(Value::Object(last)) = blocks.last_mut() {
-        last.entry("cache_control").or_insert_with(|| control.clone());
+        last.entry("cache_control")
+            .or_insert_with(|| control.clone());
     }
 }
 
 fn format_tool_result_block(msg: &Message) -> Result<Value> {
     // `Tools.format_tool_result_content`: search results become citable `search_result` blocks.
-    if let Some(results) = crate::search_results::SearchResults::from_content(msg.content.as_deref()) {
+    if let Some(results) =
+        crate::search_results::SearchResults::from_content(msg.content.as_deref())
+    {
         let blocks: Vec<Value> = results.results.iter().map(search_result_block).collect();
-        return Ok(json!({ "type": "tool_result", "tool_use_id": msg.tool_call_id, "content": blocks }));
+        return Ok(
+            json!({ "type": "tool_result", "tool_use_id": msg.tool_call_id, "content": blocks }),
+        );
     }
     let mut content = msg.content.clone().filter(|c| !c.is_empty());
     if content.is_none() && msg.attachments.is_empty() {
@@ -295,7 +355,11 @@ pub fn format_content(content: Option<&str>, attachments: &[Attachment]) -> Resu
 
 /// `Anthropic::Media.format_content(content, attachments, citations:)`: with citations on, PDFs,
 /// stored documents, and text files become citable documents titled by their filename.
-fn format_content_with(content: Option<&str>, attachments: &[Attachment], citations: bool) -> Result<Vec<Value>> {
+fn format_content_with(
+    content: Option<&str>,
+    attachments: &[Attachment],
+    citations: bool,
+) -> Result<Vec<Value>> {
     let mut parts = Vec::new();
     if let Some(text) = content.filter(|t| !t.is_empty()) {
         parts.push(json!({ "type": "text", "text": text }));
@@ -303,8 +367,13 @@ fn format_content_with(content: Option<&str>, attachments: &[Attachment], citati
     for a in attachments {
         // `format_provider_file`: a stored file is referenced by id.
         if let Some(file_id) = a.provider_file_id() {
-            let kind = if a.kind() == AttachmentType::Image { "image" } else { "document" };
-            let mut part = json!({ "type": kind, "source": { "type": "file", "file_id": file_id } });
+            let kind = if a.kind() == AttachmentType::Image {
+                "image"
+            } else {
+                "document"
+            };
+            let mut part =
+                json!({ "type": kind, "source": { "type": "file", "file_id": file_id } });
             if citations && kind == "document" {
                 enable_citations(&mut part, a);
             }
@@ -320,7 +389,9 @@ fn format_content_with(content: Option<&str>, attachments: &[Attachment], citati
             },
             AttachmentType::Pdf => {
                 let mut part = match a.url() {
-                    Some(url) => json!({ "type": "document", "source": { "type": "url", "url": url } }),
+                    Some(url) => {
+                        json!({ "type": "document", "source": { "type": "url", "url": url } })
+                    }
                     None => json!({ "type": "document", "source": {
                         "type": "base64", "media_type": a.mime_type, "data": a.encoded()?
                     }}),
@@ -354,7 +425,9 @@ fn enable_citations(document: &mut Value, attachment: &Attachment) {
 }
 
 pub(crate) fn unsupported(mime: &str) -> String {
-    format!("Unsupported attachment type: {mime}. Consider using a model that supports this attachment type.")
+    format!(
+        "Unsupported attachment type: {mime}. Consider using a model that supports this attachment type."
+    )
 }
 
 fn function_for(tool: &dyn Tool) -> Value {
@@ -387,14 +460,25 @@ fn build_tool_choice(prefs: &super::ToolPrefs) -> Value {
         tc.insert("name".into(), name.clone().into());
     }
     if kind != "none"
-        && let Some(calls) = prefs.calls {
-            tc.insert("disable_parallel_tool_use".into(), (calls == ToolCalls::One).into());
-        }
+        && let Some(calls) = prefs.calls
+    {
+        tc.insert(
+            "disable_parallel_tool_use".into(),
+            (calls == ToolCalls::One).into(),
+        );
+    }
     Value::Object(tc)
 }
 
-fn add_thinking_fields(payload: &mut Map<String, Value>, thinking: Option<&ThinkingConfig>, model: &Model, max_tokens: i64) {
-    let Some(thinking) = thinking.filter(|t| t.is_enabled()) else { return };
+fn add_thinking_fields(
+    payload: &mut Map<String, Value>,
+    thinking: Option<&ThinkingConfig>,
+    model: &Model,
+    max_tokens: i64,
+) {
+    let Some(thinking) = thinking.filter(|t| t.is_enabled()) else {
+        return;
+    };
     if thinking.enabled == Some(false) {
         payload.insert("thinking".into(), json!({ "type": "disabled" }));
         return;
@@ -406,11 +490,15 @@ fn add_thinking_fields(payload: &mut Map<String, Value>, thinking: Option<&Think
     let mode = if thinking.enabled == Some(true) {
         Some(json!({ "type": "adaptive" }))
     } else {
-        let budget = thinking.budget.or_else(|| effort_budget(effort.as_deref(), model, max_tokens));
+        let budget = thinking
+            .budget
+            .or_else(|| effort_budget(effort.as_deref(), model, max_tokens));
         let mut mode = if let Some(budget) = budget {
             Some(json!({ "type": "enabled", "budget_tokens": budget }))
         } else if thinking.display.is_some()
-            || (effort.is_some() && model.reasoning_option("effort").is_some() && model.reasoning_option("budget_tokens").is_none())
+            || (effort.is_some()
+                && model.reasoning_option("effort").is_some()
+                && model.reasoning_option("budget_tokens").is_none())
         {
             Some(json!({ "type": "adaptive" }))
         } else {
@@ -433,17 +521,40 @@ fn add_thinking_fields(payload: &mut Map<String, Value>, thinking: Option<&Think
 fn effort_budget(effort: Option<&str>, model: &Model, max_tokens: i64) -> Option<i64> {
     let effort = effort?;
     let option = model.reasoning_option("budget_tokens")?;
-    let budget = EFFORT_BUDGETS.iter().find(|(e, _)| *e == effort).map(|(_, b)| *b).unwrap_or(63_999);
-    let minimum = option.get("min").and_then(Value::as_i64).unwrap_or(0).max(1);
+    let budget = EFFORT_BUDGETS
+        .iter()
+        .find(|(e, _)| *e == effort)
+        .map(|(_, b)| *b)
+        .unwrap_or(63_999);
+    let minimum = option
+        .get("min")
+        .and_then(Value::as_i64)
+        .unwrap_or(0)
+        .max(1);
     Some(budget.clamp(minimum, (max_tokens - 1).max(minimum)))
 }
 
 fn aggregate_usage(usage: Option<&Value>) -> Map<String, Value> {
-    let Some(Value::Object(usage)) = usage else { return Map::new() };
+    let Some(Value::Object(usage)) = usage else {
+        return Map::new();
+    };
     let mut usage = usage.clone();
-    if let Some(iterations) = usage.get("iterations").and_then(Value::as_array).filter(|i| !i.is_empty()).cloned() {
-        for key in ["input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"] {
-            let sum: i64 = iterations.iter().map(|it| it.get(key).and_then(Value::as_i64).unwrap_or(0)).sum();
+    if let Some(iterations) = usage
+        .get("iterations")
+        .and_then(Value::as_array)
+        .filter(|i| !i.is_empty())
+        .cloned()
+    {
+        for key in [
+            "input_tokens",
+            "output_tokens",
+            "cache_read_input_tokens",
+            "cache_creation_input_tokens",
+        ] {
+            let sum: i64 = iterations
+                .iter()
+                .map(|it| it.get(key).and_then(Value::as_i64).unwrap_or(0))
+                .sum();
             usage.insert(key.into(), sum.into());
         }
     }
@@ -458,9 +569,16 @@ fn cache_write(usage: &Map<String, Value>) -> Option<i64> {
     Some(breakdown.values().filter_map(Value::as_i64).sum())
 }
 
-fn parse_citation(data: &Value, text: Option<String>, start: Option<i64>, end: Option<i64>) -> Citation {
+fn parse_citation(
+    data: &Value,
+    text: Option<String>,
+    start: Option<i64>,
+    end: Option<i64>,
+) -> Citation {
     let url = str_of(data.get("url")).or_else(|| str_of(data.get("source")));
-    let url = url.filter(|u| u.to_lowercase().starts_with("http://") || u.to_lowercase().starts_with("https://"));
+    let url = url.filter(|u| {
+        u.to_lowercase().starts_with("http://") || u.to_lowercase().starts_with("https://")
+    });
     Citation {
         url,
         title: str_of(data.get("document_title")).or_else(|| str_of(data.get("title"))),
@@ -468,7 +586,8 @@ fn parse_citation(data: &Value, text: Option<String>, start: Option<i64>, end: O
         text,
         start_index: start,
         end_index: end,
-        source_index: int(data.get("document_index")).or_else(|| int(data.get("search_result_index"))),
+        source_index: int(data.get("document_index"))
+            .or_else(|| int(data.get("search_result_index"))),
         start_page: int(data.get("start_page_number")),
         end_page: int(data.get("end_page_number")).map(|p| p - 1),
         ..Default::default()
@@ -477,7 +596,8 @@ fn parse_citation(data: &Value, text: Option<String>, start: Option<i64>, end: O
 
 fn is_server_tool_block(block: &Value) -> bool {
     let kind = block.get("type").and_then(Value::as_str).unwrap_or("");
-    matches!(kind, "server_tool_use" | "mcp_tool_use" | "compaction") || kind.ends_with("_tool_result")
+    matches!(kind, "server_tool_use" | "mcp_tool_use" | "compaction")
+        || kind.ends_with("_tool_result")
 }
 
 fn server_tool_calls(blocks: &[Value]) -> Vec<ServerToolCall> {
@@ -498,35 +618,66 @@ fn server_tool_calls(blocks: &[Value]) -> Vec<ServerToolCall> {
 fn thinking_blocks(blocks: &[Value]) -> Option<Value> {
     let thinking: Vec<Value> = blocks
         .iter()
-        .filter(|b| matches!(b.get("type").and_then(Value::as_str), Some("thinking" | "redacted_thinking")))
+        .filter(|b| {
+            matches!(
+                b.get("type").and_then(Value::as_str),
+                Some("thinking" | "redacted_thinking")
+            )
+        })
         .cloned()
         .collect();
     (!thinking.is_empty()).then(|| json!({ "anthropic": thinking }))
 }
 
 pub fn parse_completion_body(data: &Value, raw: RawResponse) -> Result<Message> {
-    let blocks = data.get("content").and_then(Value::as_array).cloned().unwrap_or_default();
+    let blocks = data
+        .get("content")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     let mut text = String::new();
     let mut citations = Vec::new();
-    for block in blocks.iter().filter(|b| b.get("type").and_then(Value::as_str) == Some("text")) {
+    for block in blocks
+        .iter()
+        .filter(|b| b.get("type").and_then(Value::as_str) == Some("text"))
+    {
         let block_text = block.get("text").and_then(Value::as_str).unwrap_or("");
         let start = text.chars().count() as i64;
         let end = start + block_text.chars().count() as i64;
-        for c in block.get("citations").and_then(Value::as_array).into_iter().flatten() {
-            citations.push(parse_citation(c, Some(block_text.to_string()), Some(start), Some(end)));
+        for c in block
+            .get("citations")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            citations.push(parse_citation(
+                c,
+                Some(block_text.to_string()),
+                Some(start),
+                Some(end),
+            ));
         }
         text.push_str(block_text);
     }
     let thinking_text: Vec<String> = blocks
         .iter()
         .filter(|b| b.get("type").and_then(Value::as_str) == Some("thinking"))
-        .map(|b| str_of(b.get("thinking")).or_else(|| str_of(b.get("text"))).unwrap_or_default())
+        .map(|b| {
+            str_of(b.get("thinking"))
+                .or_else(|| str_of(b.get("text")))
+                .unwrap_or_default()
+        })
         .collect();
     let signature_block = blocks
         .iter()
         .find(|b| b.get("type").and_then(Value::as_str) == Some("thinking"))
-        .or_else(|| blocks.iter().find(|b| b.get("type").and_then(Value::as_str) == Some("redacted_thinking")));
-    let signature = signature_block.and_then(|b| str_of(b.get("signature")).or_else(|| str_of(b.get("data"))));
+        .or_else(|| {
+            blocks
+                .iter()
+                .find(|b| b.get("type").and_then(Value::as_str) == Some("redacted_thinking"))
+        });
+    let signature =
+        signature_block.and_then(|b| str_of(b.get("signature")).or_else(|| str_of(b.get("data"))));
     let tool_calls: Vec<ToolCall> = blocks
         .iter()
         .filter(|b| b.get("type").and_then(Value::as_str) == Some("tool_use"))
@@ -534,7 +685,10 @@ pub fn parse_completion_body(data: &Value, raw: RawResponse) -> Result<Message> 
             ToolCall::new(
                 str_of(b.get("id")).unwrap_or_default(),
                 str_of(b.get("name")).unwrap_or_default(),
-                b.get("input").and_then(Value::as_object).cloned().unwrap_or_default(),
+                b.get("input")
+                    .and_then(Value::as_object)
+                    .cloned()
+                    .unwrap_or_default(),
             )
         })
         .collect();
@@ -544,7 +698,10 @@ pub fn parse_completion_body(data: &Value, raw: RawResponse) -> Result<Message> 
     let mut m = Message::chunk();
     m.content = Some(text);
     m.citations = citations;
-    m.thinking = Thinking::build((!thinking_text.is_empty()).then(|| thinking_text.join("")), signature);
+    m.thinking = Thinking::build(
+        (!thinking_text.is_empty()).then(|| thinking_text.join("")),
+        signature,
+    );
     m.raw_reasoning = thinking_blocks(&blocks);
     m.tool_calls = tool_call_map(tool_calls);
     m.raw_content = (!server_calls.is_empty()).then(|| Value::Array(blocks.clone()));
@@ -553,12 +710,24 @@ pub fn parse_completion_body(data: &Value, raw: RawResponse) -> Result<Message> 
     m.tokens.output = int(usage.get("output_tokens"));
     m.tokens.cache_read = int(usage.get("cache_read_input_tokens"));
     m.tokens.cache_write = cache_write(&usage);
-    m.tokens.thinking = int(usage.get("output_tokens_details").and_then(|d| d.get("thinking_tokens")))
-        .or_else(|| int(usage.get("output_tokens_details").and_then(|d| d.get("reasoning_tokens"))))
-        .or_else(|| int(usage.get("thinking_tokens")))
-        .or_else(|| int(usage.get("reasoning_tokens")));
-    m.tokens.server_tool_use = usage.get("server_tool_use").and_then(Value::as_object).cloned();
-    m.finish_reason = normalize_finish_reason(data.get("stop_reason").and_then(Value::as_str), FINISH_REASONS);
+    m.tokens.thinking = int(usage
+        .get("output_tokens_details")
+        .and_then(|d| d.get("thinking_tokens")))
+    .or_else(|| {
+        int(usage
+            .get("output_tokens_details")
+            .and_then(|d| d.get("reasoning_tokens")))
+    })
+    .or_else(|| int(usage.get("thinking_tokens")))
+    .or_else(|| int(usage.get("reasoning_tokens")));
+    m.tokens.server_tool_use = usage
+        .get("server_tool_use")
+        .and_then(Value::as_object)
+        .cloned();
+    m.finish_reason = normalize_finish_reason(
+        data.get("stop_reason").and_then(Value::as_str),
+        FINISH_REASONS,
+    );
     m.model = str_of(data.get("model"));
     m.raw = Some(raw);
     Ok(m.normalized())
@@ -574,7 +743,10 @@ pub struct StreamBlocks {
 
 impl StreamBlocks {
     fn block(&mut self, index: i64) -> Option<&mut Value> {
-        self.blocks.iter_mut().find(|(i, _)| *i == index).map(|(_, b)| b)
+        self.blocks
+            .iter_mut()
+            .find(|(i, _)| *i == index)
+            .map(|(_, b)| b)
     }
 }
 
@@ -583,11 +755,18 @@ fn track(state: &mut StreamBlocks, data: &Value, delta_type: Option<&str>) {
     match data.get("type").and_then(Value::as_str) {
         Some("message_start") => *state = StreamBlocks::default(),
         Some("content_block_start") => {
-            let block = data.get("content_block").cloned().unwrap_or_else(|| json!({}));
+            let block = data
+                .get("content_block")
+                .cloned()
+                .unwrap_or_else(|| json!({}));
             if is_server_tool_block(&block) {
                 state.saw_server_block = true;
             }
-            if block.get("type").and_then(Value::as_str).is_some_and(|t| t.ends_with("tool_use")) {
+            if block
+                .get("type")
+                .and_then(Value::as_str)
+                .is_some_and(|t| t.ends_with("tool_use"))
+            {
                 state.json.push((index, String::new()));
             }
             state.blocks.push((index, block));
@@ -596,13 +775,24 @@ fn track(state: &mut StreamBlocks, data: &Value, delta_type: Option<&str>) {
             let delta = &data["delta"];
             if delta_type == Some("input_json_delta") {
                 if let Some((_, buf)) = state.json.iter_mut().find(|(i, _)| *i == index) {
-                    buf.push_str(delta.get("partial_json").and_then(Value::as_str).unwrap_or(""));
+                    buf.push_str(
+                        delta
+                            .get("partial_json")
+                            .and_then(Value::as_str)
+                            .unwrap_or(""),
+                    );
                 }
                 return;
             }
-            let Some(block) = state.block(index) else { return };
+            let Some(block) = state.block(index) else {
+                return;
+            };
             let append = |block: &mut Value, key: &str, add: &Value| {
-                let prev = block.get(key).and_then(Value::as_str).unwrap_or("").to_string();
+                let prev = block
+                    .get(key)
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
                 block[key] = format!("{prev}{}", add.as_str().unwrap_or("")).into();
             };
             match delta_type {
@@ -614,18 +804,27 @@ fn track(state: &mut StreamBlocks, data: &Value, delta_type: Option<&str>) {
                     if !block.get("citations").is_some_and(Value::is_array) {
                         block["citations"] = json!([]);
                     }
-                    block["citations"].as_array_mut().unwrap().push(delta["citation"].clone()); // made an array just above
+                    block["citations"]
+                        .as_array_mut()
+                        .unwrap()
+                        .push(delta["citation"].clone()); // made an array just above
                 }
                 _ => {}
             }
         }
         Some("content_block_stop") => {
-            let json = state.json.iter().find(|(i, _)| *i == index).map(|(_, j)| j.clone());
+            let json = state
+                .json
+                .iter()
+                .find(|(i, _)| *i == index)
+                .map(|(_, j)| j.clone());
             if let (Some(json), Some(block)) = (json, state.block(index)) {
                 let input = if json.is_empty() {
                     block.get("input").cloned().unwrap_or_else(|| json!({}))
                 } else {
-                    serde_json::from_str(&json).unwrap_or_else(|_| block.get("input").cloned().unwrap_or_else(|| json!({})))
+                    serde_json::from_str(&json).unwrap_or_else(|_| {
+                        block.get("input").cloned().unwrap_or_else(|| json!({}))
+                    })
                 };
                 block["input"] = input;
             }
@@ -647,16 +846,27 @@ pub fn build_chunk(state: &mut StreamBlocks, data: &Value) -> Message {
         chunk.content = str_of(data.pointer("/delta/text"));
     }
     if delta_type == Some("citations_delta")
-        && let Some(c) = data.pointer("/delta/citation") {
-            chunk.citations = vec![parse_citation(c, None, None, None)];
-        }
-    let thinking = (delta_type == Some("thinking_delta")).then(|| str_of(data.pointer("/delta/thinking"))).flatten();
-    let signature = (delta_type == Some("signature_delta")).then(|| str_of(data.pointer("/delta/signature"))).flatten();
+        && let Some(c) = data.pointer("/delta/citation")
+    {
+        chunk.citations = vec![parse_citation(c, None, None, None)];
+    }
+    let thinking = (delta_type == Some("thinking_delta"))
+        .then(|| str_of(data.pointer("/delta/thinking")))
+        .flatten();
+    let signature = (delta_type == Some("signature_delta"))
+        .then(|| str_of(data.pointer("/delta/signature")))
+        .flatten();
     chunk.thinking = Thinking::build(thinking, signature);
     chunk.tokens.input = int(message_usage.get("input_tokens"));
     chunk.tokens.output = usage_int("output_tokens");
-    chunk.tokens.thinking = int(message_usage.get("output_tokens_details").and_then(|d| d.get("thinking_tokens")))
-        .or_else(|| int(delta_usage.get("output_tokens_details").and_then(|d| d.get("thinking_tokens"))));
+    chunk.tokens.thinking = int(message_usage
+        .get("output_tokens_details")
+        .and_then(|d| d.get("thinking_tokens")))
+    .or_else(|| {
+        int(delta_usage
+            .get("output_tokens_details")
+            .and_then(|d| d.get("thinking_tokens")))
+    });
     chunk.tokens.cache_read = usage_int("cache_read_input_tokens");
     chunk.tokens.cache_write = cache_write(&message_usage).or_else(|| cache_write(&delta_usage));
     chunk.tokens.server_tool_use = data
@@ -664,10 +874,17 @@ pub fn build_chunk(state: &mut StreamBlocks, data: &Value) -> Message {
         .or_else(|| data.pointer("/usage/server_tool_use"))
         .and_then(Value::as_object)
         .cloned();
-    chunk.finish_reason = normalize_finish_reason(data.pointer("/delta/stop_reason").and_then(Value::as_str), FINISH_REASONS);
+    chunk.finish_reason = normalize_finish_reason(
+        data.pointer("/delta/stop_reason").and_then(Value::as_str),
+        FINISH_REASONS,
+    );
 
     // Tool calls: a start block opens a call keyed by the block index; json deltas append to it.
-    let index = data.get("index").and_then(Value::as_i64).map(|i| i.to_string()).unwrap_or_default();
+    let index = data
+        .get("index")
+        .and_then(Value::as_i64)
+        .map(|i| i.to_string())
+        .unwrap_or_default();
     if delta_type == Some("input_json_delta") {
         let fragment = str_of(data.pointer("/delta/partial_json")).unwrap_or_default();
         chunk.tool_calls = Some(
@@ -675,9 +892,20 @@ pub fn build_chunk(state: &mut StreamBlocks, data: &Value) -> Message {
                 .into_iter()
                 .collect(),
         );
-    } else if let Some(block) = data.get("content_block").filter(|b| b.get("type").and_then(Value::as_str) == Some("tool_use")) {
-        let mut call = ToolCall::opening(str_of(block.get("id")).unwrap_or_default(), str_of(block.get("name")).unwrap_or_default(), String::new());
-        if let Some(m) = block.get("input").and_then(Value::as_object).filter(|m| !m.is_empty()) {
+    } else if let Some(block) = data
+        .get("content_block")
+        .filter(|b| b.get("type").and_then(Value::as_str) == Some("tool_use"))
+    {
+        let mut call = ToolCall::opening(
+            str_of(block.get("id")).unwrap_or_default(),
+            str_of(block.get("name")).unwrap_or_default(),
+            String::new(),
+        );
+        if let Some(m) = block
+            .get("input")
+            .and_then(Value::as_object)
+            .filter(|m| !m.is_empty())
+        {
             call.arguments = ToolArguments::Parsed(m.clone());
         }
         chunk.tool_calls = Some([(index, call)].into_iter().collect());

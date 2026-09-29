@@ -29,10 +29,17 @@ fn part(block: &Value) -> Option<Part> {
     let str_at = |key: &str| block.get(key).and_then(Value::as_str);
     match str_at("type")? {
         "text" => str_at("text").map(|t| Part::Text(t.into())),
-        kind @ ("image" | "audio") => Some(Part::File(Box::new(attachment(str_at("data"), str_at("mimeType"), kind)))),
+        kind @ ("image" | "audio") => Some(Part::File(Box::new(attachment(
+            str_at("data"),
+            str_at("mimeType"),
+            kind,
+        )))),
         "resource" => embedded(block.get("resource").unwrap_or(&Value::Null)),
         "resource_link" => {
-            let label: Vec<&str> = [str_at("title").or_else(|| str_at("name")), str_at("uri")].into_iter().flatten().collect();
+            let label: Vec<&str> = [str_at("title").or_else(|| str_at("name")), str_at("uri")]
+                .into_iter()
+                .flatten()
+                .collect();
             Some(Part::Text(label.join(": ")))
         }
         _ => None,
@@ -45,12 +52,18 @@ fn embedded(resource: &Value) -> Option<Part> {
     }
     let blob = resource.get("blob").and_then(Value::as_str)?;
     let uri = resource.get("uri").and_then(Value::as_str).unwrap_or("");
-    Some(Part::File(Box::new(attachment(Some(blob), resource.get("mimeType").and_then(Value::as_str), &filename(uri)))))
+    Some(Part::File(Box::new(attachment(
+        Some(blob),
+        resource.get("mimeType").and_then(Value::as_str),
+        &filename(uri),
+    ))))
 }
 
 /// `Content.attachment`: names a nameless file after its kind plus the MIME type's extension.
 pub(crate) fn attachment(data: Option<&str>, mime_type: Option<&str>, name: &str) -> Attachment {
-    let bytes = base64::engine::general_purpose::STANDARD.decode(data.unwrap_or("")).unwrap_or_default();
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data.unwrap_or(""))
+        .unwrap_or_default();
     let name = match mime_type.and_then(extension) {
         Some(ext) if !name.contains('.') => format!("{name}.{ext}"),
         _ => name.to_string(),
@@ -71,7 +84,13 @@ fn extension(mime_type: &str) -> Option<&'static str> {
 /// `Content.filename`: the last segment of a URI's path, or `"resource"` for an invalid URI.
 pub(crate) fn filename(uri: &str) -> String {
     match reqwest::Url::parse(uri) {
-        Ok(url) => url.path().trim_end_matches('/').rsplit('/').next().unwrap_or("").to_string(),
+        Ok(url) => url
+            .path()
+            .trim_end_matches('/')
+            .rsplit('/')
+            .next()
+            .unwrap_or("")
+            .to_string(),
         Err(_) => "resource".into(),
     }
 }

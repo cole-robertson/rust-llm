@@ -12,8 +12,8 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use rust_llm::message::indexmap_lite::IndexMap;
 use rust_llm::{
-    Attachment, CancelHandle, Caching, Chat, Config, Error, ErrorKind, Message, Parameter, ProtocolName, ProviderTool, Role, Tool,
-    ToolCall, ToolError, ToolResult,
+    Attachment, Caching, CancelHandle, Chat, Config, Error, ErrorKind, Message, Parameter,
+    ProtocolName, ProviderTool, Role, Tool, ToolCall, ToolError, ToolResult,
 };
 use serde_json::{Map, Value, json};
 use spec_helpers::{Log, log, requests, serve, text_response, tool_use_response};
@@ -78,7 +78,10 @@ struct DebugCollector(Arc<Mutex<Vec<String>>>);
 impl tracing::Subscriber for DebugCollector {
     // Tests run in parallel: a callsite first hit with no collector set is cached as "never",
     // so ask on every event instead of caching the interest.
-    fn register_callsite(&self, _: &'static tracing::Metadata<'static>) -> tracing::subscriber::Interest {
+    fn register_callsite(
+        &self,
+        _: &'static tracing::Metadata<'static>,
+    ) -> tracing::subscriber::Interest {
         tracing::subscriber::Interest::sometimes()
     }
     // Without this the global max level is recomputed from other threads' (absent) collectors and
@@ -116,7 +119,8 @@ impl tracing::Subscriber for DebugCollector {
 fn debug_logs_of(f: impl FnOnce()) -> Vec<String> {
     let logs = Arc::new(Mutex::new(Vec::new()));
     {
-        let _guard = tracing::dispatcher::set_default(&tracing::Dispatch::new(DebugCollector(logs.clone())));
+        let _guard =
+            tracing::dispatcher::set_default(&tracing::Dispatch::new(DebugCollector(logs.clone())));
         f();
     }
     logs.lock().unwrap().clone()
@@ -124,7 +128,12 @@ fn debug_logs_of(f: impl FnOnce()) -> Vec<String> {
 
 /// `/implicit caching.*RubyLLM\.cache/m`.
 fn implicit_caching_notes(logs: &[String]) -> usize {
-    logs.iter().filter(|l| l.find("implicit caching").is_some_and(|i| l[i..].contains("RubyLLM.cache"))).count()
+    logs.iter()
+        .filter(|l| {
+            l.find("implicit caching")
+                .is_some_and(|i| l[i..].contains("RubyLLM.cache"))
+        })
+        .count()
 }
 
 // ---- chat_provider_tools_spec.rb ---------------------------------------------------------------
@@ -132,7 +141,9 @@ fn implicit_caching_notes(logs: &[String]) -> usize {
 // spec: chat_provider_tools_spec.rb:19 accumulates across calls and clears with nil
 #[test]
 fn provider_tools_accumulate_across_calls_and_clear() {
-    let mut chat = chat("claude-haiku-4-5", "anthropic").with_provider_tools(["web_search".into()]).with_provider_tools(["code_execution".into()]);
+    let mut chat = chat("claude-haiku-4-5", "anthropic")
+        .with_provider_tools(["web_search".into()])
+        .with_provider_tools(["code_execution".into()]);
     assert_eq!(chat.provider_tools().len(), 2);
     chat.clear_provider_tools();
     assert!(chat.provider_tools().is_empty());
@@ -142,7 +153,10 @@ fn provider_tools_accumulate_across_calls_and_clear() {
 #[test]
 fn renders_anthropic_aliases_into_versioned_tool_entries() {
     let payload = chat("claude-haiku-4-5", "anthropic")
-        .with_provider_tools([ProviderTool::alias("web_search"), ProviderTool::with_options("web_fetch", json!({ "max_uses": 2 }))])
+        .with_provider_tools([
+            ProviderTool::alias("web_search"),
+            ProviderTool::with_options("web_fetch", json!({ "max_uses": 2 })),
+        ])
         .render()
         .unwrap();
     let tools = tools_of(&payload);
@@ -156,10 +170,19 @@ fn renders_anthropic_aliases_into_versioned_tool_entries() {
 // spec: chat_provider_tools_spec.rb:104 renders OpenAI Responses aliases
 #[test]
 fn renders_openai_responses_aliases() {
-    let payload = chat("gpt-5.2", "openai").with_provider_tools(["web_search".into(), "code_execution".into()]).render().unwrap();
+    let payload = chat("gpt-5.2", "openai")
+        .with_provider_tools(["web_search".into(), "code_execution".into()])
+        .render()
+        .unwrap();
     let tools = tools_of(&payload);
-    assert!(tools.contains(&json!({ "type": "web_search" })), "{tools:?}");
-    assert!(tools.contains(&json!({ "type": "code_interpreter", "container": { "type": "auto" } })), "{tools:?}");
+    assert!(
+        tools.contains(&json!({ "type": "web_search" })),
+        "{tools:?}"
+    );
+    assert!(
+        tools.contains(&json!({ "type": "code_interpreter", "container": { "type": "auto" } })),
+        "{tools:?}"
+    );
 }
 
 // spec: chat_provider_tools_spec.rb:113 renders Gemini aliases with options nested inside the tool key
@@ -168,13 +191,19 @@ fn renders_gemini_aliases_with_options_nested_inside_the_tool_key() {
     let payload = chat("gemini-3.5-flash", "gemini")
         .with_provider_tools([
             ProviderTool::alias("web_search"),
-            ProviderTool::with_options("file_search", json!({ "file_search_store_names": ["store"] })),
+            ProviderTool::with_options(
+                "file_search",
+                json!({ "file_search_store_names": ["store"] }),
+            ),
         ])
         .render()
         .unwrap();
     let tools = tools_of(&payload);
     assert!(tools.contains(&json!({ "google_search": {} })), "{tools:?}");
-    assert!(tools.contains(&json!({ "file_search": { "file_search_store_names": ["store"] } })), "{tools:?}");
+    assert!(
+        tools.contains(&json!({ "file_search": { "file_search_store_names": ["store"] } })),
+        "{tools:?}"
+    );
 }
 
 // spec: chat_provider_tools_spec.rb:122 renders xAI Responses aliases with passthrough options
@@ -184,15 +213,26 @@ fn renders_xai_responses_aliases_with_passthrough_options() {
         .with_provider_tools([
             ProviderTool::alias("x_search"),
             ProviderTool::alias("code_execution"),
-            ProviderTool::with_options("web_search", json!({ "filters": { "allowed_domains": ["ruby-lang.org"] } })),
+            ProviderTool::with_options(
+                "web_search",
+                json!({ "filters": { "allowed_domains": ["ruby-lang.org"] } }),
+            ),
         ])
         .render()
         .unwrap();
     assert!(payload["input"].is_array());
     let tools = tools_of(&payload);
     assert!(tools.contains(&json!({ "type": "x_search" })), "{tools:?}");
-    assert!(tools.contains(&json!({ "type": "code_execution" })), "{tools:?}");
-    assert!(tools.contains(&json!({ "type": "web_search", "filters": { "allowed_domains": ["ruby-lang.org"] } })), "{tools:?}");
+    assert!(
+        tools.contains(&json!({ "type": "code_execution" })),
+        "{tools:?}"
+    );
+    assert!(
+        tools.contains(
+            &json!({ "type": "web_search", "filters": { "allowed_domains": ["ruby-lang.org"] } })
+        ),
+        "{tools:?}"
+    );
 }
 
 // spec: chat_provider_tools_spec.rb:134 renders the xAI MCP alias with server options
@@ -217,17 +257,27 @@ fn renders_the_xai_mcp_alias_with_server_options() {
 // spec: chat_cache_until_here_spec.rb:27 keeps caching options when switching models on the same provider
 #[test]
 fn keeps_caching_options_when_switching_models_on_the_same_provider() {
-    let chat = chat("gpt-4.1-nano", "openai").with_caching(json!({ "retention": "24h" })).unwrap();
+    let chat = chat("gpt-4.1-nano", "openai")
+        .with_caching(json!({ "retention": "24h" }))
+        .unwrap();
     let chat = chat.with_model("gpt-5-nano", None).unwrap();
     assert_eq!(chat.provider().slug(), "openai");
-    assert_eq!(chat.caching(), Some(&Caching::On(json!({ "retention": "24h" }).as_object().unwrap().clone())));
+    assert_eq!(
+        chat.caching(),
+        Some(&Caching::On(
+            json!({ "retention": "24h" }).as_object().unwrap().clone()
+        ))
+    );
 }
 
 // spec: chat_cache_until_here_spec.rb:114 renders explicit breakpoints for OpenAI cache boundaries
 #[test]
 fn renders_explicit_breakpoints_for_openai_cache_boundaries() {
     let mut chat = chat("gpt-4.1-nano", "openai");
-    chat.ask_later("Long context").unwrap().cache_until_here().unwrap();
+    chat.ask_later("Long context")
+        .unwrap()
+        .cache_until_here()
+        .unwrap();
     let payload = chat.render().unwrap();
     assert_eq!(
         payload["input"].as_array().unwrap().last().unwrap()["content"],
@@ -240,7 +290,9 @@ fn renders_explicit_breakpoints_for_openai_cache_boundaries() {
 #[test]
 fn sends_cache_bounded_instructions_as_input_items_on_responses() {
     let mut chat = chat("gpt-4.1-nano", "openai");
-    chat.set_instructions(Some("Stable instructions".into()), false, false).cache_until_here().unwrap();
+    chat.set_instructions(Some("Stable instructions".into()), false, false)
+        .cache_until_here()
+        .unwrap();
     chat.ask_later("Hello").unwrap();
     let payload = chat.render().unwrap();
     assert!(payload.get("instructions").is_none_or(Value::is_null));
@@ -256,7 +308,9 @@ fn sends_cache_bounded_instructions_as_input_items_on_responses() {
 // spec: chat_cache_until_here_spec.rb:167 notes that Gemini caching is implicit when with_caching has no id
 #[test]
 fn notes_that_gemini_caching_is_implicit_when_with_caching_has_no_id() {
-    let mut chat = chat("gemini-2.5-flash", "gemini").with_caching(json!({ "ttl": "1h" })).unwrap();
+    let mut chat = chat("gemini-2.5-flash", "gemini")
+        .with_caching(json!({ "ttl": "1h" }))
+        .unwrap();
     chat.ask_later("Hello").unwrap();
     let mut payload = Value::Null;
     let logs = debug_logs_of(|| payload = chat.render().unwrap());
@@ -268,7 +322,10 @@ fn notes_that_gemini_caching_is_implicit_when_with_caching_has_no_id() {
 #[test]
 fn notes_that_gemini_ignores_explicit_cache_boundaries() {
     let mut chat = chat("gemini-2.5-flash", "gemini");
-    chat.ask_later("Long context").unwrap().cache_until_here().unwrap();
+    chat.ask_later("Long context")
+        .unwrap()
+        .cache_until_here()
+        .unwrap();
     let logs = debug_logs_of(|| {
         chat.render().unwrap();
     });
@@ -279,7 +336,9 @@ fn notes_that_gemini_ignores_explicit_cache_boundaries() {
 /// (`maybe_log_implicit_caching_note`'s guards).
 #[test]
 fn gemini_implicit_caching_note_is_quiet_otherwise() {
-    let mut explicit = chat("gemini-2.5-flash", "gemini").with_caching(json!({ "id": "abc123" })).unwrap();
+    let mut explicit = chat("gemini-2.5-flash", "gemini")
+        .with_caching(json!({ "id": "abc123" }))
+        .unwrap();
     explicit.ask_later("Hello").unwrap();
     let mut plain = chat("gemini-2.5-flash", "gemini");
     plain.ask_later("Hello").unwrap();
@@ -298,7 +357,10 @@ fn gemini_implicit_caching_note_is_quiet_otherwise() {
 #[test]
 fn cache_until_here_marks_the_staged_user_message_from_ask_later() {
     let mut chat = chat("claude-haiku-4-5", "anthropic");
-    chat.ask_later("Long context").unwrap().cache_until_here().unwrap();
+    chat.ask_later("Long context")
+        .unwrap()
+        .cache_until_here()
+        .unwrap();
     assert!(chat.messages().last().unwrap().cache_until_here);
 }
 
@@ -307,9 +369,19 @@ fn cache_until_here_marks_the_staged_user_message_from_ask_later() {
 fn cache_until_here_marks_the_instruction_added_by_with_instructions() {
     let mut chat = chat("claude-haiku-4-5", "anthropic");
     chat.add_message(Message::user("Existing message"));
-    chat.set_instructions(Some("Stable instructions".into()), false, false).cache_until_here().unwrap();
-    let system = chat.messages().iter().find(|m| m.role == Role::System).unwrap();
-    let user = chat.messages().iter().find(|m| m.role == Role::User).unwrap();
+    chat.set_instructions(Some("Stable instructions".into()), false, false)
+        .cache_until_here()
+        .unwrap();
+    let system = chat
+        .messages()
+        .iter()
+        .find(|m| m.role == Role::System)
+        .unwrap();
+    let user = chat
+        .messages()
+        .iter()
+        .find(|m| m.role == Role::User)
+        .unwrap();
     assert!(system.cache_until_here);
     assert!(!user.cache_until_here);
 }
@@ -319,41 +391,70 @@ fn cache_until_here_marks_the_instruction_added_by_with_instructions() {
 fn cache_until_here_raises_when_the_chat_has_no_messages() {
     let mut chat = chat("claude-haiku-4-5", "anthropic");
     let err = chat.cache_until_here().err().unwrap();
-    assert!(matches!(&err, Error::Argument(m) if m == "No messages to cache"), "{err}");
+    assert!(
+        matches!(&err, Error::Argument(m) if m == "No messages to cache"),
+        "{err}"
+    );
 }
 
 // ---- chat_compaction_spec.rb: request headers --------------------------------------------------
 
 /// The headers of the one request the chat `build` makes (against a server answering
 /// `response`) sent for `ask("Hello")`.
-async fn sent_headers(build: impl FnOnce(Arc<Config>) -> Chat, response: Value) -> Vec<(String, String)> {
+async fn sent_headers(
+    build: impl FnOnce(Arc<Config>) -> Chat,
+    response: Value,
+) -> Vec<(String, String)> {
     let server = serve(vec![response]).await;
     let mut chat = build(config_at(&server.uri()));
     chat.ask("Hello").await.unwrap();
     let request = &server.received_requests().await.unwrap()[0];
-    request.headers.iter().map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap_or("").to_string())).collect()
+    request
+        .headers
+        .iter()
+        .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap_or("").to_string()))
+        .collect()
 }
 
 fn header<'a>(headers: &'a [(String, String)], name: &str) -> Vec<&'a str> {
-    headers.iter().filter(|(k, _)| k.eq_ignore_ascii_case(name)).map(|(_, v)| v.as_str()).collect()
+    headers
+        .iter()
+        .filter(|(k, _)| k.eq_ignore_ascii_case(name))
+        .map(|(_, v)| v.as_str())
+        .collect()
 }
 
 fn anthropic_compacting(config: Arc<Config>) -> Chat {
-    chat_with(config, "claude-sonnet-4-6", "anthropic").with_compaction(json!({})).unwrap()
+    chat_with(config, "claude-sonnet-4-6", "anthropic")
+        .with_compaction(json!({}))
+        .unwrap()
 }
 
 // spec: chat_compaction_spec.rb:169 keeps betas another feature already asked for
 #[tokio::test]
 async fn compaction_beta_keeps_betas_another_feature_already_asked_for() {
-    let build = |c| anthropic_compacting(c).with_headers([("anthropic-beta".to_string(), "mcp-client-2025-11-20".to_string())]);
+    let build = |c| {
+        anthropic_compacting(c).with_headers([(
+            "anthropic-beta".to_string(),
+            "mcp-client-2025-11-20".to_string(),
+        )])
+    };
     let headers = sent_headers(build, text_response("Hi")).await;
-    assert_eq!(header(&headers, "anthropic-beta"), ["mcp-client-2025-11-20,compact-2026-01-12"]);
+    assert_eq!(
+        header(&headers, "anthropic-beta"),
+        ["mcp-client-2025-11-20,compact-2026-01-12"]
+    );
 }
 
 // spec: chat_compaction_spec.rb:175 asks for the beta once when it is already there
 #[tokio::test]
 async fn compaction_beta_is_asked_for_once_when_already_there() {
-    let build = |c| anthropic_compacting(c).with_headers([("anthropic-beta".to_string(), "compact-2026-01-12".to_string())]);
+    let build = |c| {
+        anthropic_compacting(c).with_headers([(
+            "anthropic-beta".to_string(),
+            "compact-2026-01-12".to_string(),
+        )])
+    };
     let headers = sent_headers(build, text_response("Hi")).await;
     assert_eq!(header(&headers, "anthropic-beta"), ["compact-2026-01-12"]);
 }
@@ -361,8 +462,12 @@ async fn compaction_beta_is_asked_for_once_when_already_there() {
 // spec: chat_compaction_spec.rb:181 leaves headers alone for protocols with no compaction beta
 #[tokio::test]
 async fn compaction_leaves_headers_alone_for_protocols_with_no_compaction_beta() {
-    let build =
-        |c| chat_with(c, "gpt-5-nano", "openai").with_compaction(json!({})).unwrap().with_headers([("x-test".to_string(), "1".to_string())]);
+    let build = |c| {
+        chat_with(c, "gpt-5-nano", "openai")
+            .with_compaction(json!({}))
+            .unwrap()
+            .with_headers([("x-test".to_string(), "1".to_string())])
+    };
     let headers = sent_headers(build, responses_text("Hi")).await;
     assert_eq!(header(&headers, "x-test"), ["1"]);
     assert!(header(&headers, "anthropic-beta").is_empty(), "{headers:?}");
@@ -386,12 +491,21 @@ fn xai_chat(server: &MockServer) -> Chat {
 // spec: chat_compact_spec.rb:42 uses the latest instructions and last compacted context across multiple rounds
 #[tokio::test]
 async fn compact_uses_the_latest_instructions_and_last_compacted_context_across_rounds() {
-    let second_output = json!([{ "type": "compaction", "id": "cmp_2", "encrypted_content": "second context" }]);
-    let server = serve(vec![compaction_body(first_output()), compaction_body(second_output.clone())]).await;
+    let second_output =
+        json!([{ "type": "compaction", "id": "cmp_2", "encrypted_content": "second context" }]);
+    let server = serve(vec![
+        compaction_body(first_output()),
+        compaction_body(second_output.clone()),
+    ])
+    .await;
     let mut chat = xai_chat(&server);
-    chat.set_instructions(Some("Old instructions".into()), false, false).ask_later("First request").unwrap();
+    chat.set_instructions(Some("Old instructions".into()), false, false)
+        .ask_later("First request")
+        .unwrap();
     chat.compact().await.unwrap();
-    chat.set_instructions(Some("Answer briefly.".into()), false, false).ask_later("Second request").unwrap();
+    chat.set_instructions(Some("Answer briefly.".into()), false, false)
+        .ask_later("Second request")
+        .unwrap();
     chat.compact().await.unwrap();
     chat.ask_later("Third request").unwrap();
 
@@ -415,13 +529,21 @@ async fn compact_uses_the_latest_instructions_and_last_compacted_context_across_
 async fn compact_keeps_current_system_cache_boundaries_in_the_rendered_input() {
     let server = serve(vec![compaction_body(first_output())]).await;
     let mut chat = xai_chat(&server);
-    chat.set_instructions(Some("Current instructions".into()), false, true).ask_later("Summarize this").unwrap();
+    chat.set_instructions(Some("Current instructions".into()), false, true)
+        .ask_later("Summarize this")
+        .unwrap();
     chat.compact().await.unwrap();
 
     let input = chat.render().unwrap()["input"].as_array().unwrap().clone();
     assert_eq!(input.first().unwrap()["role"], "system");
-    assert_eq!(input.first().unwrap()["content"][0]["text"], "Current instructions");
-    assert_eq!(input.last().unwrap(), first_output().as_array().unwrap().last().unwrap());
+    assert_eq!(
+        input.first().unwrap()["content"][0]["text"],
+        "Current instructions"
+    );
+    assert_eq!(
+        input.last().unwrap(),
+        first_output().as_array().unwrap().last().unwrap()
+    );
 }
 
 /// Answers with `body` after cancelling the chat, like the spec's `to_return { chat.cancel; ... }`.
@@ -440,7 +562,10 @@ async fn compact_cancelled_during_the_request_leaves_history_and_keeps_billed_us
     let server = MockServer::start().await;
     let mut chat = xai_chat(&server);
     Mock::given(wiremock::matchers::any())
-        .respond_with(CancelThenAnswer(chat.cancel_handle(), compaction_body(first_output())))
+        .respond_with(CancelThenAnswer(
+            chat.cancel_handle(),
+            compaction_body(first_output()),
+        ))
         .mount(&server)
         .await;
     chat.ask_later("Hello").unwrap();
@@ -466,23 +591,42 @@ fn openrouter_renders_stored_reasoning_details_verbatim() {
     chat.add_message(answer);
 
     let payload = chat.render().unwrap();
-    assert_eq!(payload["messages"].as_array().unwrap().last().unwrap()["reasoning_details"], details);
+    assert_eq!(
+        payload["messages"].as_array().unwrap().last().unwrap()["reasoning_details"],
+        details
+    );
 }
 
 // ---- chat_tool_attachments_spec.rb: wire formatting --------------------------------------------
 
 fn drive_search(id: &str) -> (String, ToolCall) {
-    (id.to_string(), ToolCall::new(id, "drive_search", Map::new()))
+    (
+        id.to_string(),
+        ToolCall::new(id, "drive_search", Map::new()),
+    )
 }
 
 /// `messages_with_tool_attachment(path)`.
 fn messages_with_tool_attachment(attachment: Attachment) -> Vec<Message> {
     let mut call = Message::new(Role::Assistant, None);
-    call.tool_calls = Some([drive_search("call_1")].into_iter().collect::<IndexMap<ToolCall>>());
-    vec![Message::user("Find the ruby logo"), call, Message::tool_result("call_1", "Found it").with_attachments(vec![attachment])]
+    call.tool_calls = Some(
+        [drive_search("call_1")]
+            .into_iter()
+            .collect::<IndexMap<ToolCall>>(),
+    );
+    vec![
+        Message::user("Find the ruby logo"),
+        call,
+        Message::tool_result("call_1", "Found it").with_attachments(vec![attachment]),
+    ]
 }
 
-fn chat_with_tool_attachment(model: &str, provider: &str, protocol: Option<ProtocolName>, attachment: Attachment) -> Chat {
+fn chat_with_tool_attachment(
+    model: &str,
+    provider: &str,
+    protocol: Option<ProtocolName>,
+    attachment: Attachment,
+) -> Chat {
     let mut chat = chat(model, provider);
     if let Some(p) = protocol {
         chat = chat.with_protocol(p);
@@ -494,30 +638,59 @@ fn chat_with_tool_attachment(model: &str, provider: &str, protocol: Option<Proto
 // spec: chat_tool_attachments_spec.rb:123 keeps parallel Chat Completions tool results consecutive
 #[tokio::test]
 async fn keeps_parallel_chat_completions_tool_results_consecutive() {
-    let mut chat = chat_with_tool_attachment("gpt-5-nano", "openai", Some(ProtocolName::ChatCompletions), loaded("ruby.png").await);
+    let mut chat = chat_with_tool_attachment(
+        "gpt-5-nano",
+        "openai",
+        Some(ProtocolName::ChatCompletions),
+        loaded("ruby.png").await,
+    );
     let mut call = Message::new(Role::Assistant, None);
-    call.tool_calls = Some([drive_search("call_1"), drive_search("call_2")].into_iter().collect::<IndexMap<ToolCall>>());
+    call.tool_calls = Some(
+        [drive_search("call_1"), drive_search("call_2")]
+            .into_iter()
+            .collect::<IndexMap<ToolCall>>(),
+    );
     chat.messages_mut()[1] = call;
     chat.add_message(Message::tool_result("call_2", "Found it too"));
 
     let payload = chat.render().unwrap();
-    let roles: Vec<&str> = payload["messages"].as_array().unwrap().iter().map(|m| m["role"].as_str().unwrap()).collect();
+    let roles: Vec<&str> = payload["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["role"].as_str().unwrap())
+        .collect();
     assert_eq!(roles, ["user", "assistant", "tool", "tool", "user"]);
 }
 
 // spec: chat_tool_attachments_spec.rb:134 raises for tool audio on providers without audio support
 #[tokio::test]
 async fn raises_for_tool_audio_on_providers_without_audio_support() {
-    let chat = chat_with_tool_attachment("deepseek-v4-flash", "deepseek", None, loaded("ruby.wav").await);
-    assert!(matches!(chat.render(), Err(Error::UnsupportedAttachment(_))));
+    let chat = chat_with_tool_attachment(
+        "deepseek-v4-flash",
+        "deepseek",
+        None,
+        loaded("ruby.wav").await,
+    );
+    assert!(matches!(
+        chat.render(),
+        Err(Error::UnsupportedAttachment(_))
+    ));
 }
 
 // spec: chat_tool_attachments_spec.rb:141 raises for tool PDFs on providers without document support
 #[tokio::test]
 async fn raises_for_tool_pdfs_on_providers_without_document_support() {
-    let chat =
-        chat_with_tool_attachment("grok-4-1-fast-non-reasoning", "xai", Some(ProtocolName::ChatCompletions), loaded("sample.pdf").await);
-    assert!(matches!(chat.render(), Err(Error::UnsupportedAttachment(_))));
+    let chat = chat_with_tool_attachment(
+        "grok-4-1-fast-non-reasoning",
+        "xai",
+        Some(ProtocolName::ChatCompletions),
+        loaded("sample.pdf").await,
+    );
+    assert!(matches!(
+        chat.render(),
+        Err(Error::UnsupportedAttachment(_))
+    ));
 }
 
 // ---- chat_schema_spec.rb: schema name sanitization ---------------------------------------------
@@ -544,7 +717,9 @@ fn schema_name_falls_back_to_title_for_a_bare_json_schema_document() {
 // spec: chat_schema_spec.rb:132 prefers name over title when both are present
 #[test]
 fn schema_name_prefers_name_over_title() {
-    let name = schema_name(json!({ "name": "EnvelopeName", "title": "DocumentTitle", "schema": { "type": "object", "properties": {} } }));
+    let name = schema_name(
+        json!({ "name": "EnvelopeName", "title": "DocumentTitle", "schema": { "type": "object", "properties": {} } }),
+    );
     assert_eq!(name, "EnvelopeName");
 }
 
@@ -552,7 +727,10 @@ fn schema_name_prefers_name_over_title() {
 
 async fn deepseek_answering(body: Value) -> (Chat, MockServer) {
     let server = serve(vec![body]).await;
-    (chat_with(config_at(&server.uri()), "deepseek-v4-flash", "deepseek"), server)
+    (
+        chat_with(config_at(&server.uri()), "deepseek-v4-flash", "deepseek"),
+        server,
+    )
 }
 
 // spec: chat_error_spec.rb:102 raises a RubyLLM::Error instead of an obscure NoMethodError
@@ -560,14 +738,18 @@ async fn deepseek_answering(body: Value) -> (Chat, MockServer) {
 async fn no_completion_message_raises_an_api_error_with_the_response() {
     let (mut chat, _server) = deepseek_answering(json!({ "choices": [] })).await;
     let err = chat.ask("Hello").await.unwrap_err();
-    assert!(matches!(&err, Error::Api(m, _) if m == "Provider returned no completion message"), "{err:?}");
+    assert!(
+        matches!(&err, Error::Api(m, _) if m == "Provider returned no completion message"),
+        "{err:?}"
+    );
     assert!(err.response().is_some());
 }
 
 // spec: chat_error_spec.rb:114 surfaces the finish_reason when the provider gives one
 #[tokio::test]
 async fn no_completion_message_surfaces_the_finish_reason() {
-    let (mut chat, _server) = deepseek_answering(json!({ "choices": [{ "finish_reason": "content_filter" }] })).await;
+    let (mut chat, _server) =
+        deepseek_answering(json!({ "choices": [{ "finish_reason": "content_filter" }] })).await;
     let err = chat.ask("Hello").await.unwrap_err();
     assert!(
         matches!(&err, Error::Api(m, _) if m == "Provider returned no completion message (finish_reason: content_filter)"),
@@ -601,7 +783,11 @@ fn responses_text(text: &str) -> Value {
 
 /// A provider response in `chat`'s wire format carrying `text`.
 fn text_answer(chat: &Chat, text: &str) -> Value {
-    match chat.provider().resolve_protocol(chat.protocol(), chat.model(), chat.config()).unwrap() {
+    match chat
+        .provider()
+        .resolve_protocol(chat.protocol(), chat.model(), chat.config())
+        .unwrap()
+    {
         ProtocolName::Anthropic => text_response(text),
         ProtocolName::Responses => responses_text(text),
         ProtocolName::Gemini => json!({
@@ -620,11 +806,17 @@ fn text_answer(chat: &Chat, text: &str) -> Value {
 
 /// A provider response in `chat`'s wire format calling `name` with no arguments as `call_1`.
 fn tool_call_answer(chat: &Chat, name: &str) -> Value {
-    match chat.provider().resolve_protocol(chat.protocol(), chat.model(), chat.config()).unwrap() {
+    match chat
+        .provider()
+        .resolve_protocol(chat.protocol(), chat.model(), chat.config())
+        .unwrap()
+    {
         ProtocolName::Anthropic => tool_use_response(&[("call_1", name, json!({}))]),
-        ProtocolName::Responses => json!({ "id": "resp_1", "object": "response", "status": "completed", "model": "m",
+        ProtocolName::Responses => {
+            json!({ "id": "resp_1", "object": "response", "status": "completed", "model": "m",
             "output": [{ "type": "function_call", "call_id": "call_1", "name": name, "arguments": "{}" }],
-            "usage": { "input_tokens": 1, "output_tokens": 1 } }),
+            "usage": { "input_tokens": 1, "output_tokens": 1 } })
+        }
         ProtocolName::Gemini => json!({
             "candidates": [{ "content": { "role": "model", "parts": [{ "functionCall": { "name": name, "args": {} } }] }, "finishReason": "STOP" }],
             "usageMetadata": { "promptTokenCount": 1, "candidatesTokenCount": 1 }
@@ -649,10 +841,21 @@ impl Tool for Weather {
         "Gets current weather for a location".into()
     }
     fn parameters(&self) -> Vec<Parameter> {
-        vec![Parameter::new("latitude").description("Latitude (e.g., 52.5200)"), Parameter::new("longitude").description("Longitude (e.g., 13.4050)")]
+        vec![
+            Parameter::new("latitude").description("Latitude (e.g., 52.5200)"),
+            Parameter::new("longitude").description("Longitude (e.g., 13.4050)"),
+        ]
     }
-    async fn execute(&self, args: Map<String, Value>, _: &ToolCall) -> Result<ToolResult, ToolError> {
-        Ok(format!("Current weather at {}, {}: 15°C, Wind: 10 km/h", args["latitude"], args["longitude"]).into())
+    async fn execute(
+        &self,
+        args: Map<String, Value>,
+        _: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
+        Ok(format!(
+            "Current weather at {}, {}: 15°C, Wind: 10 km/h",
+            args["latitude"], args["longitude"]
+        )
+        .into())
     }
 }
 
@@ -668,7 +871,10 @@ impl Tool for ParamsTool {
         "Has provider-specific params".into()
     }
     fn provider_options(&self) -> Map<String, Value> {
-        json!({ "cache_control": { "type": "ephemeral" } }).as_object().unwrap().clone()
+        json!({ "cache_control": { "type": "ephemeral" } })
+            .as_object()
+            .unwrap()
+            .clone()
     }
     async fn execute(&self, _: Map<String, Value>, _: &ToolCall) -> Result<ToolResult, ToolError> {
         Ok("ok".to_string().into())
@@ -678,21 +884,31 @@ impl Tool for ParamsTool {
 // spec: chat_tools_spec.rb:240 #{provider}/#{model} deals with non-existent tool calls
 #[tokio::test]
 async fn deals_with_non_existent_tool_calls() {
-    let final_answer = "The `list_tools` tool is not supported, but I see you have the `weather` tool.";
+    let final_answer =
+        "The `list_tools` tool is not supported, but I see you have the `weather` tool.";
     for &(provider, model) in CHAT_MODELS {
         let probe = chat(model, provider);
-        let server = serve(vec![tool_call_answer(&probe, "list_tools"), text_answer(&probe, final_answer)]).await;
+        let server = serve(vec![
+            tool_call_answer(&probe, "list_tools"),
+            text_answer(&probe, final_answer),
+        ])
+        .await;
         let received: Log<ToolResult> = log();
         let sink = received.clone();
         let mut chat = chat_with(config_at(&server.uri()), model, provider)
             .with_tool(Weather)
             .after_tool_result(move |r| sink.lock().unwrap().push(r.clone()));
 
-        let response = chat.ask("What tools do you support?").await.unwrap_or_else(|e| panic!("{provider}: {e}"));
+        let response = chat
+            .ask("What tools do you support?")
+            .await
+            .unwrap_or_else(|e| panic!("{provider}: {e}"));
         assert_eq!(response.content(), final_answer, "{provider}");
         assert_eq!(
             *received.lock().unwrap(),
-            vec![ToolResult::error("Model tried to call unavailable tool `list_tools`. Available tools: [\"weather\"].")],
+            vec![ToolResult::error(
+                "Model tried to call unavailable tool `list_tools`. Available tools: [\"weather\"]."
+            )],
             "{provider}"
         );
         assert_eq!(requests(&server).await, 2, "{provider}");
@@ -711,8 +927,12 @@ async fn can_handle_tool_provider_options() {
             continue;
         }
         let server = serve(vec![text_answer(&probe, "ok")]).await;
-        let mut chat = chat_with(config_at(&server.uri()), model, provider).with_tool(ParamsTool).with_instructions("You must call the params tool.");
-        chat.ask("Call the params tool for me").await.unwrap_or_else(|e| panic!("{provider}: {e}"));
+        let mut chat = chat_with(config_at(&server.uri()), model, provider)
+            .with_tool(ParamsTool)
+            .with_instructions("You must call the params tool.");
+        chat.ask("Call the params tool for me")
+            .await
+            .unwrap_or_else(|e| panic!("{provider}: {e}"));
 
         let sent = server.received_requests().await.unwrap();
         let payload: Value = serde_json::from_slice(&sent[0].body).unwrap();
@@ -720,7 +940,11 @@ async fn can_handle_tool_provider_options() {
             "gemini" => payload.pointer("/tools/0/functionDeclarations/0/cache_control"),
             _ => payload.pointer("/tools/0/cache_control"),
         };
-        assert_eq!(extracted, Some(&json!({ "type": "ephemeral" })), "{provider}: {payload}");
+        assert_eq!(
+            extracted,
+            Some(&json!({ "type": "ephemeral" })),
+            "{provider}: {payload}"
+        );
     }
 }
 
@@ -730,7 +954,11 @@ async fn can_handle_tool_provider_options() {
 /// the error body, the status it streams with, and the error class RubyLLM raises.
 fn error_chunk_config(provider: &str) -> (Value, u16, ErrorKind) {
     match provider {
-        "anthropic" => (json!({ "type": "error", "error": { "type": "overloaded_error", "message": "Overloaded" } }), 529, ErrorKind::Overloaded),
+        "anthropic" => (
+            json!({ "type": "error", "error": { "type": "overloaded_error", "message": "Overloaded" } }),
+            529,
+            ErrorKind::Overloaded,
+        ),
         "openai" => (
             json!({ "error": { "message": "The server is temporarily overloaded. Please try again later.", "type": "server_error", "param": null, "code": null } }),
             500,
@@ -757,12 +985,18 @@ async fn supports_handling_streaming_error_chunks() {
         let (body, status, expected) = error_chunk_config(provider);
         let server = MockServer::start().await;
         Mock::given(wiremock::matchers::any())
-            .respond_with(ResponseTemplate::new(status).set_body_raw(format!("{body}\n\n").into_bytes(), "text/event-stream"))
+            .respond_with(
+                ResponseTemplate::new(status)
+                    .set_body_raw(format!("{body}\n\n").into_bytes(), "text/event-stream"),
+            )
             .mount(&server)
             .await;
         let mut chat = chat_with(config_at(&server.uri()), model, provider);
         let mut chunks = Vec::new();
-        let err = chat.ask_stream("Count from 1 to 3", |c| chunks.push(c.clone())).await.unwrap_err();
+        let err = chat
+            .ask_stream("Count from 1 to 3", |c| chunks.push(c.clone()))
+            .await
+            .unwrap_err();
         assert_eq!(err.kind(), expected, "{provider}: {err:?}");
     }
 }
@@ -772,7 +1006,8 @@ async fn supports_handling_streaming_error_chunks() {
 // spec: chat_content_spec.rb:233 handles URL MIME type detection without ArgumentError
 #[test]
 fn url_attachment_detects_its_mime_type() {
-    let attachment = Attachment::new("https://upload.wikimedia.org/wikipedia/commons/f/f1/Ruby_logo.png");
+    let attachment =
+        Attachment::new("https://upload.wikimedia.org/wikipedia/commons/f/f1/Ruby_logo.png");
     assert!(!attachment.mime_type.is_empty());
     assert_eq!(attachment.mime_type, "image/png");
 }
@@ -788,7 +1023,10 @@ fn priced_answer(model: &str, streaming: bool) -> ResponseTemplate {
         "usage": { "prompt_tokens": 19, "completion_tokens": 17, "total_tokens": 36 }
     });
     if streaming {
-        ResponseTemplate::new(200).set_body_raw(format!("data: {body}\n\ndata: [DONE]\n\n").into_bytes(), "text/event-stream")
+        ResponseTemplate::new(200).set_body_raw(
+            format!("data: {body}\n\ndata: [DONE]\n\n").into_bytes(),
+            "text/event-stream",
+        )
     } else {
         ResponseTemplate::new(200).set_body_json(body)
     }
@@ -803,8 +1041,16 @@ fn priced_answer(model: &str, streaming: bool) -> ResponseTemplate {
 async fn uses_the_chat_providers_own_prices_streaming_and_not() {
     for streaming in [false, true] {
         let server = MockServer::start().await;
-        Mock::given(wiremock::matchers::any()).respond_with(priced_answer("deepseek-v4-flash", streaming)).mount(&server).await;
-        let mut chat = chat_with(config_at(&server.uri()), "deepseek-v4-flash", "ollama_cloud").with_protocol(ProtocolName::ChatCompletions);
+        Mock::given(wiremock::matchers::any())
+            .respond_with(priced_answer("deepseek-v4-flash", streaming))
+            .mount(&server)
+            .await;
+        let mut chat = chat_with(
+            config_at(&server.uri()),
+            "deepseek-v4-flash",
+            "ollama_cloud",
+        )
+        .with_protocol(ProtocolName::ChatCompletions);
         let response = if streaming {
             chat.ask_stream("Reply with ok", |c| {
                 if !c.content().is_empty() {
@@ -819,16 +1065,28 @@ async fn uses_the_chat_providers_own_prices_streaming_and_not() {
 
         assert_eq!(response.content(), "ok");
         let info = response.model_info().unwrap();
-        assert_eq!((info.id.as_str(), info.provider.as_str()), ("deepseek-v4-flash", "ollama_cloud"));
+        assert_eq!(
+            (info.id.as_str(), info.provider.as_str()),
+            ("deepseek-v4-flash", "ollama_cloud")
+        );
         let cost = response.cost(None);
         let near = |a: Option<f64>, b: f64| a.is_some_and(|a| (a - b).abs() < 1e-12);
         assert!(near(cost.input, 19.0 * 0.22 / 1e6), "{streaming}: {cost:?}");
-        assert!(near(cost.output, 17.0 * 0.66 / 1e6), "{streaming}: {cost:?}");
-        assert!(near(cost.total(), 19.0 * 0.22 / 1e6 + 17.0 * 0.66 / 1e6), "{streaming}: {cost:?}");
+        assert!(
+            near(cost.output, 17.0 * 0.66 / 1e6),
+            "{streaming}: {cost:?}"
+        );
+        assert!(
+            near(cost.total(), 19.0 * 0.22 / 1e6 + 17.0 * 0.66 / 1e6),
+            "{streaming}: {cost:?}"
+        );
         assert_eq!(chat.cost().total(), cost.total());
         let entries = chat.usage_entries();
         assert_eq!(entries.len(), 1);
-        assert_eq!((entries[0].provider.as_str(), entries[0].model.as_str()), ("ollama_cloud", "deepseek-v4-flash"));
+        assert_eq!(
+            (entries[0].provider.as_str(), entries[0].model.as_str()),
+            ("ollama_cloud", "deepseek-v4-flash")
+        );
         assert_eq!(entries[0].cost.total(), cost.total());
     }
 }

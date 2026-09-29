@@ -8,7 +8,10 @@ mod spec_helpers;
 
 use std::sync::{Arc, Mutex};
 
-use rust_llm::{Attachment, Chat, Config, Error, Message, ProtocolName, Provider, ProviderTool, Role, TranscribeOptions};
+use rust_llm::{
+    Attachment, Chat, Config, Error, Message, ProtocolName, Provider, ProviderTool, Role,
+    TranscribeOptions,
+};
 use serde_json::{Value, json};
 use spec_helpers::*;
 use wiremock::MockServer;
@@ -28,7 +31,10 @@ struct WarnCollector(Arc<Mutex<Vec<String>>>);
 impl tracing::Subscriber for WarnCollector {
     // Tests run in parallel: a callsite first hit with no collector set is cached as "never",
     // so ask on every event instead of caching the interest.
-    fn register_callsite(&self, _: &'static tracing::Metadata<'static>) -> tracing::subscriber::Interest {
+    fn register_callsite(
+        &self,
+        _: &'static tracing::Metadata<'static>,
+    ) -> tracing::subscriber::Interest {
         tracing::subscriber::Interest::sometimes()
     }
     // Without this the global max level is recomputed from other threads' (absent) collectors and
@@ -66,7 +72,9 @@ impl tracing::Subscriber for WarnCollector {
 fn warnings_of<T>(f: impl FnOnce() -> T) -> (T, Vec<String>) {
     let warnings = Arc::new(Mutex::new(Vec::new()));
     let result = {
-        let _guard = tracing::dispatcher::set_default(&tracing::Dispatch::new(WarnCollector(warnings.clone())));
+        let _guard = tracing::dispatcher::set_default(&tracing::Dispatch::new(WarnCollector(
+            warnings.clone(),
+        )));
         f()
     };
     let collected = warnings.lock().unwrap().clone();
@@ -74,7 +82,13 @@ fn warnings_of<T>(f: impl FnOnce() -> T) -> (T, Vec<String>) {
 }
 
 async fn bodies(server: &MockServer) -> Vec<Value> {
-    server.received_requests().await.unwrap_or_default().iter().map(|r| serde_json::from_slice(&r.body).unwrap_or(Value::Null)).collect()
+    server
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .iter()
+        .map(|r| serde_json::from_slice(&r.body).unwrap_or(Value::Null))
+        .collect()
 }
 
 // ---- perplexity/agent_spec.rb ------------------------------------------------------------------
@@ -89,7 +103,13 @@ fn perplexity_config(base: &str) -> Arc<Config> {
 
 /// `RubyLLM.chat(model:, provider: :perplexity)` with a user message, like `preset_chat`.
 fn perplexity(server: &MockServer, model: &str) -> Chat {
-    let mut chat = Chat::with_config(perplexity_config(&server.uri()), Some(model), Some("perplexity"), false).unwrap();
+    let mut chat = Chat::with_config(
+        perplexity_config(&server.uri()),
+        Some(model),
+        Some("perplexity"),
+        false,
+    )
+    .unwrap();
     chat.add_message(Message::user("Hello"));
     chat
 }
@@ -119,7 +139,10 @@ async fn keeps_sonar_chat_completions_available_as_an_explicit_protocol() {
     let sonar = perplexity(&server, "sonar").with_protocol(ProtocolName::ChatCompletions);
     let payload = sonar.render().unwrap();
     assert_eq!(payload["model"], json!("sonar"));
-    assert_eq!(payload["messages"], json!([{ "role": "user", "content": "Hello" }]));
+    assert_eq!(
+        payload["messages"],
+        json!([{ "role": "user", "content": "Hello" }])
+    );
 }
 
 // spec: protocols/perplexity/agent_spec.rb:82 runs a retired Sonar model id as its recommended preset and warns
@@ -129,7 +152,12 @@ async fn runs_a_retired_sonar_model_id_as_its_recommended_preset_and_warns() {
     let chat = perplexity(&server, "sonar-pro");
     let (payload, warnings) = warnings_of(|| chat.render().unwrap());
     assert_eq!(payload["preset"], json!("low"));
-    assert!(warnings.iter().any(|w| w.contains("sonar-pro now runs the low Agent API preset")), "{warnings:?}");
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.contains("sonar-pro now runs the low Agent API preset")),
+        "{warnings:?}"
+    );
 }
 
 // spec: protocols/perplexity/agent_spec.rb:89 caps the output of Anthropic models, which Perplexity requires
@@ -138,8 +166,18 @@ async fn runs_a_retired_sonar_model_id_as_its_recommended_preset_and_warns() {
 #[tokio::test]
 async fn caps_the_output_of_anthropic_models() {
     let server = serve(vec![]).await;
-    assert_eq!(perplexity(&server, "anthropic/claude-haiku-4-5").render().unwrap()["max_output_tokens"], json!(64_000));
-    assert_eq!(perplexity(&server, "anthropic/claude-sonnet-5").render().unwrap()["max_output_tokens"], json!(4096));
+    assert_eq!(
+        perplexity(&server, "anthropic/claude-haiku-4-5")
+            .render()
+            .unwrap()["max_output_tokens"],
+        json!(64_000)
+    );
+    assert_eq!(
+        perplexity(&server, "anthropic/claude-sonnet-5")
+            .render()
+            .unwrap()["max_output_tokens"],
+        json!(4096)
+    );
     let claude = perplexity(&server, "anthropic/claude-haiku-4-5").with_max_output_tokens(200);
     assert_eq!(claude.render().unwrap()["max_output_tokens"], json!(200));
 }
@@ -150,13 +188,30 @@ async fn posts_to_the_agent_endpoint_keeping_configured_gateway_base_paths() {
     let default = perplexity_config("https://api.perplexity.ai");
     let mut unset = Config::default();
     unset.set("perplexity_api_key", "test");
-    assert_eq!(Provider::Perplexity.agent_url(&unset).unwrap(), "https://api.perplexity.ai/v1/agent");
-    assert_eq!(Provider::Perplexity.agent_url(&default).unwrap(), "https://api.perplexity.ai/v1/agent");
-    for base in ["https://gateway.test/perplexity", "https://gateway.test/perplexity/v1/"] {
-        assert_eq!(Provider::Perplexity.agent_url(&perplexity_config(base)).unwrap(), "https://gateway.test/perplexity/v1/agent");
+    assert_eq!(
+        Provider::Perplexity.agent_url(&unset).unwrap(),
+        "https://api.perplexity.ai/v1/agent"
+    );
+    assert_eq!(
+        Provider::Perplexity.agent_url(&default).unwrap(),
+        "https://api.perplexity.ai/v1/agent"
+    );
+    for base in [
+        "https://gateway.test/perplexity",
+        "https://gateway.test/perplexity/v1/",
+    ] {
+        assert_eq!(
+            Provider::Perplexity
+                .agent_url(&perplexity_config(base))
+                .unwrap(),
+            "https://gateway.test/perplexity/v1/agent"
+        );
     }
     // And the chat really posts there through a gateway base that ends in /v1/.
-    let server = serve(vec![agent_response(json!({ "input_tokens": 12, "output_tokens": 7 }))]).await;
+    let server = serve(vec![agent_response(
+        json!({ "input_tokens": 12, "output_tokens": 7 }),
+    )])
+    .await;
     let config = perplexity_config(&format!("{}/perplexity/v1/", server.uri()));
     let mut chat = Chat::with_config(config, Some(AGENT_MODEL), Some("perplexity"), false).unwrap();
     chat.ask("Who created Rails?").await.unwrap();
@@ -170,16 +225,31 @@ async fn counts_cache_writes_apart_from_fresh_input() {
     let usage = json!({ "input_tokens": 1494, "output_tokens": 7,
                         "input_tokens_details": { "cache_creation_input_tokens": 32, "cached_tokens": 1459 } });
     let server = serve(vec![agent_response(usage)]).await;
-    let mut chat = Chat::with_config(perplexity_config(&server.uri()), Some(AGENT_MODEL), Some("perplexity"), false).unwrap();
+    let mut chat = Chat::with_config(
+        perplexity_config(&server.uri()),
+        Some(AGENT_MODEL),
+        Some("perplexity"),
+        false,
+    )
+    .unwrap();
     let tokens = chat.ask("Who created Rails?").await.unwrap().tokens;
-    assert_eq!((tokens.input, tokens.cache_read, tokens.cache_write), (Some(3), Some(1459), Some(32)));
+    assert_eq!(
+        (tokens.input, tokens.cache_read, tokens.cache_write),
+        (Some(3), Some(1459), Some(32))
+    );
 }
 
 // spec: protocols/perplexity/agent_spec.rb:209 rejects documents, which the Agent API does not accept
 #[tokio::test]
 async fn rejects_documents_which_the_agent_api_does_not_accept() {
     let server = serve(vec![]).await;
-    let mut chat = Chat::with_config(perplexity_config(&server.uri()), Some(AGENT_MODEL), Some("perplexity"), false).unwrap();
+    let mut chat = Chat::with_config(
+        perplexity_config(&server.uri()),
+        Some(AGENT_MODEL),
+        Some("perplexity"),
+        false,
+    )
+    .unwrap();
     chat.add_message(Message::user("Summarize this.").with_attachments(vec![inline("sample.pdf")]));
     match chat.render().unwrap_err() {
         Error::UnsupportedAttachment(m) => assert!(m.contains("application/pdf"), "{m}"),
@@ -206,9 +276,14 @@ fn gpustack_config(server: &MockServer, protocol: Option<&str>) -> Arc<Config> {
 
 /// `context.chat(model:, provider: :gpustack, protocol: :responses)`.
 fn gpustack(server: &MockServer) -> Chat {
-    Chat::with_config(gpustack_config(server, None), Some(GPUSTACK_MODEL), Some("gpustack"), false)
-        .unwrap()
-        .with_protocol(ProtocolName::Responses)
+    Chat::with_config(
+        gpustack_config(server, None),
+        Some(GPUSTACK_MODEL),
+        Some("gpustack"),
+        false,
+    )
+    .unwrap()
+    .with_protocol(ProtocolName::Responses)
 }
 
 fn mcp_call() -> Value {
@@ -234,12 +309,28 @@ fn never() -> Value {
 #[tokio::test]
 async fn sends_configured_mcp_labels_and_preserves_complete_calls_usage_and_replay() {
     let server = serve(vec![completion(), completion()]).await;
-    let mut chat = gpustack(&server).with_provider_tools([mcp(json!({ "name": "code_interpreter", "require_approval": "never" }))]);
+    let mut chat = gpustack(&server).with_provider_tools([mcp(
+        json!({ "name": "code_interpreter", "require_approval": "never" }),
+    )]);
     let result = chat.ask("Calculate 2+2.").await.unwrap();
 
     let call = &result.server_tool_calls[0];
-    assert_eq!((call.name.as_deref(), call.result.clone(), call.id.as_deref()), (Some("python"), Some(json!("4")), Some("mcp_1")));
-    assert_eq!((result.tokens.input, result.tokens.cache_read, result.tokens.output), (Some(16), Some(4), Some(5)));
+    assert_eq!(
+        (
+            call.name.as_deref(),
+            call.result.clone(),
+            call.id.as_deref()
+        ),
+        (Some("python"), Some(json!("4")), Some("mcp_1"))
+    );
+    assert_eq!(
+        (
+            result.tokens.input,
+            result.tokens.cache_read,
+            result.tokens.output
+        ),
+        (Some(16), Some(4), Some(5))
+    );
     assert_eq!(result.content(), "4");
     assert_eq!(result.finish_reason, Some(rust_llm::FinishReason::Stop));
 
@@ -250,14 +341,24 @@ async fn sends_configured_mcp_labels_and_preserves_complete_calls_usage_and_repl
     assert_eq!(requests.len(), 2);
     for request in &requests {
         assert_eq!(request.url.path(), format!("{PROXY}/responses"));
-        assert_eq!(request.headers.get("authorization").unwrap(), "Bearer isolated-key");
+        assert_eq!(
+            request.headers.get("authorization").unwrap(),
+            "Bearer isolated-key"
+        );
         let body: Value = serde_json::from_slice(&request.body).unwrap();
-        assert_eq!(body["tools"], json!([{ "type": "mcp", "server_label": "code_interpreter", "require_approval": "never" }]));
+        assert_eq!(
+            body["tools"],
+            json!([{ "type": "mcp", "server_label": "code_interpreter", "require_approval": "never" }])
+        );
     }
     let second: Value = serde_json::from_slice(&requests[1].body).unwrap();
     let input = second["input"].as_array().unwrap();
     assert!(input.contains(&json!({ "type": "function_call", "call_id": "mcp_1", "name": "python", "arguments": "{\"code\":\"print(2+2)\"}" })));
-    assert!(input.contains(&json!({ "type": "function_call_output", "call_id": "mcp_1", "output": "4" })));
+    assert!(
+        input.contains(
+            &json!({ "type": "function_call_output", "call_id": "mcp_1", "output": "4" })
+        )
+    );
     assert!(input.iter().all(|i| i["type"] != json!("mcp_call")));
 }
 
@@ -275,15 +376,30 @@ async fn retains_incomplete_harmony_tool_records_without_inventing_results() {
     chat.add_message(assistant);
 
     let rendered = chat.render().unwrap()["input"].as_array().cloned().unwrap();
-    assert_eq!(rendered.iter().map(|i| i["role"].clone()).collect::<Vec<_>>(), [json!("assistant"), json!("assistant")]);
-    let replayed: Vec<Value> =
-        rendered.iter().map(|i| serde_json::from_str(i["content"][0]["text"].as_str().unwrap()).unwrap()).collect();
+    assert_eq!(
+        rendered
+            .iter()
+            .map(|i| i["role"].clone())
+            .collect::<Vec<_>>(),
+        [json!("assistant"), json!("assistant")]
+    );
+    let replayed: Vec<Value> = rendered
+        .iter()
+        .map(|i| serde_json::from_str(i["content"][0]["text"].as_str().unwrap()).unwrap())
+        .collect();
     assert_eq!(Value::Array(replayed), raw);
     assert_eq!(chat.messages()[0].raw_content.as_ref(), Some(&raw));
 
     chat.add_message(Message::user("hi"));
     let parsed = chat.generate().await.unwrap();
-    assert_eq!(parsed.server_tool_calls.iter().map(|c| c.result.clone()).collect::<Vec<_>>(), [None, None]);
+    assert_eq!(
+        parsed
+            .server_tool_calls
+            .iter()
+            .map(|c| c.result.clone())
+            .collect::<Vec<_>>(),
+        [None, None]
+    );
 }
 
 // spec: protocols/gpustack/responses_spec.rb:67 reads actual Harmony reasoning content when the provider has no summary
@@ -295,7 +411,10 @@ async fn reads_actual_harmony_reasoning_content_when_there_is_no_summary() {
     let mut chat = gpustack(&server);
     chat.add_message(Message::user("hi"));
     let message = chat.generate().await.unwrap();
-    assert_eq!(message.thinking.and_then(|t| t.text).as_deref(), Some("I can calculate this."));
+    assert_eq!(
+        message.thinking.and_then(|t| t.text).as_deref(),
+        Some("I can calculate this.")
+    );
 }
 
 // spec: protocols/gpustack/responses_spec.rb:75 passes documented browser subtool filters to the configured server
@@ -319,17 +438,31 @@ async fn passes_documented_browser_subtool_filters_to_the_configured_server() {
 #[tokio::test]
 async fn maps_portable_server_tools_to_their_vllm_namespace_and_subtools() {
     let expected = [
-        ("web_search", json!({ "server_label": "web_search_preview", "allowed_tools": ["search"] })),
-        ("web_fetch", json!({ "server_label": "web_search_preview", "allowed_tools": ["open"] })),
-        ("code_execution", json!({ "server_label": "code_interpreter" })),
+        (
+            "web_search",
+            json!({ "server_label": "web_search_preview", "allowed_tools": ["search"] }),
+        ),
+        (
+            "web_fetch",
+            json!({ "server_label": "web_search_preview", "allowed_tools": ["open"] }),
+        ),
+        (
+            "code_execution",
+            json!({ "server_label": "code_interpreter" }),
+        ),
     ];
     for (name, settings) in expected {
         let server = serve(vec![completion()]).await;
-        let response =
-            gpustack(&server).with_provider_tools([ProviderTool::with_options(name, never())]).ask("Use the enabled tool.").await.unwrap();
+        let response = gpustack(&server)
+            .with_provider_tools([ProviderTool::with_options(name, never())])
+            .ask("Use the enabled tool.")
+            .await
+            .unwrap();
         assert_eq!(response.server_tool_calls[0].result, Some(json!("4")));
         let mut tool = json!({ "type": "mcp", "require_approval": "never" });
-        tool.as_object_mut().unwrap().extend(settings.as_object().unwrap().clone());
+        tool.as_object_mut()
+            .unwrap()
+            .extend(settings.as_object().unwrap().clone());
         let bodies = bodies(&server).await;
         assert_eq!(bodies.len(), 1, "{name}");
         assert_eq!(bodies[0]["tools"], json!([tool]), "{name}");
@@ -341,7 +474,10 @@ async fn maps_portable_server_tools_to_their_vllm_namespace_and_subtools() {
 async fn combines_search_and_fetch_filters() {
     let server = serve(vec![completion()]).await;
     gpustack(&server)
-        .with_provider_tools([ProviderTool::with_options("web_search", never()), ProviderTool::with_options("web_fetch", never())])
+        .with_provider_tools([
+            ProviderTool::with_options("web_search", never()),
+            ProviderTool::with_options("web_fetch", never()),
+        ])
         .ask("Search for the Ruby documentation and read the result.")
         .await
         .unwrap();
@@ -354,7 +490,12 @@ async fn combines_search_and_fetch_filters() {
 }
 
 async fn argument_error(server: &MockServer, tools: Vec<ProviderTool>) -> String {
-    match gpustack(server).with_provider_tools(tools).ask("Use the tool.").await.unwrap_err() {
+    match gpustack(server)
+        .with_provider_tools(tools)
+        .ask("Use the tool.")
+        .await
+        .unwrap_err()
+    {
         Error::Argument(m) => m,
         other => panic!("expected an ArgumentError, got {other:?}"),
     }
@@ -372,7 +513,11 @@ async fn rejects_alias_options_that_would_broaden_or_change_the_operation() {
             json!({ "require_approval": "never", "url": "https://example.test/mcp" }),
             json!({ "require_approval": "never", "name": "container" }),
         ] {
-            let message = argument_error(&server, vec![ProviderTool::with_options(name, options.clone())]).await;
+            let message = argument_error(
+                &server,
+                vec![ProviderTool::with_options(name, options.clone())],
+            )
+            .await;
             assert!(message.contains("GPUStack"), "{name} {options}: {message}");
         }
     }
@@ -390,9 +535,22 @@ async fn rejects_duplicate_server_settings_that_cannot_preserve_the_filters() {
         json!({ "allowed_tools": ["open"], "server_description": "A different browser" }),
     ] {
         let mut settings = json!({ "name": "web_search_preview", "require_approval": "never" });
-        settings.as_object_mut().unwrap().extend(options.as_object().unwrap().clone());
-        let message = argument_error(&server, vec![ProviderTool::with_options("web_search", never()), mcp(settings)]).await;
-        assert!(message.contains("one entry with explicit tool names"), "{options}: {message}");
+        settings
+            .as_object_mut()
+            .unwrap()
+            .extend(options.as_object().unwrap().clone());
+        let message = argument_error(
+            &server,
+            vec![
+                ProviderTool::with_options("web_search", never()),
+                mcp(settings),
+            ],
+        )
+        .await;
+        assert!(
+            message.contains("one entry with explicit tool names"),
+            "{options}: {message}"
+        );
     }
     assert_eq!(requests(&server).await, 0);
 }
@@ -408,7 +566,10 @@ async fn rejects_approval_modes_per_request_servers_and_read_only_filters() {
         t
     };
     let mut without_approval = tool();
-    without_approval.as_object_mut().unwrap().remove("require_approval");
+    without_approval
+        .as_object_mut()
+        .unwrap()
+        .remove("require_approval");
     for options in [
         without_approval,
         with("require_approval", json!("always")),
@@ -418,7 +579,10 @@ async fn rejects_approval_modes_per_request_servers_and_read_only_filters() {
         with("name", json!("unknown")),
     ] {
         let message = argument_error(&server, vec![mcp(options.clone())]).await;
-        assert!(message.contains("GPUStack") || message.contains("vLLM"), "{options}: {message}");
+        assert!(
+            message.contains("GPUStack") || message.contains("vLLM"),
+            "{options}: {message}"
+        );
     }
     assert_eq!(requests(&server).await, 0);
 }
@@ -432,8 +596,15 @@ async fn requires_explicit_execution_consent_and_keeps_chat_on_chat_completions(
 
     let chat = gpustack(&server);
     let model = chat.model().clone();
-    let resolve = |config: &Config| Provider::GPUStack.resolve_protocol(None, &model, config).unwrap();
-    assert_eq!(resolve(&gpustack_config(&server, None)), ProtocolName::ChatCompletions);
+    let resolve = |config: &Config| {
+        Provider::GPUStack
+            .resolve_protocol(None, &model, config)
+            .unwrap()
+    };
+    assert_eq!(
+        resolve(&gpustack_config(&server, None)),
+        ProtocolName::ChatCompletions
+    );
     let configured = gpustack_config(&server, Some("responses"));
     assert_eq!(resolve(&configured), ProtocolName::Responses);
 
@@ -445,8 +616,13 @@ async fn requires_explicit_execution_consent_and_keeps_chat_on_chat_completions(
         config: Some(configured),
         ..Default::default()
     };
-    rust_llm::transcribe(Attachment::new(fixture("ruby.wav")), options).await.unwrap();
+    rust_llm::transcribe(Attachment::new(fixture("ruby.wav")), options)
+        .await
+        .unwrap();
     let requests = server.received_requests().await.unwrap();
     assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].url.path(), format!("{PROXY}/audio/transcriptions"));
+    assert_eq!(
+        requests[0].url.path(),
+        format!("{PROXY}/audio/transcriptions")
+    );
 }

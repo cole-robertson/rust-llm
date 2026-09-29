@@ -21,7 +21,11 @@ const SCHEMA_MODELS: &[(&str, &str, &str)] = &[
     ("mistral", "mistral-small-latest", "mistral-small-latest"),
     ("openai", "gpt-5-nano", "gpt-5-nano"),
     ("openrouter", "claude-haiku-4-5", "claude-haiku-4-5"),
-    ("xai", "grok-4-1-fast-non-reasoning", "grok-4-1-fast-non-reasoning"),
+    (
+        "xai",
+        "grok-4-1-fast-non-reasoning",
+        "grok-4-1-fast-non-reasoning",
+    ),
 ];
 
 async fn run<F, Fut>(names: Vec<(String, &'static str, &'static str)>, body: F)
@@ -32,20 +36,33 @@ where
     let mut failures = Vec::new();
     let mut ran = 0;
     for (name, provider, model) in names {
-        let Some(cassette) = Cassette::start(&name).await else { continue };
+        let Some(cassette) = Cassette::start(&name).await else {
+            continue;
+        };
         ran += 1;
         match body(cassette, provider, model).await {
             Ok(cassette) => {
-                let r = futures::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(cassette.assert_all_matched())).await;
+                let r = futures::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(
+                    cassette.assert_all_matched(),
+                ))
+                .await;
                 if let Err(p) = r {
-                    failures.push(format!("{provider}: {}", p.downcast_ref::<String>().cloned().unwrap_or_default()));
+                    failures.push(format!(
+                        "{provider}: {}",
+                        p.downcast_ref::<String>().cloned().unwrap_or_default()
+                    ));
                 }
             }
             Err(e) => failures.push(format!("{provider} {model}: {e}")),
         }
     }
     assert!(ran > 0, "no cassettes");
-    assert!(failures.is_empty(), "{} of {ran} failed:\n{}", failures.len(), failures.join("\n\n"));
+    assert!(
+        failures.is_empty(),
+        "{} of {ran} failed:\n{}",
+        failures.len(),
+        failures.join("\n\n")
+    );
     eprintln!("{ran} replayed");
 }
 
@@ -59,11 +76,22 @@ async fn schema_returns_structured_output() {
         })
         .collect();
     run(names, |cassette, provider, model| async move {
-        let mut chat = Chat::with_config(config_for(&cassette, provider), Some(model), Some(provider), false)
+        let mut chat = Chat::with_config(
+            config_for(&cassette, provider),
+            Some(model),
+            Some(provider),
+            false,
+        )
+        .map_err(|e| e.to_string())?
+        .with_schema(person_schema());
+        let response = chat
+            .ask("Generate a person named John who is 30 years old")
+            .await
+            .map_err(|e| e.to_string())?;
+        let parsed = response
+            .parsed()
             .map_err(|e| e.to_string())?
-            .with_schema(person_schema());
-        let response = chat.ask("Generate a person named John who is 30 years old").await.map_err(|e| e.to_string())?;
-        let parsed = response.parsed().map_err(|e| e.to_string())?.ok_or("no parsed")?;
+            .ok_or("no parsed")?;
         if parsed["name"] != "John" || parsed["age"] != 30 {
             return Err(format!("parsed {parsed}"));
         }
@@ -78,20 +106,35 @@ async fn schema_can_be_removed_mid_conversation() {
         .iter()
         .map(|(p, m, slug)| {
             let slug = slug.replace('.', "_");
-            (format!("chat_with_schema_with_{p}_{slug}_allows_removing_schema_mid-conversation"), *p, *m)
+            (
+                format!("chat_with_schema_with_{p}_{slug}_allows_removing_schema_mid-conversation"),
+                *p,
+                *m,
+            )
         })
         .collect();
     run(names, |cassette, provider, model| async move {
-        let mut chat = Chat::with_config(config_for(&cassette, provider), Some(model), Some(provider), false)
-            .map_err(|e| e.to_string())?
-            .with_schema(person_schema());
-        let r1 = chat.ask("Generate a person named Bob").await.map_err(|e| e.to_string())?;
+        let mut chat = Chat::with_config(
+            config_for(&cassette, provider),
+            Some(model),
+            Some(provider),
+            false,
+        )
+        .map_err(|e| e.to_string())?
+        .with_schema(person_schema());
+        let r1 = chat
+            .ask("Generate a person named Bob")
+            .await
+            .map_err(|e| e.to_string())?;
         let parsed = r1.parsed().map_err(|e| e.to_string())?.ok_or("no parsed")?;
         if !parsed["age"].is_i64() {
             return Err(format!("age {parsed}"));
         }
         chat = chat.with_schema(serde_json::Value::Null);
-        let r2 = chat.ask("Now just tell me about Ruby").await.map_err(|e| e.to_string())?;
+        let r2 = chat
+            .ask("Now just tell me about Ruby")
+            .await
+            .map_err(|e| e.to_string())?;
         if !r2.content().contains("Ruby") {
             return Err("no Ruby".into());
         }
@@ -101,21 +144,42 @@ async fn schema_can_be_removed_mid_conversation() {
 }
 
 const EMBEDDING_MODELS: &[(&str, &str, &str, Option<i64>)] = &[
-    ("gemini", "gemini-embedding-001", "gemini-embedding-001", Some(768)),
+    (
+        "gemini",
+        "gemini-embedding-001",
+        "gemini-embedding-001",
+        Some(768),
+    ),
     ("mistral", "mistral-embed", "mistral-embed", None),
-    ("openai", "text-embedding-3-small", "text-embedding-3-small", Some(768)),
+    (
+        "openai",
+        "text-embedding-3-small",
+        "text-embedding-3-small",
+        Some(768),
+    ),
 ];
 
 #[tokio::test]
 async fn embeds_a_single_text() {
     let names = EMBEDDING_MODELS
         .iter()
-        .map(|(p, m, slug, _)| (format!("embedding_basic_functionality_{p}_{slug}_can_handle_a_single_text"), *p, *m))
+        .map(|(p, m, slug, _)| {
+            (
+                format!("embedding_basic_functionality_{p}_{slug}_can_handle_a_single_text"),
+                *p,
+                *m,
+            )
+        })
         .collect();
     run(names, |cassette, provider, model| async move {
         let e = embed(
             "Ruby is a programmer's best friend",
-            EmbedOptions { model: Some(model), provider: Some(provider), config: Some(config_for(&cassette, provider)), ..Default::default() },
+            EmbedOptions {
+                model: Some(model),
+                provider: Some(provider),
+                config: Some(config_for(&cassette, provider)),
+                ..Default::default()
+            },
         )
         .await
         .map_err(|e| e.to_string())?;
@@ -135,14 +199,27 @@ async fn embeds_a_single_text() {
 async fn embeds_multiple_texts() {
     let names = EMBEDDING_MODELS
         .iter()
-        .map(|(p, m, slug, _)| (format!("embedding_basic_functionality_{p}_{slug}_can_handle_multiple_texts"), *p, *m))
+        .map(|(p, m, slug, _)| {
+            (
+                format!("embedding_basic_functionality_{p}_{slug}_can_handle_multiple_texts"),
+                *p,
+                *m,
+            )
+        })
         .collect();
     run(names, |cassette, provider, model| async move {
         let texts = vec!["Ruby".to_string(), "Python".into(), "JavaScript".into()];
         // The Ruby spec omits provider: here, so the registry picks it.
-        let e = embed(texts, EmbedOptions { model: Some(model), config: Some(config_for(&cassette, provider)), ..Default::default() })
-            .await
-            .map_err(|e| e.to_string())?;
+        let e = embed(
+            texts,
+            EmbedOptions {
+                model: Some(model),
+                config: Some(config_for(&cassette, provider)),
+                ..Default::default()
+            },
+        )
+        .await
+        .map_err(|e| e.to_string())?;
         match &e.vectors {
             Vectors::Batch(rows) if rows.len() == 3 => Ok(cassette),
             _ => Err("expected 3 vectors".into()),
@@ -192,17 +269,33 @@ async fn auth_errors_are_human_readable() {
         ("openai", "gpt-5-nano", "gpt-5-nano"),
         ("openrouter", "claude-haiku-4-5", "claude-haiku-4-5"),
         ("perplexity", "openai/gpt-5-mini", "openai_gpt-5-mini"),
-        ("xai", "grok-4-1-fast-non-reasoning", "grok-4-1-fast-non-reasoning"),
+        (
+            "xai",
+            "grok-4-1-fast-non-reasoning",
+            "grok-4-1-fast-non-reasoning",
+        ),
         ("hetzner", "Qwen3.8-27B", "qwen3_8-27b"),
         ("ollama_cloud", "gpt-oss:120b", "gpt-oss_120b"),
     ];
     let names = models
         .iter()
-        .map(|(p, m, slug)| (format!("chat_error_handling_with_{p}_{slug}_raises_appropriate_auth_error"), *p, *m))
+        .map(|(p, m, slug)| {
+            (
+                format!("chat_error_handling_with_{p}_{slug}_raises_appropriate_auth_error"),
+                *p,
+                *m,
+            )
+        })
         .collect();
     run(names, |cassette, provider, model| async move {
         let assume = matches!(provider, "hetzner" | "ollama_cloud");
-        let mut chat = Chat::with_config(config_for(&cassette, provider), Some(model), Some(provider), assume).map_err(|e| e.to_string())?;
+        let mut chat = Chat::with_config(
+            config_for(&cassette, provider),
+            Some(model),
+            Some(provider),
+            assume,
+        )
+        .map_err(|e| e.to_string())?;
         let err = match chat.ask("Hello").await {
             Ok(_) => return Err("expected an error".into()),
             Err(e) => e,
@@ -211,7 +304,12 @@ async fn auth_errors_are_human_readable() {
         if err.response().is_none() {
             return Err(format!("no response on {err:?}"));
         }
-        if message.trim_start().starts_with('{') || !message.chars().next().is_some_and(|c| c.is_ascii_alphabetic()) {
+        if message.trim_start().starts_with('{')
+            || !message
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_alphabetic())
+        {
             return Err(format!("not human readable: {message}"));
         }
         Ok(cassette)
@@ -236,11 +334,22 @@ async fn typed_schema_matches_rubyllm_schema_dsl() {
         })
         .collect();
     run(names, |cassette, provider, model| async move {
-        let mut chat = Chat::with_config(config_for(&cassette, provider), Some(model), Some(provider), false)
+        let mut chat = Chat::with_config(
+            config_for(&cassette, provider),
+            Some(model),
+            Some(provider),
+            false,
+        )
+        .map_err(|e| e.to_string())?
+        .with_schema_for::<PersonSchemaClass>();
+        let response = chat
+            .ask("Generate a person named Alice who is 28 years old")
+            .await
+            .map_err(|e| e.to_string())?;
+        let parsed = response
+            .parsed()
             .map_err(|e| e.to_string())?
-            .with_schema_for::<PersonSchemaClass>();
-        let response = chat.ask("Generate a person named Alice who is 28 years old").await.map_err(|e| e.to_string())?;
-        let parsed = response.parsed().map_err(|e| e.to_string())?.ok_or("no parsed")?;
+            .ok_or("no parsed")?;
         if parsed["name"] != "Alice" {
             return Err(format!("parsed {parsed}"));
         }

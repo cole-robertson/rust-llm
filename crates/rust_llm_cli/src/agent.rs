@@ -14,9 +14,16 @@ pub fn generate(g: &mut Generator, name: &str) -> Result<(), String> {
     let file = crate::underscore(&class);
     let vars = [("class_name", class.as_str()), ("file_name", file.as_str())];
 
-    g.module_dir("agents", "//! RustLLM agents (`rust-llm generate agent NAME`).\n");
+    g.module_dir(
+        "agents",
+        "//! RustLLM agents (`rust-llm generate agent NAME`).\n",
+    );
     g.file(&format!("src/agents/{file}.rs"), &render(AGENT, &vars));
-    g.inject("src/agents/mod.rs", &format!("pub mod {file};"), Anchor::Sorted("pub mod "));
+    g.inject(
+        "src/agents/mod.rs",
+        &format!("pub mod {file};"),
+        Anchor::Sorted("pub mod "),
+    );
     // `instructions.txt.erb.tt` is empty upstream too.
     g.file(&format!("src/prompts/{file}/instructions.txt"), "");
     Ok(())

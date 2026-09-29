@@ -102,13 +102,27 @@ impl CachedContent {
         for a in &mut with {
             a.load(connection.client()).await?;
         }
-        let payload = render_cache_payload(content, &model.id, options.ttl.as_ref(), options.instructions, &with)?;
+        let payload = render_cache_payload(
+            content,
+            &model.id,
+            options.ttl.as_ref(),
+            options.instructions,
+            &with,
+        )?;
         // `post caches_url, payload, idempotent: false`: never retried, since a retry after a lost
         // response would create a second cache.
         let resp = connection
-            .send(reqwest::Method::POST, "cachedContents", &[], false, &|req| req.json(&payload))
+            .send(
+                reqwest::Method::POST,
+                "cachedContents",
+                &[],
+                false,
+                &|req| req.json(&payload),
+            )
             .await?;
-        let body = crate::transport::json_response(resp, Value::Null).await?.body;
+        let body = crate::transport::json_response(resp, Value::Null)
+            .await?
+            .body;
         Ok(parse_cache_response(&body, connection))
     }
 
@@ -117,7 +131,11 @@ impl CachedContent {
         CachedContent::find_with_config(crate::config(), name, provider).await
     }
 
-    pub async fn find_with_config(config: Arc<Config>, name: &str, provider: Option<&str>) -> Result<CachedContent> {
+    pub async fn find_with_config(
+        config: Arc<Config>,
+        name: &str,
+        provider: Option<&str>,
+    ) -> Result<CachedContent> {
         let provider = match provider {
             Some(p) => Provider::resolve_or_err(p)?,
             None => resolve_model(&config.default_model, None, false)?.1,
@@ -129,7 +147,9 @@ impl CachedContent {
 
     /// `delete`: removes the cache from the provider.
     pub async fn delete(&self) -> Result<&Self> {
-        self.connection()?.delete(&cache_name(&self.name), &[]).await?;
+        self.connection()?
+            .delete(&cache_name(&self.name), &[])
+            .await?;
         Ok(self)
     }
 
@@ -137,8 +157,18 @@ impl CachedContent {
     pub async fn renew(&mut self, ttl: impl Into<Ttl>) -> Result<&mut Self> {
         let connection = self.connection()?.clone();
         let payload = json!({ "ttl": ttl.into().render() });
-        let resp = connection.send(reqwest::Method::PATCH, &cache_name(&self.name), &[], true, &|req| req.json(&payload)).await?;
-        let body = crate::transport::json_response(resp, Value::Null).await?.body;
+        let resp = connection
+            .send(
+                reqwest::Method::PATCH,
+                &cache_name(&self.name),
+                &[],
+                true,
+                &|req| req.json(&payload),
+            )
+            .await?;
+        let body = crate::transport::json_response(resp, Value::Null)
+            .await?
+            .body;
         let refreshed = parse_cache_response(&body, connection);
         self.expires_at = refreshed.expires_at;
         self.metadata = refreshed.metadata;
@@ -146,21 +176,35 @@ impl CachedContent {
     }
 
     fn connection(&self) -> Result<&Connection> {
-        self.connection.as_ref().ok_or_else(|| Error::Argument("This cache has no provider connection".into()))
+        self.connection
+            .as_ref()
+            .ok_or_else(|| Error::Argument("This cache has no provider connection".into()))
     }
 }
 
 /// Only Gemini's protocol manages cache resources (`Protocol#cache_content` raises otherwise).
 fn connection_for(provider: Provider, config: Arc<Config>) -> Result<Connection> {
     if provider != Provider::Gemini {
-        return Err(Error::Api(format!("{} doesn't support explicit content caching", provider.display()), None));
+        return Err(Error::Api(
+            format!(
+                "{} doesn't support explicit content caching",
+                provider.display()
+            ),
+            None,
+        ));
     }
     provider.ensure_configured(&config)?;
     Connection::new(provider, config)
 }
 
 /// `Caches#render_cache_payload`.
-pub fn render_cache_payload(content: &str, model: &str, ttl: Option<&Ttl>, instructions: Option<&str>, attachments: &[Attachment]) -> Result<Value> {
+pub fn render_cache_payload(
+    content: &str,
+    model: &str,
+    ttl: Option<&Ttl>,
+    instructions: Option<&str>,
+    attachments: &[Attachment],
+) -> Result<Value> {
     let parts = crate::protocols::gemini::format_content(Some(content), attachments)?;
     let mut payload = json!({ "model": format!("models/{model}"), "contents": [{ "role": "user", "parts": parts }] });
     if let Some(text) = instructions {
@@ -174,22 +218,38 @@ pub fn render_cache_payload(content: &str, model: &str, ttl: Option<&Ttl>, instr
 
 /// `Caches#cache_name`: bare ids get the collection prefix.
 pub fn cache_name(name: &str) -> String {
-    if name.contains('/') { name.to_string() } else { format!("cachedContents/{name}") }
+    if name.contains('/') {
+        name.to_string()
+    } else {
+        format!("cachedContents/{name}")
+    }
 }
 
 fn time(v: Option<&Value>) -> Option<DateTime<Utc>> {
-    DateTime::parse_from_rfc3339(v?.as_str()?).ok().map(|t| t.with_timezone(&Utc))
+    DateTime::parse_from_rfc3339(v?.as_str()?)
+        .ok()
+        .map(|t| t.with_timezone(&Utc))
 }
 
 /// `Caches#parse_cache_response`.
 fn parse_cache_response(data: &Value, connection: Connection) -> CachedContent {
     CachedContent {
-        name: data.get("name").and_then(Value::as_str).unwrap_or_default().to_string(),
-        model: data.get("model").and_then(Value::as_str).and_then(|m| m.rsplit('/').next()).map(str::to_string),
+        name: data
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        model: data
+            .get("model")
+            .and_then(Value::as_str)
+            .and_then(|m| m.rsplit('/').next())
+            .map(str::to_string),
         provider: Provider::Gemini.slug().into(),
         created_at: time(data.get("createTime")),
         expires_at: time(data.get("expireTime")),
-        tokens: data.pointer("/usageMetadata/totalTokenCount").and_then(Value::as_i64),
+        tokens: data
+            .pointer("/usageMetadata/totalTokenCount")
+            .and_then(Value::as_i64),
         metadata: data.clone(),
         connection: Some(connection),
     }
@@ -202,7 +262,14 @@ mod tests {
     // spec: protocols/gemini/caches_spec.rb
     #[test]
     fn renders_the_model_contents_system_instruction_and_ttl() {
-        let payload = render_cache_payload("A long stable prefix.", "gemini-2.5-flash", Some(&300.into()), Some("You are a careful analyst."), &[]).unwrap();
+        let payload = render_cache_payload(
+            "A long stable prefix.",
+            "gemini-2.5-flash",
+            Some(&300.into()),
+            Some("You are a careful analyst."),
+            &[],
+        )
+        .unwrap();
         assert_eq!(
             payload,
             json!({
@@ -217,12 +284,22 @@ mod tests {
     #[test]
     fn omits_system_instruction_and_ttl_when_not_given() {
         let payload = render_cache_payload("Prefix.", "gemini-2.5-flash", None, None, &[]).unwrap();
-        assert_eq!(payload.as_object().unwrap().keys().collect::<Vec<_>>(), ["model", "contents"]);
+        assert_eq!(
+            payload.as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["model", "contents"]
+        );
     }
 
     #[test]
     fn passes_duration_strings_through_as_ttl() {
-        let payload = render_cache_payload("Prefix.", "gemini-2.5-flash", Some(&"450s".into()), None, &[]).unwrap();
+        let payload = render_cache_payload(
+            "Prefix.",
+            "gemini-2.5-flash",
+            Some(&"450s".into()),
+            None,
+            &[],
+        )
+        .unwrap();
         assert_eq!(payload["ttl"], "450s");
     }
 

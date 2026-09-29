@@ -56,19 +56,35 @@ impl Ocr {
             .iter()
             .enumerate()
             .map(|(position, page)| Page {
-                index: page.get("index").and_then(Value::as_i64).unwrap_or(position as i64),
-                markdown: page.get("markdown").and_then(Value::as_str).map(str::to_string),
+                index: page
+                    .get("index")
+                    .and_then(Value::as_i64)
+                    .unwrap_or(position as i64),
+                markdown: page
+                    .get("markdown")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
                 images: page.get("images").filter(|v| !v.is_null()).cloned(),
                 tables: page.get("tables").filter(|v| !v.is_null()).cloned(),
                 raw: page.clone(),
             })
             .collect();
-        Ocr { pages, model: model.into(), usage, raw, usage_entries: Vec::new() }
+        Ocr {
+            pages,
+            model: model.into(),
+            usage,
+            raw,
+            usage_entries: Vec::new(),
+        }
     }
 
     /// The markdown of every page, joined with blank lines.
     pub fn markdown(&self) -> String {
-        self.pages.iter().filter_map(|p| p.markdown.as_deref()).collect::<Vec<_>>().join("\n\n")
+        self.pages
+            .iter()
+            .filter_map(|p| p.markdown.as_deref())
+            .collect::<Vec<_>>()
+            .join("\n\n")
     }
 
     /// Provider-reported usage across every attempt.
@@ -101,13 +117,23 @@ pub struct OcrOptions<'a> {
 /// `RubyLLM.ocr(file, model:, provider:, pages:, provider_options:)`. `file` is a path, URL, or
 /// [`Attachment`].
 pub async fn ocr(file: impl Into<Attachment>, options: OcrOptions<'_>) -> Result<Ocr> {
-    let OcrOptions { model, provider, assume_model_exists, pages, provider_options, config } = options;
+    let OcrOptions {
+        model,
+        provider,
+        assume_model_exists,
+        pages,
+        provider_options,
+        config,
+    } = options;
     let config = config.unwrap_or_else(crate::config);
     let model_id = model.unwrap_or(&config.default_ocr_model).to_string();
     let (model, provider) = resolve_model(&model_id, provider, assume_model_exists)?;
     provider.ensure_configured(&config)?;
     if provider != Provider::Mistral {
-        return Err(Error::Api(format!("{} doesn't support OCR", provider.display()), None));
+        return Err(Error::Api(
+            format!("{} doesn't support OCR", provider.display()),
+            None,
+        ));
     }
     let connection = Connection::new(provider, config.clone())?;
     let mut attachment = file.into();
@@ -123,10 +149,20 @@ pub async fn ocr(file: impl Into<Attachment>, options: OcrOptions<'_>) -> Result
             retried.push(failure_tokens(e, None));
         }
     };
-    let raw = connection.post("ocr", &payload, &[], &mut on_attempt).await?;
+    let raw = connection
+        .post("ocr", &payload, &[], &mut on_attempt)
+        .await?;
     let data = raw.body;
-    let pages: Vec<Value> = data.get("pages").and_then(Value::as_array).cloned().unwrap_or_default();
-    let response_model = data.get("model").and_then(Value::as_str).unwrap_or(&model.id).to_string();
+    let pages: Vec<Value> = data
+        .get("pages")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let response_model = data
+        .get("model")
+        .and_then(Value::as_str)
+        .unwrap_or(&model.id)
+        .to_string();
     let usage = data.get("usage_info").filter(|v| !v.is_null()).cloned();
     let mut result = Ocr::new(&pages, response_model, usage, data);
     let entry = |status, tokens: Tokens| UsageEntry {
@@ -138,7 +174,10 @@ pub async fn ocr(file: impl Into<Attachment>, options: OcrOptions<'_>) -> Result
         cost: Cost::new(&tokens, Some(&model), Tier::Standard),
         tokens,
     };
-    let mut entries: Vec<UsageEntry> = retried.into_iter().map(|t| entry(UsageStatus::Failed, t)).collect();
+    let mut entries: Vec<UsageEntry> = retried
+        .into_iter()
+        .map(|t| entry(UsageStatus::Failed, t))
+        .collect();
     // OCR responses report pages, not tokens, so the billed attempt carries empty tokens as in Ruby.
     entries.push(entry(UsageStatus::Succeeded, Tokens::default()));
     result.usage_entries = entries;
@@ -147,7 +186,12 @@ pub async fn ocr(file: impl Into<Attachment>, options: OcrOptions<'_>) -> Result
 
 /// `Mistral::OCR#render_ocr_payload`: remote files go as URLs, local ones as data URIs; images
 /// use the `image_url` document variant.
-fn render_payload(attachment: &Attachment, model: &str, pages: Option<&[i64]>, provider_options: &Value) -> Result<Value> {
+fn render_payload(
+    attachment: &Attachment,
+    model: &str,
+    pages: Option<&[i64]>,
+    provider_options: &Value,
+) -> Result<Value> {
     let reference = attachment.url_or_data_uri()?;
     let document = if attachment.kind() == AttachmentType::Image {
         json!({ "type": "image_url", "image_url": reference })
@@ -172,7 +216,12 @@ mod tests {
     #[test]
     fn pages_without_an_index_take_their_position_and_keep_raw() {
         let raw = json!({ "markdown": "# Ruby", "images": [], "tables": [] });
-        let ocr = Ocr::new(std::slice::from_ref(&raw), "mistral-ocr-latest", None, Value::Null);
+        let ocr = Ocr::new(
+            std::slice::from_ref(&raw),
+            "mistral-ocr-latest",
+            None,
+            Value::Null,
+        );
         assert_eq!(ocr.pages[0].index, 0);
         assert_eq!(ocr.pages[0].markdown.as_deref(), Some("# Ruby"));
         assert_eq!(ocr.pages[0].images, Some(json!([])));

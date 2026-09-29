@@ -46,10 +46,23 @@ impl MigrationTrait for CreateRustLlmRecords {
         )
         .await?;
         m.create_index(
-            Index::create().name("idx-rust_llm_models-provider-model_id").table("rust_llm_models").col("provider").col("model_id").unique().to_owned(),
+            Index::create()
+                .name("idx-rust_llm_models-provider-model_id")
+                .table("rust_llm_models")
+                .col("provider")
+                .col("model_id")
+                .unique()
+                .to_owned(),
         )
         .await?;
-        m.create_index(Index::create().name("idx-rust_llm_models-family").table("rust_llm_models").col("family").to_owned()).await?;
+        m.create_index(
+            Index::create()
+                .name("idx-rust_llm_models-family")
+                .table("rust_llm_models")
+                .col("family")
+                .to_owned(),
+        )
+        .await?;
 
         // Polymorphic message/result references, like the Rails table.
         m.create_table(
@@ -73,10 +86,41 @@ impl MigrationTrait for CreateRustLlmRecords {
                 .to_owned(),
         )
         .await?;
-        m.create_index(Index::create().name("idx-rust_llm_tool_calls-message").table("rust_llm_tool_calls").col("message_type").col("message_id").to_owned()).await?;
-        m.create_index(Index::create().name("idx-rust_llm_tool_calls-result").table("rust_llm_tool_calls").col("result_type").col("result_id").to_owned()).await?;
-        m.create_index(Index::create().name("idx-rust_llm_tool_calls-tool_call_id").table("rust_llm_tool_calls").col("tool_call_id").unique().to_owned()).await?;
-        m.create_index(Index::create().name("idx-rust_llm_tool_calls-name").table("rust_llm_tool_calls").col("name").to_owned()).await?;
+        m.create_index(
+            Index::create()
+                .name("idx-rust_llm_tool_calls-message")
+                .table("rust_llm_tool_calls")
+                .col("message_type")
+                .col("message_id")
+                .to_owned(),
+        )
+        .await?;
+        m.create_index(
+            Index::create()
+                .name("idx-rust_llm_tool_calls-result")
+                .table("rust_llm_tool_calls")
+                .col("result_type")
+                .col("result_id")
+                .to_owned(),
+        )
+        .await?;
+        m.create_index(
+            Index::create()
+                .name("idx-rust_llm_tool_calls-tool_call_id")
+                .table("rust_llm_tool_calls")
+                .col("tool_call_id")
+                .unique()
+                .to_owned(),
+        )
+        .await?;
+        m.create_index(
+            Index::create()
+                .name("idx-rust_llm_tool_calls-name")
+                .table("rust_llm_tool_calls")
+                .col("name")
+                .to_owned(),
+        )
+        .await?;
 
         m.create_table(
             Table::create()
@@ -111,15 +155,39 @@ impl MigrationTrait for CreateRustLlmRecords {
                 .to_owned(),
         )
         .await?;
-        m.create_index(Index::create().name("idx-rust_llm_usages-chat").table("rust_llm_usages").col("chat_type").col("chat_id").to_owned()).await?;
-        m.create_index(Index::create().name("idx-rust_llm_usages-message").table("rust_llm_usages").col("message_type").col("message_id").to_owned()).await?;
-        m.create_index(Index::create().name("idx-rust_llm_usages-status").table("rust_llm_usages").col("status").to_owned()).await?;
+        m.create_index(
+            Index::create()
+                .name("idx-rust_llm_usages-chat")
+                .table("rust_llm_usages")
+                .col("chat_type")
+                .col("chat_id")
+                .to_owned(),
+        )
+        .await?;
+        m.create_index(
+            Index::create()
+                .name("idx-rust_llm_usages-message")
+                .table("rust_llm_usages")
+                .col("message_type")
+                .col("message_id")
+                .to_owned(),
+        )
+        .await?;
+        m.create_index(
+            Index::create()
+                .name("idx-rust_llm_usages-status")
+                .table("rust_llm_usages")
+                .col("status")
+                .to_owned(),
+        )
+        .await?;
         Ok(())
     }
 
     async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
         for t in ["rust_llm_usages", "rust_llm_tool_calls", "rust_llm_models"] {
-            m.drop_table(Table::drop().table(t).if_exists().to_owned()).await?;
+            m.drop_table(Table::drop().table(t).if_exists().to_owned())
+                .await?;
         }
         Ok(())
     }
@@ -150,11 +218,19 @@ impl MigrationTrait for CreateChats {
                 .to_owned(),
         )
         .await?;
-        m.create_index(Index::create().name("idx-chats-rust_llm_model_id").table("chats").col("rust_llm_model_id").to_owned()).await
+        m.create_index(
+            Index::create()
+                .name("idx-chats-rust_llm_model_id")
+                .table("chats")
+                .col("rust_llm_model_id")
+                .to_owned(),
+        )
+        .await
     }
 
     async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
-        m.drop_table(Table::drop().table("chats").if_exists().to_owned()).await
+        m.drop_table(Table::drop().table("chats").if_exists().to_owned())
+            .await
     }
 }
 
@@ -193,11 +269,19 @@ impl MigrationTrait for CreateMessages {
                 .to_owned(),
         )
         .await?;
-        m.create_index(Index::create().name("idx-messages-chat_id").table("messages").col("chat_id").to_owned()).await
+        m.create_index(
+            Index::create()
+                .name("idx-messages-chat_id")
+                .table("messages")
+                .col("chat_id")
+                .to_owned(),
+        )
+        .await
     }
 
     async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
-        m.drop_table(Table::drop().table("messages").if_exists().to_owned()).await
+        m.drop_table(Table::drop().table("messages").if_exists().to_owned())
+            .await
     }
 }
 
@@ -229,13 +313,24 @@ impl MigrationTrait for CreateRustLlmAttachments {
         )
         .await?;
         m.create_index(
-            Index::create().name("idx-rust_llm_attachments-message").table("rust_llm_attachments").col("message_type").col("message_id").to_owned(),
+            Index::create()
+                .name("idx-rust_llm_attachments-message")
+                .table("rust_llm_attachments")
+                .col("message_type")
+                .col("message_id")
+                .to_owned(),
         )
         .await
     }
 
     async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
-        m.drop_table(Table::drop().table("rust_llm_attachments").if_exists().to_owned()).await
+        m.drop_table(
+            Table::drop()
+                .table("rust_llm_attachments")
+                .if_exists()
+                .to_owned(),
+        )
+        .await
     }
 }
 
@@ -263,13 +358,32 @@ impl MigrationTrait for CreateRustLlmMcpCredentials {
         )
         .await?;
         m.create_index(
-            Index::create().name("idx-rust_llm_mcp_credentials-owner").table("rust_llm_mcp_credentials").col("owner_type").col("owner_id").to_owned(),
+            Index::create()
+                .name("idx-rust_llm_mcp_credentials-owner")
+                .table("rust_llm_mcp_credentials")
+                .col("owner_type")
+                .col("owner_id")
+                .to_owned(),
         )
         .await?;
-        m.create_index(Index::create().name("idx-rust_llm_mcp_credentials-key").table("rust_llm_mcp_credentials").col("key").unique().to_owned()).await
+        m.create_index(
+            Index::create()
+                .name("idx-rust_llm_mcp_credentials-key")
+                .table("rust_llm_mcp_credentials")
+                .col("key")
+                .unique()
+                .to_owned(),
+        )
+        .await
     }
 
     async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
-        m.drop_table(Table::drop().table("rust_llm_mcp_credentials").if_exists().to_owned()).await
+        m.drop_table(
+            Table::drop()
+                .table("rust_llm_mcp_credentials")
+                .if_exists()
+                .to_owned(),
+        )
+        .await
     }
 }

@@ -10,7 +10,10 @@ mod spec_helpers;
 use rust_llm::files::UploadedFile;
 use rust_llm::message::RawResponse;
 use rust_llm::protocols::anthropic::{self, StreamBlocks};
-use rust_llm::{Attachment, Chat, Error, FinishReason, Message, ProtocolName, Role, Thinking, ThinkingConfig, ThinkingDisplay};
+use rust_llm::{
+    Attachment, Chat, Error, FinishReason, Message, ProtocolName, Role, Thinking, ThinkingConfig,
+    ThinkingDisplay,
+};
 use serde_json::{Value, json};
 use spec_helpers::*;
 
@@ -23,10 +26,6 @@ async fn loaded(name: &str) -> Attachment {
     let mut a = Attachment::new(fixture(name));
     a.content().await.unwrap();
     a
-}
-
-fn anthropic_chat(server: &wiremock::MockServer, model: &str) -> Chat {
-    Chat::with_config(config(server), Some(model), Some("anthropic"), false).unwrap()
 }
 
 /// `chat.render` over `messages`.
@@ -50,7 +49,15 @@ fn parse(data: Value) -> Message {
 }
 
 fn sse_events(events: &[Value]) -> String {
-    events.iter().map(|e| format!("event: {}\ndata: {e}\n\n", e["type"].as_str().unwrap_or("message"))).collect()
+    events
+        .iter()
+        .map(|e| {
+            format!(
+                "event: {}\ndata: {e}\n\n",
+                e["type"].as_str().unwrap_or("message")
+            )
+        })
+        .collect()
 }
 
 // ---- chat_spec.rb ------------------------------------------------------------------------------
@@ -72,7 +79,10 @@ async fn citation_url_scheme_is_case_insensitive() {
     response["content"][0]["citations"] = json!([{ "url": "HTTPS://example.com/source" }]);
     let server = serve(vec![response]).await;
     let reply = chat(&server).ask("hi").await.unwrap();
-    assert_eq!(reply.citations[0].url.as_deref(), Some("HTTPS://example.com/source"));
+    assert_eq!(
+        reply.citations[0].url.as_deref(),
+        Some("HTTPS://example.com/source")
+    );
 }
 
 // spec: protocols/anthropic/chat_spec.rb:50 returns both text blocks when multiple :system messages are passed
@@ -81,7 +91,11 @@ async fn each_system_message_becomes_its_own_block() {
     let server = serve(vec![]).await;
     let payload = render(
         &mut chat(&server),
-        vec![Message::system("Static prompt."), Message::system("Per-session context."), Message::user("Hi")],
+        vec![
+            Message::system("Static prompt."),
+            Message::system("Per-session context."),
+            Message::user("Hi"),
+        ],
     );
     assert_eq!(
         payload["system"],
@@ -93,8 +107,14 @@ async fn each_system_message_becomes_its_own_block() {
 #[tokio::test]
 async fn a_turn_with_no_content_blocks_is_dropped() {
     let server = serve(vec![]).await;
-    let payload =
-        render(&mut chat(&server), vec![Message::user("Hello"), Message::assistant(""), Message::user("Still there?")]);
+    let payload = render(
+        &mut chat(&server),
+        vec![
+            Message::user("Hello"),
+            Message::assistant(""),
+            Message::user("Still there?"),
+        ],
+    );
     assert_eq!(
         payload["messages"],
         json!([
@@ -111,9 +131,24 @@ async fn a_tool_result_cache_boundary_carries_cache_control() {
     let mut result = tool_result("tool_1", "result");
     result.cache_until_here = true;
     let mut chat = chat(&server).with_caching(json!({ "ttl": "1h" })).unwrap();
-    let payload = render(&mut chat, vec![Message::user("Go"), tool_call_message(&[("tool_1", "lookup", json!({}))]), result]);
-    let last = payload["messages"].as_array().unwrap().last().unwrap().clone();
-    assert_eq!(last["content"].as_array().unwrap().last().unwrap()["cache_control"], json!({ "type": "ephemeral", "ttl": "1h" }));
+    let payload = render(
+        &mut chat,
+        vec![
+            Message::user("Go"),
+            tool_call_message(&[("tool_1", "lookup", json!({}))]),
+            result,
+        ],
+    );
+    let last = payload["messages"]
+        .as_array()
+        .unwrap()
+        .last()
+        .unwrap()
+        .clone();
+    assert_eq!(
+        last["content"].as_array().unwrap().last().unwrap()["cache_control"],
+        json!({ "type": "ephemeral", "ttl": "1h" })
+    );
 }
 
 // spec: protocols/anthropic/chat_spec.rb:140 formats attachments before tool calls
@@ -125,11 +160,25 @@ async fn attachments_render_before_tool_calls() {
     call.content = Some("Read this before calling the tool".into());
     call.attachments = vec![loaded("ruby.txt").await];
     let payload = render(&mut chat(&server), vec![Message::user("Go"), call]);
-    let content = payload["messages"][1]["content"].as_array().unwrap().clone();
-    assert_eq!(content[0], json!({ "type": "text", "text": "Read this before calling the tool" }));
+    let content = payload["messages"][1]["content"]
+        .as_array()
+        .unwrap()
+        .clone();
+    assert_eq!(
+        content[0],
+        json!({ "type": "text", "text": "Read this before calling the tool" })
+    );
     assert_eq!(content[1]["type"], "text");
-    assert!(content[1]["text"].as_str().unwrap().contains("<file name='ruby.txt' mime_type='text/plain'>"));
-    assert_eq!((content[2]["type"].as_str(), content[2]["id"].as_str()), (Some("tool_use"), Some("tool_123")));
+    assert!(
+        content[1]["text"]
+            .as_str()
+            .unwrap()
+            .contains("<file name='ruby.txt' mime_type='text/plain'>")
+    );
+    assert_eq!(
+        (content[2]["type"].as_str(), content[2]["id"].as_str()),
+        (Some("tool_use"), Some("tool_123"))
+    );
 }
 
 // spec: protocols/anthropic/chat_spec.rb:173 adds cache_control to a user message marked as a cache boundary
@@ -140,7 +189,14 @@ async fn a_user_cache_boundary_carries_cache_control() {
     chat.ask_later("Long context").unwrap();
     chat.cache_until_here().unwrap();
     let payload = chat.render().unwrap();
-    assert_eq!(payload["messages"][0]["content"].as_array().unwrap().last().unwrap()["cache_control"], json!({ "type": "ephemeral" }));
+    assert_eq!(
+        payload["messages"][0]["content"]
+            .as_array()
+            .unwrap()
+            .last()
+            .unwrap()["cache_control"],
+        json!({ "type": "ephemeral" })
+    );
 }
 
 // spec: protocols/anthropic/chat_spec.rb:294 strips strict key from schema
@@ -164,11 +220,24 @@ async fn schema_strict_is_stripped_from_output_config() {
 /// max_tokens falls back to DEFAULT_MAX_OUTPUT_TOKENS (4096). The registry entries carry the same
 /// reasoning_options the spec passes.
 fn thinking_payload(model: &str, thinking: ThinkingConfig) -> Value {
-    thinking_payload_with(model, thinking, Some(anthropic::DEFAULT_MAX_OUTPUT_TOKENS), None)
+    thinking_payload_with(
+        model,
+        thinking,
+        Some(anthropic::DEFAULT_MAX_OUTPUT_TOKENS),
+        None,
+    )
 }
 
-fn thinking_payload_with(model: &str, thinking: ThinkingConfig, max: Option<i64>, schema: Option<Value>) -> Value {
-    let mut chat = Chat::with_config(render_config(), Some(model), Some("anthropic"), false).unwrap().with_thinking(thinking).with_max_output_tokens(max);
+fn thinking_payload_with(
+    model: &str,
+    thinking: ThinkingConfig,
+    max: Option<i64>,
+    schema: Option<Value>,
+) -> Value {
+    let mut chat = Chat::with_config(render_config(), Some(model), Some("anthropic"), false)
+        .unwrap()
+        .with_thinking(thinking)
+        .with_max_output_tokens(max);
     if let Some(schema) = schema {
         chat = chat.with_schema(schema);
     }
@@ -195,7 +264,10 @@ fn effort_without_a_budget_option_thinks_adaptively() {
 #[test]
 fn effort_sizes_a_budget_on_generations_that_take_one() {
     let p = thinking_payload("claude-opus-4-5", ThinkingConfig::effort("medium"));
-    assert_eq!(p["thinking"], json!({ "type": "enabled", "budget_tokens": 4095 }));
+    assert_eq!(
+        p["thinking"],
+        json!({ "type": "enabled", "budget_tokens": 4095 })
+    );
     assert_eq!(p["output_config"], json!({ "effort": "medium" }));
 }
 
@@ -203,16 +275,27 @@ fn effort_sizes_a_budget_on_generations_that_take_one() {
 #[test]
 fn effort_budget_stays_above_the_minimum() {
     let p = thinking_payload("claude-sonnet-4-5", ThinkingConfig::effort("low"));
-    assert_eq!(p["thinking"], json!({ "type": "enabled", "budget_tokens": 1024 }));
+    assert_eq!(
+        p["thinking"],
+        json!({ "type": "enabled", "budget_tokens": 1024 })
+    );
     assert_eq!(p["output_config"], json!({ "effort": "low" }));
 }
 
 // spec: protocols/anthropic/chat_spec.rb:450 keeps the effort budget under the max_output_tokens of the request
 #[test]
 fn effort_budget_stays_under_the_request_max_output_tokens() {
-    let p = thinking_payload_with("claude-opus-4-5", ThinkingConfig::effort("medium"), Some(4000), None);
+    let p = thinking_payload_with(
+        "claude-opus-4-5",
+        ThinkingConfig::effort("medium"),
+        Some(4000),
+        None,
+    );
     assert_eq!(p["max_tokens"], json!(4000));
-    assert_eq!(p["thinking"], json!({ "type": "enabled", "budget_tokens": 3999 }));
+    assert_eq!(
+        p["thinking"],
+        json!({ "type": "enabled", "budget_tokens": 3999 })
+    );
 }
 
 // spec: protocols/anthropic/chat_spec.rb:471 resolves a bare with_thinking to a request Claude honors
@@ -227,7 +310,10 @@ fn bare_with_thinking_resolves_to_adaptive_medium() {
 #[test]
 fn a_budget_goes_out_even_when_the_registry_lists_only_effort() {
     let p = thinking_payload("claude-opus-4-7", ThinkingConfig::budget(2048));
-    assert_eq!(p["thinking"], json!({ "type": "enabled", "budget_tokens": 2048 }));
+    assert_eq!(
+        p["thinking"],
+        json!({ "type": "enabled", "budget_tokens": 2048 })
+    );
 }
 
 // spec: protocols/anthropic/chat_spec.rb:496 sends effort and budget side by side
@@ -236,22 +322,36 @@ fn effort_and_budget_go_side_by_side() {
     let mut thinking = ThinkingConfig::effort("high");
     thinking.budget = Some(4096);
     let p = thinking_payload("claude-opus-4-5", thinking);
-    assert_eq!(p["thinking"], json!({ "type": "enabled", "budget_tokens": 4096 }));
+    assert_eq!(
+        p["thinking"],
+        json!({ "type": "enabled", "budget_tokens": 4096 })
+    );
     assert_eq!(p["output_config"], json!({ "effort": "high" }));
 }
 
 // spec: protocols/anthropic/chat_spec.rb:518 carries a display on enabled thinking when a budget is set
 #[test]
 fn a_display_rides_on_budgeted_thinking() {
-    let p = thinking_payload("claude-sonnet-4-6", ThinkingConfig::budget(4096).with_display(ThinkingDisplay::Summarized));
-    assert_eq!(p["thinking"], json!({ "type": "enabled", "budget_tokens": 4096, "display": "summarized" }));
+    let p = thinking_payload(
+        "claude-sonnet-4-6",
+        ThinkingConfig::budget(4096).with_display(ThinkingDisplay::Summarized),
+    );
+    assert_eq!(
+        p["thinking"],
+        json!({ "type": "enabled", "budget_tokens": 4096, "display": "summarized" })
+    );
 }
 
 // spec: protocols/anthropic/chat_spec.rb:528 merges thinking effort with schema output_config
 #[test]
 fn effort_merges_with_the_schema_output_config() {
     let schema = json!({ "name": "response", "schema": { "type": "object", "properties": { "name": { "type": "string" } } } });
-    let p = thinking_payload_with("claude-opus-4-7", ThinkingConfig::effort("high"), Some(4096), Some(schema));
+    let p = thinking_payload_with(
+        "claude-opus-4-7",
+        ThinkingConfig::effort("high"),
+        Some(4096),
+        Some(schema),
+    );
     assert_eq!(
         p["output_config"],
         json!({
@@ -272,7 +372,13 @@ fn effort_none_omits_thinking() {
 /// `RubyLLM::Model.new(id: 'claude-3-haiku', provider: 'anthropic')`: no registry entry, no
 /// reasoning options.
 fn haiku3(thinking: Option<ThinkingConfig>) -> Value {
-    let mut chat = Chat::with_config(render_config(), Some("claude-3-haiku"), Some("anthropic"), true).unwrap();
+    let mut chat = Chat::with_config(
+        render_config(),
+        Some("claude-3-haiku"),
+        Some("anthropic"),
+        true,
+    )
+    .unwrap();
     if let Some(t) = thinking {
         chat = chat.with_thinking(t);
     }
@@ -284,7 +390,10 @@ fn haiku3(thinking: Option<ThinkingConfig>) -> Value {
 #[test]
 fn no_thinking_fields_when_thinking_is_off_or_none() {
     for p in [haiku3(None), haiku3(Some(ThinkingConfig::effort("none")))] {
-        assert!(p.get("thinking").is_none() && p.get("output_config").is_none(), "{p}");
+        assert!(
+            p.get("thinking").is_none() && p.get("output_config").is_none(),
+            "{p}"
+        );
     }
 }
 
@@ -300,7 +409,10 @@ fn effort_goes_alone_when_the_registry_lists_no_controls() {
 
 fn assistant_thinking(text: Option<&str>, signature: Option<&str>) -> Message {
     let mut m = Message::assistant("hi");
-    m.thinking = Some(Thinking { text: text.map(str::to_string), signature: signature.map(str::to_string) });
+    m.thinking = Some(Thinking {
+        text: text.map(str::to_string),
+        signature: signature.map(str::to_string),
+    });
     m
 }
 
@@ -308,8 +420,14 @@ fn assistant_thinking(text: Option<&str>, signature: Option<&str>) -> Message {
 #[tokio::test]
 async fn a_thinking_block_without_a_signature_omits_it() {
     let server = serve(vec![]).await;
-    let payload = render(&mut chat(&server), vec![Message::user("Hi"), assistant_thinking(Some("why"), None)]);
-    assert_eq!(payload["messages"][1]["content"][0], json!({ "type": "thinking", "thinking": "why" }));
+    let payload = render(
+        &mut chat(&server),
+        vec![Message::user("Hi"), assistant_thinking(Some("why"), None)],
+    );
+    assert_eq!(
+        payload["messages"][1]["content"][0],
+        json!({ "type": "thinking", "thinking": "why" })
+    );
 }
 
 // spec: protocols/anthropic/chat_spec.rb:635 replays a stored thinking block even when the request asks for no thinking
@@ -317,23 +435,42 @@ async fn a_thinking_block_without_a_signature_omits_it() {
 async fn stored_thinking_replays_on_a_tool_turn_without_thinking_config() {
     let server = serve(vec![]).await;
     let mut call = tool_call_message(&[("toolu_1", "weather", json!({}))]);
-    call.thinking = Some(Thinking { text: Some("why".into()), signature: Some("sig".into()) });
+    call.thinking = Some(Thinking {
+        text: Some("why".into()),
+        signature: Some("sig".into()),
+    });
     let payload = render(&mut chat(&server), vec![Message::user("Weather?"), call]);
-    let types: Vec<&str> = payload["messages"][1]["content"].as_array().unwrap().iter().filter_map(|b| b["type"].as_str()).collect();
+    let types: Vec<&str> = payload["messages"][1]["content"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|b| b["type"].as_str())
+        .collect();
     assert_eq!(types, ["thinking", "tool_use"]);
 }
 
 // spec: protocols/anthropic/chat_spec.rb:647 keeps a display-omitted thinking block as thinking, not redacted data
 #[tokio::test]
 async fn display_omitted_thinking_stays_thinking() {
-    let reply = parse(body(json!([{ "type": "thinking", "thinking": "", "signature": "sig" }, { "type": "text", "text": "hi" }])));
-    assert_eq!(reply.thinking, Some(Thinking { text: Some(String::new()), signature: Some("sig".into()) }));
+    let reply = parse(body(
+        json!([{ "type": "thinking", "thinking": "", "signature": "sig" }, { "type": "text", "text": "hi" }]),
+    ));
+    assert_eq!(
+        reply.thinking,
+        Some(Thinking {
+            text: Some(String::new()),
+            signature: Some("sig".into())
+        })
+    );
     // `build_thinking_block(thinking)`: rendered from the thinking alone, without the raw blocks.
     let server = serve(vec![]).await;
     let mut replay = Message::assistant("hi");
     replay.thinking = reply.thinking.clone();
     let payload = render(&mut chat(&server), vec![Message::user("Hi"), replay]);
-    assert_eq!(payload["messages"][1]["content"][0], json!({ "type": "thinking", "thinking": "", "signature": "sig" }));
+    assert_eq!(
+        payload["messages"][1]["content"][0],
+        json!({ "type": "thinking", "thinking": "", "signature": "sig" })
+    );
 }
 
 /// A server-tool assistant turn replayed verbatim from `raw_content`, marked as a cache boundary.
@@ -348,17 +485,27 @@ fn raw_boundary(raw: Value) -> Message {
 #[tokio::test]
 async fn cache_control_leaves_empty_blocks_alone() {
     let server = serve(vec![]).await;
-    let payload = render(&mut chat(&server), vec![Message::user("Hi"), raw_boundary(json!([]))]);
-    assert_eq!(payload["messages"], json!([{ "role": "user", "content": [{ "type": "text", "text": "Hi" }] }]));
+    let payload = render(
+        &mut chat(&server),
+        vec![Message::user("Hi"), raw_boundary(json!([]))],
+    );
+    assert_eq!(
+        payload["messages"],
+        json!([{ "role": "user", "content": [{ "type": "text", "text": "Hi" }] }])
+    );
 }
 
 // spec: protocols/anthropic/chat_spec.rb:665 leaves a block that already carries cache_control alone
 #[tokio::test]
 async fn cache_control_keeps_an_existing_cache_control() {
     let server = serve(vec![]).await;
-    let blocks = json!([{ "type": "text", "text": "hi", "cache_control": { "type": "ephemeral" } }]);
+    let blocks =
+        json!([{ "type": "text", "text": "hi", "cache_control": { "type": "ephemeral" } }]);
     let mut chat = chat(&server).with_caching(json!({ "ttl": "1h" })).unwrap();
-    let payload = render(&mut chat, vec![Message::user("Hi"), raw_boundary(blocks.clone())]);
+    let payload = render(
+        &mut chat,
+        vec![Message::user("Hi"), raw_boundary(blocks.clone())],
+    );
     assert_eq!(payload["messages"][1]["content"], blocks);
 }
 
@@ -366,15 +513,26 @@ async fn cache_control_keeps_an_existing_cache_control() {
 #[tokio::test]
 async fn cache_control_leaves_a_non_object_block_alone() {
     let server = serve(vec![]).await;
-    let payload = render(&mut chat(&server), vec![Message::user("Hi"), raw_boundary(json!(["plain"]))]);
+    let payload = render(
+        &mut chat(&server),
+        vec![Message::user("Hi"), raw_boundary(json!(["plain"]))],
+    );
     assert_eq!(payload["messages"][1]["content"], json!(["plain"]));
 }
 
 // spec: protocols/anthropic/chat_spec.rb:685 reads the data field off a redacted thinking block
 #[test]
 fn the_signature_comes_from_redacted_thinking_data() {
-    let reply = parse(body(json!([{ "type": "redacted_thinking", "data": "blob" }])));
-    assert_eq!(reply.thinking, Some(Thinking { text: None, signature: Some("blob".into()) }));
+    let reply = parse(body(
+        json!([{ "type": "redacted_thinking", "data": "blob" }]),
+    ));
+    assert_eq!(
+        reply.thinking,
+        Some(Thinking {
+            text: None,
+            signature: Some("blob".into())
+        })
+    );
 }
 
 // spec: protocols/anthropic/chat_spec.rb:691 is nil when no block carries thinking
@@ -422,7 +580,13 @@ async fn signed_and_redacted_blocks_replay_in_order() {
     let server = serve(vec![with_blocks(content.clone(), "end_turn")]).await;
     let mut chat = chat(&server);
     let reply = chat.ask("hi").await.unwrap();
-    assert_eq!(reply.thinking, Some(Thinking { text: Some("First.".into()), signature: Some("sig-one".into()) }));
+    assert_eq!(
+        reply.thinking,
+        Some(Thinking {
+            text: Some("First.".into()),
+            signature: Some("sig-one".into())
+        })
+    );
     assert_eq!(replayed(&mut chat), Value::Array(content));
 }
 
@@ -435,7 +599,10 @@ async fn the_thinking_sequence_replays_before_tool_calls() {
     let mut chat = chat(&server);
     chat.ask_later("hi").unwrap();
     chat.step().await.unwrap();
-    assert_eq!(chat.render().unwrap()["messages"][1]["content"], Value::Array(content));
+    assert_eq!(
+        chat.render().unwrap()["messages"][1]["content"],
+        Value::Array(content)
+    );
 }
 
 // spec: protocols/anthropic/chat_thinking_replay_spec.rb:39 replays thinking assembled from multiple streamed blocks
@@ -445,8 +612,13 @@ async fn streamed_thinking_blocks_replay_as_received() {
     let mut events = vec![json!({ "type": "message_start", "message": { "model": MODEL } })];
     for (index, block) in blocks.iter().enumerate() {
         let thinking = block["type"] == "thinking";
-        let start = if thinking { json!({ "type": "thinking", "thinking": "" }) } else { block.clone() };
-        events.push(json!({ "type": "content_block_start", "index": index, "content_block": start }));
+        let start = if thinking {
+            json!({ "type": "thinking", "thinking": "" })
+        } else {
+            block.clone()
+        };
+        events
+            .push(json!({ "type": "content_block_start", "index": index, "content_block": start }));
         if thinking {
             events.push(json!({ "type": "content_block_delta", "index": index, "delta": { "type": "thinking_delta", "thinking": block["thinking"] } }));
             events.push(json!({ "type": "content_block_delta", "index": index, "delta": { "type": "signature_delta", "signature": block["signature"] } }));
@@ -467,26 +639,42 @@ async fn another_protocols_raw_reasoning_is_not_replayed() {
     let mut done = Message::assistant("Done.");
     done.raw_reasoning = Some(json!({ "converse": [{ "reasoningContent": {} }] }));
     let payload = render(&mut chat(&server), vec![Message::user("Hi"), done]);
-    assert_eq!(payload["messages"][1]["content"], json!([{ "type": "text", "text": "Done." }]));
+    assert_eq!(
+        payload["messages"][1]["content"],
+        json!([{ "type": "text", "text": "Done." }])
+    );
 }
 
 // spec: protocols/anthropic/chat_thinking_replay_spec.rb:66 clears the previous stream's thinking before a new response
 #[test]
 fn message_start_clears_the_previous_streams_blocks() {
     let mut state = StreamBlocks::default();
-    anthropic::build_chunk(&mut state, &json!({ "type": "content_block_start", "index": 0, "content_block": thinking_sequence()[0] }));
+    anthropic::build_chunk(
+        &mut state,
+        &json!({ "type": "content_block_start", "index": 0, "content_block": thinking_sequence()[0] }),
+    );
     anthropic::build_chunk(&mut state, &json!({ "type": "message_start" }));
-    assert_eq!(anthropic::build_chunk(&mut state, &json!({ "type": "message_stop" })).raw_reasoning, None);
+    assert_eq!(
+        anthropic::build_chunk(&mut state, &json!({ "type": "message_stop" })).raw_reasoning,
+        None
+    );
 }
 
 // spec: protocols/anthropic/chat_thinking_replay_spec.rb:73 retains the thinking in the final segment of a paused server-tool turn
 #[tokio::test]
 async fn a_paused_turn_keeps_the_final_segments_thinking() {
     let blocks = thinking_sequence();
-    let first = vec![blocks[0].clone(), json!({ "type": "server_tool_use", "id": "server-1", "name": "web_search", "input": {} })];
+    let first = vec![
+        blocks[0].clone(),
+        json!({ "type": "server_tool_use", "id": "server-1", "name": "web_search", "input": {} }),
+    ];
     let mut last: Vec<Value> = blocks[1..].to_vec();
     last.push(json!({ "type": "text", "text": "Done." }));
-    let server = serve(vec![with_blocks(first.clone(), "pause_turn"), with_blocks(last.clone(), "end_turn")]).await;
+    let server = serve(vec![
+        with_blocks(first.clone(), "pause_turn"),
+        with_blocks(last.clone(), "end_turn"),
+    ])
+    .await;
     let mut chat = chat(&server);
     chat.ask("hi").await.unwrap();
     assert_eq!(replayed(&mut chat), Value::Array([first, last].concat()));
@@ -499,7 +687,13 @@ async fn a_paused_turn_keeps_the_final_segments_thinking() {
 async fn empty_text_is_skipped_beside_attachments() {
     let pdf = loaded("sample.pdf").await;
     let blocks = anthropic::format_content(Some(""), &[pdf]).unwrap();
-    assert_eq!(blocks.iter().filter_map(|b| b["type"].as_str()).collect::<Vec<_>>(), ["document"]);
+    assert_eq!(
+        blocks
+            .iter()
+            .filter_map(|b| b["type"].as_str())
+            .collect::<Vec<_>>(),
+        ["document"]
+    );
     assert!(anthropic::format_content(Some(""), &[]).unwrap().is_empty());
 }
 
@@ -522,7 +716,8 @@ async fn a_provider_managed_pdf_is_a_citable_document_file_source() {
     };
     let server = serve(vec![]).await;
     let mut chat = chat(&server).with_citations(true);
-    chat.ask_later_with("Summarize this", vec![Attachment::from_uploaded(file)]).unwrap();
+    chat.ask_later_with("Summarize this", vec![Attachment::from_uploaded(file)])
+        .unwrap();
     assert_eq!(
         chat.render().unwrap()["messages"][0]["content"][1],
         json!({
@@ -576,15 +771,24 @@ async fn stream_error(data: &str) -> Error {
 // spec: protocols/anthropic/streaming_spec.rb:68 falls back to a 500 for other typed error objects
 #[tokio::test]
 async fn other_typed_stream_errors_are_server_errors() {
-    let err = stream_error(r#"{"type":"error","error":{"type":"invalid_request_error","message":"Bad request"}}"#).await;
-    assert!(matches!(&err, Error::Server(m, Some(r)) if m == "Bad request" && r.status == 500), "{err:?}");
+    let err = stream_error(
+        r#"{"type":"error","error":{"type":"invalid_request_error","message":"Bad request"}}"#,
+    )
+    .await;
+    assert!(
+        matches!(&err, Error::Server(m, Some(r)) if m == "Bad request" && r.status == 500),
+        "{err:?}"
+    );
 }
 
 // spec: protocols/anthropic/streaming_spec.rb:78 handles a string error value
 #[tokio::test]
 async fn a_string_stream_error_is_a_server_error() {
     let err = stream_error(r#"{"type":"error","error":"Overloaded"}"#).await;
-    assert!(matches!(&err, Error::Server(m, Some(r)) if m == "Overloaded" && r.status == 500), "{err:?}");
+    assert!(
+        matches!(&err, Error::Server(m, Some(r)) if m == "Overloaded" && r.status == 500),
+        "{err:?}"
+    );
 }
 
 // spec: protocols/anthropic/streaming_spec.rb:88 ignores a body that parses to a bare JSON string
@@ -594,7 +798,10 @@ async fn a_bare_json_string_stream_error_has_no_parsed_status() {
     let status = rust_llm::protocols::streaming_error_status(ProtocolName::Anthropic);
     assert_eq!(status(r#""model unavailable (type: error)""#), None);
     let err = stream_error(r#""model unavailable (type: error)""#).await;
-    assert!(matches!(&err, Error::Server(m, Some(r)) if m == "model unavailable (type: error)" && r.status == 500), "{err:?}");
+    assert!(
+        matches!(&err, Error::Server(m, Some(r)) if m == "model unavailable (type: error)" && r.status == 500),
+        "{err:?}"
+    );
 }
 
 // ---- tools_spec.rb -------------------------------------------------------------------------------
@@ -605,7 +812,11 @@ async fn an_empty_tool_result_renders_a_placeholder() {
     let server = serve(vec![]).await;
     let payload = render(
         &mut chat(&server),
-        vec![Message::user("Go"), tool_call_message(&[("tool_123", "lookup", json!({}))]), tool_result("tool_123", "")],
+        vec![
+            Message::user("Go"),
+            tool_call_message(&[("tool_123", "lookup", json!({}))]),
+            tool_result("tool_123", ""),
+        ],
     );
     assert_eq!(
         payload["messages"][2],
@@ -619,7 +830,10 @@ async fn an_empty_tool_result_renders_a_placeholder() {
 // spec: protocols/anthropic/tools_spec.rb:279 returns nil for empty or nil input
 #[test]
 fn no_tool_use_blocks_means_no_tool_calls() {
-    assert_eq!(parse(json!({ "model": MODEL, "usage": {} })).tool_calls, None);
+    assert_eq!(
+        parse(json!({ "model": MODEL, "usage": {} })).tool_calls,
+        None
+    );
     assert_eq!(parse(body(json!([]))).tool_calls, None);
 }
 
@@ -657,8 +871,15 @@ fn streamed_compaction_deltas_accumulate() {
         anthropic::build_chunk(&mut state, &event);
     }
     let chunk = anthropic::build_chunk(&mut state, &json!({ "type": "message_stop" }));
-    let compaction = chunk.server_tool_calls.iter().find(|c| c.kind == "compaction").unwrap();
-    assert_eq!(compaction.result, Some(json!("Summary of the conversation.")));
+    let compaction = chunk
+        .server_tool_calls
+        .iter()
+        .find(|c| c.kind == "compaction")
+        .unwrap();
+    assert_eq!(
+        compaction.result,
+        Some(json!("Summary of the conversation."))
+    );
 }
 
 fn compacted_usage() -> Value {
@@ -681,12 +902,18 @@ async fn cache_tokens_sum_across_iterations() {
     response["usage"] = usage;
     let server = serve(vec![response]).await;
     let reply = chat(&server).ask("hi").await.unwrap();
-    assert_eq!((reply.tokens.cache_read, reply.tokens.cache_write), (Some(1_000), Some(20)));
+    assert_eq!(
+        (reply.tokens.cache_read, reply.tokens.cache_write),
+        (Some(1_000), Some(20))
+    );
 }
 
 // spec: protocols/anthropic_compaction_spec.rb:103 sums iterations reported mid-stream
 #[test]
 fn streamed_iterations_sum() {
-    let chunk = anthropic::build_chunk(&mut StreamBlocks::default(), &json!({ "type": "message_delta", "usage": compacted_usage() }));
+    let chunk = anthropic::build_chunk(
+        &mut StreamBlocks::default(),
+        &json!({ "type": "message_delta", "usage": compacted_usage() }),
+    );
     assert_eq!(chunk.tokens.output, Some(210));
 }

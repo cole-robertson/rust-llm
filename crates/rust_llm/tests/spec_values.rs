@@ -9,7 +9,10 @@ use async_trait::async_trait;
 use rust_llm::cost::{Component, Tier};
 use rust_llm::message::indexmap_lite::IndexMap;
 use rust_llm::model::{Modalities, ModelType, PricingCategory, PricingTier};
-use rust_llm::{Citation, Config, Cost, Error, ErrorKind, FinishReason, Message, Model, Parameter, Progress, Role, Tokens, Tool, ToolCall, ToolError, ToolResult};
+use rust_llm::{
+    Citation, Config, Cost, Error, ErrorKind, FinishReason, Message, Model, Parameter, Progress,
+    Role, Tokens, Tool, ToolCall, ToolError, ToolResult,
+};
 use serde_json::{Map, Value, json};
 
 const EPS: f64 = 1e-10;
@@ -20,7 +23,11 @@ fn close(actual: Option<f64>, expected: f64) {
 }
 
 fn tier(input: Option<f64>, output: Option<f64>) -> PricingTier {
-    PricingTier { input_per_million: input, output_per_million: output, ..Default::default() }
+    PricingTier {
+        input_per_million: input,
+        output_per_million: output,
+        ..Default::default()
+    }
 }
 
 fn model_with(id: &str, provider: &str, text: PricingCategory) -> Model {
@@ -31,7 +38,10 @@ fn model_with(id: &str, provider: &str, text: PricingCategory) -> Model {
 }
 
 fn standard(t: PricingTier) -> PricingCategory {
-    PricingCategory { standard: Some(t), ..Default::default() }
+    PricingCategory {
+        standard: Some(t),
+        ..Default::default()
+    }
 }
 
 /// cost_spec.rb's `priced-model`: $1 in, $2 out, $0.25 cache read, $1.25 cache write.
@@ -50,7 +60,11 @@ fn priced() -> Model {
 }
 
 fn tokens(input: Option<i64>, output: Option<i64>) -> Tokens {
-    Tokens { input, output, ..Default::default() }
+    Tokens {
+        input,
+        output,
+        ..Default::default()
+    }
 }
 
 fn cost(t: &Tokens, m: Option<&Model>) -> Cost {
@@ -62,7 +76,13 @@ fn cost(t: &Tokens, m: Option<&Model>) -> Cost {
 // spec: cost_spec.rb:25 calculates input, output, cache read, and cache write costs from normalized token buckets
 #[test]
 fn cost_prices_every_normalized_bucket() {
-    let t = Tokens { input: Some(1_000), output: Some(2_000), cache_read: Some(300), cache_write: Some(100), ..Default::default() };
+    let t = Tokens {
+        input: Some(1_000),
+        output: Some(2_000),
+        cache_read: Some(300),
+        cache_write: Some(100),
+        ..Default::default()
+    };
     let c = cost(&t, Some(&priced()));
     close(c.input, 0.001);
     close(c.output, 0.004);
@@ -74,7 +94,11 @@ fn cost_prices_every_normalized_bucket() {
 // spec: cost_spec.rb:36 trusts input tokens as the standard input bucket
 #[test]
 fn cost_trusts_input_tokens_as_the_standard_bucket() {
-    let t = Tokens { input: Some(700), cache_read: Some(300), ..Default::default() };
+    let t = Tokens {
+        input: Some(700),
+        cache_read: Some(300),
+        ..Default::default()
+    };
     let c = cost(&t, Some(&priced()));
     close(c.input, 0.0007);
     close(c.cache_read, 0.000075);
@@ -86,7 +110,11 @@ fn cost_trusts_input_tokens_as_the_standard_bucket() {
 fn cost_prices_images_from_text_and_image_input_details() {
     let mut m = model_with("image-model", "openai", standard(tier(Some(5.0), None)));
     m.pricing.images = Some(standard(tier(Some(10.0), Some(40.0))));
-    let c = Cost::images(&tokens(Some(350), Some(50)), Some(&m), Some(&json!({ "text_tokens": 100, "image_tokens": 250 })));
+    let c = Cost::images(
+        &tokens(Some(350), Some(50)),
+        Some(&m),
+        Some(&json!({ "text_tokens": 100, "image_tokens": 250 })),
+    );
     close(c.input, 0.003);
     close(c.output, 0.002);
     close(c.total(), 0.005);
@@ -95,7 +123,12 @@ fn cost_prices_images_from_text_and_image_input_details() {
 // spec: cost_spec.rb:80 does not price thinking tokens separately when output already includes them
 #[test]
 fn cost_does_not_price_thinking_inside_output_twice() {
-    let t = Tokens { input: Some(50), output: Some(1306), thinking: Some(1087), ..Default::default() };
+    let t = Tokens {
+        input: Some(50),
+        output: Some(1306),
+        thinking: Some(1087),
+        ..Default::default()
+    };
     let c = cost(&t, Some(&priced()));
     close(c.output, 0.002612);
     assert_eq!(c.thinking, None);
@@ -108,9 +141,17 @@ fn cost_prices_thinking_separately_with_distinct_reasoning_pricing() {
     let m = model_with(
         "reasoning-priced-model",
         "perplexity",
-        standard(PricingTier { reasoning_output_per_million: Some(3.0), ..tier(Some(2.0), Some(8.0)) }),
+        standard(PricingTier {
+            reasoning_output_per_million: Some(3.0),
+            ..tier(Some(2.0), Some(8.0))
+        }),
     );
-    let t = Tokens { input: Some(33), output: Some(11_395), thinking: Some(193_947), ..Default::default() };
+    let t = Tokens {
+        input: Some(33),
+        output: Some(11_395),
+        thinking: Some(193_947),
+        ..Default::default()
+    };
     let c = cost(&t, Some(&m));
     close(c.input, 0.000066);
     close(c.output, 0.09116);
@@ -121,8 +162,22 @@ fn cost_prices_thinking_separately_with_distinct_reasoning_pricing() {
 // spec: cost_spec.rb:113 does not double-count thinking tokens when reasoning pricing matches output pricing
 #[test]
 fn cost_does_not_double_count_thinking_at_the_output_price() {
-    let m = model_with("inclusive", "openrouter", standard(PricingTier { reasoning_output_per_million: Some(12.0), ..tier(None, Some(12.0)) }));
-    let c = cost(&Tokens { output: Some(1_000), thinking: Some(800), ..Default::default() }, Some(&m));
+    let m = model_with(
+        "inclusive",
+        "openrouter",
+        standard(PricingTier {
+            reasoning_output_per_million: Some(12.0),
+            ..tier(None, Some(12.0))
+        }),
+    );
+    let c = cost(
+        &Tokens {
+            output: Some(1_000),
+            thinking: Some(800),
+            ..Default::default()
+        },
+        Some(&m),
+    );
     assert_eq!(c.output, Some(0.012));
     assert_eq!(c.thinking, None);
     assert_eq!(c.total(), Some(0.012));
@@ -133,8 +188,14 @@ fn long_context_model() -> Model {
         "gpt-5.6-sol",
         "openai",
         PricingCategory {
-            standard: Some(PricingTier { cache_read_input_per_million: Some(0.5), ..tier(Some(5.0), Some(30.0)) }),
-            long_context: Some(PricingTier { cache_read_input_per_million: Some(1.0), ..tier(Some(10.0), Some(45.0)) }),
+            standard: Some(PricingTier {
+                cache_read_input_per_million: Some(0.5),
+                ..tier(Some(5.0), Some(30.0))
+            }),
+            long_context: Some(PricingTier {
+                cache_read_input_per_million: Some(1.0),
+                ..tier(Some(10.0), Some(45.0))
+            }),
             long_context_threshold: Some(272_000),
             ..Default::default()
         },
@@ -145,14 +206,25 @@ fn long_context_model() -> Model {
 #[test]
 fn cost_uses_long_context_rates_past_the_threshold() {
     let m = long_context_model();
-    close(cost(&tokens(Some(100_000), Some(10_000)), Some(&m)).total(), 0.8);
-    close(cost(&tokens(Some(500_000), Some(10_000)), Some(&m)).total(), 5.45);
+    close(
+        cost(&tokens(Some(100_000), Some(10_000)), Some(&m)).total(),
+        0.8,
+    );
+    close(
+        cost(&tokens(Some(500_000), Some(10_000)), Some(&m)).total(),
+        5.45,
+    );
 }
 
 // spec: cost_spec.rb:170 counts cache tokens toward the long-context prompt threshold
 #[test]
 fn cost_counts_cache_tokens_toward_the_long_context_threshold() {
-    let t = Tokens { input: Some(100_000), output: Some(1_000), cache_read: Some(200_000), ..Default::default() };
+    let t = Tokens {
+        input: Some(100_000),
+        output: Some(1_000),
+        cache_read: Some(200_000),
+        ..Default::default()
+    };
     let c = cost(&t, Some(&long_context_model()));
     close(c.input, 1.0);
     close(c.cache_read, 0.2);
@@ -162,7 +234,11 @@ fn cost_counts_cache_tokens_toward_the_long_context_threshold() {
 // spec: cost_spec.rb:201 returns nil when pricing is missing for tokens that were used
 #[test]
 fn cost_total_is_unknown_when_used_tokens_have_no_price() {
-    let m = model_with("incomplete-model", "openai", standard(tier(Some(1.0), None)));
+    let m = model_with(
+        "incomplete-model",
+        "openai",
+        standard(tier(Some(1.0), None)),
+    );
     let c = cost(&tokens(Some(10), Some(5)), Some(&m));
     assert_eq!(c.input, Some(0.00001));
     assert_eq!(c.output, None);
@@ -172,7 +248,11 @@ fn cost_total_is_unknown_when_used_tokens_have_no_price() {
 // spec: cost_spec.rb:216 does not require pricing for token buckets that were not used
 #[test]
 fn cost_needs_no_price_for_unused_buckets() {
-    let m = model_with("input-only-model", "openai", standard(tier(Some(1.0), None)));
+    let m = model_with(
+        "input-only-model",
+        "openai",
+        standard(tier(Some(1.0), None)),
+    );
     let c = cost(&tokens(Some(10), None), Some(&m));
     assert_eq!(c.output, None);
     assert_eq!(c.total(), Some(0.00001));
@@ -185,7 +265,10 @@ fn cost_total_is_unknown_without_usage() {
 }
 
 fn reported(input: Option<i64>, output: Option<i64>, amount: f64) -> Tokens {
-    Tokens { reported_cost: Some(amount), ..tokens(input, output) }
+    Tokens {
+        reported_cost: Some(amount),
+        ..tokens(input, output)
+    }
 }
 
 // spec: cost_spec.rb:236 prefers the reported cost over the registry estimate
@@ -215,7 +298,10 @@ fn cost_reports_usage_from_a_cost_alone() {
 // spec: cost_spec.rb:260 estimates from the registry when no cost was reported
 #[test]
 fn cost_estimates_from_the_registry_without_a_reported_cost() {
-    close(cost(&tokens(Some(1_000), Some(2_000)), Some(&priced())).total(), 0.005);
+    close(
+        cost(&tokens(Some(1_000), Some(2_000)), Some(&priced())).total(),
+        0.005,
+    );
 }
 
 // spec: cost_spec.rb:267 sums reported costs across aggregated attempts
@@ -257,8 +343,15 @@ fn cost_aggregate_ignores_entries_without_usage() {
 // (`Cost.from_h` is `Cost::from_recorded(amounts, total, tokens)`: the stored usage columns.)
 #[test]
 fn cost_from_recorded_reads_amounts_and_total() {
-    let c = Cost::from_recorded([Some(0.001), Some(0.004), None, None, None], Some(0.005), &Tokens::default());
-    assert_eq!((c.input, c.output, c.cache_read), (Some(0.001), Some(0.004), None));
+    let c = Cost::from_recorded(
+        [Some(0.001), Some(0.004), None, None, None],
+        Some(0.005),
+        &Tokens::default(),
+    );
+    assert_eq!(
+        (c.input, c.output, c.cache_read),
+        (Some(0.001), Some(0.004), None)
+    );
     assert_eq!(c.total(), Some(0.005));
 }
 
@@ -285,7 +378,11 @@ fn cost_from_recorded_keeps_unpriced_usage_missing() {
 // (the stored breakdown has no token counts, so nothing proves the input amount is the whole bill)
 #[test]
 fn cost_from_recorded_without_a_total_and_without_tokens_has_no_total() {
-    let c = Cost::from_recorded([Some(0.001), None, None, None, None], None, &Tokens::default());
+    let c = Cost::from_recorded(
+        [Some(0.001), None, None, None, None],
+        None,
+        &Tokens::default(),
+    );
     assert_eq!(c.input, Some(0.001));
     assert_eq!(c.total(), None);
 }
@@ -293,8 +390,16 @@ fn cost_from_recorded_without_a_total_and_without_tokens_has_no_total() {
 // spec: cost_spec.rb:363 aggregates several stored costs
 #[test]
 fn cost_aggregate_of_recorded_costs() {
-    let a = Cost::from_recorded([Some(0.001), Some(0.004), None, None, None], Some(0.005), &Tokens::default());
-    let b = Cost::from_recorded([Some(0.0005), Some(0.002), None, None, None], Some(0.0025), &Tokens::default());
+    let a = Cost::from_recorded(
+        [Some(0.001), Some(0.004), None, None, None],
+        Some(0.005),
+        &Tokens::default(),
+    );
+    let b = Cost::from_recorded(
+        [Some(0.0005), Some(0.002), None, None, None],
+        Some(0.0025),
+        &Tokens::default(),
+    );
     let agg = Cost::aggregate([&a, &b], true);
     close(agg.input, 0.0015);
     close(agg.output, 0.006);
@@ -304,7 +409,11 @@ fn cost_aggregate_of_recorded_costs() {
 // spec: cost_spec.rb:373 aggregates a stored cost mixed with a live cost
 #[test]
 fn cost_aggregate_of_a_recorded_and_a_live_cost() {
-    let stored = Cost::from_recorded([Some(0.001), Some(0.004), None, None, None], Some(0.005), &Tokens::default());
+    let stored = Cost::from_recorded(
+        [Some(0.001), Some(0.004), None, None, None],
+        Some(0.005),
+        &Tokens::default(),
+    );
     let live = cost(&tokens(Some(1_000), None), Some(&priced()));
     let agg = Cost::aggregate([&stored, &live], true);
     close(agg.input, 0.002);
@@ -325,7 +434,12 @@ fn cost_incomplete_aggregate_has_no_total() {
 #[test]
 fn cost_prices_against_a_registry_model() {
     let m = rust_llm::models().find("gpt-4.1-nano", None).unwrap();
-    assert!(cost(&tokens(Some(1_000_000), None), Some(&m)).input.unwrap() > 0.0);
+    assert!(
+        cost(&tokens(Some(1_000_000), None), Some(&m))
+            .input
+            .unwrap()
+            > 0.0
+    );
 }
 
 // spec: cost_spec.rb:429 prices a named category
@@ -348,7 +462,11 @@ fn cost_from_an_empty_record_reports_nothing() {
 // spec: cost_spec.rb:471 flags components that had tokens but no recorded cost
 #[test]
 fn cost_from_recorded_flags_components_with_tokens_but_no_cost() {
-    let c = Cost::from_recorded([Some(0.001), None, None, None, None], None, &tokens(Some(10), Some(5)));
+    let c = Cost::from_recorded(
+        [Some(0.001), None, None, None, None],
+        None,
+        &tokens(Some(10), Some(5)),
+    );
     assert!(c.missing().contains(&Component::Output));
     assert_eq!(c.total(), None);
 }
@@ -361,7 +479,12 @@ fn call(id: &str, name: &str) -> ToolCall {
 
 fn calling(calls: &[(&str, &str)]) -> Message {
     let mut m = Message::new(Role::Assistant, None::<String>);
-    m.tool_calls = Some(calls.iter().map(|(id, name)| (id.to_string(), call(id, name))).collect::<IndexMap<_>>());
+    m.tool_calls = Some(
+        calls
+            .iter()
+            .map(|(id, name)| (id.to_string(), call(id, name)))
+            .collect::<IndexMap<_>>(),
+    );
     m
 }
 
@@ -374,19 +497,32 @@ fn message_keeps_no_content_without_tool_calls() {
 // spec: message_spec.rb:44 parses JSON content
 #[test]
 fn message_parsed_reads_json() {
-    assert_eq!(Message::assistant(r#"{"name":"Alice","age":30}"#).parsed().unwrap(), Some(json!({ "name": "Alice", "age": 30 })));
+    assert_eq!(
+        Message::assistant(r#"{"name":"Alice","age":30}"#)
+            .parsed()
+            .unwrap(),
+        Some(json!({ "name": "Alice", "age": 30 }))
+    );
 }
 
 // spec: message_spec.rb:50 returns nil for nil content
 #[test]
 fn message_parsed_is_none_without_content() {
-    assert_eq!(Message::new(Role::Assistant, None::<String>).parsed().unwrap(), None);
+    assert_eq!(
+        Message::new(Role::Assistant, None::<String>)
+            .parsed()
+            .unwrap(),
+        None
+    );
 }
 
 // spec: message_spec.rb:56 raises for non-JSON content
 #[test]
 fn message_parsed_fails_for_plain_text() {
-    assert!(matches!(Message::assistant("plain text").parsed(), Err(Error::Json(_))));
+    assert!(matches!(
+        Message::assistant("plain text").parsed(),
+        Err(Error::Json(_))
+    ));
 }
 
 // spec: message_spec.rb:62 returns nil for a tool-call turn without text
@@ -432,9 +568,19 @@ fn message_tokens_and_cost_are_empty_values_by_default() {
 #[test]
 fn message_exposes_every_bucket_through_tokens() {
     let mut m = Message::assistant("Hello");
-    m.tokens = Tokens { input: Some(10), output: Some(4), cache_read: Some(42), cache_write: Some(7), thinking: Some(2), ..Default::default() };
+    m.tokens = Tokens {
+        input: Some(10),
+        output: Some(4),
+        cache_read: Some(42),
+        cache_write: Some(7),
+        thinking: Some(2),
+        ..Default::default()
+    };
     let t = m.tokens();
-    assert_eq!((t.input, t.output, t.cache_read, t.cache_write, t.thinking), (Some(10), Some(4), Some(42), Some(7), Some(2)));
+    assert_eq!(
+        (t.input, t.output, t.cache_read, t.cache_write, t.thinking),
+        (Some(10), Some(4), Some(42), Some(7), Some(2))
+    );
 }
 
 // spec: message_spec.rb:253 does not substitute another provider when the recorded model is missing
@@ -488,10 +634,18 @@ fn message_keeps_provider_finish_reasons_verbatim() {
 // spec: message_spec.rb:301 returns false when finish_reason is nil or unknown
 #[test]
 fn message_predicates_are_false_for_unknown_reasons() {
-    for reason in [None, Some(FinishReason::from_symbol("weird_provider_value"))] {
+    for reason in [
+        None,
+        Some(FinishReason::from_symbol("weird_provider_value")),
+    ] {
         let mut m = Message::assistant("Hello");
         m.finish_reason = reason;
-        assert!(!m.is_stopped() && !m.is_max_tokens() && !m.is_tool_call_stop() && !m.is_content_filtered());
+        assert!(
+            !m.is_stopped()
+                && !m.is_max_tokens()
+                && !m.is_tool_call_stop()
+                && !m.is_content_filtered()
+        );
     }
 }
 
@@ -541,43 +695,83 @@ fn citation_round_trips_through_json() {
 // spec: citation_spec.rb:28 builds from string-keyed hashes
 #[test]
 fn citation_builds_from_a_string_keyed_hash() {
-    let c: Citation = serde_json::from_value(json!({ "url": "https://example.com", "start_index": 3 })).unwrap();
-    assert_eq!((c.url.as_deref(), c.start_index), (Some("https://example.com"), Some(3)));
+    let c: Citation =
+        serde_json::from_value(json!({ "url": "https://example.com", "start_index": 3 })).unwrap();
+    assert_eq!(
+        (c.url.as_deref(), c.start_index),
+        (Some("https://example.com"), Some(3))
+    );
 }
 
 // spec: citation_spec.rb:35 preserves file identities through JSON persistence
 #[test]
 fn citation_keeps_file_identities_through_json() {
-    let c = Citation { source_id: Some("file_facts".into()), title: Some("facts.pdf".into()), ..Default::default() };
+    let c = Citation {
+        source_id: Some("file_facts".into()),
+        title: Some("facts.pdf".into()),
+        ..Default::default()
+    };
     let restored: Citation = serde_json::from_str(&serde_json::to_string(&c).unwrap()).unwrap();
-    assert_eq!((restored.source_id.as_deref(), restored.title.as_deref(), restored.url.as_deref()), (Some("file_facts"), Some("facts.pdf"), None));
-    assert_ne!(restored, Citation { source_id: Some("file_other".into()), ..c });
+    assert_eq!(
+        (
+            restored.source_id.as_deref(),
+            restored.title.as_deref(),
+            restored.url.as_deref()
+        ),
+        (Some("file_facts"), Some("facts.pdf"), None)
+    );
+    assert_ne!(
+        restored,
+        Citation {
+            source_id: Some("file_other".into()),
+            ..c
+        }
+    );
 }
 
 // spec: citation_spec.rb:43 omits missing fields from to_h
 #[test]
 fn citation_omits_missing_fields() {
-    let c = Citation { url: Some("https://example.com".into()), ..Default::default() };
-    assert_eq!(serde_json::to_value(&c).unwrap(), json!({ "url": "https://example.com" }));
+    let c = Citation {
+        url: Some("https://example.com".into()),
+        ..Default::default()
+    };
+    assert_eq!(
+        serde_json::to_value(&c).unwrap(),
+        json!({ "url": "https://example.com" })
+    );
 }
 
 // spec: citation_spec.rb:49 compares by value
 #[test]
 fn citation_compares_by_value() {
     assert_eq!(full_citation(), full_citation().clone());
-    assert_ne!(full_citation(), Citation { url: Some("https://other.com".into()), ..full_citation() });
+    assert_ne!(
+        full_citation(),
+        Citation {
+            url: Some("https://other.com".into()),
+            ..full_citation()
+        }
+    );
 }
 
 // ---- progress_spec.rb -------------------------------------------------------------------------
 
 fn progress(value: Option<f64>, total: Option<f64>, message: Option<&str>) -> Progress {
-    Progress { value, total, message: message.map(str::to_string) }
+    Progress {
+        value,
+        total,
+        message: message.map(str::to_string),
+    }
 }
 
 // spec: progress_spec.rb:6 reads the share of work done
 #[test]
 fn progress_reads_the_share_of_work_done() {
-    assert_eq!(progress(Some(3.0), Some(12.0), Some("Reading page 3 of 12")).fraction(), Some(0.25));
+    assert_eq!(
+        progress(Some(3.0), Some(12.0), Some("Reading page 3 of 12")).fraction(),
+        Some(0.25)
+    );
 }
 
 // spec: progress_spec.rb:10 has no share without a value and a total
@@ -598,17 +792,26 @@ fn errors_carry_their_message_and_no_response() {
     assert_eq!(e.to_string(), "something went wrong");
     assert!(e.response().is_none());
     let e = Error::BadRequest("bad request".into(), None);
-    assert_eq!((e.to_string().as_str(), e.response().is_none()), ("bad request", true));
+    assert_eq!(
+        (e.to_string().as_str(), e.response().is_none()),
+        ("bad request", true)
+    );
 }
 
 // spec: error_spec.rb:23 stores the response
 // spec: error_spec.rb:28 uses the provided message
 #[test]
 fn errors_keep_the_response_they_came_from() {
-    let response = rust_llm::error::ErrorResponse { status: 500, body: r#"{"error":"server error"}"#.into() };
+    let response = rust_llm::error::ErrorResponse {
+        status: 500,
+        body: r#"{"error":"server error"}"#.into(),
+    };
     let e = Error::Server("server error".into(), Some(response));
     assert_eq!(e.to_string(), "server error");
-    assert_eq!(e.response().map(|r| (r.status, r.body.as_str())), Some((500, r#"{"error":"server error"}"#)));
+    assert_eq!(
+        e.response().map(|r| (r.status, r.body.as_str())),
+        Some((500, r#"{"error":"server error"}"#))
+    );
 }
 
 // spec: error_spec.rb:59 keeps local setup and programming errors outside RubyLLM::Error
@@ -646,9 +849,18 @@ async fn tool_call_parse_errors_keep_the_finish_reason() {
     config.set("deepseek_api_base", server.uri());
     config.set("deepseek_api_key", "test");
     config.max_retries = 0;
-    let mut chat = rust_llm::Chat::with_config(std::sync::Arc::new(config), Some("deepseek-v4-flash"), Some("deepseek"), false).unwrap();
+    let mut chat = rust_llm::Chat::with_config(
+        std::sync::Arc::new(config),
+        Some("deepseek-v4-flash"),
+        Some("deepseek"),
+        false,
+    )
+    .unwrap();
     match chat.ask("hi").await.unwrap_err() {
-        Error::ToolCallParse { message, finish_reason } => {
+        Error::ToolCallParse {
+            message,
+            finish_reason,
+        } => {
             // Ruby raises with the normalized reason: `length` is `:max_tokens` by then.
             assert_eq!(finish_reason.as_deref(), Some("max_tokens"));
             assert!(message.contains("finish_reason: max_tokens"), "{message}");
@@ -675,7 +887,11 @@ fn unsupported_attachment_errors_name_the_type_and_guide() {
     let mut m = m;
     m.ask_later_with(
         "read this",
-        vec![rust_llm::Attachment::from_bytes(b"PK".to_vec(), "a.docx", Some("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))],
+        vec![rust_llm::Attachment::from_bytes(
+            b"PK".to_vec(),
+            "a.docx",
+            Some("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        )],
     )
     .unwrap();
     let err = m.render().unwrap_err();
@@ -690,37 +906,91 @@ fn unsupported_attachment_errors_name_the_type_and_guide() {
 #[tokio::test]
 async fn every_error_class_has_its_default_message() {
     for (status, kind, message) in [
-        (400, ErrorKind::BadRequest, "Invalid request - please check your input"),
-        (403, ErrorKind::Forbidden, "Forbidden - you do not have permission to access this resource"),
-        (529, ErrorKind::Overloaded, "Service overloaded - please try again later"),
-        (402, ErrorKind::PaymentRequired, "Payment required - please top up your account"),
-        (429, ErrorKind::RateLimit, "Rate limit exceeded - please wait a moment"),
-        (500, ErrorKind::Server, "API server error - please try again"),
-        (503, ErrorKind::ServiceUnavailable, "API server unavailable - please try again later"),
-        (401, ErrorKind::Unauthorized, "Invalid API key - check your credentials"),
+        (
+            400,
+            ErrorKind::BadRequest,
+            "Invalid request - please check your input",
+        ),
+        (
+            403,
+            ErrorKind::Forbidden,
+            "Forbidden - you do not have permission to access this resource",
+        ),
+        (
+            529,
+            ErrorKind::Overloaded,
+            "Service overloaded - please try again later",
+        ),
+        (
+            402,
+            ErrorKind::PaymentRequired,
+            "Payment required - please top up your account",
+        ),
+        (
+            429,
+            ErrorKind::RateLimit,
+            "Rate limit exceeded - please wait a moment",
+        ),
+        (
+            500,
+            ErrorKind::Server,
+            "API server error - please try again",
+        ),
+        (
+            503,
+            ErrorKind::ServiceUnavailable,
+            "API server unavailable - please try again later",
+        ),
+        (
+            401,
+            ErrorKind::Unauthorized,
+            "Invalid API key - check your credentials",
+        ),
     ] {
         // An empty error body: the provider "says nothing".
         let server = wiremock::MockServer::start().await;
-        wiremock::Mock::given(wiremock::matchers::any()).respond_with(wiremock::ResponseTemplate::new(status)).mount(&server).await;
+        wiremock::Mock::given(wiremock::matchers::any())
+            .respond_with(wiremock::ResponseTemplate::new(status))
+            .mount(&server)
+            .await;
         let mut config = Config::default();
         config.set("anthropic_api_key", "test");
         config.set("anthropic_api_base", server.uri());
         config.max_retries = 0;
-        let mut chat = rust_llm::Chat::with_config(std::sync::Arc::new(config), Some("claude-haiku-4-5"), Some("anthropic"), false).unwrap();
+        let mut chat = rust_llm::Chat::with_config(
+            std::sync::Arc::new(config),
+            Some("claude-haiku-4-5"),
+            Some("anthropic"),
+            false,
+        )
+        .unwrap();
         let e = chat.ask("hi").await.unwrap_err();
-        assert_eq!((e.kind(), e.to_string()), (kind, message.to_string()), "{status}");
+        assert_eq!(
+            (e.kind(), e.to_string()),
+            (kind, message.to_string()),
+            "{status}"
+        );
     }
 }
 
 /// `ErrorMiddleware.parse_error` through a real request: `status` with `body`, no retries.
 async fn error_for(status: u16, body: &str) -> Error {
     let server = wiremock::MockServer::start().await;
-    wiremock::Mock::given(wiremock::matchers::any()).respond_with(wiremock::ResponseTemplate::new(status).set_body_string(body)).mount(&server).await;
+    wiremock::Mock::given(wiremock::matchers::any())
+        .respond_with(wiremock::ResponseTemplate::new(status).set_body_string(body))
+        .mount(&server)
+        .await;
     let mut config = Config::default();
     config.set("anthropic_api_key", "test");
     config.set("anthropic_api_base", server.uri());
     config.max_retries = 0;
-    let mut chat = rust_llm::Chat::with_config(std::sync::Arc::new(config), Some("claude-haiku-4-5"), Some("anthropic"), false).unwrap();
+    let mut chat = rust_llm::Chat::with_config(
+        std::sync::Arc::new(config),
+        Some("claude-haiku-4-5"),
+        Some("anthropic"),
+        false,
+    )
+    .unwrap();
     chat.ask("hi").await.unwrap_err()
 }
 
@@ -729,7 +999,13 @@ async fn error_for(status: u16, body: &str) -> Error {
 #[tokio::test]
 async fn gateway_errors_are_service_unavailable() {
     for status in [502, 504] {
-        assert_eq!(error_for(status, r#"{"error":{"message":"down"}}"#).await.kind(), ErrorKind::ServiceUnavailable, "{status}");
+        assert_eq!(
+            error_for(status, r#"{"error":{"message":"down"}}"#)
+                .await
+                .kind(),
+            ErrorKind::ServiceUnavailable,
+            "{status}"
+        );
     }
 }
 
@@ -737,7 +1013,10 @@ async fn gateway_errors_are_service_unavailable() {
 #[tokio::test]
 async fn an_unmapped_status_is_the_base_error_with_the_provider_message() {
     let e = error_for(418, r#"{"error":{"message":"teapot"}}"#).await;
-    assert_eq!((e.kind(), e.to_string().as_str()), (ErrorKind::Api, "teapot"));
+    assert_eq!(
+        (e.kind(), e.to_string().as_str()),
+        (ErrorKind::Api, "teapot")
+    );
 }
 
 // spec: error_spec.rb:37 falls back to the response body for the message
@@ -773,8 +1052,14 @@ fn config_treats_blank_strings_as_unset() {
     c.set("anthropic_api_key", " \t\n");
     assert_eq!(c.get("openai_api_base"), None);
     assert_eq!(c.get("anthropic_api_key"), None);
-    c.set("openai_api_base", "https://openai-compatible.example.com/v1");
-    assert_eq!(c.get("openai_api_base"), Some("https://openai-compatible.example.com/v1"));
+    c.set(
+        "openai_api_base",
+        "https://openai-compatible.example.com/v1",
+    );
+    assert_eq!(
+        c.get("openai_api_base"),
+        Some("https://openai-compatible.example.com/v1")
+    );
 }
 
 // ---- model_spec.rb ----------------------------------------------------------------------------
@@ -799,23 +1084,50 @@ fn gpt5() -> Model {
 #[test]
 fn model_reads_registry_attributes() {
     let m = gpt5();
-    assert_eq!((m.id.as_str(), m.name.as_str(), m.provider.as_str(), m.family.as_deref()), ("gpt-5", "GPT-5", "openai", Some("gpt")));
-    assert_eq!((m.context_window, m.max_output_tokens), (Some(400_000), Some(128_000)));
-    assert_eq!(m.modalities, Modalities { input: vec!["text".into(), "image".into()], output: vec!["text".into()] });
+    assert_eq!(
+        (
+            m.id.as_str(),
+            m.name.as_str(),
+            m.provider.as_str(),
+            m.family.as_deref()
+        ),
+        ("gpt-5", "GPT-5", "openai", Some("gpt"))
+    );
+    assert_eq!(
+        (m.context_window, m.max_output_tokens),
+        (Some(400_000), Some(128_000))
+    );
+    assert_eq!(
+        m.modalities,
+        Modalities {
+            input: vec!["text".into(), "image".into()],
+            output: vec!["text".into()]
+        }
+    );
 }
 
 // spec: model_spec.rb:64 defaults missing optional fields
 #[test]
 fn model_defaults_missing_optional_fields() {
-    let m: Model = serde_json::from_value(json!({ "id": "test", "name": "Test", "provider": "openai" })).unwrap();
-    assert!(m.capabilities.is_empty() && m.metadata.is_empty() && m.reasoning_options().is_empty() && m.modalities.input.is_empty());
+    let m: Model =
+        serde_json::from_value(json!({ "id": "test", "name": "Test", "provider": "openai" }))
+            .unwrap();
+    assert!(
+        m.capabilities.is_empty()
+            && m.metadata.is_empty()
+            && m.reasoning_options().is_empty()
+            && m.modalities.input.is_empty()
+    );
 }
 
 // spec: model_spec.rb:77 creates a model with assumed capabilities
 #[test]
 fn model_default_assumes_capabilities() {
     let m = Model::default_for("my-custom-model", "openai");
-    assert_eq!((m.id.as_str(), m.provider.as_str()), ("my-custom-model", "openai"));
+    assert_eq!(
+        (m.id.as_str(), m.provider.as_str()),
+        ("my-custom-model", "openai")
+    );
     assert!(m.supports("function_calling") && m.supports("streaming"));
     assert!(m.metadata.contains_key("warning"));
 }
@@ -834,7 +1146,10 @@ fn model_supports_reads_capabilities() {
 #[test]
 fn model_unlisted_follows_unlisted_at() {
     assert!(!gpt5().is_unlisted());
-    let gone = Model { unlisted_at: Some("2026-02-20 00:00:00 +0700".into()), ..gpt5() };
+    let gone = Model {
+        unlisted_at: Some("2026-02-20 00:00:00 +0700".into()),
+        ..gpt5()
+    };
     assert!(gone.is_unlisted());
 }
 
@@ -844,14 +1159,26 @@ fn model_unlisted_follows_unlisted_at() {
 fn model_reads_reasoning_options() {
     let m = gpt5();
     assert_eq!(m.reasoning_options().len(), 2);
-    assert_eq!(m.reasoning_option_values("effort"), ["low", "medium", "high"]);
+    assert_eq!(
+        m.reasoning_option_values("effort"),
+        ["low", "medium", "high"]
+    );
     assert!(m.reasoning_option_values("budget_tokens").is_empty());
 }
 
 // spec: model_spec.rb:193 returns chat for text output models (and the rest of `#type`)
 #[test]
 fn model_type_follows_output_modalities() {
-    let typed = |out: &[&str]| Model { modalities: Modalities { input: vec!["text".into()], output: out.iter().map(|s| s.to_string()).collect() }, ..gpt5() }.model_type();
+    let typed = |out: &[&str]| {
+        Model {
+            modalities: Modalities {
+                input: vec!["text".into()],
+                output: out.iter().map(|s| s.to_string()).collect(),
+            },
+            ..gpt5()
+        }
+        .model_type()
+    };
     assert_eq!(gpt5().model_type(), ModelType::Chat);
     assert_eq!(typed(&["embeddings"]), ModelType::Embedding);
     assert_eq!(typed(&["image"]), ModelType::Image);
@@ -872,7 +1199,10 @@ fn model_label_names_provider_and_model() {
 // spec: model_spec.rb:274 builds a Cost for the supplied tokens
 #[test]
 fn model_cost_for_prices_tokens() {
-    assert_eq!(gpt5().cost_for(&tokens(Some(1_000), Some(2_000))).total(), Some(0.0225));
+    assert_eq!(
+        gpt5().cost_for(&tokens(Some(1_000), Some(2_000))).total(),
+        Some(0.0225)
+    );
 }
 
 // spec: model_spec.rb:292 builds a Cost from batch pricing when requested
@@ -880,7 +1210,10 @@ fn model_cost_for_prices_tokens() {
 fn model_batch_pricing() {
     let mut m = gpt5();
     m.pricing.text_tokens.as_mut().unwrap().batch = Some(tier(Some(1.25), Some(5.0)));
-    assert_eq!(Cost::new(&tokens(Some(1_000), Some(2_000)), Some(&m), Tier::Batch).total(), Some(0.01125));
+    assert_eq!(
+        Cost::new(&tokens(Some(1_000), Some(2_000)), Some(&m), Tier::Batch).total(),
+        Some(0.01125)
+    );
 }
 
 // ---- models_spec.rb / models/lookup_spec.rb ---------------------------------------------------
@@ -897,38 +1230,67 @@ fn models_filter_by_provider() {
 // spec: models_spec.rb:48 leaves unlisted models out of every listing method but still finds them
 #[test]
 fn models_leave_unlisted_models_out_of_listings_but_find_them() {
-    let gone = Model { id: "gone-model".into(), unlisted_at: Some("2026-01-01".into()), ..Model::default_for("gone-model", "openai") };
+    let gone = Model {
+        id: "gone-model".into(),
+        unlisted_at: Some("2026-01-01".into()),
+        ..Model::default_for("gone-model", "openai")
+    };
     let listed = Model::default_for("kept-model", "openai");
     let registry = rust_llm::models::Models::new(vec![gone, listed]);
     let ids: Vec<&str> = registry.all().iter().map(|m| m.id.as_str()).collect();
     assert_eq!(ids, ["kept-model"]);
     assert!(registry.chat_models().iter().all(|m| m.id != "gone-model"));
-    assert!(registry.by_provider("openai").iter().all(|m| m.id != "gone-model"));
+    assert!(
+        registry
+            .by_provider("openai")
+            .iter()
+            .all(|m| m.id != "gone-model")
+    );
     assert_eq!(registry.find("gone-model", None).unwrap().id, "gone-model");
 }
 
 // spec: models_spec.rb:64 prefers a listed model over an unlisted one when no provider is given
 #[test]
 fn models_prefer_a_listed_model_over_an_unlisted_one() {
-    let gone = Model { unlisted_at: Some("2026-01-01".into()), ..Model::default_for("same-id", "openai") };
+    let gone = Model {
+        unlisted_at: Some("2026-01-01".into()),
+        ..Model::default_for("same-id", "openai")
+    };
     let listed = Model::default_for("same-id", "openrouter");
     let registry = rust_llm::models::Models::new(vec![gone, listed]);
-    assert_eq!(registry.find("same-id", None).unwrap().provider, "openrouter");
+    assert_eq!(
+        registry.find("same-id", None).unwrap().provider,
+        "openrouter"
+    );
 }
 
 // spec: models_spec.rb:89 finds models by ID
 // spec: models_spec.rb:104 raises ModelNotFoundError for unknown models
 #[test]
 fn models_find_by_id_and_raise_for_unknown_ids() {
-    let m = rust_llm::models().find("gpt-5-nano", Some("openai")).unwrap();
-    assert_eq!((m.id.as_str(), m.provider.as_str()), ("gpt-5-nano", "openai"));
-    assert!(matches!(rust_llm::models().find("no-such-model-12345", None), Err(Error::ModelNotFound(_))));
+    let m = rust_llm::models()
+        .find("gpt-5-nano", Some("openai"))
+        .unwrap();
+    assert_eq!(
+        (m.id.as_str(), m.provider.as_str()),
+        ("gpt-5-nano", "openai")
+    );
+    assert!(matches!(
+        rust_llm::models().find("no-such-model-12345", None),
+        Err(Error::ModelNotFound(_))
+    ));
 }
 
 // spec: models_spec.rb:141 prefers the first-party provider when an aggregator serves the same name
 #[test]
 fn models_prefer_the_first_party_provider() {
-    assert_eq!(rust_llm::models().find("claude-haiku-4-5", None).unwrap().provider, "anthropic");
+    assert_eq!(
+        rust_llm::models()
+            .find("claude-haiku-4-5", None)
+            .unwrap()
+            .provider,
+        "anthropic"
+    );
 }
 
 // spec: models_spec.rb:453 filters to models that are embedding-capable
@@ -937,8 +1299,18 @@ fn models_prefer_the_first_party_provider() {
 fn models_split_chat_and_embedding_models() {
     let registry = rust_llm::models();
     assert!(!registry.embedding_models().is_empty());
-    assert!(registry.embedding_models().iter().all(|m| m.model_type() == ModelType::Embedding));
-    assert!(registry.chat_models().iter().all(|m| m.model_type() == ModelType::Chat));
+    assert!(
+        registry
+            .embedding_models()
+            .iter()
+            .all(|m| m.model_type() == ModelType::Embedding)
+    );
+    assert!(
+        registry
+            .chat_models()
+            .iter()
+            .all(|m| m.model_type() == ModelType::Chat)
+    );
 }
 
 // spec: models/lookup_spec.rb:28 keeps exact matches first when provider preferences tie
@@ -962,8 +1334,14 @@ fn lookup_keeps_catalog_order_for_same_provider_duplicates() {
 #[test]
 fn tool_names_derive_from_the_type_name() {
     assert_eq!(rust_llm::tool::tool_name_from_type("SampleTool"), "sample");
-    assert_eq!(rust_llm::tool::tool_name_from_type("AnotherSample"), "another_sample");
-    assert_eq!(rust_llm::tool::tool_name_from_type("app::tools::SampleTool"), "sample");
+    assert_eq!(
+        rust_llm::tool::tool_name_from_type("AnotherSample"),
+        "another_sample"
+    );
+    assert_eq!(
+        rust_llm::tool::tool_name_from_type("app::tools::SampleTool"),
+        "sample"
+    );
 }
 
 // spec: tool_spec.rb:80 normalizes class name Unicode characters to ASCII
@@ -985,7 +1363,11 @@ impl Tool for Signature {
     fn parameters(&self) -> Vec<Parameter> {
         vec![Parameter::new("questions").kind("array")]
     }
-    async fn execute(&self, args: Map<String, Value>, _call: &ToolCall) -> Result<ToolResult, ToolError> {
+    async fn execute(
+        &self,
+        args: Map<String, Value>,
+        _call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
         Ok(args["questions"].clone().into())
     }
 }
@@ -998,7 +1380,11 @@ impl Tool for NoArgument {
     fn description(&self) -> String {
         "No arguments".into()
     }
-    async fn execute(&self, _args: Map<String, Value>, _call: &ToolCall) -> Result<ToolResult, ToolError> {
+    async fn execute(
+        &self,
+        _args: Map<String, Value>,
+        _call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
         Ok("ok".into())
     }
 }
@@ -1009,10 +1395,28 @@ async fn call_tool(tool: impl Tool + 'static, name: &str, arguments: Value) -> S
     let mut config = Config::default();
     config.set("anthropic_api_key", "test");
     config.set("anthropic_api_base", server.uri());
-    let mut chat = rust_llm::Chat::with_config(std::sync::Arc::new(config), Some("claude-haiku-4-5"), Some("anthropic"), false).unwrap().with_tool(tool);
+    let mut chat = rust_llm::Chat::with_config(
+        std::sync::Arc::new(config),
+        Some("claude-haiku-4-5"),
+        Some("anthropic"),
+        false,
+    )
+    .unwrap()
+    .with_tool(tool);
     chat.ask_later("go").unwrap();
     let mut m = Message::new(Role::Assistant, Some(String::new()));
-    m.tool_calls = Some([("call_1".to_string(), ToolCall::new("call_1", name, arguments.as_object().cloned().unwrap_or_default()))].into_iter().collect());
+    m.tool_calls = Some(
+        [(
+            "call_1".to_string(),
+            ToolCall::new(
+                "call_1",
+                name,
+                arguments.as_object().cloned().unwrap_or_default(),
+            ),
+        )]
+        .into_iter()
+        .collect(),
+    );
     chat.add_message(m);
     chat.run_tools().await.unwrap();
     chat.messages().last().unwrap().content().to_string()
@@ -1021,22 +1425,36 @@ async fn call_tool(tool: impl Tool + 'static, name: &str, arguments: Value) -> S
 // spec: tool_spec.rb:112 returns an error hash for unknown keyword arguments
 #[tokio::test]
 async fn tools_answer_unknown_arguments_with_an_error() {
-    let content = call_tool(Signature, "signature", json!({ "questions": [], "isOther": true })).await;
-    assert_eq!(content, json!({ "error": "Invalid tool arguments: unknown keyword: isOther" }).to_string());
+    let content = call_tool(
+        Signature,
+        "signature",
+        json!({ "questions": [], "isOther": true }),
+    )
+    .await;
+    assert_eq!(
+        content,
+        json!({ "error": "Invalid tool arguments: unknown keyword: isOther" }).to_string()
+    );
 }
 
 // spec: tool_spec.rb:124 returns an error hash for missing required keyword arguments
 #[tokio::test]
 async fn tools_answer_missing_arguments_with_an_error() {
     let content = call_tool(Signature, "signature", json!({})).await;
-    assert_eq!(content, json!({ "error": "Invalid tool arguments: missing keyword: questions" }).to_string());
+    assert_eq!(
+        content,
+        json!({ "error": "Invalid tool arguments: missing keyword: questions" }).to_string()
+    );
 }
 
 // spec: tool_spec.rb:160 returns an error hash for unknown arguments when execute takes no keywords
 #[tokio::test]
 async fn tools_without_parameters_reject_unexpected_arguments() {
     let content = call_tool(NoArgument, "no_argument", json!({ "unexpected": true })).await;
-    assert_eq!(content, json!({ "error": "Invalid tool arguments: unknown keyword: unexpected" }).to_string());
+    assert_eq!(
+        content,
+        json!({ "error": "Invalid tool arguments: unknown keyword: unexpected" }).to_string()
+    );
 }
 
 // spec: tool_spec.rb:254 uses an empty object schema for tools without keyword arguments
@@ -1044,10 +1462,20 @@ async fn tools_without_parameters_reject_unexpected_arguments() {
 async fn tools_without_parameters_render_an_empty_object_schema() {
     let mut config = Config::default();
     config.set("openai_api_key", "test");
-    let mut chat = rust_llm::Chat::with_config(std::sync::Arc::new(config), Some("gpt-5-nano"), Some("openai"), false).unwrap().with_tool(NoArgument);
+    let mut chat = rust_llm::Chat::with_config(
+        std::sync::Arc::new(config),
+        Some("gpt-5-nano"),
+        Some("openai"),
+        false,
+    )
+    .unwrap()
+    .with_tool(NoArgument);
     chat.ask_later("go").unwrap();
     let payload = chat.render().unwrap();
-    assert_eq!(payload["tools"][0]["parameters"], json!({ "type": "object", "properties": {}, "required": [], "additionalProperties": false, "strict": true }));
+    assert_eq!(
+        payload["tools"][0]["parameters"],
+        json!({ "type": "object", "properties": {}, "required": [], "additionalProperties": false, "strict": true })
+    );
 }
 
 // spec: tool_spec.rb:312 stringifies a result that is neither text nor structured data
@@ -1055,7 +1483,10 @@ async fn tools_without_parameters_render_an_empty_object_schema() {
 #[test]
 fn tool_results_serialize_structured_data_as_json() {
     assert_eq!(ToolResult::from(json!(42)).content, "42");
-    assert_eq!(ToolResult::from(json!({ "ok": true })).content, r#"{"ok":true}"#);
+    assert_eq!(
+        ToolResult::from(json!({ "ok": true })).content,
+        r#"{"ok":true}"#
+    );
     assert_eq!(ToolResult::from(json!([1, 2])).content, "[1,2]");
 }
 
@@ -1071,8 +1502,12 @@ fn progress_reports_nowhere_outside_a_chat() {
 #[test]
 fn parameter_schemas_default_array_items_to_strings() {
     assert!(rust_llm::tool::schema_from_parameters(&[]).is_none());
-    let schema = rust_llm::tool::schema_from_parameters(&[Parameter::new("tags").kind("array")]).unwrap();
-    assert_eq!(schema["properties"]["tags"], json!({ "type": "array", "items": { "type": "string" } }));
+    let schema =
+        rust_llm::tool::schema_from_parameters(&[Parameter::new("tags").kind("array")]).unwrap();
+    assert_eq!(
+        schema["properties"]["tags"],
+        json!({ "type": "array", "items": { "type": "string" } })
+    );
 }
 
 // spec: tool_spec.rb:391 maps #{declared} to #{expected}
@@ -1089,8 +1524,13 @@ fn parameter_types_map_like_rubyllm() {
         ("object", "object"),
         ("anything else", "string"),
     ] {
-        let schema = rust_llm::tool::schema_from_parameters(&[Parameter::new("p").kind(declared)]).unwrap();
-        assert_eq!(schema["properties"]["p"]["type"], json!(expected), "{declared}");
+        let schema =
+            rust_llm::tool::schema_from_parameters(&[Parameter::new("p").kind(declared)]).unwrap();
+        assert_eq!(
+            schema["properties"]["p"]["type"],
+            json!(expected),
+            "{declared}"
+        );
     }
 }
 
@@ -1103,7 +1543,13 @@ fn fixture(name: &str) -> String {
     format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"))
 }
 
-fn uploaded(id: &str, provider: &str, filename: &str, size: u64, mime: Option<&str>) -> rust_llm::UploadedFile {
+fn uploaded(
+    id: &str,
+    provider: &str,
+    filename: &str,
+    size: u64,
+    mime: Option<&str>,
+) -> rust_llm::UploadedFile {
     rust_llm::UploadedFile {
         id: id.into(),
         provider: provider.into(),
@@ -1124,38 +1570,62 @@ fn uploaded(id: &str, provider: &str, filename: &str, size: u64, mime: Option<&s
 #[test]
 fn path_attachments_read_their_name_and_type() {
     let a = Attachment::new(fixture("ruby.txt"));
-    assert_eq!((a.filename.as_deref(), a.mime_type.as_str()), (Some("ruby.txt"), "text/plain"));
+    assert_eq!(
+        (a.filename.as_deref(), a.mime_type.as_str()),
+        (Some("ruby.txt"), "text/plain")
+    );
 }
 
 // spec: attachment_spec.rb:49 classifies rich document files semantically
 #[test]
 fn attachments_classify_rich_documents() {
     let a = Attachment::from_bytes(b"docx bytes".to_vec(), "proposal.docx", None);
-    assert_eq!(a.mime_type, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    assert_eq!(
+        a.mime_type,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    );
     assert_eq!(a.kind(), AttachmentType::Document);
 }
 
 // spec: attachment_spec.rb:58 keeps text files in one attachment category
 #[test]
 fn text_attachments_are_text_not_documents() {
-    assert_eq!(Attachment::from_bytes(b"notes".to_vec(), "notes.txt", None).kind(), AttachmentType::Text);
+    assert_eq!(
+        Attachment::from_bytes(b"notes".to_vec(), "notes.txt", None).kind(),
+        AttachmentType::Text
+    );
 }
 
 // spec: attachment_spec.rb:66 wraps provider-managed files without reading inline content
 #[test]
 fn provider_files_are_wrapped_without_inline_content() {
-    let a = Attachment::from_uploaded(uploaded("file_123", "anthropic", "proposal.pdf", 1234, Some("application/pdf")));
+    let a = Attachment::from_uploaded(uploaded(
+        "file_123",
+        "anthropic",
+        "proposal.pdf",
+        1234,
+        Some("application/pdf"),
+    ));
     assert!(a.is_provider_file());
     assert_eq!(a.provider_file_id(), Some("file_123"));
-    assert_eq!((a.filename.as_deref(), a.mime_type.as_str(), a.byte_size()), (Some("proposal.pdf"), "application/pdf", Some(1234)));
+    assert_eq!(
+        (a.filename.as_deref(), a.mime_type.as_str(), a.byte_size()),
+        (Some("proposal.pdf"), "application/pdf", Some(1234))
+    );
     let err = a.encoded().unwrap_err();
-    assert!(err.to_string().contains("cannot be read as inline"), "{err}");
+    assert!(
+        err.to_string().contains("cannot be read as inline"),
+        "{err}"
+    );
 }
 
 // spec: attachment_spec.rb:85 does not fetch URL content to determine byte size
 #[test]
 fn url_attachments_have_no_size_until_fetched() {
-    assert_eq!(Attachment::new("https://example.com/report.pdf").byte_size(), None);
+    assert_eq!(
+        Attachment::new("https://example.com/report.pdf").byte_size(),
+        None
+    );
 }
 
 // spec: attachment_spec.rb:92 recognizes URL schemes regardless of case
@@ -1169,21 +1639,32 @@ fn url_schemes_are_case_insensitive() {
 // spec: attachment_spec.rb:100 passes a remote URL through without fetching it
 #[test]
 fn url_or_data_uri_passes_urls_through() {
-    assert_eq!(Attachment::new("https://example.com/ruby.png").url_or_data_uri().unwrap(), "https://example.com/ruby.png");
+    assert_eq!(
+        Attachment::new("https://example.com/ruby.png")
+            .url_or_data_uri()
+            .unwrap(),
+        "https://example.com/ruby.png"
+    );
 }
 
 // spec: attachment_spec.rb:114 inlines an IO as a base64 data URI
 #[test]
 fn url_or_data_uri_inlines_bytes() {
     let a = Attachment::from_bytes(b"%PDF-1.4".to_vec(), "report.pdf", None);
-    assert_eq!(a.url_or_data_uri().unwrap(), "data:application/pdf;base64,JVBERi0xLjQ=");
+    assert_eq!(
+        a.url_or_data_uri().unwrap(),
+        "data:application/pdf;base64,JVBERi0xLjQ="
+    );
 }
 
 // spec: attachment_spec.rb:120 inlines text as a data URI rather than a file tag
 #[test]
 fn url_or_data_uri_inlines_text_as_a_data_uri() {
     let a = Attachment::from_bytes(b"notes".to_vec(), "notes.txt", None);
-    assert_eq!(a.url_or_data_uri().unwrap(), "data:text/plain;base64,bm90ZXM=");
+    assert_eq!(
+        a.url_or_data_uri().unwrap(),
+        "data:text/plain;base64,bm90ZXM="
+    );
 }
 
 // spec: attachment_spec.rb:138 reports no provider id or URI for ordinary sources
@@ -1205,14 +1686,26 @@ fn provider_files_derive_the_type_from_the_filename() {
 // spec: attachment_spec.rb:168 falls back to the file stat
 #[test]
 fn byte_size_reads_bytes_or_the_file_stat() {
-    assert_eq!(Attachment::from_bytes(b"12345".to_vec(), "a.txt", None).byte_size(), Some(5));
-    assert!(Attachment::new(fixture("ruby.txt")).byte_size().is_some_and(|s| s > 0));
+    assert_eq!(
+        Attachment::from_bytes(b"12345".to_vec(), "a.txt", None).byte_size(),
+        Some(5)
+    );
+    assert!(
+        Attachment::new(fixture("ruby.txt"))
+            .byte_size()
+            .is_some_and(|s| s > 0)
+    );
 }
 
 // spec: attachment_spec.rb:229 takes the basename of a URL path
 #[test]
 fn url_filenames_are_the_path_basename() {
-    assert_eq!(Attachment::new("https://example.com/docs/report.pdf").filename.as_deref(), Some("report.pdf"));
+    assert_eq!(
+        Attachment::new("https://example.com/docs/report.pdf")
+            .filename
+            .as_deref(),
+        Some("report.pdf")
+    );
 }
 
 // spec: attachment_spec.rb:235 is not a document when it is a PDF or plain text
@@ -1229,14 +1722,34 @@ fn document_classification_excludes_pdf_and_text() {
 // spec: attachment_spec.rb:247 takes the size and filename off the record
 #[test]
 fn provider_files_take_size_name_and_type_off_the_record() {
-    let a = Attachment::from_uploaded(uploaded("file_1", "openai", "batch.jsonl", 42, Some("application/jsonl")));
-    assert_eq!((a.byte_size(), a.filename.as_deref(), a.mime_type.as_str(), a.provider_file_id()), (Some(42), Some("batch.jsonl"), "application/jsonl", Some("file_1")));
+    let a = Attachment::from_uploaded(uploaded(
+        "file_1",
+        "openai",
+        "batch.jsonl",
+        42,
+        Some("application/jsonl"),
+    ));
+    assert_eq!(
+        (
+            a.byte_size(),
+            a.filename.as_deref(),
+            a.mime_type.as_str(),
+            a.provider_file_id()
+        ),
+        (
+            Some(42),
+            Some("batch.jsonl"),
+            "application/jsonl",
+            Some("file_1")
+        )
+    );
 }
 
 // spec: attachment_spec.rb:260 accepts a media resolution
 #[test]
 fn attachments_accept_a_media_resolution() {
-    let a = Attachment::from_bytes(b"png".to_vec(), "page.png", None).with_resolution(rust_llm::Resolution::UltraHigh);
+    let a = Attachment::from_bytes(b"png".to_vec(), "page.png", None)
+        .with_resolution(rust_llm::Resolution::UltraHigh);
     assert_eq!(a.resolution, Some(rust_llm::Resolution::UltraHigh));
 }
 
@@ -1259,7 +1772,13 @@ async fn a_parsed_tool_call_turn_has_empty_content() {
     let mut config = Config::default();
     config.set("deepseek_api_base", server.uri());
     config.set("deepseek_api_key", "test");
-    let mut chat = rust_llm::Chat::with_config(std::sync::Arc::new(config), Some("deepseek-v4-flash"), Some("deepseek"), false).unwrap();
+    let mut chat = rust_llm::Chat::with_config(
+        std::sync::Arc::new(config),
+        Some("deepseek-v4-flash"),
+        Some("deepseek"),
+        false,
+    )
+    .unwrap();
     chat.ask_later("weather?").unwrap();
     let message = chat.generate().await.unwrap();
     assert_eq!(message.content, Some(String::new()));
@@ -1281,7 +1800,13 @@ fn lookup_prefers_the_resolved_alias_for_a_provider() {
     let exact = Model::default_for("claude-haiku-4-5", "anthropic");
     let aliased = Model::default_for("claude-haiku-4-5-20251001", "anthropic");
     let registry = rust_llm::models::Models::new(vec![exact, aliased]);
-    assert_eq!(registry.find("claude-haiku-4-5", Some("anthropic")).unwrap().id, "claude-haiku-4-5-20251001");
+    assert_eq!(
+        registry
+            .find("claude-haiku-4-5", Some("anthropic"))
+            .unwrap()
+            .id,
+        "claude-haiku-4-5-20251001"
+    );
 }
 
 // spec: models/lookup_spec.rb:42 falls back to the exact id when the resolved alias belongs to another provider
@@ -1290,8 +1815,13 @@ fn lookup_falls_back_to_the_exact_id() {
     let exact = Model::default_for("claude-haiku-4-5", "anthropic");
     let other = Model::default_for("claude-haiku-4-5-20251001", "azure");
     let registry = rust_llm::models::Models::new(vec![other, exact]);
-    let found = registry.find("claude-haiku-4-5", Some("anthropic")).unwrap();
-    assert_eq!((found.id.as_str(), found.provider.as_str()), ("claude-haiku-4-5", "anthropic"));
+    let found = registry
+        .find("claude-haiku-4-5", Some("anthropic"))
+        .unwrap();
+    assert_eq!(
+        (found.id.as_str(), found.provider.as_str()),
+        ("claude-haiku-4-5", "anthropic")
+    );
 }
 
 // spec: models/lookup_spec.rb:50 prefers a first-party alias over another provider with the exact id
@@ -1300,23 +1830,53 @@ fn lookup_prefers_a_first_party_alias() {
     let other = Model::default_for("claude-haiku-4-5", "vertexai");
     let aliased = Model::default_for("claude-haiku-4-5-20251001", "anthropic");
     let registry = rust_llm::models::Models::new(vec![other, aliased]);
-    assert_eq!(registry.find("claude-haiku-4-5", None).unwrap().provider, "anthropic");
-    assert_eq!(registry.find("claude-haiku-4-5", Some("vertexai")).unwrap().provider, "vertexai");
+    assert_eq!(
+        registry.find("claude-haiku-4-5", None).unwrap().provider,
+        "anthropic"
+    );
+    assert_eq!(
+        registry
+            .find("claude-haiku-4-5", Some("vertexai"))
+            .unwrap()
+            .provider,
+        "vertexai"
+    );
 }
 
 // spec: models_spec.rb:116 includes provider-specific refresh guidance for unknown models
 #[test]
 fn unknown_models_name_the_provider() {
-    let err = rust_llm::models().find("nonexistent-model-12345", Some("openai")).unwrap_err();
-    assert!(err.to_string().contains(r#"Unknown model: "nonexistent-model-12345" for provider: "openai""#), "{err}");
+    let err = rust_llm::models()
+        .find("nonexistent-model-12345", Some("openai"))
+        .unwrap_err();
+    assert!(
+        err.to_string()
+            .contains(r#"Unknown model: "nonexistent-model-12345" for provider: "openai""#),
+        "{err}"
+    );
 }
 
 // spec: models_spec.rb:129 prioritizes exact matches over aliases
 #[test]
 fn exact_ids_win_over_aliases() {
-    assert_eq!(rust_llm::models().find("gemini-2.5-flash", None).unwrap().id, "gemini-2.5-flash");
-    assert_eq!(rust_llm::models().find("gemini-2.5-flash", Some("gemini")).unwrap().id, "gemini-2.5-flash");
-    assert_eq!(rust_llm::models().find("gemini-flash", None).unwrap().id, "gemini-flash-latest");
+    assert_eq!(
+        rust_llm::models()
+            .find("gemini-2.5-flash", None)
+            .unwrap()
+            .id,
+        "gemini-2.5-flash"
+    );
+    assert_eq!(
+        rust_llm::models()
+            .find("gemini-2.5-flash", Some("gemini"))
+            .unwrap()
+            .id,
+        "gemini-2.5-flash"
+    );
+    assert_eq!(
+        rust_llm::models().find("gemini-flash", None).unwrap().id,
+        "gemini-flash-latest"
+    );
 }
 
 // spec: tool_spec.rb:7 sets and returns the tool description
@@ -1340,7 +1900,11 @@ fn tool_name_overrides_win() {
         fn description(&self) -> String {
             String::new()
         }
-        async fn execute(&self, _a: Map<String, Value>, _c: &ToolCall) -> Result<ToolResult, ToolError> {
+        async fn execute(
+            &self,
+            _a: Map<String, Value>,
+            _c: &ToolCall,
+        ) -> Result<ToolResult, ToolError> {
             Ok("".into())
         }
     }

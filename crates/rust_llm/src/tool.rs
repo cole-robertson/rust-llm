@@ -34,7 +34,12 @@ pub struct Parameter {
 impl Parameter {
     /// A required string parameter, the Ruby default.
     pub fn new(name: impl Into<String>) -> Parameter {
-        Parameter { name: name.into(), kind: "string".into(), description: None, required: true }
+        Parameter {
+            name: name.into(),
+            kind: "string".into(),
+            description: None,
+            required: true,
+        }
     }
 
     pub fn description(mut self, text: impl Into<String>) -> Parameter {
@@ -61,8 +66,14 @@ pub struct ToolResult {
 }
 
 impl ToolResult {
-    pub fn with_attachments(content: impl Into<String>, attachments: Vec<Attachment>) -> ToolResult {
-        ToolResult { content: content.into(), attachments }
+    pub fn with_attachments(
+        content: impl Into<String>,
+        attachments: Vec<Attachment>,
+    ) -> ToolResult {
+        ToolResult {
+            content: content.into(),
+            attachments,
+        }
     }
 
     /// A structured error the model can read and recover from, like `{ error: "..." }` in Ruby.
@@ -73,7 +84,10 @@ impl ToolResult {
 
 impl From<String> for ToolResult {
     fn from(content: String) -> Self {
-        ToolResult { content, attachments: Vec::new() }
+        ToolResult {
+            content,
+            attachments: Vec::new(),
+        }
     }
 }
 
@@ -134,12 +148,21 @@ pub trait Tool: Send + Sync {
         Map::new()
     }
 
-    async fn execute(&self, arguments: Map<String, Value>, tool_call: &ToolCall) -> Result<ToolResult, ToolError>;
+    async fn execute(
+        &self,
+        arguments: Map<String, Value>,
+        tool_call: &ToolCall,
+    ) -> Result<ToolResult, ToolError>;
 
     /// `resume(input, arguments)`: continues a call that paused on input requests (MCP
     /// elicitation), now answered. `input` is the paused state `InputRequiredError#to_h` gave.
     /// Tools that never pause run again.
-    async fn resume(&self, _input: &Value, arguments: Map<String, Value>, tool_call: &ToolCall) -> Result<ToolResult, ToolError> {
+    async fn resume(
+        &self,
+        _input: &Value,
+        arguments: Map<String, Value>,
+        tool_call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
         self.execute(arguments, tool_call).await
     }
 }
@@ -154,7 +177,13 @@ pub fn tool_name_from_type(type_name: &str) -> String {
     let ascii: String = base
         .nfkd()
         .filter(char::is_ascii)
-        .map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '-' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' || c == '-' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect();
     let name = underscore(&ascii);
     name.strip_suffix("_tool").unwrap_or(&name).to_string()
@@ -168,7 +197,10 @@ pub fn underscore(name: &str) -> String {
         if i > 0 && c.is_ascii_uppercase() {
             let prev = chars[i - 1];
             let next_lower = chars.get(i + 1).is_some_and(|n| n.is_ascii_lowercase());
-            if prev.is_ascii_lowercase() || prev.is_ascii_digit() || (prev.is_ascii_uppercase() && next_lower) {
+            if prev.is_ascii_lowercase()
+                || prev.is_ascii_digit()
+                || (prev.is_ascii_uppercase() && next_lower)
+            {
                 out.push('_');
             }
         }
@@ -206,8 +238,11 @@ pub fn schema_from_parameters(parameters: &[Parameter]) -> Option<Value> {
         }
         properties.insert(p.name.clone(), Value::Object(schema));
     }
-    let required: Vec<Value> =
-        parameters.iter().filter(|p| p.required).map(|p| Value::String(p.name.clone())).collect();
+    let required: Vec<Value> = parameters
+        .iter()
+        .filter(|p| p.required)
+        .map(|p| Value::String(p.name.clone()))
+        .collect();
     Some(json!({
         "type": "object",
         "properties": properties,
@@ -252,19 +287,30 @@ pub fn schema_for<T: schemars::JsonSchema>() -> Value {
 }
 
 /// Numeric `format`s schemars adds from Rust types; RubyLLM's DSL emits plain `number`/`integer`.
-const RUST_NUMBER_FORMATS: &[&str] =
-    &["double", "float", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64"];
+const RUST_NUMBER_FORMATS: &[&str] = &[
+    "double", "float", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32",
+    "uint64",
+];
 
 fn close_objects(node: &mut Value) {
     match node {
         Value::Object(map) => {
-            if map.get("type").and_then(Value::as_str) == Some("object") && map.contains_key("properties") {
-                map.entry("additionalProperties").or_insert(Value::Bool(false));
+            if map.get("type").and_then(Value::as_str) == Some("object")
+                && map.contains_key("properties")
+            {
+                map.entry("additionalProperties")
+                    .or_insert(Value::Bool(false));
             }
-            if map.get("format").and_then(Value::as_str).is_some_and(|f| RUST_NUMBER_FORMATS.contains(&f)) {
+            if map
+                .get("format")
+                .and_then(Value::as_str)
+                .is_some_and(|f| RUST_NUMBER_FORMATS.contains(&f))
+            {
                 map.remove("format");
             }
-            if map.get("minimum").and_then(Value::as_i64) == Some(0) && map.get("type").and_then(Value::as_str) == Some("integer") {
+            if map.get("minimum").and_then(Value::as_i64) == Some(0)
+                && map.get("type").and_then(Value::as_str) == Some("integer")
+            {
                 map.remove("minimum");
             }
             map.values_mut().for_each(close_objects);
@@ -275,17 +321,26 @@ fn close_objects(node: &mut Value) {
 }
 
 /// Rejects arguments `execute(**kwargs)` would: missing required keys and unknown keys.
-pub(crate) fn validate_arguments(tool: &dyn Tool, arguments: &Map<String, Value>) -> Option<String> {
+pub(crate) fn validate_arguments(
+    tool: &dyn Tool,
+    arguments: &Map<String, Value>,
+) -> Option<String> {
     // A tool with no declared parameters renders the empty object schema, like Ruby's `execute`
     // without keywords, so any argument is unknown there too.
     let params = tool.parameters();
     if tool.parameters_schema().is_some() {
         return None;
     }
-    if let Some(missing) = params.iter().find(|p| p.required && !arguments.contains_key(&p.name)) {
+    if let Some(missing) = params
+        .iter()
+        .find(|p| p.required && !arguments.contains_key(&p.name))
+    {
         return Some(format!("missing keyword: {}", missing.name));
     }
-    if let Some(unknown) = arguments.keys().find(|k| !params.iter().any(|p| &p.name == *k)) {
+    if let Some(unknown) = arguments
+        .keys()
+        .find(|k| !params.iter().any(|p| &p.name == *k))
+    {
         return Some(format!("unknown keyword: {unknown}"));
     }
     None
@@ -293,7 +348,8 @@ pub(crate) fn validate_arguments(tool: &dyn Tool, arguments: &Map<String, Value>
 
 pub type SharedTool = Arc<dyn Tool>;
 
-type ToolFnFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Result<ToolResult, ToolError>> + Send>>;
+type ToolFnFuture =
+    std::pin::Pin<Box<dyn std::future::Future<Output = Result<ToolResult, ToolError>> + Send>>;
 
 /// A tool defined inline from a closure, for one-off tools that don't warrant a type.
 pub struct FnTool {
@@ -344,7 +400,11 @@ impl Tool for FnTool {
     fn requires_approval(&self) -> bool {
         self.approval
     }
-    async fn execute(&self, arguments: Map<String, Value>, _call: &ToolCall) -> Result<ToolResult, ToolError> {
+    async fn execute(
+        &self,
+        arguments: Map<String, Value>,
+        _call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
         (self.run)(arguments).await
     }
 }
@@ -355,9 +415,15 @@ mod tests {
 
     #[test]
     fn tool_names_follow_rust_llm_underscoring() {
-        assert_eq!(tool_name_from_type("app::tools::WeatherLookup"), "weather_lookup");
+        assert_eq!(
+            tool_name_from_type("app::tools::WeatherLookup"),
+            "weather_lookup"
+        );
         assert_eq!(tool_name_from_type("HTTPProxyTool"), "http_proxy");
-        assert_eq!(tool_name_from_type("BestLanguageToLearn"), "best_language_to_learn");
+        assert_eq!(
+            tool_name_from_type("BestLanguageToLearn"),
+            "best_language_to_learn"
+        );
     }
 
     // Matches the "tools" payload recorded in chat_function_calling_*_can_use_tools cassettes.

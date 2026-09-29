@@ -12,11 +12,28 @@ use support::{Cassette, config_for};
 #[tokio::test]
 async fn openrouter_orders_documents_by_relevance_and_reports_the_exact_cost() {
     let name = "rerank_reranking_with_openrouter_voyageai_rerank-2_5-lite_orders_documents_by_relevance_and_reports_the_exact_cost";
-    let cassette = Cassette::start(name).await.expect("run bin/convert-cassettes 'rerank_*'");
+    let cassette = Cassette::start(name)
+        .await
+        .expect("run bin/convert-cassettes 'rerank_*'");
     let config = config_for(&cassette, "openrouter");
-    let documents = ["Paris is the capital of France", "Ruby is a programming language created by Matz"];
-    let options = RerankOptions { provider: Some("openrouter"), assume_model_exists: true, config: Some(config), ..Default::default() };
-    let result = rerank("what is ruby", &documents, "voyageai/rerank-2.5-lite", options).await.unwrap();
+    let documents = [
+        "Paris is the capital of France",
+        "Ruby is a programming language created by Matz",
+    ];
+    let options = RerankOptions {
+        provider: Some("openrouter"),
+        assume_model_exists: true,
+        config: Some(config),
+        ..Default::default()
+    };
+    let result = rerank(
+        "what is ruby",
+        &documents,
+        "voyageai/rerank-2.5-lite",
+        options,
+    )
+    .await
+    .unwrap();
 
     assert!(result.results[0].document.contains("Ruby"));
     assert!(result.results[0].score > result.results[1].score);
@@ -36,7 +53,16 @@ async fn openrouter_orders_documents_by_relevance_and_reports_the_exact_cost() {
 async fn providers_without_a_rerank_endpoint_fail_clearly() {
     let mut config = rust_llm::Config::default();
     config.set("anthropic_api_key", "test");
-    let options = RerankOptions { provider: Some("anthropic"), config: Some(config.into()), ..Default::default() };
-    let err = rerank("query", &["doc"], "claude-haiku-4-5", options).await.unwrap_err();
-    assert!(err.to_string().contains("doesn't support reranking"), "{err}");
+    let options = RerankOptions {
+        provider: Some("anthropic"),
+        config: Some(config.into()),
+        ..Default::default()
+    };
+    let err = rerank("query", &["doc"], "claude-haiku-4-5", options)
+        .await
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("doesn't support reranking"),
+        "{err}"
+    );
 }

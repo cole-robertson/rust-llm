@@ -10,8 +10,8 @@ mod spec_helpers;
 use std::sync::{Arc, Once};
 
 use rust_llm::{
-    Agent, Attachment, Chat, Config, EmbedOptions, ErrorKind, Fallback, FnTool, Mcp, Message, ProtocolName, SharedTool,
-    ThinkingConfig, ToolCalls, ToolChoice, UsageEntry, UsageStatus,
+    Agent, Attachment, Chat, Config, EmbedOptions, ErrorKind, Fallback, FnTool, Mcp, Message,
+    ProtocolName, SharedTool, ThinkingConfig, ToolCalls, ToolChoice, UsageEntry, UsageStatus,
 };
 use serde_json::{Value, json};
 use spec_helpers::*;
@@ -51,7 +51,9 @@ fn global_keys() {
 }
 
 fn echo_tool() -> SharedTool {
-    Arc::new(FnTool::new("echo_tool", "Echoes", |_args| async { Ok("ok".into()) }))
+    Arc::new(FnTool::new("echo_tool", "Echoes", |_args| async {
+        Ok("ok".into())
+    }))
 }
 
 // ---- with_tool_options -----------------------------------------------------------------------
@@ -75,7 +77,12 @@ fn stores_the_tool_concurrency_preference() {
 // spec: chat_functions_spec.rb:141 clears tool concurrency preferences
 #[test]
 fn clears_the_tool_concurrency_preference() {
-    assert!(!openai().with_tool_concurrency(true).with_tool_concurrency(false).concurrency());
+    assert!(
+        !openai()
+            .with_tool_concurrency(true)
+            .with_tool_concurrency(false)
+            .concurrency()
+    );
 }
 
 // spec: chat_functions_spec.rb:210 resets choice and calls to nil and concurrency to the configured default
@@ -83,14 +90,22 @@ fn clears_the_tool_concurrency_preference() {
 fn nil_tool_options_reset_to_the_configured_defaults() {
     let mut config = (*offline()).clone();
     config.tool_concurrency = true;
-    let chat = Chat::with_config(Arc::new(config), Some("gpt-4.1-nano"), Some("openai"), false)
-        .unwrap()
-        .with_tool_choice(ToolChoice::Required)
-        .unwrap()
-        .with_tool_calls(ToolCalls::One)
-        .with_tool_concurrency(false);
+    let chat = Chat::with_config(
+        Arc::new(config),
+        Some("gpt-4.1-nano"),
+        Some("openai"),
+        false,
+    )
+    .unwrap()
+    .with_tool_choice(ToolChoice::Required)
+    .unwrap()
+    .with_tool_calls(ToolCalls::One)
+    .with_tool_concurrency(false);
 
-    let chat = chat.clear_tool_choice().with_tool_calls(None).with_tool_concurrency(None);
+    let chat = chat
+        .clear_tool_choice()
+        .with_tool_calls(None)
+        .with_tool_concurrency(None);
 
     assert_eq!(chat.tool_prefs().choice, None);
     assert_eq!(chat.tool_prefs().calls, None);
@@ -100,12 +115,22 @@ fn nil_tool_options_reset_to_the_configured_defaults() {
 // spec: chat_options_spec.rb:17 clears the recorded preferences when given nil
 #[test]
 fn clears_the_recorded_tool_preferences() {
-    let chat = openai().with_tool_choice(ToolChoice::Auto).unwrap().with_tool_calls(ToolCalls::One);
+    let chat = openai()
+        .with_tool_choice(ToolChoice::Auto)
+        .unwrap()
+        .with_tool_calls(ToolCalls::One);
 
     let chat = chat.clear_tool_choice().with_tool_calls(None);
 
-    assert_eq!((chat.tool_prefs().choice.clone(), chat.tool_prefs().calls), (None, None));
-    let payload = render(chat.with_tool(FnTool::new("lookup", "Looks up", |_a| async { Ok("x".into()) })));
+    assert_eq!(
+        (chat.tool_prefs().choice.clone(), chat.tool_prefs().calls),
+        (None, None)
+    );
+    let payload = render(
+        chat.with_tool(FnTool::new("lookup", "Looks up", |_a| async {
+            Ok("x".into())
+        })),
+    );
     assert!(payload.get("tool_choice").is_none(), "{payload}");
     assert!(payload.get("parallel_tool_calls").is_none(), "{payload}");
 }
@@ -114,7 +139,12 @@ fn clears_the_recorded_tool_preferences() {
 #[test]
 fn nil_concurrency_falls_back_to_the_configured_default() {
     // Config::default() leaves tool_concurrency off, Ruby's nil.
-    assert!(!openai().with_tool_concurrency(true).with_tool_concurrency(None).concurrency());
+    assert!(
+        !openai()
+            .with_tool_concurrency(true)
+            .with_tool_concurrency(None)
+            .concurrency()
+    );
 }
 
 // ---- with_model / with_temperature / with_max_output_tokens --------------------------------
@@ -142,22 +172,34 @@ fn with_temperature_none_clears_it() {
 #[test]
 fn sends_temperature_even_when_the_registry_says_the_model_rejects_it() {
     let chat = chat("claude-sonnet-5", "anthropic");
-    assert_eq!(chat.model().metadata.get("temperature"), Some(&json!(false)));
+    assert_eq!(
+        chat.model().metadata.get("temperature"),
+        Some(&json!(false))
+    );
 
-    assert_eq!(render(chat.with_temperature(0.5))["temperature"], json!(0.5));
+    assert_eq!(
+        render(chat.with_temperature(0.5))["temperature"],
+        json!(0.5)
+    );
 }
 
 // spec: chat_functions_spec.rb:355 sends the temperature you set to search models
 #[test]
 fn sends_temperature_to_search_models() {
-    let chat = chat("gpt-5-search-api", "openai").with_protocol(ProtocolName::ChatCompletions).with_temperature(0.7);
+    let chat = chat("gpt-5-search-api", "openai")
+        .with_protocol(ProtocolName::ChatCompletions)
+        .with_temperature(0.7);
     assert_eq!(render(chat)["temperature"], json!(0.7));
 }
 
 // spec: chat_request_options_spec.rb:25 clears the limit with with_max_output_tokens(nil)
 #[test]
 fn with_max_output_tokens_none_clears_the_limit() {
-    let payload = render(openai().with_max_output_tokens(1234).with_max_output_tokens(None));
+    let payload = render(
+        openai()
+            .with_max_output_tokens(1234)
+            .with_max_output_tokens(None),
+    );
     assert!(payload.get("max_output_tokens").is_none(), "{payload}");
 }
 
@@ -255,7 +297,11 @@ impl Agent for Greeter {
 #[test]
 fn agent_chat_applies_instructions_tools_tool_options_caching_and_provider_options() {
     global_keys();
-    let chat = Greeter { display_name: "Ava".into() }.chat().unwrap();
+    let chat = Greeter {
+        display_name: "Ava".into(),
+    }
+    .chat()
+    .unwrap();
 
     let first = &chat.messages()[0];
     assert_eq!(first.role, rust_llm::Role::System);
@@ -263,7 +309,12 @@ fn agent_chat_applies_instructions_tools_tool_options_caching_and_provider_optio
     assert!(chat.tools().iter().any(|t| t.name() == "echo_tool"));
     assert_eq!(chat.tool_prefs().choice, Some(ToolChoice::Required));
     assert_eq!(chat.tool_prefs().calls, Some(ToolCalls::One));
-    assert_eq!(chat.caching(), Some(&rust_llm::Caching::On(json!({ "ttl": "1h" }).as_object().unwrap().clone())));
+    assert_eq!(
+        chat.caching(),
+        Some(&rust_llm::Caching::On(
+            json!({ "ttl": "1h" }).as_object().unwrap().clone()
+        ))
+    );
     assert_eq!(chat.provider_options(), &json!({ "max_tokens": 12 }));
 }
 
@@ -282,7 +333,10 @@ impl Agent for Capped {
 #[test]
 fn agent_max_output_tokens_reaches_the_payload() {
     global_keys();
-    assert_eq!(render(Capped.chat().unwrap())["max_output_tokens"], json!(1000));
+    assert_eq!(
+        render(Capped.chat().unwrap())["max_output_tokens"],
+        json!(1000)
+    );
 }
 
 struct ToolOptions;
@@ -310,7 +364,14 @@ impl Agent for ToolOptions {
 fn agent_tool_options_apply_separately_from_the_tools() {
     global_keys();
     // `concurrency: :fibers` is `true` here: the port has one concurrent mode.
-    assert_eq!((ToolOptions.tool_choice(), ToolOptions.tool_calls(), ToolOptions.tool_concurrency()), (Some(ToolChoice::Required), Some(ToolCalls::One), Some(true)));
+    assert_eq!(
+        (
+            ToolOptions.tool_choice(),
+            ToolOptions.tool_calls(),
+            ToolOptions.tool_concurrency()
+        ),
+        (Some(ToolChoice::Required), Some(ToolCalls::One), Some(true))
+    );
 
     let chat = ToolOptions.chat().unwrap();
 
@@ -357,7 +418,10 @@ impl Agent for Thinker {
 fn agent_exposes_its_thinking_and_applies_it() {
     global_keys();
     assert_eq!(Thinker.thinking(), Some(ThinkingConfig::effort("low")));
-    assert_eq!(Thinker.chat().unwrap().thinking(), Some(&ThinkingConfig::effort("low")));
+    assert_eq!(
+        Thinker.chat().unwrap().thinking(),
+        Some(&ThinkingConfig::effort("low"))
+    );
 }
 
 struct WithFallbacks;
@@ -369,7 +433,10 @@ impl Agent for WithFallbacks {
     fn fallbacks(&self) -> Vec<Fallback> {
         vec![
             Fallback::from("gpt-4.1-mini"),
-            Fallback { model: "claude-haiku-4-5-20251001".into(), provider: Some("anthropic".into()) },
+            Fallback {
+                model: "claude-haiku-4-5-20251001".into(),
+                provider: Some("anthropic".into()),
+            },
         ]
     }
     fn fallback_errors(&self) -> Option<Vec<ErrorKind>> {
@@ -385,7 +452,10 @@ fn agent_fallbacks_and_their_error_classes_reach_new_chats() {
 
     let ids: Vec<&str> = chat.fallbacks().iter().map(|f| f.model.as_str()).collect();
     assert_eq!(ids, ["gpt-4.1-mini", "claude-haiku-4-5-20251001"]);
-    assert_eq!(chat.fallbacks().last().unwrap().provider.as_deref(), Some("anthropic"));
+    assert_eq!(
+        chat.fallbacks().last().unwrap().provider.as_deref(),
+        Some("anthropic")
+    );
     assert_eq!(chat.fallback_errors(), [ErrorKind::RateLimit]);
 }
 
@@ -437,10 +507,18 @@ fn agent_applies_the_configured_options_to_a_new_chat() {
     assert_eq!(chat.temperature(), Some(0.4));
     assert_eq!(chat.max_output_tokens(), Some(128));
     assert!(chat.citations());
-    assert_eq!(chat.caching(), Some(&rust_llm::Caching::On(json!({ "ttl": "1h" }).as_object().unwrap().clone())));
+    assert_eq!(
+        chat.caching(),
+        Some(&rust_llm::Caching::On(
+            json!({ "ttl": "1h" }).as_object().unwrap().clone()
+        ))
+    );
     assert_eq!(chat.provider_options(), &json!({ "top_p": 0.9 }));
     assert_eq!(chat.headers(), [("X-Test".to_string(), "1".to_string())]);
-    assert_eq!(chat.thinking().and_then(|t| t.effort.as_deref()), Some("low"));
+    assert_eq!(
+        chat.thinking().and_then(|t| t.effort.as_deref()),
+        Some("low")
+    );
     assert_eq!(chat.end_user(), Some("tenant-42"));
     assert_eq!(chat.compaction(), Some(&json!({ "at": 50_000 })));
 }
@@ -450,13 +528,21 @@ fn agent_applies_the_configured_options_to_a_new_chat() {
 // spec: attachment_spec.rb:154 is nil for a filename without one
 #[test]
 fn extension_is_none_without_one() {
-    assert_eq!(Attachment::from_bytes(b"x".to_vec(), "README", None).extension(), None);
+    assert_eq!(
+        Attachment::from_bytes(b"x".to_vec(), "README", None).extension(),
+        None
+    );
 }
 
 // spec: attachment_spec.rb:158 downcases the extension
 #[test]
 fn extension_is_downcased() {
-    assert_eq!(Attachment::from_bytes(b"x".to_vec(), "REPORT.PDF", None).extension().as_deref(), Some("pdf"));
+    assert_eq!(
+        Attachment::from_bytes(b"x".to_vec(), "REPORT.PDF", None)
+            .extension()
+            .as_deref(),
+        Some("pdf")
+    );
 }
 
 // ---- Context entry points ------------------------------------------------------------------
@@ -469,13 +555,26 @@ fn context_embed_later_stages_a_request_with_the_context() {
     let context = rust_llm::Context::new(config);
 
     let request = context
-        .embed_later("Hello", EmbedOptions { model: Some("text-embedding-3-small"), provider: Some("openai"), dimensions: Some(256), ..Default::default() })
+        .embed_later(
+            "Hello",
+            EmbedOptions {
+                model: Some("text-embedding-3-small"),
+                provider: Some("openai"),
+                dimensions: Some(256),
+                ..Default::default()
+            },
+        )
         .unwrap();
 
-    assert_eq!((&request.text, request.dimensions), (&rust_llm::embedding::EmbedInput::from("Hello"), Some(256)));
+    assert_eq!(
+        (&request.text, request.dimensions),
+        (&rust_llm::embedding::EmbedInput::from("Hello"), Some(256))
+    );
     assert_eq!(request.model().id, "text-embedding-3-small");
     // Without a model it reads the context's default, not the global one.
-    let request = context.embed_later("Hello", EmbedOptions::default()).unwrap();
+    let request = context
+        .embed_later("Hello", EmbedOptions::default())
+        .unwrap();
     assert_eq!(request.model().id, "text-embedding-3-large");
 }
 
@@ -492,17 +591,26 @@ async fn context_mcp_connects_with_the_context() {
         .mount(&server)
         .await;
     wiremock::Mock::given(wiremock::matchers::any())
-        .respond_with(wiremock::ResponseTemplate::new(200).set_delay(std::time::Duration::from_secs(30)))
+        .respond_with(
+            wiremock::ResponseTemplate::new(200).set_delay(std::time::Duration::from_secs(30)),
+        )
         .mount(&server)
         .await;
     let mut config = (*offline()).clone();
     config.request_timeout = std::time::Duration::from_secs(1);
     let context = rust_llm::Context::new(config);
 
-    let mcp = context.mcp(Mcp::url(format!("{}/mcp", server.uri())).prefix("docs")).build().unwrap();
+    let mcp = context
+        .mcp(Mcp::url(format!("{}/mcp", server.uri())).prefix("docs"))
+        .build()
+        .unwrap();
 
     let started = std::time::Instant::now();
     let err = mcp.tools().await.err().expect("timed out");
     assert!(matches!(err, rust_llm::Error::Timeout(_)), "{err}");
-    assert!(started.elapsed() < std::time::Duration::from_secs(5), "used the context's timeout: {:?}", started.elapsed());
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(5),
+        "used the context's timeout: {:?}",
+        started.elapsed()
+    );
 }

@@ -78,7 +78,10 @@ pub trait Agent {
         if let Value::Object(extra) = locals {
             merged.extend(extra);
         }
-        crate::prompt::render_prompt(&format!("{}/{name}", prompt_agent_path(&self.name())), Value::Object(merged))
+        crate::prompt::render_prompt(
+            &format!("{}/{name}", prompt_agent_path(&self.name())),
+            Value::Object(merged),
+        )
     }
     fn tools(&self) -> Vec<SharedTool> {
         Vec::new()
@@ -153,8 +156,15 @@ pub trait Agent {
             Some(text) => Some(text),
             // `instructions_config`: the conventional prompt when nothing is declared.
             None => {
-                let prompt = crate::prompt::Prompt::with_config(chat.config().clone(), format!("{}/instructions", prompt_agent_path(&self.name())));
-                if prompt.exists() { Some(prompt.render(self.prompt_locals())?).filter(|t| !t.trim().is_empty()) } else { None }
+                let prompt = crate::prompt::Prompt::with_config(
+                    chat.config().clone(),
+                    format!("{}/instructions", prompt_agent_path(&self.name())),
+                );
+                if prompt.exists() {
+                    Some(prompt.render(self.prompt_locals())?).filter(|t| !t.trim().is_empty())
+                } else {
+                    None
+                }
             }
         };
         if let Some(text) = text {

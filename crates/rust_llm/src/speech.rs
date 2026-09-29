@@ -41,7 +41,11 @@ pub const MIME_TYPES: &[(&str, &str)] = &[
 
 /// `MIME_TYPES.fetch(format, "audio/#{format}")`.
 fn mime_type_for(format: &str) -> String {
-    MIME_TYPES.iter().find(|(f, _)| *f == format).map(|(_, m)| m.to_string()).unwrap_or_else(|| format!("audio/{format}"))
+    MIME_TYPES
+        .iter()
+        .find(|(f, _)| *f == format)
+        .map(|(_, m)| m.to_string())
+        .unwrap_or_else(|| format!("audio/{format}"))
 }
 
 /// Audio generated from text (`RubyLLM::Speech`). `speak` returns one.
@@ -74,7 +78,11 @@ pub struct SpeechChunk {
 
 impl SpeechChunk {
     pub fn new(data: Vec<u8>, format: &str, mime_type: Option<&str>) -> SpeechChunk {
-        SpeechChunk { data, format: format.to_string(), mime_type: mime_type.map_or_else(|| mime_type_for(format), str::to_string) }
+        SpeechChunk {
+            data,
+            format: format.to_string(),
+            mime_type: mime_type.map_or_else(|| mime_type_for(format), str::to_string),
+        }
     }
 
     /// The raw audio bytes. Alias for `data`.
@@ -103,7 +111,13 @@ pub struct SpeakOptions<'a> {
 impl Speech {
     /// `Speech.new(data:, model:, voice:, format:, mime_type:)`. `format` defaults to `"mp3"` and
     /// `mime_type` to the one `format` implies.
-    pub fn new(data: Vec<u8>, model: impl Into<String>, voice: Option<&str>, format: Option<&str>, mime_type: Option<&str>) -> Speech {
+    pub fn new(
+        data: Vec<u8>,
+        model: impl Into<String>,
+        voice: Option<&str>,
+        format: Option<&str>,
+        mime_type: Option<&str>,
+    ) -> Speech {
         let format = format.unwrap_or("mp3").to_string();
         Speech {
             data,
@@ -140,7 +154,11 @@ impl Speech {
         if !self.usage_entries.is_empty() {
             return Tokens::aggregate(self.usage_entries.iter().map(|e| &e.tokens));
         }
-        Tokens { input: self.input_tokens, output: self.output_tokens, ..Default::default() }
+        Tokens {
+            input: self.input_tokens,
+            output: self.output_tokens,
+            ..Default::default()
+        }
     }
 
     /// Cost across every provider attempt, priced as audio tokens.
@@ -165,20 +183,41 @@ pub async fn speak(input: &str, options: SpeakOptions<'_>) -> Result<Speech> {
 
 /// `RubyLLM.speak(input, ...) { |chunk| ... }`: `on_chunk` receives each [`SpeechChunk`] as audio
 /// arrives, and the complete [`Speech`] is still returned.
-pub async fn speak_stream(input: &str, options: SpeakOptions<'_>, mut on_chunk: impl FnMut(&SpeechChunk) + Send) -> Result<Speech> {
-    run(input, options, Some(&mut on_chunk as &mut (dyn FnMut(&SpeechChunk) + Send))).await
+pub async fn speak_stream(
+    input: &str,
+    options: SpeakOptions<'_>,
+    mut on_chunk: impl FnMut(&SpeechChunk) + Send,
+) -> Result<Speech> {
+    run(
+        input,
+        options,
+        Some(&mut on_chunk as &mut (dyn FnMut(&SpeechChunk) + Send)),
+    )
+    .await
 }
 
-async fn run(input: &str, options: SpeakOptions<'_>, on_chunk: Option<&mut (dyn FnMut(&SpeechChunk) + Send)>) -> Result<Speech> {
+async fn run(
+    input: &str,
+    options: SpeakOptions<'_>,
+    on_chunk: Option<&mut (dyn FnMut(&SpeechChunk) + Send)>,
+) -> Result<Speech> {
     let config = options.config.clone().unwrap_or_else(crate::config);
-    let model_id = options.model.unwrap_or(&config.default_speech_model).to_string();
-    let (model, provider) = resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let model_id = options
+        .model
+        .unwrap_or(&config.default_speech_model)
+        .to_string();
+    let (model, provider) =
+        resolve_model(&model_id, options.provider, options.assume_model_exists)?;
     provider.ensure_configured(&config)?;
     let connection = Connection::new(provider, config.clone())?;
     let family = Family::for_provider(provider)?;
     let (voice, format) = (options.voice, options.format);
     // `provider_options: {}` by default; `Null` would replace the payload in a deep merge.
-    let provider_options = if options.provider_options.is_null() { json!({}) } else { options.provider_options.clone() };
+    let provider_options = if options.provider_options.is_null() {
+        json!({})
+    } else {
+        options.provider_options.clone()
+    };
     let payload = family.render(input, &model.id, voice, format, &provider_options);
 
     let mut tracker = Tracker::default();
@@ -186,10 +225,29 @@ async fn run(input: &str, options: SpeakOptions<'_>, on_chunk: Option<&mut (dyn 
         None => post(&connection, family.url(&model.id), &payload, &mut tracker)
             .await
             .and_then(|body| family.parse(&body, &model.id, voice, format)),
-        Some(on_chunk) => family.stream(provider, &connection, &model.id, voice, format, payload, &mut tracker, on_chunk).await,
+        Some(on_chunk) => {
+            family
+                .stream(
+                    provider,
+                    &connection,
+                    &model.id,
+                    voice,
+                    format,
+                    payload,
+                    &mut tracker,
+                    on_chunk,
+                )
+                .await
+        }
     };
     let mut speech = result?;
-    speech.usage_entries = tracker.entries(Operation::Speech, provider, &model, speech.tokens(), speech.cost());
+    speech.usage_entries = tracker.entries(
+        Operation::Speech,
+        provider,
+        &model,
+        speech.tokens(),
+        speech.cost(),
+    );
     Ok(speech)
 }
 
@@ -210,28 +268,57 @@ impl Tracker {
 
     /// `Tracker#succeed`: one entry per attempt, the last billed with the result's usage. The
     /// result's cost is kept when it has a total; otherwise the tokens are priced as audio.
-    pub(crate) fn entries(self, operation: Operation, provider: Provider, model: &Model, tokens: Tokens, cost: Cost) -> Vec<UsageEntry> {
+    pub(crate) fn entries(
+        self,
+        operation: Operation,
+        provider: Provider,
+        model: &Model,
+        tokens: Tokens,
+        cost: Cost,
+    ) -> Vec<UsageEntry> {
         let entry = |status, tokens: Tokens, cost: Option<Cost>| UsageEntry {
             id: UsageEntry::next_id(),
             operation,
             provider: provider.slug().into(),
             model: model.id.clone(),
             status,
-            cost: cost.filter(|c| c.total().is_some()).unwrap_or_else(|| Cost::audio(&tokens, Some(model))),
+            cost: cost
+                .filter(|c| c.total().is_some())
+                .unwrap_or_else(|| Cost::audio(&tokens, Some(model))),
             tokens,
         };
-        let mut entries: Vec<UsageEntry> = self.retried.into_iter().map(|t| entry(UsageStatus::Failed, t, None)).collect();
+        let mut entries: Vec<UsageEntry> = self
+            .retried
+            .into_iter()
+            .map(|t| entry(UsageStatus::Failed, t, None))
+            .collect();
         entries.push(entry(UsageStatus::Succeeded, tokens, Some(cost)));
         entries
     }
 }
 
 /// POSTs JSON and returns the raw response bytes: speech endpoints answer with audio, not JSON.
-async fn post(connection: &Connection, path: String, payload: &Value, tracker: &mut Tracker) -> Result<Vec<u8>> {
+async fn post(
+    connection: &Connection,
+    path: String,
+    payload: &Value,
+    tracker: &mut Tracker,
+) -> Result<Vec<u8>> {
     let resp = connection
-        .send_tracked(reqwest::Method::POST, &path, &[], true, &|req| req.json(payload), &mut tracker.on_attempt())
+        .send_tracked(
+            reqwest::Method::POST,
+            &path,
+            &[],
+            true,
+            &|req| req.json(payload),
+            &mut tracker.on_attempt(),
+        )
         .await?;
-    Ok(resp.bytes().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?.to_vec())
+    Ok(resp
+        .bytes()
+        .await
+        .map_err(|e| Error::ConnectionFailed(e.to_string()))?
+        .to_vec())
 }
 
 /// Which speech seams a provider's protocol includes.
@@ -255,9 +342,10 @@ impl Family {
             Provider::OpenRouter => Ok(Family::OpenRouter),
             Provider::Gemini => Ok(Family::Gemini),
             Provider::GPUStack => Ok(Family::GPUStack),
-            Provider::Anthropic | Provider::TypeSafe => {
-                Err(Error::Api(format!("{} doesn't support speech generation", provider.display()), None))
-            }
+            Provider::Anthropic | Provider::TypeSafe => Err(Error::Api(
+                format!("{} doesn't support speech generation", provider.display()),
+                None,
+            )),
             _ => Ok(Family::OpenAI),
         }
     }
@@ -272,7 +360,14 @@ impl Family {
     }
 
     /// `render_speech_payload`.
-    fn render(self, input: &str, model: &str, voice: Option<&str>, format: Option<&str>, provider_options: &Value) -> Value {
+    fn render(
+        self,
+        input: &str,
+        model: &str,
+        voice: Option<&str>,
+        format: Option<&str>,
+        provider_options: &Value,
+    ) -> Value {
         let mut payload = Map::new();
         let mut put = |key: &str, value: Option<Value>| {
             if let Some(value) = value {
@@ -331,24 +426,59 @@ impl Family {
     }
 
     /// `parse_speech_response`.
-    fn parse(self, body: &[u8], model: &str, voice: Option<&str>, format: Option<&str>) -> Result<Speech> {
+    fn parse(
+        self,
+        body: &[u8],
+        model: &str,
+        voice: Option<&str>,
+        format: Option<&str>,
+    ) -> Result<Speech> {
         let format = format.unwrap_or("mp3");
         match self {
-            Family::OpenAI | Family::GPUStack => Ok(Speech::new(body.to_vec(), model, Some(voice.unwrap_or("alloy")), Some(format), None)),
+            Family::OpenAI | Family::GPUStack => Ok(Speech::new(
+                body.to_vec(),
+                model,
+                Some(voice.unwrap_or("alloy")),
+                Some(format),
+                None,
+            )),
             Family::OpenRouter => Ok(Speech::new(body.to_vec(), model, voice, Some(format), None)),
-            Family::XAI => Ok(Speech::new(body.to_vec(), model, Some(voice.unwrap_or("eve")), Some(format), None)),
+            Family::XAI => Ok(Speech::new(
+                body.to_vec(),
+                model,
+                Some(voice.unwrap_or("eve")),
+                Some(format),
+                None,
+            )),
             Family::Mistral => {
                 let data: Value = serde_json::from_slice(body).unwrap_or(Value::Null);
                 let audio = data.get("audio_data").and_then(Value::as_str).unwrap_or("");
-                Ok(Speech::new(decode(audio)?, model, voice, Some(format), None))
+                Ok(Speech::new(
+                    decode(audio)?,
+                    model,
+                    voice,
+                    Some(format),
+                    None,
+                ))
             }
             Family::Gemini => {
                 let data: Value = serde_json::from_slice(body).unwrap_or(Value::Null);
                 let audio = data
                     .pointer("/candidates/0/content/parts/0/inlineData/data")
                     .and_then(Value::as_str)
-                    .ok_or_else(|| Error::Api("Unexpected response format from Gemini speech generation API".into(), None))?;
-                Ok(Speech::new(decode(audio)?, model, Some(voice.unwrap_or("Kore")), Some("pcm"), None))
+                    .ok_or_else(|| {
+                        Error::Api(
+                            "Unexpected response format from Gemini speech generation API".into(),
+                            None,
+                        )
+                    })?;
+                Ok(Speech::new(
+                    decode(audio)?,
+                    model,
+                    Some(voice.unwrap_or("Kore")),
+                    Some("pcm"),
+                    None,
+                ))
             }
         }
     }
@@ -367,12 +497,24 @@ impl Family {
         on_chunk: &mut (dyn FnMut(&SpeechChunk) + Send),
     ) -> Result<Speech> {
         match self {
-            Family::Gemini => {
-                Err(Error::Api(format!("{} doesn't support streaming speech with this protocol", provider.display()), None))
+            Family::Gemini => Err(Error::Api(
+                format!(
+                    "{} doesn't support streaming speech with this protocol",
+                    provider.display()
+                ),
+                None,
+            )),
+            Family::Mistral => {
+                stream_mistral(connection, model, voice, format, payload, tracker, on_chunk).await
             }
-            Family::Mistral => stream_mistral(connection, model, voice, format, payload, tracker, on_chunk).await,
-            Family::XAI if payload.get("with_timestamps").is_some_and(|v| !v.is_null() && v != &Value::Bool(false)) => {
-                Err(Error::Argument("xAI streaming speech does not accept with_timestamps".into()))
+            Family::XAI
+                if payload
+                    .get("with_timestamps")
+                    .is_some_and(|v| !v.is_null() && v != &Value::Bool(false)) =>
+            {
+                Err(Error::Argument(
+                    "xAI streaming speech does not accept with_timestamps".into(),
+                ))
             }
             Family::GPUStack => {
                 let format = format.unwrap_or("pcm");
@@ -380,9 +522,23 @@ impl Family {
                     object.insert("stream".into(), true.into());
                     object.insert("response_format".into(), format.into());
                 }
-                self.stream_binary(connection, model, voice, Some(format), &payload, tracker, on_chunk).await
+                self.stream_binary(
+                    connection,
+                    model,
+                    voice,
+                    Some(format),
+                    &payload,
+                    tracker,
+                    on_chunk,
+                )
+                .await
             }
-            _ => self.stream_binary(connection, model, voice, format, &payload, tracker, on_chunk).await,
+            _ => {
+                self.stream_binary(
+                    connection, model, voice, format, &payload, tracker, on_chunk,
+                )
+                .await
+            }
         }
     }
 
@@ -402,7 +558,14 @@ impl Family {
     ) -> Result<Speech> {
         let empty = self.parse(&[], model, voice, format)?;
         let resp = connection
-            .send_tracked(reqwest::Method::POST, &self.url(model), &[], true, &|req| req.json(payload), &mut tracker.on_attempt())
+            .send_tracked(
+                reqwest::Method::POST,
+                &self.url(model),
+                &[],
+                true,
+                &|req| req.json(payload),
+                &mut tracker.on_attempt(),
+            )
             .await?;
         let status = resp.status().as_u16();
         let content_type = resp
@@ -413,7 +576,8 @@ impl Family {
             .unwrap_or("")
             .trim()
             .to_string();
-        let audio = content_type.starts_with("audio/") || content_type == "application/octet-stream";
+        let audio =
+            content_type.starts_with("audio/") || content_type == "application/octet-stream";
         let mut buffer = Vec::new();
         let mut stream = resp.bytes_stream();
         while let Some(bytes) = stream.next().await {
@@ -423,7 +587,11 @@ impl Family {
             }
             buffer.extend_from_slice(&bytes);
             if audio {
-                on_chunk(&SpeechChunk::new(bytes.to_vec(), &empty.format, Some(&empty.mime_type)));
+                on_chunk(&SpeechChunk::new(
+                    bytes.to_vec(),
+                    &empty.format,
+                    Some(&empty.mime_type),
+                ));
             }
         }
         if !audio {
@@ -475,7 +643,9 @@ async fn stream_mistral(
                 let encoded = data
                     .get("audio_data")
                     .and_then(Value::as_str)
-                    .ok_or_else(|| Error::Api("Mistral speech delta carries no audio_data".into(), None))?;
+                    .ok_or_else(|| {
+                        Error::Api("Mistral speech delta carries no audio_data".into(), None)
+                    })?;
                 let bytes = decode(encoded)?;
                 audio.extend_from_slice(&bytes);
                 if !bytes.is_empty() {
@@ -494,10 +664,17 @@ async fn stream_mistral(
             &[],
             &mut tracker.on_attempt(),
             &mut on_event,
-            crate::protocols::streaming_error_status(crate::providers::ProtocolName::ChatCompletions),
+            crate::protocols::streaming_error_status(
+                crate::providers::ProtocolName::ChatCompletions,
+            ),
         )
         .await?;
-    let last = last.ok_or_else(|| Error::Api("Mistral speech stream ended before its completion event".into(), None))?;
+    let last = last.ok_or_else(|| {
+        Error::Api(
+            "Mistral speech stream ended before its completion event".into(),
+            None,
+        )
+    })?;
     let usage = last.get("usage").cloned().unwrap_or_else(|| json!({}));
     Ok(Speech::new(audio, model, voice, Some(format), None).with_tokens(&usage))
 }
@@ -515,20 +692,41 @@ mod tests {
     // speech_spec.rb "#mime_type uses the format when no explicit MIME type is provided".
     #[test]
     fn mime_type_follows_the_format() {
-        assert_eq!(Speech::new(b"audio bytes".to_vec(), "tts-1", None, Some("wav"), None).mime_type, "audio/wav");
-        assert_eq!(Speech::new(Vec::new(), "tts-1", None, None, None).mime_type, "audio/mpeg");
-        assert_eq!(Speech::new(Vec::new(), "tts-1", None, Some("ogg"), None).mime_type, "audio/ogg");
+        assert_eq!(
+            Speech::new(b"audio bytes".to_vec(), "tts-1", None, Some("wav"), None).mime_type,
+            "audio/wav"
+        );
+        assert_eq!(
+            Speech::new(Vec::new(), "tts-1", None, None, None).mime_type,
+            "audio/mpeg"
+        );
+        assert_eq!(
+            Speech::new(Vec::new(), "tts-1", None, Some("ogg"), None).mime_type,
+            "audio/ogg"
+        );
     }
 
     #[test]
     fn openai_payload_defaults_the_voice_and_lets_provider_options_win() {
-        let payload = Family::OpenAI.render("Hi", "tts-1", None, None, &json!({ "speed": 1.5, "voice": "nova" }));
-        assert_eq!(payload, json!({ "model": "tts-1", "input": "Hi", "voice": "nova", "speed": 1.5 }));
+        let payload = Family::OpenAI.render(
+            "Hi",
+            "tts-1",
+            None,
+            None,
+            &json!({ "speed": 1.5, "voice": "nova" }),
+        );
+        assert_eq!(
+            payload,
+            json!({ "model": "tts-1", "input": "Hi", "voice": "nova", "speed": 1.5 })
+        );
     }
 
     #[test]
     fn xai_nests_the_format_as_a_codec() {
         let payload = Family::XAI.render("Hi", "grok-tts", Some("ara"), Some("wav"), &json!({}));
-        assert_eq!(payload, json!({ "text": "Hi", "voice_id": "ara", "language": "auto", "output_format": { "codec": "wav" } }));
+        assert_eq!(
+            payload,
+            json!({ "text": "Hi", "voice_id": "ara", "language": "auto", "output_format": { "codec": "wav" } })
+        );
     }
 }

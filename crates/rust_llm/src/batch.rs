@@ -99,9 +99,20 @@ pub struct EmbeddingRequest {
 impl EmbeddingRequest {
     pub fn new(text: impl Into<EmbedInput>, options: EmbedOptions<'_>) -> Result<EmbeddingRequest> {
         let config = options.config.clone().unwrap_or_else(crate::config);
-        let model_id = options.model.unwrap_or(&config.default_embedding_model).to_string();
-        let (model, provider) = resolve_model(&model_id, options.provider, options.assume_model_exists)?;
-        Ok(EmbeddingRequest { text: text.into(), dimensions: options.dimensions, result: None, model, provider, config })
+        let model_id = options
+            .model
+            .unwrap_or(&config.default_embedding_model)
+            .to_string();
+        let (model, provider) =
+            resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+        Ok(EmbeddingRequest {
+            text: text.into(),
+            dimensions: options.dimensions,
+            result: None,
+            model,
+            provider,
+            config,
+        })
     }
 
     pub fn model(&self) -> &Model {
@@ -115,7 +126,10 @@ impl EmbeddingRequest {
     /// `EmbeddingRequest#render`: the embedding payload in the provider's wire format.
     pub fn render(&self) -> Result<Value> {
         match self.provider {
-            Provider::Anthropic => Err(Error::Api("Anthropic doesn't support embeddings".into(), None)),
+            Provider::Anthropic => Err(Error::Api(
+                "Anthropic doesn't support embeddings".into(),
+                None,
+            )),
             Provider::Gemini => {
                 // `[text].flatten.map { single_embedding_payload }` (`text.to_s`, so nil is "").
                 let texts = match &self.text {
@@ -174,7 +188,10 @@ fn embed_input_value(text: &EmbedInput) -> Option<Value> {
 }
 
 /// `RubyLLM.embed_later(text, model:, provider:, dimensions:)`: `text` is one string or an array.
-pub fn embed_later(text: impl Into<EmbedInput>, options: EmbedOptions<'_>) -> Result<EmbeddingRequest> {
+pub fn embed_later(
+    text: impl Into<EmbedInput>,
+    options: EmbedOptions<'_>,
+) -> Result<EmbeddingRequest> {
     EmbeddingRequest::new(text, options)
 }
 
@@ -274,9 +291,16 @@ impl Batch {
     }
 
     /// `Batch.find(id, provider:, context:)`.
-    pub async fn find_with_config(config: Arc<Config>, id: &str, provider: Option<&str>) -> Result<Batch> {
+    pub async fn find_with_config(
+        config: Arc<Config>,
+        id: &str,
+        provider: Option<&str>,
+    ) -> Result<Batch> {
         let Some(provider) = provider else {
-            return Err(Error::Argument("Provider must be specified to find a batch that is not persisted by RustLLM".into()));
+            return Err(Error::Argument(
+                "Provider must be specified to find a batch that is not persisted by RustLLM"
+                    .into(),
+            ));
         };
         let provider = Provider::resolve_or_err(provider)?;
         let kind = default_kind(provider)?;
@@ -303,7 +327,11 @@ impl Batch {
     /// `Batch.new(provider:, id:, raw_status:, completed:, ...)` (`batch.rb`): a batch from state
     /// already fetched, without contacting the provider. Errors like `batch_status` does when the
     /// provider has no batch API.
-    pub fn from_attributes(config: Arc<Config>, provider: &str, attributes: BatchAttributes) -> Result<Batch> {
+    pub fn from_attributes(
+        config: Arc<Config>,
+        provider: &str,
+        attributes: BatchAttributes,
+    ) -> Result<Batch> {
         let provider = Provider::resolve_or_err(provider)?;
         default_kind(provider)?;
         let mut batch = Batch::new(provider, config)?;
@@ -357,7 +385,14 @@ impl Batch {
         let requests = chats
             .iter()
             .enumerate()
-            .map(|(i, chat)| Ok(Req { custom_id: i.to_string(), model: chat.model().id.clone(), payload: chat.render()?, text: None }))
+            .map(|(i, chat)| {
+                Ok(Req {
+                    custom_id: i.to_string(),
+                    model: chat.model().id.clone(),
+                    payload: chat.render()?,
+                    text: None,
+                })
+            })
             .collect::<Result<Vec<_>>>()?;
         batch.create_instrumented(&requests).await?;
         batch.chats = Some(chats);
@@ -372,7 +407,14 @@ impl Batch {
         let lines = requests
             .iter()
             .enumerate()
-            .map(|(i, r)| Ok(Req { custom_id: i.to_string(), model: r.model.id.clone(), payload: r.render()?, text: Some(r.text.clone()) }))
+            .map(|(i, r)| {
+                Ok(Req {
+                    custom_id: i.to_string(),
+                    model: r.model.id.clone(),
+                    payload: r.render()?,
+                    text: Some(r.text.clone()),
+                })
+            })
             .collect::<Result<Vec<_>>>()?;
         let mut batch = Batch::new(provider, requests[0].config.clone())?;
         batch.create_instrumented(&lines).await?;
@@ -516,12 +558,23 @@ impl Batch {
 
     /// The chat answers of `results`.
     pub async fn messages(&mut self) -> Result<Vec<Option<Message>>> {
-        Ok(self.results().await?.into_iter().map(|r| r.and_then(|r| r.as_message().cloned())).collect())
+        Ok(self
+            .results()
+            .await?
+            .into_iter()
+            .map(|r| r.and_then(|r| r.as_message().cloned()))
+            .collect())
     }
 
     /// Token usage aggregated across the collected responses.
     pub async fn tokens(&mut self) -> Result<Tokens> {
-        let tokens: Vec<Tokens> = self.results().await?.iter().flatten().map(BatchResult::tokens).collect();
+        let tokens: Vec<Tokens> = self
+            .results()
+            .await?
+            .iter()
+            .flatten()
+            .map(BatchResult::tokens)
+            .collect();
         Ok(Tokens::aggregate(tokens.iter()))
     }
 
@@ -534,7 +587,13 @@ impl Batch {
         if !self.completed {
             return Ok(Cost::aggregate(std::iter::empty::<&Cost>(), false));
         }
-        let costs: Vec<Cost> = self.results().await?.iter().flatten().map(BatchResult::cost).collect();
+        let costs: Vec<Cost> = self
+            .results()
+            .await?
+            .iter()
+            .flatten()
+            .map(BatchResult::cost)
+            .collect();
         Ok(Cost::aggregate(costs.iter(), true))
     }
 
@@ -550,8 +609,12 @@ impl Batch {
         if attrs.reported_cost.is_some() {
             self.reported_cost = attrs.reported_cost;
         }
-        let kind = self.batch_protocol.or_else(|| default_kind(self.http.provider).ok());
-        self.status = kind.map_or(BatchStatus::Pending, |k| k.status(self.raw_status.as_deref(), self.completed));
+        let kind = self
+            .batch_protocol
+            .or_else(|| default_kind(self.http.provider).ok());
+        self.status = kind.map_or(BatchStatus::Pending, |k| {
+            k.status(self.raw_status.as_deref(), self.completed)
+        });
     }
 
     async fn results_kind(&self) -> Result<Kind> {
@@ -571,29 +634,51 @@ impl Batch {
         let rows = self.http.results(kind, &self.id).await?;
         let known = self.known_request_count();
         // `validate_result_indices`: every index is checked for range before any for duplicates.
-        if let Some((index, _, _)) = rows.iter().find(|(i, _, _)| *i < 0 || known.is_some_and(|count| *i as usize >= count)) {
-            return Err(Error::Api(format!("Invalid batch result index: {index}"), None));
+        if let Some((index, _, _)) = rows
+            .iter()
+            .find(|(i, _, _)| *i < 0 || known.is_some_and(|count| *i as usize >= count))
+        {
+            return Err(Error::Api(
+                format!("Invalid batch result index: {index}"),
+                None,
+            ));
         }
         let mut seen = HashSet::new();
         for (index, _, _) in &rows {
             if !seen.insert(*index) {
-                return Err(Error::Api(format!("Duplicate batch result index: {index}"), None));
+                return Err(Error::Api(
+                    format!("Duplicate batch result index: {index}"),
+                    None,
+                ));
             }
         }
-        let size = known.unwrap_or_else(|| rows.iter().map(|(i, _, _)| *i as usize + 1).max().unwrap_or(0));
+        let size = known.unwrap_or_else(|| {
+            rows.iter()
+                .map(|(i, _, _)| *i as usize + 1)
+                .max()
+                .unwrap_or(0)
+        });
         let mut slots: Vec<Option<BatchResult>> = vec![None; size];
         if self.statuses.len() < size {
             self.statuses.resize(size, None);
         }
         for (index, result, failure) in rows {
             let index = index as usize;
-            self.statuses[index] = Some(if result.is_some() { BatchStatus::Succeeded } else { failure });
+            self.statuses[index] = Some(if result.is_some() {
+                BatchStatus::Succeeded
+            } else {
+                failure
+            });
             if let Some(result) = result {
                 slots[index] = Some(self.deliver(index, result)?);
             }
         }
         if self.completed {
-            let missing = if self.is_cancelled() { BatchStatus::Cancelled } else { BatchStatus::Failed };
+            let missing = if self.is_cancelled() {
+                BatchStatus::Cancelled
+            } else {
+                BatchStatus::Failed
+            };
             for status in self.statuses.iter_mut().take(size) {
                 status.get_or_insert(missing);
             }
@@ -602,7 +687,11 @@ impl Batch {
     }
 
     fn known_request_count(&self) -> Option<usize> {
-        self.chats.as_ref().map(Vec::len).or_else(|| self.requests.as_ref().map(Vec::len)).or(self.request_count)
+        self.chats
+            .as_ref()
+            .map(Vec::len)
+            .or_else(|| self.requests.as_ref().map(Vec::len))
+            .or(self.request_count)
     }
 
     /// Collecting early keeps reading fresh, so a result already delivered comes back on every
@@ -610,9 +699,18 @@ impl Batch {
     fn deliver(&mut self, index: usize, result: BatchResult) -> Result<BatchResult> {
         match result {
             BatchResult::Embedding(mut embedding) => {
-                let model = self.requests.as_ref().and_then(|r| r.get(index)).map(|r| r.model.clone());
+                let model = self
+                    .requests
+                    .as_ref()
+                    .and_then(|r| r.get(index))
+                    .map(|r| r.model.clone());
                 if embedding.usage_entries.is_empty() {
-                    let entry = self.batch_usage(Operation::Embedding, Some(embedding.model.as_str()), embedding.tokens(), model)?;
+                    let entry = self.batch_usage(
+                        Operation::Embedding,
+                        Some(embedding.model.as_str()),
+                        embedding.tokens(),
+                        model,
+                    )?;
                     embedding.usage_entries = vec![entry];
                 }
                 if self.delivered.insert(index)
@@ -623,13 +721,26 @@ impl Batch {
                 Ok(BatchResult::Embedding(embedding))
             }
             BatchResult::Message(mut message) => {
-                let chat_model = self.chats.as_ref().and_then(|c| c.get(index)).map(|c| c.model().clone());
+                let chat_model = self
+                    .chats
+                    .as_ref()
+                    .and_then(|c| c.get(index))
+                    .map(|c| c.model().clone());
                 if message.usage_entries.is_empty() {
-                    let entry = self.batch_usage(Operation::Chat, message.model.as_deref(), message.tokens.clone(), chat_model)?;
+                    let entry = self.batch_usage(
+                        Operation::Chat,
+                        message.model.as_deref(),
+                        message.tokens.clone(),
+                        chat_model,
+                    )?;
                     message.usage_entries = vec![entry];
                 }
                 let delivered = self.delivered.contains(&index)
-                    || self.chats.as_ref().and_then(|c| c.get(index)).is_some_and(|chat| already_in_chat(chat, &message));
+                    || self
+                        .chats
+                        .as_ref()
+                        .and_then(|c| c.get(index))
+                        .is_some_and(|chat| already_in_chat(chat, &message));
                 if !delivered {
                     self.delivered.insert(index);
                     if let Some(chat) = self.chats.as_mut().and_then(|c| c.get_mut(index)) {
@@ -642,18 +753,28 @@ impl Batch {
     }
 
     /// `attach_batch_usage`: one succeeded entry priced at batch rates.
-    fn batch_usage(&self, operation: Operation, result_model: Option<&str>, tokens: Tokens, model: Option<Model>) -> Result<UsageEntry> {
+    fn batch_usage(
+        &self,
+        operation: Operation,
+        result_model: Option<&str>,
+        tokens: Tokens,
+        model: Option<Model>,
+    ) -> Result<UsageEntry> {
         let provider = self.http.provider;
         let model = match model {
             Some(m) => m,
-            None => models::models().find(result_model.unwrap_or_default(), Some(provider.slug()))?,
+            None => {
+                models::models().find(result_model.unwrap_or_default(), Some(provider.slug()))?
+            }
         };
         let cost = batch_cost(provider, &tokens, &model);
         Ok(UsageEntry {
             id: UsageEntry::next_id(),
             operation,
             provider: provider.slug().into(),
-            model: result_model.map(str::to_string).unwrap_or_else(|| model.id.clone()),
+            model: result_model
+                .map(str::to_string)
+                .unwrap_or_else(|| model.id.clone()),
             status: UsageStatus::Succeeded,
             tokens,
             cost,
@@ -665,18 +786,31 @@ impl Batch {
 /// staged chat loads what its payload needs before the batch renders it, as `Chat#ask` does:
 /// local files and untyped URLs, then any URL whose bytes the payload carries.
 async fn load_chat_attachments(chat: &mut Chat, client: &reqwest::Client) -> Result<()> {
-    for a in chat.messages_mut().iter_mut().flat_map(|m| m.attachments.iter_mut()) {
+    for a in chat
+        .messages_mut()
+        .iter_mut()
+        .flat_map(|m| m.attachments.iter_mut())
+    {
         a.prepare(client).await?;
     }
     let _ = chat.render();
-    for a in chat.messages_mut().iter_mut().flat_map(|m| m.attachments.iter_mut()).filter(|a| a.is_wanted()) {
+    for a in chat
+        .messages_mut()
+        .iter_mut()
+        .flat_map(|m| m.attachments.iter_mut())
+        .filter(|a| a.is_wanted())
+    {
         a.load(client).await?;
     }
     Ok(())
 }
 
 fn awaiting_model(chat: &Chat) -> bool {
-    !chat.is_complete() && chat.messages().last().is_some_and(|m| AWAITING_ROLES.contains(&m.role))
+    !chat.is_complete()
+        && chat
+            .messages()
+            .last()
+            .is_some_and(|m| AWAITING_ROLES.contains(&m.role))
 }
 
 /// A plain answer is the chat's last message once it arrives. A tool-call answer is not: running
@@ -684,9 +818,15 @@ fn awaiting_model(chat: &Chat) -> bool {
 fn already_in_chat(chat: &Chat, message: &Message) -> bool {
     match &message.tool_calls {
         Some(calls) if message.is_tool_call() => chat.messages().iter().any(|m| {
-            m.is_tool_call() && m.tool_calls.as_ref().is_some_and(|c| c.keys().any(|k| calls.contains_key(k)))
+            m.is_tool_call()
+                && m.tool_calls
+                    .as_ref()
+                    .is_some_and(|c| c.keys().any(|k| calls.contains_key(k)))
         }),
-        _ => !chat.messages().last().is_some_and(|m| AWAITING_ROLES.contains(&m.role)),
+        _ => !chat
+            .messages()
+            .last()
+            .is_some_and(|m| AWAITING_ROLES.contains(&m.role)),
     }
 }
 
@@ -699,7 +839,10 @@ fn shared_provider(providers: impl Iterator<Item = Provider>) -> Result<Provider
     }
     if slugs.len() > 1 {
         let names: Vec<&str> = slugs.iter().map(Provider::slug).collect();
-        return Err(Error::Argument(format!("A batch takes one provider per submission, got: {}", names.join(", "))));
+        return Err(Error::Argument(format!(
+            "A batch takes one provider per submission, got: {}",
+            names.join(", ")
+        )));
     }
     let provider = slugs[0];
     default_kind(provider)?;
@@ -708,15 +851,26 @@ fn shared_provider(providers: impl Iterator<Item = Provider>) -> Result<Provider
 
 // ---- pricing ------------------------------------------------------------------------------------
 
-const COMPONENTS: [Component; 5] =
-    [Component::Input, Component::Output, Component::CacheRead, Component::CacheWrite, Component::Thinking];
+const COMPONENTS: [Component; 5] = [
+    Component::Input,
+    Component::Output,
+    Component::CacheRead,
+    Component::CacheWrite,
+    Component::Thinking,
+];
 
 /// `Provider#batch_cost_multiplier`: the provider's batch discount per component, applied when
 /// the model lists no batch price.
 fn batch_cost_multiplier(provider: Provider, component: Component) -> Option<f64> {
     match provider {
         Provider::OpenAI | Provider::Anthropic | Provider::Mistral => Some(0.5),
-        Provider::Gemini => Some(if matches!(component, Component::CacheRead | Component::CacheWrite) { 1.0 } else { 0.5 }),
+        Provider::Gemini => Some(
+            if matches!(component, Component::CacheRead | Component::CacheWrite) {
+                1.0
+            } else {
+                0.5
+            },
+        ),
         _ => None,
     }
 }
@@ -734,7 +888,10 @@ fn batch_rate(tier: &PricingTier, component: Component) -> Option<f64> {
 fn long_context_pricing(pricing: &PricingCategory, tokens: &Tokens) -> bool {
     match (&pricing.long_context, pricing.long_context_threshold) {
         (Some(_), Some(threshold)) => {
-            tokens.input.unwrap_or(0) + tokens.cache_read.unwrap_or(0) + tokens.cache_write.unwrap_or(0) > threshold
+            tokens.input.unwrap_or(0)
+                + tokens.cache_read.unwrap_or(0)
+                + tokens.cache_write.unwrap_or(0)
+                > threshold
         }
         _ => false,
     }
@@ -749,17 +906,29 @@ pub fn batch_cost(provider: Provider, tokens: &Tokens, model: &Model) -> Cost {
         return standard;
     }
     let pricing = model.pricing.text_tokens();
-    let batch_tier = if long_context_pricing(&pricing, tokens) { None } else { pricing.batch.clone() };
-    let batch = batch_tier.as_ref().map(|_| Cost::new(tokens, Some(model), Tier::Batch));
+    let batch_tier = if long_context_pricing(&pricing, tokens) {
+        None
+    } else {
+        pricing.batch.clone()
+    };
+    let batch = batch_tier
+        .as_ref()
+        .map(|_| Cost::new(tokens, Some(model), Tier::Batch));
     let mut amounts = [None; 5];
     let mut missing = Vec::new();
     for (i, component) in COMPONENTS.into_iter().enumerate() {
         amounts[i] = match (&batch_tier, &batch) {
-            (Some(tier), Some(batch)) if batch_rate(tier, component).is_some() => batch.get(component),
-            _ => standard.get(component).zip(batch_cost_multiplier(provider, component)).map(|(v, m)| v * m),
+            (Some(tier), Some(batch)) if batch_rate(tier, component).is_some() => {
+                batch.get(component)
+            }
+            _ => standard
+                .get(component)
+                .zip(batch_cost_multiplier(provider, component))
+                .map(|(v, m)| v * m),
         };
         if amounts[i].is_none()
-            && (standard.missing().contains(&component) || standard.get(component).is_some_and(|v| v > 0.0))
+            && (standard.missing().contains(&component)
+                || standard.get(component).is_some_and(|v| v > 0.0))
         {
             missing.push(component);
         }
@@ -788,14 +957,19 @@ impl Kind {
         match self {
             Kind::Anthropic => "anthropic",
             Kind::Responses => "responses",
-            Kind::ChatCompletions | Kind::Mistral | Kind::XAI | Kind::OpenRouter => "chat_completions",
+            Kind::ChatCompletions | Kind::Mistral | Kind::XAI | Kind::OpenRouter => {
+                "chat_completions"
+            }
             Kind::Embeddings => "embeddings",
             Kind::Gemini => "gemini",
         }
     }
 
     fn is_openai(self) -> bool {
-        matches!(self, Kind::Responses | Kind::ChatCompletions | Kind::Embeddings)
+        matches!(
+            self,
+            Kind::Responses | Kind::ChatCompletions | Kind::Embeddings
+        )
     }
 
     /// `parse_batch_status`.
@@ -807,11 +981,13 @@ impl Kind {
         match self {
             Kind::Anthropic if raw == "ended" => BatchStatus::Succeeded,
             Kind::Anthropic => BatchStatus::Pending,
-            Kind::Responses | Kind::ChatCompletions | Kind::Embeddings | Kind::OpenRouter => match raw {
-                "completed" => BatchStatus::Succeeded,
-                "cancelled" => BatchStatus::Cancelled,
-                _ => BatchStatus::Failed,
-            },
+            Kind::Responses | Kind::ChatCompletions | Kind::Embeddings | Kind::OpenRouter => {
+                match raw {
+                    "completed" => BatchStatus::Succeeded,
+                    "cancelled" => BatchStatus::Cancelled,
+                    _ => BatchStatus::Failed,
+                }
+            }
             Kind::Gemini if raw.ends_with("SUCCEEDED") => BatchStatus::Succeeded,
             Kind::Gemini if raw.ends_with("CANCELLED") => BatchStatus::Cancelled,
             Kind::Gemini => BatchStatus::Failed,
@@ -835,7 +1011,10 @@ fn default_kind(provider: Provider) -> Result<Kind> {
         Provider::Mistral => Ok(Kind::Mistral),
         Provider::XAI => Ok(Kind::XAI),
         Provider::OpenRouter => Ok(Kind::OpenRouter),
-        _ => Err(Error::Api(format!("{} doesn't support batch requests", provider.slug()), None)),
+        _ => Err(Error::Api(
+            format!("{} doesn't support batch requests", provider.slug()),
+            None,
+        )),
     }
 }
 
@@ -853,7 +1032,10 @@ fn kind_for(provider: Provider, requests: &[Req]) -> Result<Kind> {
     }
     match kinds.as_slice() {
         [kind] => Ok(*kind),
-        _ => Err(Error::Api("openai batch requests must target one endpoint per submission".into(), None)),
+        _ => Err(Error::Api(
+            "openai batch requests must target one endpoint per submission".into(),
+            None,
+        )),
     }
 }
 
@@ -862,10 +1044,15 @@ fn kind_for(provider: Provider, requests: &[Req]) -> Result<Kind> {
 fn openai_kind_for_payload(payload: &Value) -> Result<Kind> {
     match payload.get("input").filter(|i| !i.is_null()) {
         Some(Value::String(_)) => Ok(Kind::Embeddings),
-        Some(Value::Array(a)) if !a.is_empty() && a.iter().all(Value::is_string) => Ok(Kind::Embeddings),
+        Some(Value::Array(a)) if !a.is_empty() && a.iter().all(Value::is_string) => {
+            Ok(Kind::Embeddings)
+        }
         Some(_) => Ok(Kind::Responses),
         None if payload.get("messages").is_some() => Ok(Kind::ChatCompletions),
-        None => Err(Error::Api("openai batch requests only support chat, responses, or embedding payloads".into(), None)),
+        None => Err(Error::Api(
+            "openai batch requests only support chat, responses, or embedding payloads".into(),
+            None,
+        )),
     }
 }
 
@@ -900,7 +1087,10 @@ pub fn mistral_batch_endpoint(payloads: &[Value]) -> Result<&'static str> {
     if payloads.iter().all(|p| is_embedding(&p)) {
         Ok("/v1/embeddings")
     } else if payloads.iter().any(|p| is_embedding(&p)) {
-        Err(Error::Api("Mistral batches cannot mix chat and embedding requests".into(), None))
+        Err(Error::Api(
+            "Mistral batches cannot mix chat and embedding requests".into(),
+            None,
+        ))
     } else {
         Ok("/v1/chat/completions")
     }
@@ -955,12 +1145,17 @@ fn single_batch_model<'a>(requests: &'a [Req], provider_name: &str) -> Result<&'
     if requests.iter().all(|r| r.model == first) {
         return Ok(first);
     }
-    Err(Error::Api(format!("{provider_name} batch requests must use one model per submission"), None))
+    Err(Error::Api(
+        format!("{provider_name} batch requests must use one model per submission"),
+        None,
+    ))
 }
 
 /// `batch_result_index`: Ruby's `Integer(id)`.
 fn batch_result_index(id: &str) -> Result<i64> {
-    id.trim().parse::<i64>().map_err(|_| Error::Argument(format!("invalid value for Integer(): {id:?}")))
+    id.trim()
+        .parse::<i64>()
+        .map_err(|_| Error::Argument(format!("invalid value for Integer(): {id:?}")))
 }
 
 /// `Batch::Helpers#batch_failure` (`batch.rb`): logs the failed request and normalizes its status.
@@ -971,7 +1166,11 @@ pub fn batch_failure(custom_id: &str, detail: Option<String>, status: &str) -> B
         line.push_str(&format!(": {detail}"));
     }
     tracing::warn!("{line}");
-    if status.to_lowercase().contains("cancel") { BatchStatus::Cancelled } else { BatchStatus::Failed }
+    if status.to_lowercase().contains("cancel") {
+        BatchStatus::Cancelled
+    } else {
+        BatchStatus::Failed
+    }
 }
 
 /// `Batch::Helpers#batch_error_message` (`batch.rb`): the error text of a failed result line.
@@ -987,14 +1186,25 @@ pub fn batch_error_message(line: &Value) -> Option<String> {
     let response = line.get("response");
     line.get("error")
         .and_then(value)
-        .or_else(|| line.get("error_message").and_then(Value::as_str).map(str::to_string))
-        .or_else(|| response.and_then(|r| r.get("body")).and_then(|b| b.get("error")).and_then(value))
+        .or_else(|| {
+            line.get("error_message")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        })
+        .or_else(|| {
+            response
+                .and_then(|r| r.get("body"))
+                .and_then(|b| b.get("error"))
+                .and_then(value)
+        })
         .or_else(|| response.and_then(|r| r.get("error")).and_then(value))
 }
 
 fn count(v: Option<&Value>) -> Option<usize> {
     let v = v?;
-    v.as_u64().map(|n| n as usize).or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+    v.as_u64()
+        .map(|n| n as usize)
+        .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
 }
 
 fn str_at(v: &Value, key: &str) -> Option<String> {
@@ -1006,12 +1216,20 @@ fn random_hex() -> String {
 }
 
 fn raw(body: &Value) -> RawResponse {
-    RawResponse { status: 200, headers: Vec::new(), body: body.clone(), request_body: Default::default() }
+    RawResponse {
+        status: 200,
+        headers: Vec::new(),
+        body: body.clone(),
+        request_body: Default::default(),
+    }
 }
 
 fn anthropic_attrs(data: &Value) -> Attrs {
     let request_counts = data.get("request_counts").filter(|v| !v.is_null()).cloned();
-    let request_count = request_counts.as_ref().and_then(Value::as_object).map(|o| o.values().filter_map(Value::as_u64).sum::<u64>() as usize);
+    let request_count = request_counts
+        .as_ref()
+        .and_then(Value::as_object)
+        .map(|o| o.values().filter_map(Value::as_u64).sum::<u64>() as usize);
     let raw_status = str_at(data, "processing_status");
     Attrs {
         id: str_at(data, "id").unwrap_or_default(),
@@ -1047,8 +1265,12 @@ fn gemini_attrs(data: &Value) -> Attrs {
     let raw_status = str_at(batch, "state");
     let request_counts = batch.get("batchStats").cloned();
     Attrs {
-        id: str_at(data, "name").or_else(|| str_at(batch, "name")).unwrap_or_default(),
-        completed: raw_status.as_deref().is_some_and(|s| TERMINAL.iter().any(|t| s.ends_with(t))),
+        id: str_at(data, "name")
+            .or_else(|| str_at(batch, "name"))
+            .unwrap_or_default(),
+        completed: raw_status
+            .as_deref()
+            .is_some_and(|s| TERMINAL.iter().any(|t| s.ends_with(t))),
         raw_status,
         // An embedding batch counts each text of an array input, not each submitted request.
         request_count: if gemini_embedding_response(data) {
@@ -1066,7 +1288,12 @@ fn mistral_attrs(data: &Value) -> Attrs {
     const TERMINAL: [&str; 4] = ["SUCCESS", "FAILED", "TIMEOUT_EXCEEDED", "CANCELLED"];
     let raw_status = str_at(data, "status");
     let mut counts = Map::new();
-    for (key, field) in [("total", "total_requests"), ("completed", "completed_requests"), ("succeeded", "succeeded_requests"), ("failed", "failed_requests")] {
+    for (key, field) in [
+        ("total", "total_requests"),
+        ("completed", "completed_requests"),
+        ("succeeded", "succeeded_requests"),
+        ("failed", "failed_requests"),
+    ] {
         if let Some(v) = data.get(field).filter(|v| !v.is_null()) {
             counts.insert(key.into(), v.clone());
         }
@@ -1084,17 +1311,39 @@ fn mistral_attrs(data: &Value) -> Attrs {
 
 fn xai_attrs(data: &Value) -> Attrs {
     let empty = json!({});
-    let state = data.get("state").filter(|s| s.is_object()).unwrap_or(&empty);
+    let state = data
+        .get("state")
+        .filter(|s| s.is_object())
+        .unwrap_or(&empty);
     let num = |key: &str| state.get(key).and_then(Value::as_i64).unwrap_or(0);
     let completed = num("num_requests") > 0 && num("num_pending") == 0;
     let raw_status = if data.get("state").is_some() {
-        let error = state.get("error").map(|e| e.as_str().map(str::to_string).unwrap_or_else(|| if e.is_null() { String::new() } else { e.to_string() }));
-        Some(if error.is_some_and(|e| !e.is_empty()) { "failed" } else if completed { "completed" } else { "processing" }.to_string())
+        let error = state.get("error").map(|e| {
+            e.as_str().map(str::to_string).unwrap_or_else(|| {
+                if e.is_null() {
+                    String::new()
+                } else {
+                    e.to_string()
+                }
+            })
+        });
+        Some(
+            if error.is_some_and(|e| !e.is_empty()) {
+                "failed"
+            } else if completed {
+                "completed"
+            } else {
+                "processing"
+            }
+            .to_string(),
+        )
     } else {
         str_at(data, "status")
     };
     Attrs {
-        id: str_at(data, "batch_id").or_else(|| str_at(data, "id")).unwrap_or_default(),
+        id: str_at(data, "batch_id")
+            .or_else(|| str_at(data, "id"))
+            .unwrap_or_default(),
         raw_status,
         completed,
         request_count: count(state.get("num_requests")),
@@ -1107,7 +1356,9 @@ fn xai_attrs(data: &Value) -> Attrs {
 /// `batch_schema_payload`: batchGenerateContent ignores `responseJsonSchema` but honors the legacy
 /// `responseSchema`, so batches carry the schema in Gemini's Schema dialect.
 fn gemini_batch_schema_payload(mut payload: Value) -> Value {
-    if let Some(config) = payload.get_mut("generationConfig").and_then(Value::as_object_mut)
+    if let Some(config) = payload
+        .get_mut("generationConfig")
+        .and_then(Value::as_object_mut)
         && let Some(schema) = config.remove("responseJsonSchema")
     {
         config.insert("responseSchema".into(), gemini_response_schema(&schema));
@@ -1126,9 +1377,12 @@ fn gemini_response_schema(node: &Value) -> Value {
                     continue;
                 }
                 let converted = match value {
-                    Value::Object(props) if key == "properties" => {
-                        Value::Object(props.iter().map(|(k, v)| (k.clone(), gemini_response_schema(v))).collect())
-                    }
+                    Value::Object(props) if key == "properties" => Value::Object(
+                        props
+                            .iter()
+                            .map(|(k, v)| (k.clone(), gemini_response_schema(v)))
+                            .collect(),
+                    ),
                     _ => gemini_response_schema(value),
                 };
                 schema.insert(key.clone(), converted);
@@ -1140,7 +1394,10 @@ fn gemini_response_schema(node: &Value) -> Value {
                 None => Vec::new(),
             };
             if types.len() > 1 && types.contains(&json!("null")) {
-                let first = types.into_iter().find(|t| t != &json!("null")).unwrap_or(Value::Null);
+                let first = types
+                    .into_iter()
+                    .find(|t| t != &json!("null"))
+                    .unwrap_or(Value::Null);
                 schema.insert("type".into(), first);
                 schema.insert("nullable".into(), true.into());
             }
@@ -1167,7 +1424,10 @@ struct Http {
 
 impl Http {
     fn new(provider: Provider, config: Arc<Config>) -> Result<Http> {
-        Ok(Http { provider, connection: Connection::new(provider, config)? })
+        Ok(Http {
+            provider,
+            connection: Connection::new(provider, config)?,
+        })
     }
 
     async fn get(&self, path: &str) -> Result<Value> {
@@ -1180,9 +1440,21 @@ impl Http {
     }
 
     async fn post(&self, path: &str, body: Value) -> Result<Value> {
-        let resp = self.connection.send(reqwest::Method::POST, path, &[], false, &|req| req.json(&body)).await?;
-        let text = resp.text().await.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
-        Ok(if text.trim().is_empty() { Value::Null } else { serde_json::from_str(&text).unwrap_or(Value::String(text)) })
+        let resp = self
+            .connection
+            .send(reqwest::Method::POST, path, &[], false, &|req| {
+                req.json(&body)
+            })
+            .await?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| Error::ConnectionFailed(e.to_string()))?;
+        Ok(if text.trim().is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_str(&text).unwrap_or(Value::String(text))
+        })
     }
 
     /// The JSONL input file for an OpenAI batch, uploaded to `files` with `purpose=batch`
@@ -1201,9 +1473,15 @@ impl Http {
                 .file_name("ruby_llm_batch.jsonl")
                 .mime_str("application/jsonl")
                 .expect("static mime type");
-            reqwest::multipart::Form::new().part("file", file).text("purpose", "batch")
+            reqwest::multipart::Form::new()
+                .part("file", file)
+                .text("purpose", "batch")
         };
-        let data = self.connection.post_multipart("files", form, &[], false).await?.body;
+        let data = self
+            .connection
+            .post_multipart("files", form, &[], false)
+            .await?
+            .body;
         str_at(&data, "id").ok_or_else(|| Error::Api("File upload returned no id".into(), None))
     }
 
@@ -1211,8 +1489,15 @@ impl Http {
     async fn create(&self, kind: Kind, requests: &[Req]) -> Result<Attrs> {
         match kind {
             Kind::Anthropic => {
-                let rows: Vec<Value> = requests.iter().map(|r| json!({ "custom_id": r.custom_id, "params": r.payload })).collect();
-                Ok(anthropic_attrs(&self.post("v1/messages/batches", json!({ "requests": rows })).await?))
+                let rows: Vec<Value> = requests
+                    .iter()
+                    .map(|r| json!({ "custom_id": r.custom_id, "params": r.payload }))
+                    .collect();
+                Ok(anthropic_attrs(
+                    &self
+                        .post("v1/messages/batches", json!({ "requests": rows }))
+                        .await?,
+                ))
             }
             Kind::Responses | Kind::ChatCompletions | Kind::Embeddings => {
                 single_batch_model(requests, self.provider.slug())?;
@@ -1227,7 +1512,9 @@ impl Http {
             Kind::OpenRouter => {
                 let (endpoint, model, rows) = openrouter_batch_rows(requests)?;
                 let body = json!({ "endpoint": endpoint, "model": model, "requests": rows });
-                Ok(openrouter_attrs(&self.post(&self.openrouter_batch_api_base()?, body).await?))
+                Ok(openrouter_attrs(
+                    &self.post(&self.openrouter_batch_api_base()?, body).await?,
+                ))
             }
             Kind::Mistral => {
                 let model = single_batch_model(requests, "mistral")?;
@@ -1237,8 +1524,11 @@ impl Http {
                     .iter()
                     .map(|r| {
                         let body = batch_payload(r, &["model"]);
-                        let custom_id =
-                            if body.get("input").is_some_and(Value::is_array) { format!("{}:array", r.custom_id) } else { r.custom_id.clone() };
+                        let custom_id = if body.get("input").is_some_and(Value::is_array) {
+                            format!("{}:array", r.custom_id)
+                        } else {
+                            r.custom_id.clone()
+                        };
                         json!({ "custom_id": custom_id, "body": body })
                     })
                     .collect();
@@ -1246,7 +1536,12 @@ impl Http {
                 Ok(mistral_attrs(&self.post("batch/jobs", body).await?))
             }
             Kind::XAI => {
-                let batch = self.post("batches", json!({ "name": format!("ruby_llm_{}", random_hex()) })).await?;
+                let batch = self
+                    .post(
+                        "batches",
+                        json!({ "name": format!("ruby_llm_{}", random_hex()) }),
+                    )
+                    .await?;
                 let id = str_at(&batch, "batch_id")
                     .or_else(|| str_at(&batch, "id"))
                     .ok_or_else(|| Error::Api("xAI returned no batch id".into(), None))?;
@@ -1254,13 +1549,21 @@ impl Http {
                     .iter()
                     .map(|r| {
                         let payload = batch_payload(r, &[]);
-                        let kind = if payload.get("input").is_some() { "responses" } else { "chat_get_completion" };
+                        let kind = if payload.get("input").is_some() {
+                            "responses"
+                        } else {
+                            "chat_get_completion"
+                        };
                         let mut request = Map::new();
                         request.insert(kind.into(), payload);
                         json!({ "batch_request_id": r.custom_id, "batch_request": request })
                     })
                     .collect();
-                self.post(&format!("batches/{id}/requests"), json!({ "batch_requests": rows })).await?;
+                self.post(
+                    &format!("batches/{id}/requests"),
+                    json!({ "batch_requests": rows }),
+                )
+                .await?;
                 self.find(kind, &id).await
             }
         }
@@ -1269,10 +1572,16 @@ impl Http {
     /// `find_batch`.
     async fn find(&self, kind: Kind, id: &str) -> Result<Attrs> {
         match kind {
-            Kind::Anthropic => Ok(anthropic_attrs(&self.get(&format!("v1/messages/batches/{id}")).await?)),
+            Kind::Anthropic => Ok(anthropic_attrs(
+                &self.get(&format!("v1/messages/batches/{id}")).await?,
+            )),
             k if k.is_openai() => Ok(openai_attrs(&self.get(&format!("batches/{id}")).await?)),
             Kind::Gemini => Ok(gemini_attrs(&self.get(&gemini_batch_name(id)).await?)),
-            Kind::OpenRouter => Ok(openrouter_attrs(&self.get(&format!("{}/{id}", self.openrouter_batch_api_base()?)).await?)),
+            Kind::OpenRouter => Ok(openrouter_attrs(
+                &self
+                    .get(&format!("{}/{id}", self.openrouter_batch_api_base()?))
+                    .await?,
+            )),
             // A just-created Mistral job can 404 for a moment; retry that twice.
             Kind::Mistral => {
                 let mut attempts = 0;
@@ -1284,7 +1593,8 @@ impl Http {
                             if !(e.response().is_some_and(|r| r.status == 404) && attempts < 3) {
                                 return Err(e);
                             }
-                            tokio::time::sleep(Duration::from_secs_f64(0.5 * attempts as f64)).await;
+                            tokio::time::sleep(Duration::from_secs_f64(0.5 * attempts as f64))
+                                .await;
                         }
                     }
                 }
@@ -1296,15 +1606,35 @@ impl Http {
     /// `cancel_batch`.
     async fn cancel(&self, kind: Kind, id: &str) -> Result<Attrs> {
         match kind {
-            Kind::Anthropic => Ok(anthropic_attrs(&self.post(&format!("v1/messages/batches/{id}/cancel"), json!({})).await?)),
-            k if k.is_openai() => Ok(openai_attrs(&self.post(&format!("batches/{id}/cancel"), json!({})).await?)),
+            Kind::Anthropic => Ok(anthropic_attrs(
+                &self
+                    .post(&format!("v1/messages/batches/{id}/cancel"), json!({}))
+                    .await?,
+            )),
+            k if k.is_openai() => Ok(openai_attrs(
+                &self
+                    .post(&format!("batches/{id}/cancel"), json!({}))
+                    .await?,
+            )),
             Kind::Gemini => {
-                self.post(&format!("{}:cancel", gemini_batch_name(id)), json!({})).await?;
+                self.post(&format!("{}:cancel", gemini_batch_name(id)), json!({}))
+                    .await?;
                 self.find(kind, id).await
             }
-            Kind::Mistral => Ok(mistral_attrs(&self.post(&format!("batch/jobs/{id}/cancel"), json!({})).await?)),
-            Kind::OpenRouter => Err(Error::Api("OpenRouter does not expose batch cancellation".into(), None)),
-            _ => Ok(xai_attrs(&self.post(&format!("batches/{id}:cancel"), json!({})).await?)),
+            Kind::Mistral => Ok(mistral_attrs(
+                &self
+                    .post(&format!("batch/jobs/{id}/cancel"), json!({}))
+                    .await?,
+            )),
+            Kind::OpenRouter => Err(Error::Api(
+                "OpenRouter does not expose batch cancellation".into(),
+                None,
+            )),
+            _ => Ok(xai_attrs(
+                &self
+                    .post(&format!("batches/{id}:cancel"), json!({}))
+                    .await?,
+            )),
         }
     }
 
@@ -1312,7 +1642,9 @@ impl Http {
     async fn results(&self, kind: Kind, id: &str) -> Result<Vec<Row>> {
         match kind {
             Kind::Anthropic => {
-                let text = self.get_text(&format!("v1/messages/batches/{id}/results")).await?;
+                let text = self
+                    .get_text(&format!("v1/messages/batches/{id}/results"))
+                    .await?;
                 let mut rows = Vec::new();
                 for line in text.lines().filter(|l| !l.trim().is_empty()) {
                     let line: Value = serde_json::from_str(line)?;
@@ -1323,9 +1655,16 @@ impl Http {
                     if result_type == "succeeded" {
                         let body = result.get("message").cloned().unwrap_or(Value::Null);
                         let message = anthropic::parse_completion_body(&body, raw(&body))?;
-                        rows.push((index, Some(BatchResult::Message(message)), BatchStatus::Failed));
+                        rows.push((
+                            index,
+                            Some(BatchResult::Message(message)),
+                            BatchStatus::Failed,
+                        ));
                     } else {
-                        let detail = result.pointer("/error/error/message").and_then(Value::as_str).map(str::to_string);
+                        let detail = result
+                            .pointer("/error/error/message")
+                            .and_then(Value::as_str)
+                            .map(str::to_string);
                         rows.push((index, None, batch_failure(&custom_id, detail, &result_type)));
                     }
                 }
@@ -1335,7 +1674,13 @@ impl Http {
                 let batch = self.get(&format!("batches/{id}")).await?;
                 let mut rows = Vec::new();
                 for key in ["output_file_id", "error_file_id"] {
-                    let Some(file_id) = batch.get(key).and_then(Value::as_str).filter(|f| !f.is_empty()) else { continue };
+                    let Some(file_id) = batch
+                        .get(key)
+                        .and_then(Value::as_str)
+                        .filter(|f| !f.is_empty())
+                    else {
+                        continue;
+                    };
                     let text = self.get_text(&format!("files/{file_id}/content")).await?;
                     for line in text.lines().filter(|l| !l.trim().is_empty()) {
                         let line: Value = serde_json::from_str(line)?;
@@ -1362,20 +1707,35 @@ impl Http {
                 if gemini_embedding_response(&body) {
                     return gemini_embedding_batch_results(&inlined);
                 }
-                let model_id = batch.get("model").and_then(Value::as_str).unwrap_or_default().trim_start_matches("models/");
+                let model_id = batch
+                    .get("model")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .trim_start_matches("models/");
                 let model = Model::default_for(model_id, "gemini");
                 let mut rows = Vec::new();
                 for (position, inline) in inlined.iter().enumerate() {
-                    let key = inline.pointer("/metadata/custom_id").or_else(|| inline.pointer("/metadata/key")).and_then(Value::as_str);
+                    let key = inline
+                        .pointer("/metadata/custom_id")
+                        .or_else(|| inline.pointer("/metadata/key"))
+                        .and_then(Value::as_str);
                     let index = match key {
                         Some(k) => batch_result_index(k)?,
                         None => position as i64,
                     };
                     if let Some(response) = inline.get("response") {
-                        let message = gemini::parse_completion_body(&model, response, raw(response))?;
-                        rows.push((index, Some(BatchResult::Message(message)), BatchStatus::Failed));
+                        let message =
+                            gemini::parse_completion_body(&model, response, raw(response))?;
+                        rows.push((
+                            index,
+                            Some(BatchResult::Message(message)),
+                            BatchStatus::Failed,
+                        ));
                     } else {
-                        let detail = inline.pointer("/error/message").and_then(Value::as_str).map(str::to_string);
+                        let detail = inline
+                            .pointer("/error/message")
+                            .and_then(Value::as_str)
+                            .map(str::to_string);
                         let label = key.map(str::to_string).unwrap_or_else(|| index.to_string());
                         rows.push((index, None, batch_failure(&label, detail, "failed")));
                     }
@@ -1383,27 +1743,55 @@ impl Http {
                 Ok(rows)
             }
             Kind::OpenRouter => {
-                let data = self.get(&format!("{}/{id}", self.openrouter_batch_api_base()?)).await?;
-                let rows = data.get("results").and_then(Value::as_array).cloned().unwrap_or_default();
+                let data = self
+                    .get(&format!("{}/{id}", self.openrouter_batch_api_base()?))
+                    .await?;
+                let rows = data
+                    .get("results")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default();
                 rows.iter().map(|row| openrouter_row(row, &data)).collect()
             }
             Kind::Mistral => {
                 let data = self.get(&format!("batch/jobs/{id}?inline=true")).await?;
-                let outputs = data.get("outputs").and_then(Value::as_array).cloned().unwrap_or_default();
+                let outputs = data
+                    .get("outputs")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default();
                 let mut rows = Vec::new();
                 for line in &outputs {
                     let full_id = str_at(line, "custom_id").unwrap_or_default();
-                    let (custom_id, shape) = full_id.split_once(':').map_or((full_id.as_str(), None), |(a, b)| (a, Some(b)));
+                    let (custom_id, shape) = full_id
+                        .split_once(':')
+                        .map_or((full_id.as_str(), None), |(a, b)| (a, Some(b)));
                     let index = batch_result_index(custom_id)?;
                     match line.pointer("/response/body").filter(|b| !b.is_null()) {
                         Some(body) if body.get("data").is_some_and(Value::is_array) => {
-                            rows.push((index, Some(embedding_result(body, shape == Some("array"))), BatchStatus::Failed));
+                            rows.push((
+                                index,
+                                Some(embedding_result(body, shape == Some("array"))),
+                                BatchStatus::Failed,
+                            ));
                         }
                         Some(body) => {
-                            let message = chat_completions::parse_completion_body(self.provider, body, raw(body))?;
-                            rows.push((index, Some(BatchResult::Message(message)), BatchStatus::Failed));
+                            let message = chat_completions::parse_completion_body(
+                                self.provider,
+                                body,
+                                raw(body),
+                            )?;
+                            rows.push((
+                                index,
+                                Some(BatchResult::Message(message)),
+                                BatchStatus::Failed,
+                            ));
                         }
-                        None => rows.push((index, None, batch_failure(&full_id, batch_error_message(line), "failed"))),
+                        None => rows.push((
+                            index,
+                            None,
+                            batch_failure(&full_id, batch_error_message(line), "failed"),
+                        )),
                     }
                 }
                 Ok(rows)
@@ -1417,22 +1805,42 @@ impl Http {
                         path.push_str(&format!("&pagination_token={t}"));
                     }
                     let response = self.get(&path).await?;
-                    let page = response.get("results").or_else(|| response.get("batch_results")).and_then(Value::as_array).cloned().unwrap_or_default();
+                    let page = response
+                        .get("results")
+                        .or_else(|| response.get("batch_results"))
+                        .and_then(Value::as_array)
+                        .cloned()
+                        .unwrap_or_default();
                     for result in &page {
-                        let request_id = str_at(result, "batch_request_id").or_else(|| str_at(result, "custom_id")).unwrap_or_default();
+                        let request_id = str_at(result, "batch_request_id")
+                            .or_else(|| str_at(result, "custom_id"))
+                            .unwrap_or_default();
                         let index = batch_result_index(&request_id)?;
                         let body = result
                             .pointer("/batch_result/response/chat_get_completion")
                             .or_else(|| result.pointer("/response/chat_get_completion"));
                         match body {
                             Some(body) => {
-                                let message = chat_completions::parse_completion_body(self.provider, body, raw(body))?;
-                                rows.push((index, Some(BatchResult::Message(message)), BatchStatus::Failed));
+                                let message = chat_completions::parse_completion_body(
+                                    self.provider,
+                                    body,
+                                    raw(body),
+                                )?;
+                                rows.push((
+                                    index,
+                                    Some(BatchResult::Message(message)),
+                                    BatchStatus::Failed,
+                                ));
                             }
-                            None => rows.push((index, None, batch_failure(&request_id, batch_error_message(result), "failed"))),
+                            None => rows.push((
+                                index,
+                                None,
+                                batch_failure(&request_id, batch_error_message(result), "failed"),
+                            )),
                         }
                     }
-                    token = str_at(&response, "pagination_token").or_else(|| str_at(&response, "next_page_token"));
+                    token = str_at(&response, "pagination_token")
+                        .or_else(|| str_at(&response, "next_page_token"));
                     if token.is_none() {
                         break;
                     }
@@ -1446,24 +1854,41 @@ impl Http {
         let custom_id = str_at(line, "custom_id").unwrap_or_default();
         let index = batch_result_index(&custom_id)?;
         let response = line.get("response").filter(|r| !r.is_null());
-        let ok = response.and_then(|r| r.get("status_code")).and_then(Value::as_i64).is_some_and(|s| (200..=299).contains(&s));
+        let ok = response
+            .and_then(|r| r.get("status_code"))
+            .and_then(Value::as_i64)
+            .is_some_and(|s| (200..=299).contains(&s));
         let body = response.and_then(|r| r.get("body"));
         match body {
             Some(body) if ok => {
                 let result = match kind {
                     Kind::Embeddings => embedding_result(body, false),
-                    Kind::ChatCompletions => BatchResult::Message(chat_completions::parse_completion_body(self.provider, body, raw(body))?),
-                    _ => BatchResult::Message(responses::parse_completion_body(self.provider, body, raw(body))?),
+                    Kind::ChatCompletions => BatchResult::Message(
+                        chat_completions::parse_completion_body(self.provider, body, raw(body))?,
+                    ),
+                    _ => BatchResult::Message(responses::parse_completion_body(
+                        self.provider,
+                        body,
+                        raw(body),
+                    )?),
                 };
                 Ok((index, Some(result), BatchStatus::Failed))
             }
-            _ => Ok((index, None, batch_failure(&custom_id, batch_error_message(line), "failed"))),
+            _ => Ok((
+                index,
+                None,
+                batch_failure(&custom_id, batch_error_message(line), "failed"),
+            )),
         }
     }
 }
 
 fn gemini_batch_name(id: &str) -> String {
-    if id.starts_with("batches/") { id.to_string() } else { format!("batches/{id}") }
+    if id.starts_with("batches/") {
+        id.to_string()
+    } else {
+        format!("batches/{id}")
+    }
 }
 
 fn truthy(v: Option<&Value>) -> bool {
@@ -1475,7 +1900,11 @@ fn truthy(v: Option<&Value>) -> bool {
 /// `Gemini::Batches#create_batch`: the path and body for a chat or an embedding batch.
 fn gemini_batch_body(requests: &[Req]) -> Result<(String, Value)> {
     let model = single_batch_model(requests, "gemini")?;
-    let action = if gemini_embedding_batch(requests)? { "asyncBatchEmbedContent" } else { "batchGenerateContent" };
+    let action = if gemini_embedding_batch(requests)? {
+        "asyncBatchEmbedContent"
+    } else {
+        "batchGenerateContent"
+    };
     let mut rows = Vec::new();
     for r in requests {
         if gemini_embedding_payload(&r.payload) {
@@ -1498,8 +1927,14 @@ fn gemini_batch_body(requests: &[Req]) -> Result<(String, Value)> {
 /// `embedding_batch?`.
 fn gemini_embedding_batch(requests: &[Req]) -> Result<bool> {
     let first = gemini_embedding_payload(&requests[0].payload);
-    if requests.iter().any(|r| gemini_embedding_payload(&r.payload) != first) {
-        return Err(Error::Api("Gemini batches take chat or embedding requests, not both".into(), None));
+    if requests
+        .iter()
+        .any(|r| gemini_embedding_payload(&r.payload) != first)
+    {
+        return Err(Error::Api(
+            "Gemini batches take chat or embedding requests, not both".into(),
+            None,
+        ));
     }
     Ok(first)
 }
@@ -1511,8 +1946,14 @@ fn gemini_embedding_payload(payload: &Value) -> bool {
 
 /// `embedding_batch_response?`.
 fn gemini_embedding_response(data: &Value) -> bool {
-    let batch = data.get("metadata").filter(|m| !m.is_null()).unwrap_or(data);
-    let ends = |v: Option<&Value>, suffix: &str| v.and_then(Value::as_str).is_some_and(|t| t.ends_with(suffix));
+    let batch = data
+        .get("metadata")
+        .filter(|m| !m.is_null())
+        .unwrap_or(data);
+    let ends = |v: Option<&Value>, suffix: &str| {
+        v.and_then(Value::as_str)
+            .is_some_and(|t| t.ends_with(suffix))
+    };
     ends(batch.get("@type"), ".EmbedContentBatch")
         || ends(data.pointer("/response/@type"), ".EmbedContentBatchOutput")
         || truthy(data.pointer("/response/inlinedEmbedContentResponses"))
@@ -1524,12 +1965,17 @@ fn gemini_embedding_response(data: &Value) -> bool {
 fn gemini_embedding_batch_requests(request: &Req, model: &str) -> Result<Vec<Value>> {
     let array_input = request.payload.get("requests").is_some();
     let inputs: Vec<Value> = if array_input {
-        request.payload["requests"].as_array().cloned().unwrap_or_default()
+        request.payload["requests"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
     } else {
         vec![request.payload.clone()]
     };
     if inputs.is_empty() {
-        return Err(Error::Argument("Gemini embedding batches require at least one text per request".into()));
+        return Err(Error::Argument(
+            "Gemini embedding batches require at least one text per request".into(),
+        ));
     }
     let embedding_count = inputs.len();
     Ok(inputs
@@ -1555,7 +2001,10 @@ fn gemini_embedding_batch_requests(request: &Req, model: &str) -> Result<Vec<Val
 fn gemini_embedding_batch_results(responses: &[Value]) -> Result<Vec<Row>> {
     let mut groups: Vec<(String, Vec<&Value>)> = Vec::new();
     for (position, inline) in responses.iter().enumerate() {
-        let key = inline.pointer("/metadata/custom_id").and_then(Value::as_str).map_or_else(|| position.to_string(), str::to_string);
+        let key = inline
+            .pointer("/metadata/custom_id")
+            .and_then(Value::as_str)
+            .map_or_else(|| position.to_string(), str::to_string);
         match groups.iter_mut().find(|(k, _)| *k == key) {
             Some((_, group)) => group.push(inline),
             None => groups.push((key, vec![inline])),
@@ -1572,16 +2021,25 @@ fn gemini_embedding_batch_results(responses: &[Value]) -> Result<Vec<Row>> {
 fn gemini_embedding_batch_group(key: &str, responses: &[&Value]) -> Result<Option<Row>> {
     let index = batch_result_index(key)?;
     if let Some(error) = responses.iter().find(|r| truthy(r.get("error"))) {
-        let detail = error.pointer("/error/message").and_then(Value::as_str).map(str::to_string);
+        let detail = error
+            .pointer("/error/message")
+            .and_then(Value::as_str)
+            .map(str::to_string);
         return Ok(Some((index, None, batch_failure(key, detail, "failed"))));
     }
     let missing = |key: &str| Error::Api(format!("key not found: {key:?}"), None);
-    let metadata = responses[0].get("metadata").ok_or_else(|| missing("metadata"))?;
-    let expected = count(metadata.get("embedding_count")).ok_or_else(|| missing("embedding_count"))?;
+    let metadata = responses[0]
+        .get("metadata")
+        .ok_or_else(|| missing("metadata"))?;
+    let expected =
+        count(metadata.get("embedding_count")).ok_or_else(|| missing("embedding_count"))?;
     if responses.len() < expected {
         return Ok(None);
     }
-    let position = |r: &&Value| r.pointer("/metadata/embedding_index").and_then(Value::as_i64);
+    let position = |r: &&Value| {
+        r.pointer("/metadata/embedding_index")
+            .and_then(Value::as_i64)
+    };
     let mut positions: Vec<Option<i64>> = responses.iter().map(position).collect();
     positions.sort();
     if positions != (0..responses.len() as i64).map(Some).collect::<Vec<_>>() {
@@ -1594,31 +2052,63 @@ fn gemini_embedding_batch_group(key: &str, responses: &[&Value]) -> Result<Optio
     let vectors: Option<Vec<Vec<f64>>> = ordered
         .iter()
         .map(|r| {
-            let values = r.pointer("/response/embedding/values").and_then(Value::as_array).filter(|v| !v.is_empty())?;
+            let values = r
+                .pointer("/response/embedding/values")
+                .and_then(Value::as_array)
+                .filter(|v| !v.is_empty())?;
             Some(values.iter().filter_map(Value::as_f64).collect())
         })
         .collect();
     let Some(vectors) = vectors else {
-        return Ok(Some((index, None, batch_failure(key, Some("Gemini returned no embedding".into()), "failed"))));
+        return Ok(Some((
+            index,
+            None,
+            batch_failure(key, Some("Gemini returned no embedding".into()), "failed"),
+        )));
     };
     // `embedding_batch_tokens`.
-    let counts: Vec<i64> =
-        responses.iter().filter_map(|r| r.pointer("/response/usageMetadata/promptTokenCount").and_then(Value::as_i64)).collect();
+    let counts: Vec<i64> = responses
+        .iter()
+        .filter_map(|r| {
+            r.pointer("/response/usageMetadata/promptTokenCount")
+                .and_then(Value::as_i64)
+        })
+        .collect();
     let input_tokens = (!counts.is_empty()).then(|| counts.iter().sum());
     let vectors = if truthy(metadata.get("array_input")) {
         Vectors::Batch(vectors)
     } else {
         Vectors::Single(vectors.into_iter().next().unwrap_or_default())
     };
-    let model = metadata.get("model").and_then(Value::as_str).ok_or_else(|| missing("model"))?;
-    Ok(Some((index, Some(BatchResult::Embedding(Embedding::new(vectors, model.into(), input_tokens))), BatchStatus::Failed)))
+    let model = metadata
+        .get("model")
+        .and_then(Value::as_str)
+        .ok_or_else(|| missing("model"))?;
+    Ok(Some((
+        index,
+        Some(BatchResult::Embedding(Embedding::new(
+            vectors,
+            model.into(),
+            input_tokens,
+        ))),
+        BatchStatus::Failed,
+    )))
 }
 
 // ---- OpenRouter batches (`protocols/openrouter/batches.rb`) ------------------------------------
 
 const OPENROUTER_MEDIA_TYPES: [&str; 11] = [
-    "image", "image_url", "input_image", "input_audio", "audio", "video", "video_url", "input_video", "file",
-    "input_file", "document",
+    "image",
+    "image_url",
+    "input_image",
+    "input_audio",
+    "audio",
+    "video",
+    "video_url",
+    "input_video",
+    "file",
+    "input_file",
+    "document",
 ];
 
 impl Http {
@@ -1626,7 +2116,10 @@ impl Http {
     /// `"#{api_base.sub(%r{/v1/?\z}, '')}/beta/batches"`.
     fn openrouter_batch_api_base(&self) -> Result<String> {
         let base = self.provider.api_base(self.connection.config())?;
-        let base = base.strip_suffix("/v1/").or_else(|| base.strip_suffix("/v1")).unwrap_or(&base);
+        let base = base
+            .strip_suffix("/v1/")
+            .or_else(|| base.strip_suffix("/v1"))
+            .unwrap_or(&base);
         Ok(format!("{base}/beta/batches"))
     }
 }
@@ -1642,7 +2135,9 @@ fn openrouter_batch_rows(requests: &[Req]) -> Result<(&'static str, &str, Vec<Va
         }
     }
     let [endpoint] = endpoints[..] else {
-        return Err(Error::Argument("OpenRouter batches require one API protocol per submission".into()));
+        return Err(Error::Argument(
+            "OpenRouter batches require one API protocol per submission".into(),
+        ));
     };
     let rows = requests
         .iter()
@@ -1651,7 +2146,11 @@ fn openrouter_batch_rows(requests: &[Req]) -> Result<(&'static str, &str, Vec<Va
             let body = batch_payload(r, &[]);
             openrouter_validate_batch_body(&body, endpoint)?;
             let array = endpoint == "/v1/embeddings" && matches!(r.text, Some(EmbedInput::Many(_)));
-            let custom_id = if array { format!("{}:array", r.custom_id) } else { r.custom_id.clone() };
+            let custom_id = if array {
+                format!("{}:array", r.custom_id)
+            } else {
+                r.custom_id.clone()
+            };
             Ok(json!({ "custom_id": custom_id, "body": body }))
         })
         .collect::<Result<Vec<_>>>()?;
@@ -1667,7 +2166,9 @@ fn openrouter_batch_request_endpoint(request: &Req) -> Result<&'static str> {
     } else if request.payload.get("input").is_some() {
         Ok("/v1/responses")
     } else {
-        Err(Error::Argument("OpenRouter batches require chat or embedding requests".into()))
+        Err(Error::Argument(
+            "OpenRouter batches require chat or embedding requests".into(),
+        ))
     }
 }
 
@@ -1675,13 +2176,20 @@ fn openrouter_batch_request_endpoint(request: &Req) -> Result<&'static str> {
 fn openrouter_validate_batch_body(body: &Value, endpoint: &str) -> Result<()> {
     let has = |key: &str| body.get(key).is_some();
     if endpoint == "/v1/embeddings" {
-        if has("input_type") || has("provider") || !openrouter_text_embedding_input(body.get("input")) {
+        if has("input_type")
+            || has("provider")
+            || !openrouter_text_embedding_input(body.get("input"))
+        {
             return Err(Error::Argument(
                 "OpenRouter embedding batches accept text only, without task_type or provider preferences".into(),
             ));
         }
-    } else if openrouter_batch_media(body) || ["modalities", "audio", "image_config"].into_iter().any(has) {
-        return Err(Error::Argument("OpenRouter batches accept text input and output only".into()));
+    } else if openrouter_batch_media(body)
+        || ["modalities", "audio", "image_config"].into_iter().any(has)
+    {
+        return Err(Error::Argument(
+            "OpenRouter batches accept text input and output only".into(),
+        ));
     }
     Ok(())
 }
@@ -1707,7 +2215,9 @@ fn openrouter_text_embedding_input(input: Option<&Value>) -> bool {
 fn openrouter_batch_media(value: &Value) -> bool {
     match value {
         Value::Object(o) => {
-            o.get("type").and_then(Value::as_str).is_some_and(|t| OPENROUTER_MEDIA_TYPES.contains(&t))
+            o.get("type")
+                .and_then(Value::as_str)
+                .is_some_and(|t| OPENROUTER_MEDIA_TYPES.contains(&t))
                 || o.values().any(openrouter_batch_media)
         }
         Value::Array(a) => a.iter().any(openrouter_batch_media),
@@ -1739,17 +2249,38 @@ fn openrouter_attrs(data: &Value) -> Attrs {
 /// `0...n`, or the parsed Responses / Chat Completions / embeddings body.
 fn openrouter_row(row: &Value, data: &Value) -> Result<Row> {
     let full_id = str_at(row, "custom_id").unwrap_or_default();
-    let (custom_id, shape) = full_id.split_once(':').map_or((full_id.as_str(), None), |(id, shape)| (id, Some(shape)));
+    let (custom_id, shape) = full_id
+        .split_once(':')
+        .map_or((full_id.as_str(), None), |(id, shape)| (id, Some(shape)));
     let index = batch_result_index(custom_id)?;
     let response = row.get("response").filter(|r| !r.is_null());
-    let status = response.and_then(|r| r.get("status_code")).and_then(|s| s.as_i64().or_else(|| s.as_str()?.trim().parse().ok()));
-    if response.is_none() || !status.is_some_and(|s| (200..=299).contains(&s)) || truthy(row.get("error")) {
-        return Ok((index, None, batch_failure(custom_id, batch_error_message(row), "failed")));
+    let status = response
+        .and_then(|r| r.get("status_code"))
+        .and_then(|s| s.as_i64().or_else(|| s.as_str()?.trim().parse().ok()));
+    if response.is_none()
+        || !status.is_some_and(|s| (200..=299).contains(&s))
+        || truthy(row.get("error"))
+    {
+        return Ok((
+            index,
+            None,
+            batch_failure(custom_id, batch_error_message(row), "failed"),
+        ));
     }
-    let body = response.and_then(|r| r.get("body")).cloned().unwrap_or(Value::Null);
-    let endpoint = data.get("endpoint").and_then(Value::as_str).unwrap_or_default();
+    let body = response
+        .and_then(|r| r.get("body"))
+        .cloned()
+        .unwrap_or(Value::Null);
+    let endpoint = data
+        .get("endpoint")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     if endpoint == "/v1/embeddings" {
-        let records = body.get("data").and_then(Value::as_array).cloned().unwrap_or_default();
+        let records = body
+            .get("data")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
         let position = |r: &Value| r.get("index").and_then(Value::as_i64);
         let mut positions: Vec<Option<i64>> = records.iter().map(position).collect();
         positions.sort();
@@ -1763,20 +2294,46 @@ fn openrouter_row(row: &Value, data: &Value) -> Result<Row> {
         ordered.sort_by_key(position);
         let mut vectors: Vec<Vec<f64>> = ordered
             .iter()
-            .map(|r| r.get("embedding").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_f64).collect()).unwrap_or_default())
+            .map(|r| {
+                r.get("embedding")
+                    .and_then(Value::as_array)
+                    .map(|a| a.iter().filter_map(Value::as_f64).collect())
+                    .unwrap_or_default()
+            })
             .collect();
-        let vectors = if vectors.len() == 1 && shape != Some("array") { Vectors::Single(vectors.remove(0)) } else { Vectors::Batch(vectors) };
-        let model = str_at(&body, "model").or_else(|| str_at(data, "model")).unwrap_or_default();
-        let mut embedding = Embedding::new(vectors, model, body.pointer("/usage/prompt_tokens").and_then(Value::as_i64));
-        embedding.reported_cost = chat_completions::reported_cost(Provider::OpenRouter, body.get("usage").unwrap_or(&Value::Null));
-        return Ok((index, Some(BatchResult::Embedding(embedding)), BatchStatus::Failed));
+        let vectors = if vectors.len() == 1 && shape != Some("array") {
+            Vectors::Single(vectors.remove(0))
+        } else {
+            Vectors::Batch(vectors)
+        };
+        let model = str_at(&body, "model")
+            .or_else(|| str_at(data, "model"))
+            .unwrap_or_default();
+        let mut embedding = Embedding::new(
+            vectors,
+            model,
+            body.pointer("/usage/prompt_tokens").and_then(Value::as_i64),
+        );
+        embedding.reported_cost = chat_completions::reported_cost(
+            Provider::OpenRouter,
+            body.get("usage").unwrap_or(&Value::Null),
+        );
+        return Ok((
+            index,
+            Some(BatchResult::Embedding(embedding)),
+            BatchStatus::Failed,
+        ));
     }
     let message = if endpoint == "/v1/responses" {
         responses::parse_completion_body(Provider::OpenRouter, &body, raw(&body))?
     } else {
         chat_completions::parse_completion_body(Provider::OpenRouter, &body, raw(&body))?
     };
-    Ok((index, Some(BatchResult::Message(message)), BatchStatus::Failed))
+    Ok((
+        index,
+        Some(BatchResult::Message(message)),
+        BatchStatus::Failed,
+    ))
 }
 
 #[cfg(test)]
@@ -1799,7 +2356,10 @@ mod tests {
     #[test]
     fn a_cancelled_request_type_is_normalized_to_cancelled() {
         assert_eq!(batch_failure("0", None, "canceled"), BatchStatus::Cancelled);
-        assert_eq!(batch_failure("0", Some("boom".into()), "errored"), BatchStatus::Failed);
+        assert_eq!(
+            batch_failure("0", Some("boom".into()), "errored"),
+            BatchStatus::Failed
+        );
     }
 
     // ---- protocols/gemini/embedding_batches_spec.rb (private protocol methods) ----
@@ -1810,9 +2370,20 @@ mod tests {
     fn gemini_request(text: impl Into<EmbedInput>, id: &str) -> Req {
         let mut config = Config::default();
         config.set("gemini_api_key", "test");
-        let options = EmbedOptions { model: Some(GEMINI_EMBEDDING), provider: Some("gemini"), dimensions: Some(64), config: Some(Arc::new(config)), ..Default::default() };
+        let options = EmbedOptions {
+            model: Some(GEMINI_EMBEDDING),
+            provider: Some("gemini"),
+            dimensions: Some(64),
+            config: Some(Arc::new(config)),
+            ..Default::default()
+        };
         let request = EmbeddingRequest::new(text, options).unwrap();
-        Req { custom_id: id.into(), model: GEMINI_EMBEDDING.into(), payload: request.render().unwrap(), text: Some(request.text) }
+        Req {
+            custom_id: id.into(),
+            model: GEMINI_EMBEDDING.into(),
+            payload: request.render().unwrap(),
+            text: Some(request.text),
+        }
     }
 
     fn inline_response(request: &Value, vector: &[f64]) -> Value {
@@ -1824,37 +2395,68 @@ mod tests {
     }
 
     fn embedding_of(row: &Row) -> &Embedding {
-        row.1.as_ref().and_then(BatchResult::as_embedding).expect("embedding")
+        row.1
+            .as_ref()
+            .and_then(BatchResult::as_embedding)
+            .expect("embedding")
     }
 
     // spec: protocols/gemini/embedding_batches_spec.rb:56 preserves scalar, one-element array, and multiple input shapes with reordered results
     #[test]
-    fn gemini_preserves_scalar_one_element_array_and_multiple_input_shapes_with_reordered_results() {
-        let texts = [EmbedInput::One("Ruby".into()), many(&["Rails"]), many(&["Python", "Rust"])];
+    fn gemini_preserves_scalar_one_element_array_and_multiple_input_shapes_with_reordered_results()
+    {
+        let texts = [
+            EmbedInput::One("Ruby".into()),
+            many(&["Rails"]),
+            many(&["Python", "Rust"]),
+        ];
         let inputs: Vec<Value> = texts
             .into_iter()
             .enumerate()
-            .flat_map(|(i, t)| gemini_embedding_batch_requests(&gemini_request(t, &i.to_string()), GEMINI_EMBEDDING).unwrap())
+            .flat_map(|(i, t)| {
+                gemini_embedding_batch_requests(
+                    &gemini_request(t, &i.to_string()),
+                    GEMINI_EMBEDDING,
+                )
+                .unwrap()
+            })
             .collect();
-        let mut responses: Vec<Value> = inputs.iter().enumerate().map(|(i, r)| inline_response(r, &[i as f64, 0.2])).collect();
+        let mut responses: Vec<Value> = inputs
+            .iter()
+            .enumerate()
+            .map(|(i, r)| inline_response(r, &[i as f64, 0.2]))
+            .collect();
         responses.reverse();
 
         let rows = gemini_embedding_batch_results(&responses).unwrap();
-        let by_index = |i: i64| rows.iter().find(|r| r.0 == i).map(embedding_of).expect("row");
+        let by_index = |i: i64| {
+            rows.iter()
+                .find(|r| r.0 == i)
+                .map(embedding_of)
+                .expect("row")
+        };
 
         assert_eq!(by_index(0).vectors, Vectors::Single(vec![0.0, 0.2]));
         assert_eq!(by_index(1).vectors, Vectors::Batch(vec![vec![1.0, 0.2]]));
-        assert_eq!(by_index(2).vectors, Vectors::Batch(vec![vec![2.0, 0.2], vec![3.0, 0.2]]));
+        assert_eq!(
+            by_index(2).vectors,
+            Vectors::Batch(vec![vec![2.0, 0.2], vec![3.0, 0.2]])
+        );
         assert_eq!(by_index(2).tokens().input, Some(4));
     }
 
     // spec: protocols/gemini/embedding_batches_spec.rb:70 reads embedding output when collecting a batch from a fresh protocol instance
     #[test]
     fn gemini_reads_embedding_output_from_a_fresh_protocol_instance() {
-        let input = gemini_embedding_batch_requests(&gemini_request("Ruby", "0"), GEMINI_EMBEDDING).unwrap().remove(0);
+        let input = gemini_embedding_batch_requests(&gemini_request("Ruby", "0"), GEMINI_EMBEDDING)
+            .unwrap()
+            .remove(0);
         let body = json!({ "response": { "inlinedEmbedContentResponses": { "inlinedResponses": [inline_response(&input, &[0.1, 0.2])] } } });
         assert!(gemini_embedding_response(&body));
-        let inlined = body.pointer("/response/inlinedEmbedContentResponses/inlinedResponses").and_then(Value::as_array).unwrap();
+        let inlined = body
+            .pointer("/response/inlinedEmbedContentResponses/inlinedResponses")
+            .and_then(Value::as_array)
+            .unwrap();
 
         let rows = gemini_embedding_batch_results(inlined).unwrap();
 
@@ -1866,38 +2468,71 @@ mod tests {
     // spec: protocols/gemini/embedding_batches_spec.rb:85 keeps incomplete grouped results pending and reports per-item errors
     #[test]
     fn gemini_keeps_incomplete_grouped_results_pending_and_reports_per_item_errors() {
-        let inputs = gemini_embedding_batch_requests(&gemini_request(many(&["Ruby", "Rails"]), "0"), GEMINI_EMBEDDING).unwrap();
+        let inputs = gemini_embedding_batch_requests(
+            &gemini_request(many(&["Ruby", "Rails"]), "0"),
+            GEMINI_EMBEDDING,
+        )
+        .unwrap();
         let success = inline_response(&inputs[0], &[0.1]);
-        let failure = json!({ "metadata": inputs[1]["metadata"], "error": { "message": "Input too long" } });
+        let failure =
+            json!({ "metadata": inputs[1]["metadata"], "error": { "message": "Input too long" } });
 
-        assert!(gemini_embedding_batch_results(std::slice::from_ref(&success)).unwrap().is_empty());
+        assert!(
+            gemini_embedding_batch_results(std::slice::from_ref(&success))
+                .unwrap()
+                .is_empty()
+        );
         let rows = gemini_embedding_batch_results(&[success, failure]).unwrap();
         assert_eq!(rows.len(), 1);
-        assert_eq!((rows[0].0, rows[0].1.is_none(), rows[0].2), (0, true, BatchStatus::Failed));
+        assert_eq!(
+            (rows[0].0, rows[0].1.is_none(), rows[0].2),
+            (0, true, BatchStatus::Failed)
+        );
     }
 
     // spec: protocols/gemini/embedding_batches_spec.rb:96 rejects a duplicated embedding_index instead of silently pairing the wrong vector
     #[test]
     fn gemini_rejects_a_duplicated_embedding_index() {
-        let inputs = gemini_embedding_batch_requests(&gemini_request(many(&["Ruby", "Rails"]), "0"), GEMINI_EMBEDDING).unwrap();
+        let inputs = gemini_embedding_batch_requests(
+            &gemini_request(many(&["Ruby", "Rails"]), "0"),
+            GEMINI_EMBEDDING,
+        )
+        .unwrap();
         let duplicated = json!({ "metadata": inputs[0]["metadata"] });
-        let responses = [inline_response(&duplicated, &[1.0]), inline_response(&duplicated, &[2.0])];
+        let responses = [
+            inline_response(&duplicated, &[1.0]),
+            inline_response(&duplicated, &[2.0]),
+        ];
 
         let rows = gemini_embedding_batch_results(&responses).unwrap();
 
         assert_eq!(rows.len(), 1);
-        assert_eq!((rows[0].0, rows[0].1.is_none(), rows[0].2), (0, true, BatchStatus::Failed));
+        assert_eq!(
+            (rows[0].0, rows[0].1.is_none(), rows[0].2),
+            (0, true, BatchStatus::Failed)
+        );
     }
 
     // spec: protocols/gemini/embedding_batches_spec.rb:133 rejects mixed operations and empty embedding inputs before submission
     #[test]
     fn gemini_rejects_mixed_operations_and_empty_embedding_inputs_before_submission() {
-        let chat = Req { custom_id: "1".into(), model: GEMINI_EMBEDDING.into(), payload: json!({ "contents": [] }), text: None };
+        let chat = Req {
+            custom_id: "1".into(),
+            model: GEMINI_EMBEDDING.into(),
+            payload: json!({ "contents": [] }),
+            text: None,
+        };
         let err = gemini_batch_body(&[gemini_request("Ruby", "0"), chat]).unwrap_err();
-        assert!(matches!(err, Error::Api(..)) && err.to_string().contains("chat or embedding requests"), "{err:?}");
+        assert!(
+            matches!(err, Error::Api(..)) && err.to_string().contains("chat or embedding requests"),
+            "{err:?}"
+        );
 
         let err = gemini_batch_body(&[gemini_request(many(&[]), "0")]).unwrap_err();
-        assert!(matches!(err, Error::Argument(_)) && err.to_string().contains("at least one text"), "{err:?}");
+        assert!(
+            matches!(err, Error::Argument(_)) && err.to_string().contains("at least one text"),
+            "{err:?}"
+        );
     }
 
     // ---- protocols/openrouter/batches_spec.rb ----
@@ -1914,6 +2549,9 @@ mod tests {
             text: Some(EmbedInput::One("Ruby".into())),
         };
         let err = openrouter_batch_rows(&[request]).unwrap_err();
-        assert!(matches!(err, Error::Argument(_)) && err.to_string().contains("text"), "{err:?}");
+        assert!(
+            matches!(err, Error::Argument(_)) && err.to_string().contains("text"),
+            "{err:?}"
+        );
     }
 }

@@ -27,7 +27,11 @@ impl Tool for Echo {
     fn parameters(&self) -> Vec<Parameter> {
         vec![Parameter::new("text").description("Text to echo")]
     }
-    async fn execute(&self, args: Map<String, Value>, _call: &ToolCall) -> Result<ToolResult, ToolError> {
+    async fn execute(
+        &self,
+        args: Map<String, Value>,
+        _call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
         Ok(args["text"].as_str().unwrap_or_default().into())
     }
 }
@@ -43,8 +47,17 @@ impl Tool for AttributedEcho {
     fn parameters(&self) -> Vec<Parameter> {
         vec![Parameter::new("text").description("Text to echo")]
     }
-    async fn execute(&self, args: Map<String, Value>, call: &ToolCall) -> Result<ToolResult, ToolError> {
-        Ok(format!("{} via {}", args["text"].as_str().unwrap_or_default(), call.id).into())
+    async fn execute(
+        &self,
+        args: Map<String, Value>,
+        call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
+        Ok(format!(
+            "{} via {}",
+            args["text"].as_str().unwrap_or_default(),
+            call.id
+        )
+        .into())
     }
 }
 
@@ -53,7 +66,10 @@ fn echo_call(name: &str) -> Message {
 }
 
 fn two_echo_calls() -> Message {
-    tool_call_message(&[("call_1", "echo", json!({ "text": "first" })), ("call_2", "echo", json!({ "text": "second" }))])
+    tool_call_message(&[
+        ("call_1", "echo", json!({ "text": "first" })),
+        ("call_2", "echo", json!({ "text": "second" })),
+    ])
 }
 
 fn roles(chat: &rust_llm::Chat) -> Vec<Role> {
@@ -104,7 +120,12 @@ async fn not_complete_while_a_tool_round_is_partially_answered() {
 #[tokio::test]
 async fn complete_on_a_chat_with_only_instructions() {
     let server = serve(vec![]).await;
-    assert!(chat(&server).with_tool(Echo).with_instructions("Be terse.").is_complete());
+    assert!(
+        chat(&server)
+            .with_tool(Echo)
+            .with_instructions("Be terse.")
+            .is_complete()
+    );
 }
 
 // spec: chat_loop_spec.rb:88 ignores trailing instructions when deciding whether the model owes a response
@@ -174,18 +195,24 @@ async fn cancel_during_a_request_drops_the_response_but_keeps_its_cost() {
     let server = serve(vec![text_response("hello")]).await;
     let handle_later = Arc::new(Mutex::new(None::<rust_llm::CancelHandle>));
     let slot = handle_later.clone();
-    let mut chat = spec_helpers::chat(&server).with_tool(Echo).before_request(move |_| {
-        if let Some(h) = slot.lock().unwrap().as_ref() {
-            h.cancel();
-        }
-    });
+    let mut chat = spec_helpers::chat(&server)
+        .with_tool(Echo)
+        .before_request(move |_| {
+            if let Some(h) = slot.lock().unwrap().as_ref() {
+                h.cancel();
+            }
+        });
     *handle_later.lock().unwrap() = Some(chat.cancel_handle());
     chat.ask_later("Echo \"hello\" back to me.").unwrap();
     let err = chat.generate().await.unwrap_err();
     assert!(matches!(err, Error::Cancelled), "{err}");
     assert!(!chat.is_cancelled());
     assert_eq!(roles(&chat), [Role::User]);
-    assert!(chat.cost().total().is_some_and(|t| t > 0.0), "the billed attempt still counts: {:?}", chat.cost());
+    assert!(
+        chat.cost().total().is_some_and(|t| t > 0.0),
+        "the billed attempt still counts: {:?}",
+        chat.cost()
+    );
 }
 
 // spec: chat_loop_spec.rb:148 raises before executing pending tool calls
@@ -247,8 +274,15 @@ async fn run_tools_executes_only_unanswered_calls() {
     chat.add_message(two_echo_calls());
     chat.add_message(Message::tool_result("call_1", "first"));
     chat.run_tools().await.unwrap();
-    let results: Vec<&Message> = chat.messages().iter().filter(|m| m.is_tool_result()).collect();
-    let ids: Vec<&str> = results.iter().map(|m| m.tool_call_id.as_deref().unwrap()).collect();
+    let results: Vec<&Message> = chat
+        .messages()
+        .iter()
+        .filter(|m| m.is_tool_result())
+        .collect();
+    let ids: Vec<&str> = results
+        .iter()
+        .map(|m| m.tool_call_id.as_deref().unwrap())
+        .collect();
     assert_eq!(ids, ["call_1", "call_2"]);
     assert_eq!(results.last().unwrap().content(), "second");
 }
@@ -274,7 +308,10 @@ async fn run_tools_passes_the_executing_tool_call() {
     chat.ask_later("Echo \"hello\" back to me.").unwrap();
     chat.add_message(echo_call("attributed_echo"));
     chat.run_tools().await.unwrap();
-    assert_eq!(chat.messages().last().unwrap().content(), "hello via call_1");
+    assert_eq!(
+        chat.messages().last().unwrap().content(),
+        "hello via call_1"
+    );
 }
 
 // ---- #step ------------------------------------------------------------------------------------
@@ -320,7 +357,13 @@ async fn step_finishes_an_interrupted_tool_round_before_generating() {
     chat.add_message(Message::tool_result("call_1", "first"));
     chat.step().await.unwrap();
     assert_eq!(requests(&server).await, 0);
-    assert_eq!(chat.messages().iter().filter(|m| m.is_tool_result()).count(), 2);
+    assert_eq!(
+        chat.messages()
+            .iter()
+            .filter(|m| m.is_tool_result())
+            .count(),
+        2
+    );
 }
 
 // spec: chat_loop_spec.rb:269 generates once every tool call in the round is answered
@@ -346,7 +389,10 @@ async fn complete_resumes_an_unanswered_tool_call() {
     chat.add_message(echo_call("echo"));
     let response = chat.complete().await.unwrap();
     assert_eq!(response.content(), "hello");
-    assert_eq!(roles(&chat), [Role::User, Role::Assistant, Role::Tool, Role::Assistant]);
+    assert_eq!(
+        roles(&chat),
+        [Role::User, Role::Assistant, Role::Tool, Role::Assistant]
+    );
     assert_eq!(requests(&server).await, 1);
 }
 
@@ -360,7 +406,16 @@ async fn complete_resumes_between_tool_executions() {
     chat.add_message(Message::tool_result("call_1", "first"));
     let response = chat.complete().await.unwrap();
     assert_eq!(response.content(), "hello");
-    assert_eq!(roles(&chat), [Role::User, Role::Assistant, Role::Tool, Role::Tool, Role::Assistant]);
+    assert_eq!(
+        roles(&chat),
+        [
+            Role::User,
+            Role::Assistant,
+            Role::Tool,
+            Role::Tool,
+            Role::Assistant
+        ]
+    );
     assert_eq!(requests(&server).await, 1);
 }
 
@@ -396,15 +451,24 @@ async fn add_completion_appends_and_runs_message_callbacks() {
 #[tokio::test]
 async fn add_completion_keeps_raw_json_and_parsed_reads_it() {
     let server = serve(vec![]).await;
-    let mut chat = chat(&server).with_schema(json!({ "type": "object", "properties": { "answer": { "type": "string" } } }));
-    let message = chat.add_completion(Message::assistant(r#"{"answer":"hello"}"#), false).clone();
+    let mut chat = chat(&server)
+        .with_schema(json!({ "type": "object", "properties": { "answer": { "type": "string" } } }));
+    let message = chat
+        .add_completion(Message::assistant(r#"{"answer":"hello"}"#), false)
+        .clone();
     assert_eq!(message.content(), r#"{"answer":"hello"}"#);
-    assert_eq!(message.parsed().unwrap(), Some(json!({ "answer": "hello" })));
+    assert_eq!(
+        message.parsed().unwrap(),
+        Some(json!({ "answer": "hello" }))
+    );
 }
 
 // ---- chat_before_request_spec.rb --------------------------------------------------------------
 
-fn staged(server: &wiremock::MockServer, hook: impl FnMut(&mut Value) + Send + Sync + 'static) -> rust_llm::Chat {
+fn staged(
+    server: &wiremock::MockServer,
+    hook: impl FnMut(&mut Value) + Send + Sync + 'static,
+) -> rust_llm::Chat {
     let mut chat = chat(server).before_request(hook);
     chat.ask_later("Hello").unwrap();
     chat
@@ -415,7 +479,10 @@ fn staged(server: &wiremock::MockServer, hook: impl FnMut(&mut Value) + Send + S
 async fn before_request_hooks_mutate_the_rendered_payload() {
     let server = serve(vec![]).await;
     let chat = staged(&server, |p| p["metadata"] = json!({ "user_id": "u-1" }));
-    assert_eq!(chat.render().unwrap()["metadata"], json!({ "user_id": "u-1" }));
+    assert_eq!(
+        chat.render().unwrap()["metadata"],
+        json!({ "user_id": "u-1" })
+    );
 }
 
 // spec: chat_before_request_spec.rb:18 lets hooks add provider-native content blocks
@@ -424,11 +491,20 @@ async fn before_request_hooks_add_provider_native_blocks() {
     let server = serve(vec![]).await;
     let chat = staged(&server, |p| {
         let last = p["messages"].as_array_mut().unwrap().last_mut().unwrap();
-        last["content"].as_array_mut().unwrap().push(json!({ "type": "custom_context", "data": "x" }));
+        last["content"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({ "type": "custom_context", "data": "x" }));
     });
     let payload = chat.render().unwrap();
-    let content = payload["messages"].as_array().unwrap().last().unwrap()["content"].as_array().unwrap().clone();
-    assert_eq!(content.last().unwrap(), &json!({ "type": "custom_context", "data": "x" }));
+    let content = payload["messages"].as_array().unwrap().last().unwrap()["content"]
+        .as_array()
+        .unwrap()
+        .clone();
+    assert_eq!(
+        content.last().unwrap(),
+        &json!({ "type": "custom_context", "data": "x" })
+    );
 }
 
 // spec: chat_before_request_spec.rb:27 supports wholesale replacement via payload.replace
@@ -463,7 +539,10 @@ async fn before_request_hooks_run_after_provider_options_merge() {
         .with_provider_options(json!({ "metadata": { "user_id": "from-params" } }))
         .before_request(|p| p["metadata"]["user_id"] = json!("from-hook"));
     chat.ask_later("Hello").unwrap();
-    assert_eq!(chat.render().unwrap()["metadata"], json!({ "user_id": "from-hook" }));
+    assert_eq!(
+        chat.render().unwrap()["metadata"],
+        json!({ "user_id": "from-hook" })
+    );
 }
 
 // A request actually sent carries the hook's edit too (Ruby applies hooks inside `Protocol#render`).
@@ -472,7 +551,8 @@ async fn before_request_hooks_apply_to_the_sent_request() {
     let server = serve(vec![text_response("ok")]).await;
     let mut chat = chat(&server).before_request(|p| p["metadata"] = json!({ "user_id": "u-1" }));
     chat.ask("Hello").await.unwrap();
-    let sent: Value = serde_json::from_slice(&server.received_requests().await.unwrap()[0].body).unwrap();
+    let sent: Value =
+        serde_json::from_slice(&server.received_requests().await.unwrap()[0].body).unwrap();
     assert_eq!(sent["metadata"], json!({ "user_id": "u-1" }));
 }
 
@@ -490,7 +570,15 @@ async fn message_callbacks_are_additive_and_ordered() {
         .after_message(move |m| c.lock().unwrap().push(format!("after_one {}", m.content())))
         .after_message(move |m| d.lock().unwrap().push(format!("after_two {}", m.content())));
     chat.ask("Hello").await.unwrap();
-    assert_eq!(*calls.lock().unwrap(), ["before_one", "before_two", "after_one done", "after_two done"]);
+    assert_eq!(
+        *calls.lock().unwrap(),
+        [
+            "before_one",
+            "before_two",
+            "after_one done",
+            "after_two done"
+        ]
+    );
 }
 
 /// `CallbackProbeTool`.
@@ -501,7 +589,11 @@ impl Tool for CallbackProbe {
     fn description(&self) -> String {
         "Returns a callback probe result".into()
     }
-    async fn execute(&self, _args: Map<String, Value>, _call: &ToolCall) -> Result<ToolResult, ToolError> {
+    async fn execute(
+        &self,
+        _args: Map<String, Value>,
+        _call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
         Ok("tool result".into())
     }
 }
@@ -509,15 +601,33 @@ impl Tool for CallbackProbe {
 // spec: chat_callbacks_spec.rb:52 runs additive tool callbacks in order
 #[tokio::test]
 async fn tool_callbacks_are_additive_and_ordered() {
-    let server = serve(vec![tool_use_response(&[("call_1", "callback_probe", json!({}))]), text_response("complete")]).await;
+    let server = serve(vec![
+        tool_use_response(&[("call_1", "callback_probe", json!({}))]),
+        text_response("complete"),
+    ])
+    .await;
     let calls = log::<String>();
     let (a, b) = (calls.clone(), calls.clone());
     let mut chat = chat(&server)
         .with_tool(CallbackProbe)
-        .before_tool_call(move |call| a.lock().unwrap().push(format!("before_tool_call {}", call.name)))
-        .after_tool_result(move |result| b.lock().unwrap().push(format!("after_tool_result {}", result.content)));
+        .before_tool_call(move |call| {
+            a.lock()
+                .unwrap()
+                .push(format!("before_tool_call {}", call.name))
+        })
+        .after_tool_result(move |result| {
+            b.lock()
+                .unwrap()
+                .push(format!("after_tool_result {}", result.content))
+        });
     chat.ask("Use the tool").await.unwrap();
-    assert_eq!(*calls.lock().unwrap(), ["before_tool_call callback_probe", "after_tool_result tool result"]);
+    assert_eq!(
+        *calls.lock().unwrap(),
+        [
+            "before_tool_call callback_probe",
+            "after_tool_result tool result"
+        ]
+    );
 }
 
 /// `ProgressProbeTool`: reports twice, then answers.
@@ -531,18 +641,36 @@ impl Tool for ProgressProbe {
     fn parameters(&self) -> Vec<Parameter> {
         vec![Parameter::new("label")]
     }
-    async fn execute(&self, args: Map<String, Value>, _call: &ToolCall) -> Result<ToolResult, ToolError> {
+    async fn execute(
+        &self,
+        args: Map<String, Value>,
+        _call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
         let label = args["label"].as_str().unwrap_or_default().to_string();
-        rust_llm::progress::report(Progress { value: None, total: None, message: Some(format!("Starting {label}")) });
+        rust_llm::progress::report(Progress {
+            value: None,
+            total: None,
+            message: Some(format!("Starting {label}")),
+        });
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-        rust_llm::progress::report(Progress { value: Some(2.0), total: Some(2.0), message: Some(format!("Finishing {label}")) });
+        rust_llm::progress::report(Progress {
+            value: Some(2.0),
+            total: Some(2.0),
+            message: Some(format!("Finishing {label}")),
+        });
         Ok(format!("{label} done").into())
     }
 }
 
 fn progress_calls(labels: &[&str]) -> Value {
-    let calls: Vec<(String, Value)> = labels.iter().map(|l| (format!("call_{l}"), json!({ "label": l }))).collect();
-    let calls: Vec<(&str, &str, Value)> = calls.iter().map(|(id, a)| (id.as_str(), "progress_probe", a.clone())).collect();
+    let calls: Vec<(String, Value)> = labels
+        .iter()
+        .map(|l| (format!("call_{l}"), json!({ "label": l })))
+        .collect();
+    let calls: Vec<(&str, &str, Value)> = calls
+        .iter()
+        .map(|(id, a)| (id.as_str(), "progress_probe", a.clone()))
+        .collect();
     tool_use_response(&calls)
 }
 
@@ -555,11 +683,23 @@ async fn tool_progress_reaches_after_tool_progress_before_the_result() {
     let mut chat = chat(&server)
         .with_tool(ProgressProbe)
         .after_tool_progress(move |call, p| {
-            a.lock().unwrap().push(format!("{} {} {:?}", call.id, p.message.clone().unwrap_or_default(), p.fraction()))
+            a.lock().unwrap().push(format!(
+                "{} {} {:?}",
+                call.id,
+                p.message.clone().unwrap_or_default(),
+                p.fraction()
+            ))
         })
         .after_tool_result(move |r| b.lock().unwrap().push(format!("result {}", r.content)));
     chat.ask("Use the tool").await.unwrap();
-    assert_eq!(*calls.lock().unwrap(), ["call_a Starting a None", "call_a Finishing a Some(1.0)", "result a done"]);
+    assert_eq!(
+        *calls.lock().unwrap(),
+        [
+            "call_a Starting a None",
+            "call_a Finishing a Some(1.0)",
+            "result a done"
+        ]
+    );
 }
 
 // spec: chat_callbacks_spec.rb:98 keeps progress with its own tool call when tools run with #{mode}
@@ -571,11 +711,19 @@ async fn concurrent_tool_progress_stays_with_its_own_call() {
     let mut chat = chat(&server)
         .with_tool(ProgressProbe)
         .with_tool_concurrency(true)
-        .after_tool_progress(move |call, p| seen.lock().unwrap().push((call.id.clone(), p.message.clone().unwrap_or_default())));
+        .after_tool_progress(move |call, p| {
+            seen.lock()
+                .unwrap()
+                .push((call.id.clone(), p.message.clone().unwrap_or_default()))
+        });
     chat.ask("Use the tools").await.unwrap();
     let calls = calls.lock().unwrap();
     for id in ["a", "b"] {
-        let mine: Vec<&str> = calls.iter().filter(|(c, _)| *c == format!("call_{id}")).map(|(_, m)| m.as_str()).collect();
+        let mine: Vec<&str> = calls
+            .iter()
+            .filter(|(c, _)| *c == format!("call_{id}"))
+            .map(|(_, m)| m.as_str())
+            .collect();
         assert_eq!(mine, [format!("Starting {id}"), format!("Finishing {id}")]);
     }
 }
@@ -588,10 +736,18 @@ impl Tool for FanOut {
     fn description(&self) -> String {
         "Reports from a background task".into()
     }
-    async fn execute(&self, _args: Map<String, Value>, _call: &ToolCall) -> Result<ToolResult, ToolError> {
+    async fn execute(
+        &self,
+        _args: Map<String, Value>,
+        _call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
         let listener = rust_llm::progress::listener();
         tokio::spawn(rust_llm::progress::listen(listener, async {
-            rust_llm::progress::report(Progress { value: None, total: None, message: Some("Reading in the background".into()) });
+            rust_llm::progress::report(Progress {
+                value: None,
+                total: None,
+                message: Some("Reading in the background".into()),
+            });
         }))
         .await?;
         Ok("done".into())
@@ -603,14 +759,28 @@ impl Tool for FanOut {
 // the listener on with `progress::listener()` + `progress::listen`, which this checks.
 #[tokio::test]
 async fn progress_from_a_task_the_tool_spawns_reaches_the_chat() {
-    let server = serve(vec![tool_use_response(&[("call_1", "fan_out", json!({}))]), text_response("complete")]).await;
+    let server = serve(vec![
+        tool_use_response(&[("call_1", "fan_out", json!({}))]),
+        text_response("complete"),
+    ])
+    .await;
     let calls = log::<(String, String)>();
     let seen = calls.clone();
     let mut chat = chat(&server)
         .with_tool(FanOut)
-        .after_tool_progress(move |call, p| seen.lock().unwrap().push((call.id.clone(), p.message.clone().unwrap_or_default())));
+        .after_tool_progress(move |call, p| {
+            seen.lock()
+                .unwrap()
+                .push((call.id.clone(), p.message.clone().unwrap_or_default()))
+        });
     chat.ask("Use the tool").await.unwrap();
-    assert_eq!(*calls.lock().unwrap(), [("call_1".to_string(), "Reading in the background".to_string())]);
+    assert_eq!(
+        *calls.lock().unwrap(),
+        [(
+            "call_1".to_string(),
+            "Reading in the background".to_string()
+        )]
+    );
 }
 
 // spec: chat_callbacks_spec.rb:131 runs tools that report progress without a callback
@@ -619,7 +789,14 @@ async fn tools_report_progress_without_a_listener() {
     let server = serve(vec![progress_calls(&["a"]), text_response("complete")]).await;
     let mut chat = chat(&server).with_tool(ProgressProbe);
     chat.ask("Use the tool").await.unwrap();
-    assert_eq!(chat.messages().iter().find(|m| m.is_tool_result()).unwrap().content(), "a done");
+    assert_eq!(
+        chat.messages()
+            .iter()
+            .find(|m| m.is_tool_result())
+            .unwrap()
+            .content(),
+        "a done"
+    );
 }
 
 /// A tool that fails, to check what concurrent execution does with the error.
@@ -633,7 +810,11 @@ impl Tool for BlowsUp {
     fn description(&self) -> String {
         "Fails".into()
     }
-    async fn execute(&self, _args: Map<String, Value>, _call: &ToolCall) -> Result<ToolResult, ToolError> {
+    async fn execute(
+        &self,
+        _args: Map<String, Value>,
+        _call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
         Err("tool blew up".into())
     }
 }
@@ -642,11 +823,24 @@ impl Tool for BlowsUp {
 #[tokio::test]
 async fn concurrent_tool_errors_escape_after_every_call_ends() {
     let server = serve(vec![]).await;
-    let mut chat = chat(&server).with_tool(BlowsUp).with_tool(Echo).with_tool_concurrency(true);
+    let mut chat = chat(&server)
+        .with_tool(BlowsUp)
+        .with_tool(Echo)
+        .with_tool_concurrency(true);
     chat.ask_later("go").unwrap();
-    chat.add_message(tool_call_message(&[("call_1", "blows_up", json!({})), ("call_2", "echo", json!({ "text": "ok" }))]));
+    chat.add_message(tool_call_message(&[
+        ("call_1", "blows_up", json!({})),
+        ("call_2", "echo", json!({ "text": "ok" })),
+    ]));
     let err = chat.run_tools().await.unwrap_err();
     assert_eq!(err.to_string(), "tool blew up");
     // The call that succeeded still recorded its result before the error escaped.
-    assert_eq!(chat.messages().iter().filter(|m| m.is_tool_result()).map(|m| m.content()).collect::<Vec<_>>(), ["ok"]);
+    assert_eq!(
+        chat.messages()
+            .iter()
+            .filter(|m| m.is_tool_result())
+            .map(|m| m.content())
+            .collect::<Vec<_>>(),
+        ["ok"]
+    );
 }
