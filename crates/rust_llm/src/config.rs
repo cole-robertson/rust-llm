@@ -12,6 +12,8 @@ pub struct Config {
     pub default_embedding_model: String,
     /// `default_image_model`: the model `rust_llm::paint` uses when none is given.
     pub default_image_model: String,
+    /// `default_judgment_model`: what `judge` uses; judges never fall back to the chat model.
+    pub default_judgment_model: String,
     pub request_timeout: Duration,
     pub max_retries: u32,
     pub retry_interval: f64,
@@ -38,6 +40,7 @@ const PROVIDER_OPTIONS: &[&str] = &[
     "ollama_cloud_api_key", "ollama_cloud_api_base",
     "gpustack_api_base", "gpustack_api_key",
     "hetzner_api_key", "hetzner_api_base",
+    "typesafe_api_key", "typesafe_api_base",
 ];
 
 impl Default for Config {
@@ -46,6 +49,7 @@ impl Default for Config {
             default_model: "gpt-5.6".into(),
             default_embedding_model: "text-embedding-3-small".into(),
             default_image_model: "gpt-image-2".into(),
+            default_judgment_model: "jev-latest".into(),
             request_timeout: Duration::from_secs(300),
             max_retries: 3,
             retry_interval: 0.1,

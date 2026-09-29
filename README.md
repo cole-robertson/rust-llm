@@ -36,6 +36,10 @@ let batch = rust_llm::batch(chats).await?;   // later: batch.refresh().await?; b
 let file = rust_llm::upload("contract.pdf", Default::default()).await?;
 chat.ask_with("Summarize this", vec![file.into()]).await?;
 
+// class Urgency < RubyLLM::Judge; probability :urgent, "Does this need attention today?"; end
+let urgency = rust_llm::Judge::new().probability("urgent", "Does this need attention today?")?;
+urgency.judge("Please refund the duplicate charge today.").await?.probability("urgent"); // => Some(0.91)
+
 // chat.with_mcp(RubyLLM.mcp(command: ["npx", "-y", "@modelcontextprotocol/server-github"]))
 let github = rust_llm::mcp::Mcp::command(["npx", "-y", "@modelcontextprotocol/server-github"]).build()?;
 chat.with_mcp(github).ask("List my open PRs").await?;
@@ -63,10 +67,17 @@ chat.with_mcp(github).ask("List my open PRs").await?;
 | `Provider` + `Protocols::{ChatCompletions, Responses, Anthropic, Gemini}` | `Provider` enum + `protocols::{chat_completions, responses, anthropic, gemini}` |
 | Error classes + `ErrorMiddleware` status/pattern mapping, Faraday retry | `Error` enum, same mapping; same retry rules (never retries a stream that already delivered) |
 | `acts_as_chat` / `acts_as_message` / `acts_as_tool_call`, `rust_llm_models`, `rust_llm_usages` | `rust_llm_loco::ChatRecord`; same tables and columns via SeaORM migrations |
+| `RubyLLM.paint` (generate, edit with reference images) | `rust_llm::paint` → `Image` (`save`, `to_blob`, `cost`) |
+| `RubyLLM.batch`, `Batch.find`, `embed_later` | `rust_llm::batch`, `Batch::find`, `embed_later`; batch-tier pricing |
+| `RubyLLM.upload` / `download`, `UploadedFile`, auto-upload of large attachments | `rust_llm::upload` / `download`, `UploadedFile` |
+| `RubyLLM.mcp`, `chat.with_mcp`, MCP prompts/resources, input requests | `rust_llm::mcp` (stdio + streamable HTTP), `with_mcp`, `answer`/`decline` |
+| `with_provider_tools` (web search, code execution, remote MCP) | `with_provider_tools` |
+| `RubyLLM::Judge` (`probability`/`choice`/`score`, `inputs`), `RubyLLM.judge(questions:)`, TypeSafe/Jev and Jev-compatible servers | `rust_llm::Judge`, `rust_llm::judge`, `Provider::TypeSafe` (`typesafe_api_key`/`typesafe_api_base`, `default_judgment_model = "jev-latest"`) |
+| `rails g ruby_llm:install / tool / agent / schema / chat_ui / provider / upgrade` | `rust-llm generate install / tool / agent / schema / chat_ui / provider / upgrade` (Loco + Inertia + React + shadcn) |
 
 Providers: OpenAI (Responses by default, Chat Completions for audio/search models), Anthropic,
 Gemini, DeepSeek, Mistral, OpenRouter, xAI, Perplexity (Agent API), Ollama, Ollama Cloud,
-GPUStack, Hetzner.
+GPUStack, Hetzner, and TypeSafe (Jev judgments over the System One API).
 
 ## Loco / SeaORM
 
@@ -118,7 +129,7 @@ The chat UI polls for new messages while a reply is pending; it doesn't stream t
 ## Not ported yet
 
 These are listed so nothing is silently missing:
-- Bedrock, Vertex AI, Azure (cloud auth); Cohere; ElevenLabs; Deepgram; TypeSafe/`Judge`.
+- Bedrock, Vertex AI, Azure (cloud auth); Cohere; ElevenLabs; Deepgram.
 - `animate`, `speak`, `transcribe`, `ocr`, `rerank`, `moderate`.
 - MCP OAuth; Gemini embedding batches; multipart image edits for non-gpt-image models (dall-e-2).
 - `with_compaction`, `count_tokens`, `with_citations` as a request option; instrumentation events.

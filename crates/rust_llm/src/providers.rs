@@ -20,6 +20,8 @@ pub enum Provider {
     OllamaCloud,
     GPUStack,
     Hetzner,
+    /// TypeSafe's System One API (Jev judgment models).
+    TypeSafe,
 }
 
 /// The wire formats under `RubyLLM::Protocols`.
@@ -56,6 +58,7 @@ pub const ALL: &[Provider] = &[
     Provider::OllamaCloud,
     Provider::GPUStack,
     Provider::Hetzner,
+    Provider::TypeSafe,
 ];
 
 /// `Providers::OpenAI::Capabilities::SEARCH_MODELS`: these only work over Chat Completions.
@@ -97,6 +100,7 @@ impl Provider {
             Provider::OllamaCloud => "ollama_cloud",
             Provider::GPUStack => "gpustack",
             Provider::Hetzner => "hetzner",
+            Provider::TypeSafe => "typesafe",
         }
     }
 
@@ -114,6 +118,7 @@ impl Provider {
             Provider::OllamaCloud => "OllamaCloud",
             Provider::GPUStack => "GPUStack",
             Provider::Hetzner => "Hetzner",
+            Provider::TypeSafe => "TypeSafe",
         }
     }
 
@@ -142,6 +147,7 @@ impl Provider {
             Provider::OllamaCloud => &["ollama_cloud_api_key"],
             Provider::GPUStack => &["gpustack_api_base"],
             Provider::Hetzner => &["hetzner_api_key"],
+            Provider::TypeSafe => &["typesafe_api_key"],
         }
     }
 
@@ -181,6 +187,7 @@ impl Provider {
             Provider::OllamaCloud => ("ollama_cloud_api_base", Some("https://ollama.com/v1")),
             Provider::GPUStack => ("gpustack_api_base", None),
             Provider::Hetzner => ("hetzner_api_base", Some("https://inference.hetzner.com/api/v1")),
+            Provider::TypeSafe => ("typesafe_api_base", Some("https://api.typesafe.ai")),
         };
         config
             .get(key)
@@ -226,6 +233,7 @@ impl Provider {
             Provider::OllamaCloud => bearer("ollama_cloud_api_key"),
             Provider::GPUStack => bearer("gpustack_api_key"),
             Provider::Hetzner => bearer("hetzner_api_key"),
+            Provider::TypeSafe => bearer("typesafe_api_key"),
         }
     }
 
@@ -248,6 +256,8 @@ impl Provider {
             Provider::Anthropic => protocol == ProtocolName::Anthropic,
             Provider::Gemini => protocol == ProtocolName::Gemini,
             Provider::Perplexity => matches!(protocol, ProtocolName::ChatCompletions | ProtocolName::Responses),
+            // System One answers judgments only (`rust_llm::judge`); it has no chat protocol.
+            Provider::TypeSafe => false,
             _ => protocol == ProtocolName::ChatCompletions,
         }
     }
@@ -269,6 +279,9 @@ impl Provider {
                 _ => self.default_protocol(),
             },
         };
+        if *self == Provider::TypeSafe {
+            return Err(Error::Api(format!("{} doesn't support chat", self.display()), None));
+        }
         if !self.supports_protocol(protocol) {
             return Err(Error::Api(format!("{protocol:?} is not a protocol of {}", self.display()), None));
         }

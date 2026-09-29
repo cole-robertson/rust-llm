@@ -112,6 +112,23 @@ impl Error {
         }
     }
 
+    /// The same error class with a provider-specific message (`Provider#parse_error` overrides).
+    pub(crate) fn with_message(self, message: String) -> Error {
+        match self {
+            Error::Api(_, r) => Error::Api(message, r),
+            Error::BadRequest(_, r) => Error::BadRequest(message, r),
+            Error::Unauthorized(_, r) => Error::Unauthorized(message, r),
+            Error::PaymentRequired(_, r) => Error::PaymentRequired(message, r),
+            Error::Forbidden(_, r) => Error::Forbidden(message, r),
+            Error::RateLimit(_, r) => Error::RateLimit(message, r),
+            Error::ContextLengthExceeded(_, r) => Error::ContextLengthExceeded(message, r),
+            Error::Server(_, r) => Error::Server(message, r),
+            Error::ServiceUnavailable(_, r) => Error::ServiceUnavailable(message, r),
+            Error::Overloaded(_, r) => Error::Overloaded(message, r),
+            other => other,
+        }
+    }
+
     pub fn response(&self) -> Option<&ErrorResponse> {
         match self {
             Error::Api(_, r)
