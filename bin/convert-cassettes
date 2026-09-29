@@ -8,6 +8,8 @@ patterns = ARGV.empty? ? ['*'] : ARGV
 count = 0
 patterns.each do |pat|
   Dir.glob(File.join(src, "#{pat}.yml")).each do |file|
+    # Providers RustLLM doesn't implement: their cassettes would never be replayed.
+    next if File.basename(file).match?(/_(azure|bedrock|vertexai|cohere|elevenlabs|deepgram)_/)
     data = YAML.unsafe_load_file(file)
     interactions = data.fetch('http_interactions').map do |i|
       body = ->(b) { s = b['string'].to_s; s.force_encoding('UTF-8'); s.valid_encoding? ? s : s.scrub }
