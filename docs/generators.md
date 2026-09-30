@@ -104,12 +104,16 @@ rust-llm generate provider Acme --dialect chat_completions --api-base https://ap
 
 For contributors: run from a RustLLM checkout (or pass `--destination`). Writes
 `crates/rust_llm/src/providers/acme.rs` and `crates/rust_llm/tests/provider_acme.rs`, registers the
-module, and prints the `Provider` enum wiring to add by hand. Dialects: `chat_completions`,
+module, and prints the `Provider` enum wiring to add by hand. `--models-dev-provider KEY` also adds
+the provider to `MODELS_DEV_PROVIDER_MAP`; core files that are not there are left alone. Dialects: `chat_completions`,
 `responses`, `anthropic`, `gemini`, `ollama`.
 
 ## upgrade
 
-Writes nothing and says so: `install` already creates the current schema.
+Writes `migration/src/m<timestamp>_upgrade_rust_llm_to_2_1.rs` (RubyLLM's
+`upgrade_ruby_llm_to_2_1.rb.tt`) and registers it: it adds `rust_llm_mcp_credentials` and
+`rust_llm_tool_calls.pending_input` when they are missing, so it is safe on an up-to-date schema.
+Then run `cargo loco db migrate`.
 
 ## Not ported
 

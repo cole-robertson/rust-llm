@@ -17,7 +17,7 @@
 //! | `bin/rails g ruby_llm:agent Support` | `rust-llm generate agent Support` |
 //! | `bin/rails g ruby_llm:schema Product` | `rust-llm generate schema Product` |
 //! | `bin/rails g ruby_llm:chat_ui` | `rust-llm generate chat_ui` |
-//! | `script/generate-provider NAME` (core mode) | `rust-llm generate provider NAME [--dialect D] [--api-base URL] [--dynamic-models] [--destination DIR]` |
+//! | `script/generate-provider NAME` (core mode) | `rust-llm generate provider NAME [--dialect D] [--api-base URL] [--models-dev-provider KEY] [--dynamic-models] [--destination DIR]` |
 //! | `bin/rails g ruby_llm:upgrade` | `rust-llm generate upgrade` |
 //!
 //! `g` is short for `generate`, and every generator takes `--force`. Like Rails generators,
@@ -398,13 +398,19 @@ pub const USAGE: &str = "Usage:
   rust-llm generate schema NAME [--force]
   rust-llm generate chat_ui [--force]
   rust-llm generate provider NAME [--dialect chat_completions|responses|anthropic|gemini|ollama]
-                                  [--api-base URL] [--dynamic-models] [--destination DIR] [--force]
-  rust-llm generate upgrade
+                                  [--api-base URL] [--models-dev-provider KEY] [--dynamic-models]
+                                  [--destination DIR] [--force]
+  rust-llm generate upgrade [--force]
 
 Run app generators from the root of a Loco + Inertia + React app.";
 
 /// Parses `generate <generator> [NAME] [options]` and runs it in `cwd`. Returns the exit code.
 pub fn run(args: &[String], cwd: &Path) -> i32 {
+    // `CLI#run`: a bare invocation prints help and succeeds.
+    if args.is_empty() {
+        println!("{USAGE}");
+        return 0;
+    }
     let mut positional: Vec<&str> = Vec::new();
     let mut force = false;
     let mut dynamic_models = false;
@@ -419,7 +425,7 @@ pub fn run(args: &[String], cwd: &Path) -> i32 {
             }
             "-f" | "--force" => force = true,
             "--dynamic-models" => dynamic_models = true,
-            "--path" | "--dialect" | "--api-base" | "--destination" => {
+            "--path" | "--dialect" | "--api-base" | "--destination" | "--models-dev-provider" => {
                 let Some(value) = args.get(i + 1) else {
                     eprintln!("{arg} needs a value\n\n{USAGE}");
                     return 1;
@@ -445,6 +451,16 @@ pub fn run(args: &[String], cwd: &Path) -> i32 {
         eprintln!("{USAGE}");
         return 1;
     }
+    // `parse_provider_options`: `Unexpected arguments: ...` for positionals past the NAME.
+    let arity = match generator.copied() {
+        Some("install" | "chat_ui" | "upgrade") => 2,
+        Some("tool" | "agent" | "schema" | "provider") => 3,
+        _ => usize::MAX,
+    };
+    if positional.len() > arity {
+        eprintln!("Unexpected arguments: {}", positional[arity..].join(" "));
+        return 1;
+    }
     let needs_name = |g: &str| name.ok_or_else(|| format!("`rust-llm generate {g}` needs a NAME"));
     let mut generator_run = Generator::new(cwd, force).echo();
     let result = match generator.copied() {
@@ -461,14 +477,12 @@ pub fn run(args: &[String], cwd: &Path) -> i32 {
             let opts = provider::Options {
                 dialect: option("--dialect"),
                 api_base: option("--api-base"),
+                models_dev_provider: option("--models-dev-provider"),
                 dynamic_models,
             };
             provider::generate(&mut generator_run, n, &opts)
         }),
-        Some("upgrade") => {
-            upgrade::generate(&mut generator_run);
-            Ok(())
-        }
+        Some("upgrade") => upgrade::generate(&mut generator_run),
         other => Err(format!(
             "Unknown generator: {}\n\n{USAGE}",
             other.unwrap_or("(none)")

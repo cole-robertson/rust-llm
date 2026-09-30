@@ -1035,12 +1035,14 @@ fn save_to_json_round_trips_the_registry() {
         json!({ "capabilities": ["streaming"] }),
     )]);
     registry.save_to_json(Some(&file)).unwrap();
-    let loaded = Models::load_from_json(Some(&file));
+    let mut loaded = Models::new(Vec::new());
+    loaded.load_from_json(Some(&file));
     assert_eq!(loaded.all().len(), 1);
     assert_eq!(loaded.all()[0].capabilities, ["streaming"]);
     // A missing file falls back to the bundled registry.
     assert!(
-        Models::load_from_json(Some(&dir.join("missing.json")))
+        loaded
+            .load_from_json(Some(&dir.join("missing.json")))
             .all()
             .len()
             > 100

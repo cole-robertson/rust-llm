@@ -52,22 +52,24 @@ fn add_dependencies(g: &mut Generator, rust_llm_path: Option<&str>) -> Result<()
     Ok(())
 }
 
-fn existing_migration(g: &Generator) -> Option<String> {
+fn existing_migration(g: &Generator, suffix: &str) -> Option<String> {
     let entries = std::fs::read_dir(g.path("migration/src")).ok()?;
     entries
         .filter_map(|e| e.ok()?.file_name().into_string().ok())
         .filter_map(|name| name.strip_suffix(".rs").map(str::to_string))
-        .find(|stem| stem.ends_with(MIGRATION_SUFFIX))
+        .find(|stem| stem.ends_with(suffix))
 }
 
 fn create_migration(g: &mut Generator) {
-    let module = existing_migration(g).unwrap_or_else(|| {
-        format!(
-            "{}{MIGRATION_SUFFIX}",
-            chrono::Utc::now().format("m%Y%m%d_%H%M%S")
-        )
-    });
-    g.file(&format!("migration/src/{module}.rs"), MIGRATION);
+    migration_template(g, MIGRATION_SUFFIX, MIGRATION);
+}
+
+/// `migration_template`: writes `migration/src/m<timestamp><suffix>.rs` (reusing an existing one
+/// with that suffix) and registers it with the app's `Migrator`.
+pub(crate) fn migration_template(g: &mut Generator, suffix: &str, content: &str) {
+    let module = existing_migration(g, suffix)
+        .unwrap_or_else(|| format!("{}{suffix}", chrono::Utc::now().format("m%Y%m%d_%H%M%S")));
+    g.file(&format!("migration/src/{module}.rs"), content);
     // Loco's own model generator injects these two lines the same way.
     g.inject(
         "migration/src/lib.rs",

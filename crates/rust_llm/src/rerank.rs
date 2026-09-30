@@ -106,25 +106,71 @@ pub struct RerankOptions<'a> {
     pub provider_options: Value,
     /// `context:`: use this configuration instead of the global one.
     pub config: Option<Arc<Config>>,
+    /// `metadata:`: added to the `rerank.rust_llm` event payload, never sent to the provider.
+    pub metadata: Option<Value>,
 }
 
-/// `RubyLLM.rerank(query, documents, model:, provider:, top_n:, provider_options:)`. `model` is
-/// required: rerank catalogs are provider-specific.
+/// `RubyLLM.rerank(query, documents, model:, provider:, top_n:, provider_options:, metadata:)`,
+/// inside a `rerank.rust_llm` event. `model` is required: rerank catalogs are provider-specific.
 pub async fn rerank(
     query: &str,
     documents: &[&str],
     model: &str,
     options: RerankOptions<'_>,
 ) -> Result<Rerank> {
+    let config = options.config.clone().unwrap_or_else(crate::config);
+    let (model, provider) = resolve_model(model, options.provider, options.assume_model_exists)?;
+    let mut event = crate::instrumentation::Event::start(&config, "rerank.rust_llm", || {
+        let empty = Tokens::default();
+        crate::instrumentation::payload([
+            ("provider", provider.slug().into()),
+            ("provider_class", provider.display().into()),
+            ("model", model.id.clone().into()),
+            ("query", query.into()),
+            ("document_count", documents.len().into()),
+            ("top_n", options.top_n.into()),
+            ("provider_options", options.provider_options.clone()),
+            (
+                "metadata",
+                crate::instrumentation::metadata(&options.metadata),
+            ),
+            ("tokens", crate::instrumentation::tokens_h(&empty)),
+            (
+                "cost",
+                crate::instrumentation::cost_h(&embeddings_cost(&empty, Some(&model))),
+            ),
+        ])
+    });
+    let result = tracing::Instrument::instrument(
+        rerank_inner(query, documents, options, config.clone(), model, provider),
+        event.span(),
+    )
+    .await;
+    if let Ok(r) = &result {
+        crate::instrumentation::usages(&config, &r.usage_entries);
+        event.set("result", || {
+            json!({ "model": r.model, "results": r.results.iter().map(|x| json!({ "index": x.index, "score": x.score })).collect::<Vec<_>>() })
+        });
+        event.set("tokens", || crate::instrumentation::tokens_h(&r.tokens()));
+        event.set("cost", || crate::instrumentation::cost_h(&r.cost()));
+    }
+    event.finish(result.as_ref().err());
+    result
+}
+
+async fn rerank_inner(
+    query: &str,
+    documents: &[&str],
+    options: RerankOptions<'_>,
+    config: Arc<Config>,
+    model: Model,
+    provider: Provider,
+) -> Result<Rerank> {
     let RerankOptions {
-        provider,
-        assume_model_exists,
         top_n,
         provider_options,
-        config,
+        ..
     } = options;
-    let config = config.unwrap_or_else(crate::config);
-    let (model, provider) = resolve_model(model, provider, assume_model_exists)?;
     provider.ensure_configured(&config)?;
     if !matches!(provider, Provider::OpenRouter | Provider::GPUStack) {
         return Err(Error::Api(
@@ -264,5 +310,20 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.to_string().contains("invalid document index"));
+    }
+
+    // spec: protocols/chat_completions/rerank_spec.rb:45 #parse_rerank_response > rejects a negative document index instead of wrapping to the last document
+    #[test]
+    fn rejects_a_negative_document_index() {
+        let err = parse_response(
+            json!({ "model": "voyageai/rerank-2.5-lite", "results": [{ "index": -1, "relevance_score": 0.9 }] }),
+            "voyageai/rerank-2.5-lite",
+            &["doc0", "doc1", "doc2"],
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, Error::Api(m, _) if m.contains("invalid document index")),
+            "{err:?}"
+        );
     }
 }

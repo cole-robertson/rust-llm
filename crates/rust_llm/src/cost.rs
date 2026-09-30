@@ -212,6 +212,21 @@ impl Cost {
         cost
     }
 
+    /// `Cost#to_h`: the priced components and the total, leaving out the ones that are `None`.
+    /// [`Cost::from_h`] reads it back.
+    pub fn to_h(&self) -> serde_json::Value {
+        let mut h = serde_json::Map::new();
+        for component in COMPONENTS {
+            if let Some(v) = self.get(component) {
+                h.insert(component.as_key().into(), v.into());
+            }
+        }
+        if let Some(total) = self.total() {
+            h.insert("total".into(), total.into());
+        }
+        serde_json::Value::Object(h)
+    }
+
     /// `tokens?`: whether there was any usage to price.
     pub fn is_reported(&self) -> bool {
         self.reported

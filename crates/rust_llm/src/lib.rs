@@ -95,7 +95,7 @@ pub use chat::{CancelHandle, Chat, Fallback, FallbackAttempt};
 pub use config::{Config, config, configure};
 pub use context::{Context, context};
 pub use cost::Cost;
-pub use embedding::{EmbedOptions, Embedding, Vectors, embed};
+pub use embedding::{EmbedOptions, Embedding, SparseVectors, Vectors, embed};
 pub use error::{Error, ErrorKind, Result};
 pub use files::{DownloadedFile, FileOptions, UploadOptions, UploadedFile, download, upload};
 pub use image::{Image, Images, PaintOptions, paint};

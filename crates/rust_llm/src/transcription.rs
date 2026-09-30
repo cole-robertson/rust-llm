@@ -5,16 +5,22 @@
 //! `protocols/gemini/transcription.rb` (generateContent), `protocols/gemini/file_transcription.rb`
 //! with `protocols/interactions/transcription.rb` (Gemini's dedicated transcription models),
 //! `protocols/openrouter/transcription.rb`, `providers/mistral/transcription.rb`,
-//! `providers/xai/transcription.rb`, and `providers/gpustack/transcription.rb`.
-//!
-//! Not ported: WebSocket transcription (`protocols/gemini/live_transcription.rb`,
-//! `protocols/xai/streaming_transcription.rb`), since rust_llm has no WebSocket transport and
-//! RubyLLM's WebSocket cassettes use their own recorder. Streaming those models returns an error.
+//! `providers/xai/transcription.rb`, and `providers/gpustack/transcription.rb`. WebSocket
+//! transcription lives in `gemini_live` (`protocols/gemini/live_transcription.rb`) and
+//! `xai_streaming` (`protocols/xai/streaming_transcription.rb`), over
+//! [`WebsocketConnection`](crate::transport::WebsocketConnection), with `wav_audio`
+//! (`transcription/wav_audio.rb`) reading the PCM format.
 //!
 //! ```ruby
 //! transcription = RubyLLM.transcribe("meeting.wav")
 //! transcription.text   # => "Welcome to today's meeting..."
 //! ```
+
+mod gemini_live;
+#[cfg(test)]
+mod spec_tests;
+mod wav_audio;
+mod xai_streaming;
 
 use std::sync::Arc;
 
@@ -130,6 +136,9 @@ pub struct TranscribeOptions<'a> {
     pub provider_options: Value,
     /// `context:`: use this configuration instead of the global one.
     pub config: Option<Arc<Config>>,
+    /// `metadata:`: added to the `transcription.rust_llm` event payload, never sent to the
+    /// provider.
+    pub metadata: Option<Value>,
 }
 
 impl Transcription {
@@ -214,7 +223,7 @@ enum Family {
     Gemini,
     /// `Interactions::Transcription`: Gemini's dedicated transcription model.
     Interactions,
-    /// `Gemini::LiveTranscription`, over a WebSocket this port does not have.
+    /// `Gemini::LiveTranscription`, over the Live API WebSocket.
     GeminiLive,
 }
 
@@ -237,10 +246,12 @@ impl Family {
         }
     }
 
-    /// Whether this port can stream the family. RubyLLM streams xAI and Gemini Live over
-    /// WebSockets, which are not ported.
+    /// Whether the family streams: over SSE, or over a WebSocket for xAI and Gemini Live.
     fn streams(self) -> bool {
-        matches!(self, Family::OpenAI | Family::GPUStack | Family::Mistral)
+        matches!(
+            self,
+            Family::OpenAI | Family::GPUStack | Family::Mistral | Family::XAI | Family::GeminiLive
+        )
     }
 
     /// `render_transcription_options(timestamps:, format:, streaming:)`.
@@ -292,8 +303,9 @@ impl Family {
     }
 }
 
+/// `Transcription.transcribe`: the provider call inside a `transcription.rust_llm` event.
 async fn run(
-    mut audio: Attachment,
+    audio: Attachment,
     options: TranscribeOptions<'_>,
     on_chunk: Option<&mut (dyn FnMut(&TranscriptionChunk) + Send)>,
 ) -> Result<Transcription> {
@@ -304,6 +316,51 @@ async fn run(
         .to_string();
     let (model, provider) =
         resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let mut event = crate::instrumentation::Event::start(&config, "transcription.rust_llm", || {
+        let empty = Tokens::default();
+        crate::instrumentation::payload([
+            ("provider", provider.slug().into()),
+            ("provider_class", provider.display().into()),
+            ("model", model.id.clone().into()),
+            ("language", options.language.into()),
+            ("provider_options", options.provider_options.clone()),
+            (
+                "metadata",
+                crate::instrumentation::metadata(&options.metadata),
+            ),
+            ("tokens", crate::instrumentation::tokens_h(&empty)),
+            (
+                "cost",
+                crate::instrumentation::cost_h(&Cost::audio(&empty, Some(&model))),
+            ),
+        ])
+    });
+    let result = tracing::Instrument::instrument(
+        transcribe_inner(audio, options, on_chunk, config.clone(), model, provider),
+        event.span(),
+    )
+    .await;
+    if let Ok(t) = &result {
+        crate::instrumentation::usages(&config, &t.usage_entries);
+        event.set("result", || {
+            json!({ "text": t.text, "model": t.model, "language": t.language, "duration": t.duration })
+        });
+        event.set("response_model", || t.model.clone().into());
+        event.set("tokens", || crate::instrumentation::tokens_h(&t.tokens()));
+        event.set("cost", || crate::instrumentation::cost_h(&t.cost()));
+    }
+    event.finish(result.as_ref().err());
+    result
+}
+
+async fn transcribe_inner(
+    mut audio: Attachment,
+    options: TranscribeOptions<'_>,
+    on_chunk: Option<&mut (dyn FnMut(&TranscriptionChunk) + Send)>,
+    config: Arc<Config>,
+    model: Model,
+    provider: Provider,
+) -> Result<Transcription> {
     provider.ensure_configured(&config)?;
     let connection = Connection::new(provider, config.clone())?;
     let family = Family::for_model(provider, &model.id)?;
@@ -319,26 +376,11 @@ async fn run(
         deep_merge(&mut provider_options, &options.provider_options);
     }
     if on_chunk.is_some() && !family.streams() {
-        return Err(match family {
-            Family::XAI | Family::GeminiLive => Error::Api(
-                format!(
-                    "{} streams transcriptions over a WebSocket, which rust_llm has not ported",
-                    provider.display()
-                ),
-                None,
-            ),
-            _ => Error::Api(
-                format!(
-                    "{} doesn't support streaming transcription",
-                    provider.display()
-                ),
-                None,
-            ),
-        });
-    }
-    if family == Family::GeminiLive {
         return Err(Error::Api(
-            "Gemini Live transcription needs a WebSocket, which rust_llm has not ported".into(),
+            format!(
+                "{} doesn't support streaming transcription",
+                provider.display()
+            ),
             None,
         ));
     }
@@ -392,6 +434,17 @@ async fn run(
                 .await?;
             parse_json(provider, &raw.body, &model.id)
         }
+        Family::GeminiLive => {
+            gemini_live::transcribe(
+                audio.bytes()?,
+                &request,
+                &provider.api_base(&config)?,
+                &provider.headers(&config),
+                &config,
+                on_chunk,
+            )
+            .await?
+        }
         _ => {
             let file = FilePart::new(&audio)?;
             let mut payload = multipart_payload(family, &request)?;
@@ -401,6 +454,20 @@ async fn run(
                 "audio/transcriptions"
             };
             match on_chunk {
+                // `XAI::StreamingTranscription#stream_transcription`: the payload goes out as
+                // WebSocket query parameters instead of a multipart form.
+                Some(on_chunk) if family == Family::XAI => {
+                    xai_streaming::stream_transcription(
+                        audio.bytes()?,
+                        &payload,
+                        &model.id,
+                        &provider.api_base(&config)?,
+                        &provider.headers(&config),
+                        &config,
+                        on_chunk,
+                    )
+                    .await?
+                }
                 Some(on_chunk) => {
                     if family == Family::GPUStack {
                         // `{ stream_include_usage: 'true' }.merge(payload)`: the flag goes first.

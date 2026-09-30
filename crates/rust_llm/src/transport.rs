@@ -5,6 +5,10 @@
 //! overloads, timeouts, and connection failures, with exponential backoff and jitter, honoring
 //! `Retry-After`/`retry-after-ms`. A stream that has already delivered a chunk is never retried.
 
+pub mod websocket_connection;
+
+pub use websocket_connection::WebsocketConnection;
+
 use std::time::Duration;
 
 use futures::StreamExt;
@@ -496,6 +500,11 @@ impl Connection {
                 ));
             }
             *delivered = true;
+            // `stream_events`: `block.call(data) if data.is_a?(Hash)`; `data: true` is skipped
+            // (after `handle_sse` has marked progress, as Ruby does).
+            if !data.is_object() {
+                return Ok(());
+            }
             on_event(event, data)
         };
         while let Some(bytes) = stream.next().await {

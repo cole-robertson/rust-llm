@@ -86,6 +86,7 @@ fn setup() -> Roots {
 
 // ---- .render ---------------------------------------------------------------------------------
 
+// spec: prompt_spec.rb:26 .render > renders a prompt with locals
 #[test]
 fn renders_a_prompt_with_locals() {
     let r = setup();
@@ -96,6 +97,7 @@ fn renders_a_prompt_with_locals() {
     );
 }
 
+// spec: prompt_spec.rb:31 .render > renders a nested prompt path
 #[test]
 fn renders_a_nested_prompt_path() {
     let r = setup();
@@ -111,6 +113,7 @@ fn renders_a_nested_prompt_path() {
     );
 }
 
+// spec: prompt_spec.rb:36 .render > renders without locals
 #[test]
 fn renders_without_locals() {
     let r = setup();
@@ -121,6 +124,7 @@ fn renders_without_locals() {
     );
 }
 
+// spec: prompt_spec.rb:41 .render > raises PromptNotFoundError for missing prompts
 #[test]
 fn raises_prompt_not_found_for_missing_prompts() {
     let r = setup();
@@ -132,6 +136,7 @@ fn raises_prompt_not_found_for_missing_prompts() {
 
 // ---- #render / #path -------------------------------------------------------------------------
 
+// spec: prompt_spec.rb:59 #render > exposes name and path
 #[test]
 fn exposes_name_and_path() {
     let r = setup();
@@ -140,8 +145,21 @@ fn exposes_name_and_path() {
     assert_eq!(prompt.path(), r.app.join("greeting.txt.jinja"));
 }
 
+// spec: prompt_spec.rb:53 #render > renders the prompt with locals
+#[test]
+fn prompt_render_renders_with_locals() {
+    let r = setup();
+    write(&r.app, "greeting", "Hi {{ name }}, welcome!");
+    let prompt = Prompt::with_config(r.config.clone(), "greeting");
+    assert_eq!(
+        prompt.render(json!({ "name": "Andrey" })).unwrap(),
+        "Hi Andrey, welcome!"
+    );
+}
+
 // ---- partials ------------------------------------------------------------------------------------
 
+// spec: prompt_spec.rb:67 partials > renders a partial from the current prompt directory
 #[test]
 fn renders_a_partial_from_the_current_prompt_directory() {
     let r = setup();
@@ -158,6 +176,7 @@ fn renders_a_partial_from_the_current_prompt_directory() {
     );
 }
 
+// spec: prompt_spec.rb:73 partials > does not fall back to the prompt root for a bare name
 #[test]
 fn does_not_fall_back_to_the_prompt_root_for_a_bare_name() {
     let r = setup();
@@ -176,6 +195,7 @@ fn does_not_fall_back_to_the_prompt_root_for_a_bare_name() {
     );
 }
 
+// spec: prompt_spec.rb:80 partials > resolves a bare name from the prompt root for a top-level prompt
 #[test]
 fn resolves_a_bare_name_from_the_root_for_a_top_level_prompt() {
     let r = setup();
@@ -184,6 +204,7 @@ fn resolves_a_bare_name_from_the_root_for_a_top_level_prompt() {
     assert_eq!(r.render("instructions", Value::Null).unwrap(), "Root tone.");
 }
 
+// spec: prompt_spec.rb:86 partials > resolves a path name from the prompt roots, not the current prompt directory
 #[test]
 fn resolves_a_path_name_from_the_roots_not_the_current_directory() {
     let r = setup();
@@ -201,6 +222,7 @@ fn resolves_a_path_name_from_the_roots_not_the_current_directory() {
     );
 }
 
+// spec: prompt_spec.rb:93 partials > renders a partial with the hash form
 #[test]
 fn renders_a_partial_with_the_hash_form() {
     let r = setup();
@@ -217,6 +239,7 @@ fn renders_a_partial_with_the_hash_form() {
     );
 }
 
+// spec: prompt_spec.rb:99 partials > renders a partial with the hash form and no locals
 #[test]
 fn renders_a_partial_with_the_hash_form_and_no_locals() {
     let r = setup();
@@ -229,6 +252,7 @@ fn renders_a_partial_with_the_hash_form_and_no_locals() {
     assert_eq!(r.render("instructions", Value::Null).unwrap(), "Stay safe.");
 }
 
+// spec: prompt_spec.rb:105 partials > exposes local_assigns in a partial
 #[test]
 fn exposes_local_assigns_in_a_partial() {
     let r = setup();
@@ -245,6 +269,7 @@ fn exposes_local_assigns_in_a_partial() {
     assert_eq!(r.render("instructions", Value::Null).unwrap(), "friend Ada");
 }
 
+// spec: prompt_spec.rb:111 partials > exposes local_assigns in a prompt
 #[test]
 fn exposes_local_assigns_in_a_prompt() {
     let r = setup();
@@ -260,6 +285,7 @@ fn exposes_local_assigns_in_a_prompt() {
     );
 }
 
+// spec: prompt_spec.rb:117 partials > keeps a local with an invalid variable name in local_assigns only
 #[test]
 fn keeps_a_local_with_an_invalid_variable_name_in_local_assigns_only() {
     let r = setup();
@@ -280,6 +306,7 @@ fn keeps_a_local_with_an_invalid_variable_name_in_local_assigns_only() {
     ));
 }
 
+// spec: prompt_spec.rb:122 partials > treats nil locals in the hash form as no locals
 #[test]
 fn treats_null_locals_in_the_hash_form_as_no_locals() {
     let r = setup();
@@ -292,6 +319,7 @@ fn treats_null_locals_in_the_hash_form_as_no_locals() {
     assert_eq!(r.render("instructions", Value::Null).unwrap(), "Stay calm.");
 }
 
+// spec: prompt_spec.rb:128 partials > renders nested partials
 #[test]
 fn renders_nested_partials() {
     let r = setup();
@@ -304,6 +332,7 @@ fn renders_nested_partials() {
     );
 }
 
+// spec: prompt_spec.rb:135 partials > resolves a bare name next to the partial that renders it
 #[test]
 fn resolves_a_bare_name_next_to_the_partial_that_renders_it() {
     let r = setup();
@@ -316,6 +345,7 @@ fn resolves_a_bare_name_next_to_the_partial_that_renders_it() {
     );
 }
 
+// spec: prompt_spec.rb:142 partials > does not leak locals into a partial
 #[test]
 fn does_not_leak_locals_into_a_partial() {
     let r = setup();
@@ -327,6 +357,7 @@ fn does_not_leak_locals_into_a_partial() {
     assert!(err.to_string().contains("undefined"), "{err}");
 }
 
+// spec: prompt_spec.rb:148 partials > raises PromptNotFoundError for a missing partial
 #[test]
 fn raises_prompt_not_found_for_a_missing_partial() {
     let r = setup();
@@ -344,6 +375,7 @@ fn raises_prompt_not_found_for_a_missing_partial() {
     );
 }
 
+// spec: prompt_spec.rb:154 partials > reports the root path for a missing path partial
 #[test]
 fn reports_the_root_path_for_a_missing_path_partial() {
     let r = setup();
@@ -363,6 +395,7 @@ fn reports_the_root_path_for_a_missing_path_partial() {
 
 // ---- .roots ------------------------------------------------------------------------------------
 
+// spec: prompt_spec.rb:181 .roots > keeps the application root first
 #[test]
 fn keeps_the_application_root_first() {
     let (r, engines) = roots(1);
@@ -372,6 +405,7 @@ fn keeps_the_application_root_first() {
     );
 }
 
+// spec: prompt_spec.rb:186 .roots > resolves a prompt from an engine root when the application does not ship it
 #[test]
 fn resolves_a_prompt_from_an_engine_root_the_application_does_not_ship() {
     let (r, engines) = roots(1);
@@ -387,6 +421,7 @@ fn resolves_a_prompt_from_an_engine_root_the_application_does_not_ship() {
     );
 }
 
+// spec: prompt_spec.rb:191 .roots > prefers the application prompt over an engine prompt at the same path
 #[test]
 fn prefers_the_application_prompt_over_an_engine_prompt() {
     let (r, engines) = roots(1);
@@ -398,6 +433,7 @@ fn prefers_the_application_prompt_over_an_engine_prompt() {
     );
 }
 
+// spec: prompt_spec.rb:197 .roots > resolves #path to the engine file when only the engine ships it
 #[test]
 fn resolves_path_to_the_engine_file_when_only_the_engine_ships_it() {
     let (r, engines) = roots(1);
@@ -408,6 +444,7 @@ fn resolves_path_to_the_engine_file_when_only_the_engine_ships_it() {
     );
 }
 
+// spec: prompt_spec.rb:203 .roots > renders a partial shipped by an engine
 #[test]
 fn renders_a_partial_shipped_by_an_engine() {
     let (r, engines) = roots(1);
@@ -423,6 +460,7 @@ fn renders_a_partial_shipped_by_an_engine() {
     );
 }
 
+// spec: prompt_spec.rb:209 .roots > falls back to the application path when no root has the file
 #[test]
 fn falls_back_to_the_application_path_when_no_root_has_the_file() {
     let (r, _) = roots(1);
@@ -431,6 +469,40 @@ fn falls_back_to_the_application_path_when_no_root_has_the_file() {
     assert!(
         matches!(prompt.render(Value::Null), Err(Error::PromptNotFound(m)) if m.contains("missing.txt.jinja"))
     );
+}
+
+// ---- RubyLLM.render_prompt ---------------------------------------------------------------------
+
+// spec: prompt_spec.rb:217 RubyLLM.render_prompt > renders a prompt with locals through the top-level entrypoint
+// spec: prompt_spec.rb:222 RubyLLM.render_prompt > renders a nested prompt path
+// spec: prompt_spec.rb:227 RubyLLM.render_prompt > raises PromptNotFoundError for missing prompts
+/// The top-level entrypoint reads the global configuration, so this is the one test in the file
+/// that sets it (the others pass their own `Config`).
+#[test]
+fn render_prompt_is_the_top_level_entrypoint() {
+    let r = setup();
+    write(&r.app, "friend", "Hello, {{ name }}!");
+    write(
+        &r.app,
+        "work_assistant/instructions",
+        "You assist {{ user }}.",
+    );
+    let app = r.app.to_string_lossy().to_string();
+    rust_llm::configure(|c| {
+        c.set("prompt_root", app);
+    });
+    assert_eq!(
+        rust_llm::render_prompt("friend", json!({ "name": "Andrey" })).unwrap(),
+        "Hello, Andrey!"
+    );
+    assert_eq!(
+        rust_llm::render_prompt("work_assistant/instructions", json!({ "user": "Bob" })).unwrap(),
+        "You assist Bob."
+    );
+    assert!(matches!(
+        rust_llm::render_prompt("nonexistent", Value::Null),
+        Err(Error::PromptNotFound(_))
+    ));
 }
 
 // ---- Agent instructions from prompts (agent_instructions_spec.rb) ------------------------------

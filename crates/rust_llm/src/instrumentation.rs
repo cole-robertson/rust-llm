@@ -174,6 +174,19 @@ pub(crate) fn usage(config: &Arc<Config>, entry: &UsageEntry) {
     instrument_event(config, "usage.rust_llm", payload);
 }
 
+/// `Tracker#finish` -> `Accounting::Usage.instrument` for every attempt of a one-shot operation
+/// (moderation, speech, ...), which records its ledger when it finishes rather than per attempt.
+pub(crate) fn usages(config: &Arc<Config>, entries: &[UsageEntry]) {
+    for entry in entries {
+        usage(config, entry);
+    }
+}
+
+/// `metadata:`: per-call data for the event payload, never sent to the provider.
+pub(crate) fn metadata(metadata: &Option<Value>) -> Value {
+    metadata.clone().unwrap_or(Value::Null)
+}
+
 /// `Tokens#to_h`.
 pub(crate) fn tokens_h(tokens: &Tokens) -> Value {
     let mut h = Map::new();

@@ -7,58 +7,8 @@ use std::path::Path;
 
 use rust_llm_cli::{Generator, agent, chat_ui, install, provider, schema, tool, upgrade};
 
-/// The parts of the starter kit the generators read or inject into, verbatim where it matters
-/// (anchors: `inject-above`, `pub struct Migrator`, `AppRoutes::empty()`, `fn connect_workers`,
-/// `fn initializers`, `// scaffold:paths`, `// scaffold:routes`, `// scaffold:nav`).
-fn app() -> tempfile::TempDir {
-    let dir = tempfile::tempdir().unwrap();
-    let files: &[(&str, &str)] = &[
-        (
-            "Cargo.toml",
-            "[package]\nname = \"app\"\n\n[dependencies]\nloco-rs = { workspace = true }\nmigration = { path = \"migration\" }\n\n[dev-dependencies]\nrstest = \"0.25\"\n",
-        ),
-        (
-            "migration/Cargo.toml",
-            "[package]\nname = \"migration\"\n\n[dependencies]\nloco-rs = { workspace = true }\n\n[dependencies.sea-orm-migration]\nversion = \"2.0\"\n",
-        ),
-        (
-            "migration/src/lib.rs",
-            "pub use sea_orm_migration::prelude::*;\nmod m20220101_000001_users;\n\npub struct Migrator;\n\nimpl MigratorTrait for Migrator {\n    fn migrations() -> Vec<Box<dyn MigrationTrait>> {\n        vec![\n            Box::new(m20220101_000001_users::Migration),\n            // inject-above (do not remove this comment)\n        ]\n    }\n}\n",
-        ),
-        (
-            "src/lib.rs",
-            "pub mod app;\npub mod controllers;\npub mod initializers;\npub mod models;\npub mod route_table;\npub mod workers;\n",
-        ),
-        (
-            "src/app.rs",
-            "impl Hooks for App {\n    async fn initializers(_ctx: &AppContext) -> Result<Vec<Box<dyn loco_rs::app::Initializer>>> {\n        Ok(vec![Box::new(crate::inertia::ssr::SsrSupervisor)])\n    }\n    fn routes(ctx: &AppContext) -> AppRoutes {\n        let routes = AppRoutes::empty()\n            .add_route(controllers::home::routes());\n        routes\n    }\n    async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {\n        Ok(())\n    }\n}\n",
-        ),
-        (
-            "src/models/mod.rs",
-            "pub mod _entities;\n#[cfg(feature = \"bench\")]\npub mod bench_events;\npub mod sessions;\npub mod users;\n",
-        ),
-        (
-            "src/controllers/mod.rs",
-            "use std::sync::Arc;\n\n#[cfg(feature = \"bench\")]\npub mod bench;\npub mod dashboard;\npub mod users;\n\npub fn settings() {}\n",
-        ),
-        ("src/workers/mod.rs", "//! Background workers.\n"),
-        ("src/initializers/mod.rs", "\n"),
-        (
-            "src/route_table.rs",
-            "pub const ROOT: &str = \"/\";\n// scaffold:paths (above this line)\n\npub const ROUTES: &[RouteDef] = {\n    &[\n        route(\"home.index\", Get, ROOT, None),\n        // scaffold:routes (above this line)\n    ]\n};\n",
-        ),
-        (
-            "frontend/components/app-sidebar.tsx",
-            "import { Link } from \"@inertiajs/react\"\nimport { BookOpen, Folder, LayoutGrid } from \"lucide-react\"\n\nimport { dashboard } from \"@/routes\"\n\nconst mainNavItems: NavItem[] = [\n  {\n    title: \"Dashboard\",\n  },\n  // scaffold:nav\n]\n",
-        ),
-    ];
-    for (path, content) in files {
-        let path = dir.path().join(path);
-        fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(path, content).unwrap();
-    }
-    dir
-}
+mod support;
+use support::app;
 
 fn read(root: &Path, rel: &str) -> String {
     fs::read_to_string(root.join(rel)).unwrap_or_else(|e| panic!("{rel}: {e}"))
@@ -532,6 +482,7 @@ fn provider_writes_a_module_and_test_and_registers_the_module() {
     let options = provider::Options {
         dialect: Some("anthropic"),
         api_base: Some("https://api.acme.test/v1"),
+        models_dev_provider: None,
         dynamic_models: true,
     };
     provider::generate(&mut g, "acme-ai", &options).unwrap();
@@ -559,6 +510,7 @@ fn provider_writes_a_module_and_test_and_registers_the_module() {
     let bad = provider::Options {
         dialect: Some("converse"),
         api_base: None,
+        models_dev_provider: None,
         dynamic_models: false,
     };
     assert!(
@@ -569,22 +521,47 @@ fn provider_writes_a_module_and_test_and_registers_the_module() {
     let plain = provider::Options {
         dialect: None,
         api_base: None,
+        models_dev_provider: None,
         dynamic_models: false,
     };
     assert!(provider::generate(&mut g, "9lives", &plain).is_err());
 }
 
 #[test]
-fn upgrade_writes_nothing_and_says_so() {
+fn upgrade_writes_one_migration_and_registers_it() {
     let dir = installed();
+    let mut g = Generator::new(dir.path(), false);
+    upgrade::generate(&mut g).unwrap();
+    assert!(g.failures.is_empty(), "{:?}", g.failures);
+    let lib = read(dir.path(), "migration/src/lib.rs");
+    let module = lib
+        .lines()
+        .find_map(|l| {
+            l.strip_prefix("mod ")?
+                .strip_suffix("_upgrade_rust_llm_to_2_1;")
+        })
+        .map(|stem| format!("{stem}_upgrade_rust_llm_to_2_1"))
+        .expect("upgrade migration declared");
+    assert!(lib.contains(&format!(
+        "            Box::new({module}::Migration),\n            // inject-above"
+    )));
+    assert!(
+        lib.find(&format!("Box::new({module}")) > lib.find("_create_rust_llm_records::Migration"),
+        "runs after the install migration"
+    );
+    assert_eq!(
+        read(dir.path(), &format!("migration/src/{module}.rs")),
+        include_str!("../templates/upgrade/migration.rs")
+    );
+
+    // A second run reuses the file instead of adding another migration.
     let before = walk(dir.path());
     let mut g = Generator::new(dir.path(), false);
-    upgrade::generate(&mut g);
-    assert!(g.actions.is_empty());
+    upgrade::generate(&mut g).unwrap();
     assert!(
-        g.notes
-            .iter()
-            .any(|n| n.contains("No upgrade migrations exist for rust_llm 2.0.0"))
+        actions(&g).iter().all(|(a, _)| *a == "identical"),
+        "{:?}",
+        g.actions
     );
     assert_eq!(walk(dir.path()), before);
 }

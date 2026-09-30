@@ -56,7 +56,7 @@ fn names(events: &Events) -> Vec<String> {
         .collect()
 }
 
-// spec: support/instrumentation_spec.rb "emits structured events through a Rails-compatible instrumenter"
+// spec: support/instrumentation_spec.rb:8 emits structured events through a Rails-compatible instrumenter
 #[tokio::test]
 async fn emits_structured_events_and_returns_the_block_result() {
     let (config, events) = capturing();
@@ -81,7 +81,7 @@ async fn emits_structured_events_and_returns_the_block_result() {
     );
 }
 
-// spec: "allows no-op events when no instrumenter is configured"
+// spec: support/instrumentation_spec.rb:19 allows no-op events when no instrumenter is configured
 #[tokio::test]
 async fn no_instrumenter_is_a_no_op() {
     let config = Arc::new(Config::default());
@@ -93,7 +93,7 @@ async fn no_instrumenter_is_a_no_op() {
     );
 }
 
-// spec: "does not swallow errors from the instrumented block"
+// spec: support/instrumentation_spec.rb:31 does not swallow errors from the instrumented block
 #[tokio::test]
 async fn errors_pass_through_and_are_recorded() {
     let (config, events) = capturing();
@@ -108,8 +108,8 @@ async fn errors_pass_through_and_are_recorded() {
     );
 }
 
-// spec: "emits rich chat events around the whole completion flow" and
-// "emits one usage event for every transport attempt", against a replayed OpenAI cassette.
+// spec: support/instrumentation_spec.rb:45 emits rich chat events around the whole completion flow
+// (against a replayed OpenAI cassette, with its usage event)
 #[tokio::test]
 async fn a_completed_chat_reports_response_tokens_cost_and_usage() {
     let cassette = Cassette::start(
@@ -170,7 +170,7 @@ async fn a_completed_chat_reports_response_tokens_cost_and_usage() {
     assert_eq!(request["status"], 200);
 }
 
-// spec: "marks streaming chat events when a block is passed"
+// spec: support/instrumentation_spec.rb:86 marks streaming chat events when a block is passed
 #[tokio::test]
 async fn streaming_chats_are_marked() {
     let cassette =
@@ -186,7 +186,7 @@ async fn streaming_chats_are_marked() {
     assert_eq!(payload(&events, "chat.rust_llm")["streaming"], true);
 }
 
-// spec: "emits one usage event for every transport attempt"
+// spec: support/instrumentation_spec.rb:116 emits one usage event for every transport attempt
 #[tokio::test]
 async fn one_usage_event_per_transport_attempt() {
     use wiremock::matchers::{method, path};
@@ -291,7 +291,7 @@ impl Tool for Weather {
     }
 }
 
-// spec: "emits tool call events with arguments and result"
+// spec: support/instrumentation_spec.rb:156 emits tool call events with arguments and result
 #[tokio::test]
 async fn tool_call_events_carry_arguments_and_result() {
     let cassette = Cassette::start("chat_function_calling_openai_gpt-5-nano_can_use_tools")
@@ -332,7 +332,7 @@ async fn tool_call_events_carry_arguments_and_result() {
     );
 }
 
-// spec: "emits embedding events with usage and vector dimensions"
+// spec: support/instrumentation_spec.rb:191 emits embedding events with usage and vector dimensions
 #[tokio::test]
 async fn embedding_events_carry_usage_and_dimensions() {
     let cassette = Cassette::start(
@@ -391,7 +391,7 @@ fn example(
     async move { instrument(&config, &name, payload, async { Ok(()) }).await }
 }
 
-// spec: "adds workflow and step identity to every nested instrumentation event"
+// spec: workflow_spec.rb:11 adds workflow and step identity to every nested instrumentation event
 #[tokio::test]
 async fn workflow_and_step_identity_reach_nested_events() {
     let (config, events) = capturing();
@@ -422,7 +422,7 @@ async fn workflow_and_step_identity_reach_nested_events() {
     assert!(!wf.contains_key("workflow_step_id") && !wf.contains_key("workflow_metadata"));
 }
 
-// spec: "attaches workflow metadata as workflow_metadata alongside per-call metadata"
+// spec: workflow_spec.rb:39 attaches workflow metadata as workflow_metadata alongside per-call metadata
 #[tokio::test]
 async fn workflow_metadata_sits_beside_per_call_metadata() {
     let (config, events) = capturing();
@@ -456,7 +456,7 @@ async fn workflow_metadata_sits_beside_per_call_metadata() {
     );
 }
 
-// spec: "generates IDs when they are omitted"
+// spec: workflow_spec.rb:54 generates IDs when they are omitted
 #[tokio::test]
 async fn ids_are_generated_when_omitted() {
     let (config, events) = capturing();
@@ -486,7 +486,7 @@ fn step_event(events: &Events, id: &str) -> Map<String, Value> {
         .unwrap()
 }
 
-// spec: "records parent identity for nested steps"
+// spec: workflow_spec.rb:66 records parent identity for nested steps
 #[tokio::test]
 async fn nested_steps_record_their_parent() {
     let (config, events) = capturing();
@@ -517,7 +517,7 @@ fn workflow_event(events: &Events, id: &str) -> Map<String, Value> {
         .unwrap()
 }
 
-// spec: "links nested workflows to their parent workflow and step"
+// spec: workflow_spec.rb:84 links nested workflows to their parent workflow and step
 #[tokio::test]
 async fn nested_workflows_link_to_their_parent() {
     let (config, events) = capturing();
@@ -558,7 +558,7 @@ async fn nested_workflows_link_to_their_parent() {
     assert!(!resumed.contains_key("workflow_parent_id"));
 }
 
-// spec: "recomputes parent links each time a workflow runs"
+// spec: workflow_spec.rb:108 recomputes parent links each time a workflow runs
 #[tokio::test]
 async fn parent_links_are_recomputed_per_run() {
     let (config, events) = capturing();
@@ -590,7 +590,7 @@ async fn parent_links_are_recomputed_per_run() {
     );
 }
 
-// spec: "restores the previous instrumentation context after errors"
+// spec: workflow_spec.rb:124 restores the previous instrumentation context after errors
 #[tokio::test]
 async fn context_is_restored_after_errors() {
     let (config, events) = capturing();
@@ -613,7 +613,7 @@ async fn context_is_restored_after_errors() {
     );
 }
 
-// spec: "rejects empty names and missing blocks" (a Rust closure is always given)
+// spec: workflow_spec.rb:136 rejects empty names and missing blocks (a Rust closure is always given)
 #[tokio::test]
 async fn empty_names_are_rejected() {
     let config = Arc::new(Config::default());

@@ -97,6 +97,13 @@ impl From<&str> for ToolResult {
     }
 }
 
+/// `split_result(attachment)`: a lone attachment goes back with empty text.
+impl From<Attachment> for ToolResult {
+    fn from(attachment: Attachment) -> Self {
+        ToolResult::with_attachments("", vec![attachment])
+    }
+}
+
 /// Hashes and arrays go to the model as JSON, like `result.to_json`.
 impl From<Value> for ToolResult {
     fn from(value: Value) -> Self {

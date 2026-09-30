@@ -39,6 +39,12 @@ pub enum Error {
     ToolCallParse {
         message: String,
         finish_reason: Option<String>,
+        /// `error.response`: the response whose arguments failed to parse, when the protocol
+        /// passes it (`ToolCallParseError.new(response:)`).
+        response: Option<ErrorResponse>,
+        /// `error.cause`: the `JSON::ParserError` it was raised from, when there is one.
+        #[source]
+        cause: Option<serde_json::Error>,
     },
     #[error("{0}")]
     UnsupportedAttachment(String),
@@ -153,6 +159,7 @@ impl Error {
             | Error::Server(_, r)
             | Error::ServiceUnavailable(_, r)
             | Error::Overloaded(_, r) => r.as_ref(),
+            Error::ToolCallParse { response, .. } => response.as_ref(),
             _ => None,
         }
     }
@@ -178,6 +185,29 @@ impl Error {
         Error::ToolCallParse {
             message,
             finish_reason: finish_reason.map(str::to_string),
+            response: None,
+            cause: None,
+        }
+    }
+
+    /// `raise ToolCallParseError.new(response:, finish_reason:), cause: e`.
+    pub(crate) fn tool_call_parse_from(
+        finish_reason: Option<&str>,
+        response: ErrorResponse,
+        cause: serde_json::Error,
+    ) -> Self {
+        match Error::tool_call_parse(finish_reason) {
+            Error::ToolCallParse {
+                message,
+                finish_reason,
+                ..
+            } => Error::ToolCallParse {
+                message,
+                finish_reason,
+                response: Some(response),
+                cause: Some(cause),
+            },
+            other => other,
         }
     }
 }

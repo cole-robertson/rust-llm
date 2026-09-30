@@ -102,6 +102,8 @@ pub struct PaintOptions<'a> {
     pub provider_options: Value,
     /// `context:`: use this configuration instead of the global one.
     pub config: Option<Arc<Config>>,
+    /// `metadata:`: added to the `image.rust_llm` event payload, never sent to the provider.
+    pub metadata: Option<Value>,
 }
 
 impl Image {
@@ -222,6 +224,10 @@ pub async fn paint(prompt: &str, options: PaintOptions<'_>) -> Result<Images> {
             ("size", options.size.into()),
             ("count", options.count.into()),
             ("provider_options", options.provider_options.clone()),
+            (
+                "metadata",
+                crate::instrumentation::metadata(&options.metadata),
+            ),
             ("tokens", crate::instrumentation::tokens_h(&empty)),
             (
                 "cost",
@@ -235,6 +241,9 @@ pub async fn paint(prompt: &str, options: PaintOptions<'_>) -> Result<Images> {
             Images::One(i) => vec![i],
             Images::Many(v) => v.iter().collect(),
         };
+        if let Some(billed) = all.first() {
+            crate::instrumentation::usages(&config, &billed.usage_entries);
+        }
         event.set("result", || serde_json::json!(all.iter().map(|i| serde_json::json!({ "url": i.url, "mime_type": i.mime_type, "model": i.model, "revised_prompt": i.revised_prompt })).collect::<Vec<_>>()));
         event.set("response_model", || {
             all.first().map(|i| i.model.clone()).into()

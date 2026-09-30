@@ -195,6 +195,36 @@ pub fn embed_later(
     EmbeddingRequest::new(text, options)
 }
 
+/// `config.batch_store`: persists chat batches so `Batch::find` can return one without asking
+/// the provider. RubyLLM duck-types it (`fetch`, `persist`, `sync`); a store that only looks
+/// batches up can leave `persist` and `sync` as the default no-ops.
+#[async_trait::async_trait]
+pub trait BatchStore: Send + Sync {
+    /// `fetch(id, provider:, context:)`: the persisted batch, or `None` to ask the provider.
+    async fn fetch(
+        &self,
+        id: &str,
+        provider: Option<&str>,
+        config: Arc<Config>,
+    ) -> Result<Option<Batch>>;
+
+    /// `persist(batch, chats)`: called once a chat batch is submitted; the batch owns its chats.
+    async fn persist(&self, _batch: &Batch) -> Result<()> {
+        Ok(())
+    }
+
+    /// `sync(batch)`: called after `refresh` and `cancel` with the batch's new state.
+    async fn sync(&self, _batch: &Batch) -> Result<()> {
+        Ok(())
+    }
+}
+
+impl std::fmt::Debug for dyn BatchStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("BatchStore")
+    }
+}
+
 /// What `RubyLLM.batch` accepts: chats, or embedding requests, never both.
 pub enum Submission {
     Chats(Vec<Chat>),
@@ -290,12 +320,17 @@ impl Batch {
         Batch::find_with_config(crate::config(), id, provider).await
     }
 
-    /// `Batch.find(id, provider:, context:)`.
+    /// `Batch.find(id, provider:, context:)`: the configured `batch_store` answers first.
     pub async fn find_with_config(
         config: Arc<Config>,
         id: &str,
         provider: Option<&str>,
     ) -> Result<Batch> {
+        if let Some(store) = config.batch_store.clone()
+            && let Some(persisted) = store.fetch(id, provider, config.clone()).await?
+        {
+            return Ok(persisted);
+        }
         let Some(provider) = provider else {
             return Err(Error::Argument(
                 "Provider must be specified to find a batch that is not persisted by RustLLM"
@@ -314,6 +349,26 @@ impl Batch {
     /// them (`Batch.new(provider:, chats:, ...)`). Answers already in a chat are not appended again.
     pub fn with_chats(mut self, chats: Vec<Chat>) -> Self {
         self.chats = Some(chats);
+        self
+    }
+
+    /// `Batch.new(batch_protocol:)`: the protocol a stored batch was submitted through (its
+    /// [`Batch::batch_protocol`] name), so collecting reads its results the same way. An unknown
+    /// name, or `None`, leaves the provider's default.
+    pub fn with_batch_protocol(mut self, name: Option<&str>) -> Self {
+        let default = default_kind(self.http.provider).ok();
+        let kind = match name {
+            Some("responses") if self.http.provider == Provider::OpenAI => Some(Kind::Responses),
+            Some("chat_completions") if self.http.provider == Provider::OpenAI => {
+                Some(Kind::ChatCompletions)
+            }
+            Some("embeddings") if self.http.provider == Provider::OpenAI => Some(Kind::Embeddings),
+            Some(name) => default.filter(|k| k.name() == name),
+            None => None,
+        };
+        if kind.is_some() {
+            self.batch_protocol = kind;
+        }
         self
     }
 
@@ -396,6 +451,9 @@ impl Batch {
             .collect::<Result<Vec<_>>>()?;
         batch.create_instrumented(&requests).await?;
         batch.chats = Some(chats);
+        if let Some(store) = batch.store() {
+            store.persist(&batch).await?;
+        }
         Ok(batch)
     }
 
@@ -531,6 +589,7 @@ impl Batch {
         let kind = default_kind(self.http.provider)?;
         let attrs = self.http.find(kind, &self.id).await?;
         self.apply(attrs);
+        self.persist_state().await?;
         Ok(self)
     }
 
@@ -539,7 +598,20 @@ impl Batch {
         let kind = default_kind(self.http.provider)?;
         let attrs = self.http.cancel(kind, &self.id).await?;
         self.apply(attrs);
+        self.persist_state().await?;
         Ok(self)
+    }
+
+    fn store(&self) -> Option<Arc<dyn BatchStore>> {
+        self.http.connection.config().batch_store.clone()
+    }
+
+    /// `persist_state`: `@store&.sync(self)`.
+    async fn persist_state(&self) -> Result<()> {
+        match self.store() {
+            Some(store) => store.sync(self).await,
+            None => Ok(()),
+        }
     }
 
     /// `messages`/`results`: the answers in submission order, `None` where a request failed. Chat
@@ -705,12 +777,17 @@ impl Batch {
                     .and_then(|r| r.get(index))
                     .map(|r| r.model.clone());
                 if embedding.usage_entries.is_empty() {
+                    // `instrument: !request.nil? && !delivered`.
+                    let instrument = model.is_some() && !self.delivered.contains(&index);
                     let entry = self.batch_usage(
                         Operation::Embedding,
                         Some(embedding.model.as_str()),
                         embedding.tokens(),
                         model,
                     )?;
+                    if instrument {
+                        crate::instrumentation::usage(self.http.connection.config(), &entry);
+                    }
                     embedding.usage_entries = vec![entry];
                 }
                 if self.delivered.insert(index)
@@ -1139,6 +1216,44 @@ fn batch_payload(request: &Req, except: &[&str]) -> Value {
     payload
 }
 
+/// `validate_batch_requests!` of `ChatCompletions::Batches` (`messages`), `Responses::Batches`
+/// (`input`), and `ChatCompletions::EmbeddingBatches` (`input`); other protocols accept anything.
+fn validate_batch_requests<'a>(
+    kind: Kind,
+    provider_slug: &str,
+    mut payloads: impl Iterator<Item = &'a Value>,
+) -> Result<()> {
+    let (key, message) = match kind {
+        Kind::ChatCompletions => (
+            "messages",
+            "batch requests require chat completion payloads",
+        ),
+        Kind::Responses => ("input", "batch requests require responses payloads"),
+        Kind::Embeddings => (
+            "input",
+            "embedding batch requests require embedding payloads",
+        ),
+        _ => return Ok(()),
+    };
+    if payloads.all(|p| p.get(key).is_some()) {
+        return Ok(());
+    }
+    Err(Error::Api(format!("{provider_slug} {message}"), None))
+}
+
+/// `validate_batch_requests!` for the OpenAI batch protocol `protocol` ("chat_completions",
+/// "responses", or "embeddings"), exposed for the spec port.
+#[doc(hidden)]
+pub fn openai_validate_batch_requests(protocol: &str, payloads: &[Value]) -> Result<()> {
+    let kind = match protocol {
+        "chat_completions" => Kind::ChatCompletions,
+        "responses" => Kind::Responses,
+        "embeddings" => Kind::Embeddings,
+        other => return Err(Error::Argument(format!("unknown batch protocol {other:?}"))),
+    };
+    validate_batch_requests(kind, Provider::OpenAI.slug(), payloads.iter())
+}
+
 /// `single_batch_model!`.
 fn single_batch_model<'a>(requests: &'a [Req], provider_name: &str) -> Result<&'a str> {
     let first = requests[0].model.as_str();
@@ -1408,8 +1523,8 @@ fn gemini_response_schema(node: &Value) -> Value {
 }
 
 /// OpenAI-compatible embeddings body to an `Embedding` (`parse_embedding_response`).
-fn embedding_result(body: &Value, array_input: bool) -> BatchResult {
-    BatchResult::Embedding(Embedding::from_openai_body(body, !array_input))
+fn embedding_result(body: &Value, array_input: bool) -> Result<BatchResult> {
+    Embedding::from_openai_body(body, !array_input).map(BatchResult::Embedding)
 }
 
 // ---- HTTP ---------------------------------------------------------------------------------------
@@ -1501,6 +1616,11 @@ impl Http {
             }
             Kind::Responses | Kind::ChatCompletions | Kind::Embeddings => {
                 single_batch_model(requests, self.provider.slug())?;
+                validate_batch_requests(
+                    kind,
+                    self.provider.slug(),
+                    requests.iter().map(|r| &r.payload),
+                )?;
                 let file_id = self.upload_batch_file(kind, requests).await?;
                 let body = json!({ "input_file_id": file_id, "endpoint": openai_endpoint(kind), "completion_window": "24h" });
                 Ok(openai_attrs(&self.post("batches", body).await?))
@@ -1771,7 +1891,7 @@ impl Http {
                         Some(body) if body.get("data").is_some_and(Value::is_array) => {
                             rows.push((
                                 index,
-                                Some(embedding_result(body, shape == Some("array"))),
+                                Some(embedding_result(body, shape == Some("array"))?),
                                 BatchStatus::Failed,
                             ));
                         }
@@ -1862,7 +1982,7 @@ impl Http {
         match body {
             Some(body) if ok => {
                 let result = match kind {
-                    Kind::Embeddings => embedding_result(body, false),
+                    Kind::Embeddings => embedding_result(body, false)?,
                     Kind::ChatCompletions => BatchResult::Message(
                         chat_completions::parse_completion_body(self.provider, body, raw(body))?,
                     ),

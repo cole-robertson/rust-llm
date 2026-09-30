@@ -652,17 +652,20 @@ fn defaults_to_gpt_transcribe() {
 }
 
 #[tokio::test]
-async fn websocket_streaming_is_not_ported_and_says_so() {
+async fn websocket_streaming_requires_wav_audio_before_connecting() {
     let mut config = Config::default();
     config
         .set("xai_api_key", "test-key")
         .set("xai_api_base", "http://127.0.0.1:9");
     let error = transcribe_stream(
-        ruby_wav().as_str(),
+        fixture("ruby.mp3").as_str(),
         options("grok-stt", "xai", Arc::new(config)),
         |_| {},
     )
     .await
     .unwrap_err();
-    assert!(error.to_string().contains("WebSocket"), "{error}");
+    assert!(
+        matches!(&error, Error::Argument(m) if m.contains("requires a WAV file")),
+        "{error:?}"
+    );
 }

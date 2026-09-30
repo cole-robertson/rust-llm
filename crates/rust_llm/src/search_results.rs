@@ -42,7 +42,7 @@ impl SearchResults {
     }
 
     /// `SearchResults.from_content`: recognizes a tool result that serialized search results.
-    pub(crate) fn from_content(content: Option<&str>) -> Option<SearchResults> {
+    pub fn from_content(content: Option<&str>) -> Option<SearchResults> {
         let content = content?;
         if !content.trim_start().starts_with('{') {
             return None;

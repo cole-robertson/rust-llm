@@ -860,6 +860,7 @@ async fn tool_call_parse_errors_keep_the_finish_reason() {
         Error::ToolCallParse {
             message,
             finish_reason,
+            ..
         } => {
             // Ruby raises with the normalized reason: `length` is `:max_tokens` by then.
             assert_eq!(finish_reason.as_deref(), Some("max_tokens"));

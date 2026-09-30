@@ -1,11 +1,14 @@
 //! Port of `lib/ruby_llm/embedding.rb` with the OpenAI-compatible and Gemini embedding protocols.
 
+use std::collections::BTreeMap;
+
 use serde_json::{Value, json};
 
 use crate::attachment::{Attachment, AttachmentType};
 use crate::chat::resolve_model;
 use crate::cost::{Cost, Tier};
 use crate::error::{Error, Result};
+use crate::message::{Operation, UsageEntry, UsageStatus};
 use crate::model::Model;
 use crate::protocols::deep_merge;
 use crate::providers::Provider;
@@ -20,9 +23,20 @@ pub enum Vectors {
     Batch(Vec<Vec<f64>>),
 }
 
+/// Sparse vectors for one text (`Single`) or a batch (`Batch`), shaped like [`Vectors`]: each maps
+/// a token id to its weight. A batch row is `None` where the server sent no sparse vector.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SparseVectors {
+    Single(BTreeMap<i64, f64>),
+    Batch(Vec<Option<BTreeMap<i64, f64>>>),
+}
+
 #[derive(Debug, Clone)]
 pub struct Embedding {
     pub vectors: Vectors,
+    /// `sparse_vectors`: the token-to-weight map sparse-capable models return beside the dense
+    /// vector; `None` on models that return only dense vectors.
+    pub sparse_vectors: Option<SparseVectors>,
     pub model: String,
     pub input_tokens: Option<i64>,
     /// What the provider billed, when it says (OpenRouter's `usage.cost`).
@@ -60,6 +74,7 @@ impl Embedding {
         Embedding {
             model_info: crate::models::models().find(&model, None).ok(),
             vectors,
+            sparse_vectors: None,
             model,
             input_tokens,
             reported_cost: None,
@@ -68,10 +83,9 @@ impl Embedding {
     }
 
     /// `parse_embedding_response` for an OpenAI-compatible body, e.g. one line of a batch result.
-    pub(crate) fn from_openai_body(body: &Value, single: bool) -> Embedding {
-        let rows: Vec<Vec<f64>> = body
-            .get("data")
-            .and_then(Value::as_array)
+    pub(crate) fn from_openai_body(body: &Value, single: bool) -> Result<Embedding> {
+        let data = body.get("data").and_then(Value::as_array);
+        let rows: Vec<Vec<f64>> = data
             .map(|d| d.iter().map(|x| floats(&x["embedding"])).collect())
             .unwrap_or_default();
         let model = body
@@ -79,14 +93,18 @@ impl Embedding {
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_string();
-        Embedding {
+        Ok(Embedding {
+            sparse_vectors: parse_sparse_vectors(
+                data.map_or(&[][..], Vec::as_slice),
+                single && rows.len() == 1,
+            )?,
             vectors: vectors_from(rows, single),
             model_info: crate::models::models().find(&model, None).ok(),
             model,
             input_tokens: body.pointer("/usage/prompt_tokens").and_then(Value::as_i64),
             reported_cost: None,
             usage_entries: Vec::new(),
-        }
+        })
     }
 }
 
@@ -136,8 +154,12 @@ pub struct EmbedOptions<'a> {
     /// `task_type:`: the embedding task in the provider's vocabulary (Gemini's `taskType`,
     /// OpenRouter's `input_type`); ignored by providers without one.
     pub task_type: Option<&'a str>,
+    /// `title:`: labels the document on Gemini retrieval tasks; ignored by other providers.
+    pub title: Option<&'a str>,
     /// `provider_options:`: merged into the request as-is, overriding rendered fields.
     pub provider_options: Value,
+    /// `metadata:`: added to the `embedding.rust_llm` event payload, never sent to the provider.
+    pub metadata: Option<Value>,
 }
 
 fn vectors_from(rows: Vec<Vec<f64>>, single: bool) -> Vectors {
@@ -146,6 +168,53 @@ fn vectors_from(rows: Vec<Vec<f64>>, single: bool) -> Vectors {
     } else {
         Vectors::Batch(rows)
     }
+}
+
+/// `ChatCompletions::Embeddings#parse_sparse_vectors`: sparse-capable models return a
+/// token-to-weight map beside the dense vector, under `lexical_weights` on BGE-M3 and
+/// `sparse_embedding` elsewhere. `None` when no row carries one.
+fn parse_sparse_vectors(rows: &[Value], single: bool) -> Result<Option<SparseVectors>> {
+    let sparse = rows
+        .iter()
+        .map(|row| {
+            let weights = row
+                .get("sparse_embedding")
+                .filter(|w| !w.is_null())
+                .or_else(|| row.get("lexical_weights"));
+            weights.map_or(Ok(None), normalize_sparse_vector)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    if sparse.iter().all(Option::is_none) {
+        return Ok(None);
+    }
+    Ok(Some(if single {
+        SparseVectors::Single(sparse.into_iter().next().flatten().unwrap_or_default())
+    } else {
+        SparseVectors::Batch(sparse)
+    }))
+}
+
+/// `normalize_sparse_vector`: `{ Integer(token) => Float(weight) }`; anything but a Hash is `nil`.
+/// Like Ruby's `Integer()`/`Float()`, a token or weight that is not a number is an error.
+fn normalize_sparse_vector(weights: &Value) -> Result<Option<BTreeMap<i64, f64>>> {
+    let Some(weights) = weights.as_object() else {
+        return Ok(None);
+    };
+    weights
+        .iter()
+        .map(|(token, weight)| {
+            let token = token
+                .trim()
+                .parse()
+                .map_err(|_| Error::Argument(format!("invalid value for Integer(): {token:?}")))?;
+            let weight = weight
+                .as_f64()
+                .or_else(|| weight.as_str()?.trim().parse().ok())
+                .ok_or_else(|| Error::Argument(format!("invalid value for Float(): {weight}")))?;
+            Ok((token, weight))
+        })
+        .collect::<Result<_>>()
+        .map(Some)
 }
 
 fn int8s(v: &Value) -> Vec<f64> {
@@ -191,8 +260,13 @@ pub async fn embed(input: impl Into<EmbedInput>, options: EmbedOptions<'_>) -> R
             ),
             ("dimensions", options.dimensions.into()),
             ("task_type", options.task_type.into()),
+            ("title", options.title.into()),
             ("attachment_count", options.with.len().into()),
             ("provider_options", options.provider_options.clone()),
+            (
+                "metadata",
+                crate::instrumentation::metadata(&options.metadata),
+            ),
             ("tokens", crate::instrumentation::tokens_h(&empty)),
             (
                 "cost",
@@ -202,6 +276,7 @@ pub async fn embed(input: impl Into<EmbedInput>, options: EmbedOptions<'_>) -> R
     });
     let result = tracing::Instrument::instrument(embed_inner(input, options), event.span()).await;
     if let Ok(e) = &result {
+        crate::instrumentation::usages(&config, &e.usage_entries);
         event.set("result", || {
             serde_json::json!({ "model": e.model, "vectors": match &e.vectors {
             Vectors::Single(v) => serde_json::json!(v),
@@ -288,6 +363,9 @@ async fn embed_inner(input: EmbedInput, options: EmbedOptions<'_>) -> Result<Emb
             if let Some(t) = options.task_type {
                 r["taskType"] = t.into();
             }
+            if let Some(t) = options.title {
+                r["title"] = t.into();
+            }
             let mut payload = json!({ "requests": [r] });
             deep_merge(&mut payload, &Value::Object(provider_options));
             (format!("models/{}:batchEmbedContents", model.id), payload)
@@ -302,6 +380,9 @@ async fn embed_inner(input: EmbedInput, options: EmbedOptions<'_>) -> Result<Emb
                     }
                     if let Some(t) = options.task_type {
                         r["taskType"] = t.into();
+                    }
+                    if let Some(t) = options.title {
+                        r["title"] = t.into();
                     }
                     r
                 })
@@ -368,8 +449,28 @@ async fn embed_inner(input: EmbedInput, options: EmbedOptions<'_>) -> Result<Emb
         }
     };
 
-    let raw = connection.post(&path, &payload, &[], &mut |_| {}).await?;
+    // `track_usage(:embedding)`: one entry per HTTP attempt.
+    let mut retried: Vec<Tokens> = Vec::new();
+    let mut on_attempt = |previous: Option<&Error>| {
+        if let Some(e) = previous {
+            retried.push(crate::chat::failure_tokens(e, None));
+        }
+    };
+    let raw = connection
+        .post(&path, &payload, &[], &mut on_attempt)
+        .await?;
     let body = raw.body;
+    // `ChatCompletions::Embeddings#parse_sparse_vectors`; Gemini, Mistral, and Perplexity override
+    // `parse_embedding_response` without it.
+    let sparse_vectors = match provider {
+        Provider::Gemini | Provider::Mistral | Provider::Perplexity => None,
+        _ => parse_sparse_vectors(
+            body.get("data")
+                .and_then(Value::as_array)
+                .map_or(&[][..], Vec::as_slice),
+            single && body.get("data").and_then(Value::as_array).map(Vec::len) == Some(1),
+        )?,
+    };
     let (rows, input_tokens) = match provider {
         Provider::Gemini => (
             body.get("embeddings")
@@ -398,14 +499,37 @@ async fn embed_inner(input: EmbedInput, options: EmbedOptions<'_>) -> Result<Emb
         provider,
         body.get("usage").unwrap_or(&Value::Null),
     );
-    Ok(Embedding {
+    let mut embedding = Embedding {
         vectors: vectors_from(rows, single),
+        sparse_vectors,
         model: model.id.clone(),
         input_tokens,
         reported_cost,
         usage_entries: Vec::new(),
-        model_info: Some(model),
-    })
+        model_info: Some(model.clone()),
+    };
+    let entry = |status, tokens: Tokens, cost: Option<Cost>| UsageEntry {
+        id: UsageEntry::next_id(),
+        operation: Operation::Embedding,
+        provider: provider.slug().into(),
+        model: model.id.clone(),
+        status,
+        cost: cost
+            .filter(|c| c.total().is_some())
+            .unwrap_or_else(|| crate::rerank::embeddings_cost(&tokens, Some(&model))),
+        tokens,
+    };
+    let mut entries: Vec<UsageEntry> = retried
+        .into_iter()
+        .map(|t| entry(UsageStatus::Failed, t, None))
+        .collect();
+    entries.push(entry(
+        UsageStatus::Succeeded,
+        embedding.tokens(),
+        Some(embedding.cost()),
+    ));
+    embedding.usage_entries = entries;
+    Ok(embedding)
 }
 
 /// `OpenRouter::Embeddings#format_embedding_content`: audio, video, and PDFs as `input_*` parts

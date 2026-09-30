@@ -44,6 +44,9 @@ pub struct Config {
     /// `model_registry_file`: where `Models::refresh` saves the registry and where the registry
     /// loads from before falling back to the bundled copy. `None` keeps it in memory only.
     pub model_registry_file: Option<std::path::PathBuf>,
+    /// `model_registry_store`: where the registry lives instead of `model_registry_file`, such as
+    /// an application's database (`rust_llm::models::registry::ModelRegistryStore`).
+    pub model_registry_store: Option<Arc<dyn crate::models::registry::ModelRegistryStore>>,
     /// `Prompt.roots`: the directories `render_prompt` searches after `app/prompts`, in order.
     pub prompt_roots: Vec<std::path::PathBuf>,
     /// `mcp_credential_store`: where MCP OAuth credentials live. `None` keeps them in memory;
@@ -55,6 +58,9 @@ pub struct Config {
     /// `mcp_client_id`: the HTTPS URL of your OAuth client metadata document, used instead of
     /// registering by authorization servers that support client ID metadata documents.
     pub mcp_client_id: Option<String>,
+    /// `batch_store`: where submitted chat batches are persisted, so `Batch::find` can hand one
+    /// back without contacting the provider. `None` keeps nothing (`crate::batch::BatchStore`).
+    pub batch_store: Option<Arc<dyn crate::batch::BatchStore>>,
     values: HashMap<String, String>,
 }
 
@@ -118,10 +124,12 @@ impl Default for Config {
             auto_upload_large_files: true,
             instrumenter: None,
             model_registry_file: crate::models::registry::cache_path(),
+            model_registry_store: None,
             prompt_roots: Vec::new(),
             mcp_credential_store: None,
             mcp_client_name: "RustLLM".into(),
             mcp_client_id: None,
+            batch_store: None,
             values: HashMap::new(),
         }
     }

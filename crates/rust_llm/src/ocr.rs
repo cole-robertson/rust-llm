@@ -112,22 +112,62 @@ pub struct OcrOptions<'a> {
     pub provider_options: Value,
     /// `context:`: use this configuration instead of the global one.
     pub config: Option<Arc<Config>>,
+    /// `metadata:`: added to the `ocr.rust_llm` event payload, never sent to the provider.
+    pub metadata: Option<Value>,
 }
 
-/// `RubyLLM.ocr(file, model:, provider:, pages:, provider_options:)`. `file` is a path, URL, or
-/// [`Attachment`].
+/// `RubyLLM.ocr(file, model:, provider:, pages:, provider_options:, metadata:)`, inside an
+/// `ocr.rust_llm` event. `file` is a path, URL, or [`Attachment`].
 pub async fn ocr(file: impl Into<Attachment>, options: OcrOptions<'_>) -> Result<Ocr> {
+    let config = options.config.clone().unwrap_or_else(crate::config);
+    let model_id = options
+        .model
+        .unwrap_or(&config.default_ocr_model)
+        .to_string();
+    let (model, provider) =
+        resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let mut event = crate::instrumentation::Event::start(&config, "ocr.rust_llm", || {
+        crate::instrumentation::payload([
+            ("provider", provider.slug().into()),
+            ("provider_class", provider.display().into()),
+            ("model", model.id.clone().into()),
+            ("pages", json!(options.pages)),
+            ("provider_options", options.provider_options.clone()),
+            (
+                "metadata",
+                crate::instrumentation::metadata(&options.metadata),
+            ),
+        ])
+    });
+    let result = tracing::Instrument::instrument(
+        ocr_inner(file.into(), options, config.clone(), model, provider),
+        event.span(),
+    )
+    .await;
+    if let Ok(r) = &result {
+        crate::instrumentation::usages(&config, &r.usage_entries);
+        event.set(
+            "result",
+            || json!({ "model": r.model, "pages": r.pages.len() }),
+        );
+        event.set("response_model", || r.model.clone().into());
+    }
+    event.finish(result.as_ref().err());
+    result
+}
+
+async fn ocr_inner(
+    file: Attachment,
+    options: OcrOptions<'_>,
+    config: Arc<Config>,
+    model: crate::model::Model,
+    provider: Provider,
+) -> Result<Ocr> {
     let OcrOptions {
-        model,
-        provider,
-        assume_model_exists,
         pages,
         provider_options,
-        config,
+        ..
     } = options;
-    let config = config.unwrap_or_else(crate::config);
-    let model_id = model.unwrap_or(&config.default_ocr_model).to_string();
-    let (model, provider) = resolve_model(&model_id, provider, assume_model_exists)?;
     provider.ensure_configured(&config)?;
     if provider != Provider::Mistral {
         return Err(Error::Api(
@@ -136,7 +176,7 @@ pub async fn ocr(file: impl Into<Attachment>, options: OcrOptions<'_>) -> Result
         ));
     }
     let connection = Connection::new(provider, config.clone())?;
-    let mut attachment = file.into();
+    let mut attachment = file;
     if !attachment.is_url() {
         attachment.load(connection.client()).await?;
     }

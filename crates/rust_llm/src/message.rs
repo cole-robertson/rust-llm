@@ -210,8 +210,9 @@ impl ToolCall {
         }
     }
 
-    /// A streamed piece that opens a call (`id` present, possibly empty).
-    pub(crate) fn opening(id: String, name: String, arguments: String) -> ToolCall {
+    /// A streamed piece that opens a call (`id` present, possibly empty): Ruby's
+    /// `ToolCall.new(id: '', name:, arguments: '')` as a stream chunk carries it.
+    pub fn opening(id: String, name: String, arguments: String) -> ToolCall {
         ToolCall {
             id,
             name,
@@ -222,8 +223,9 @@ impl ToolCall {
         }
     }
 
-    /// A streamed argument fragment for a call opened earlier (`id: nil`).
-    pub(crate) fn fragment(arguments: String) -> ToolCall {
+    /// A streamed argument fragment for a call opened earlier: Ruby's
+    /// `ToolCall.new(id: nil, name: nil, arguments: '...')`. A `nil` fragment is an empty one.
+    pub fn fragment(arguments: String) -> ToolCall {
         ToolCall {
             id: String::new(),
             name: String::new(),

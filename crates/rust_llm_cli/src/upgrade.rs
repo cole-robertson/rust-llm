@@ -1,17 +1,22 @@
-//! Port of `lib/generators/ruby_llm/upgrade/upgrade_generator.rb`.
-//!
-//! Upstream's only upgrade is 2.0 -> 2.1 (`upgrade_ruby_llm_to_2_1.rb.tt`: an MCP credentials
-//! table and `ruby_llm_tool_calls.pending_input`). This port is 2.0.0, its install migration
-//! already creates `pending_input`, and the credentials table only backs MCP OAuth, which is not
-//! ported (MCP itself is: `rust_llm::mcp` over stdio and Streamable HTTP, `Chat::with_mcp`), so
-//! there is nothing to write.
+//! Port of `lib/generators/ruby_llm/upgrade/upgrade_generator.rb`: the 2.0 -> 2.1 schema upgrade
+//! (`upgrade_ruby_llm_to_2_1.rb.tt`) as a Loco migration that adds `rust_llm_mcp_credentials`
+//! and `rust_llm_tool_calls.pending_input` when they are missing.
 
 use crate::Generator;
 
-/// `rust-llm generate upgrade`: writes nothing and says so.
-pub fn generate(g: &mut Generator) {
-    g.note(format!(
-        "  No upgrade migrations exist for rust_llm {} yet; `rust-llm generate install` creates the current schema. Nothing was written.",
-        rust_llm::VERSION
-    ));
+const MIGRATION: &str = include_str!("../templates/upgrade/migration.rs");
+
+/// The name the generated migration file ends with (`upgrade_ruby_llm_to_2_1`).
+pub const MIGRATION_SUFFIX: &str = "_upgrade_rust_llm_to_2_1";
+
+/// `rust-llm generate upgrade`: `create_migration_file`.
+pub fn generate(g: &mut Generator) -> Result<(), String> {
+    if !g.exists("migration/src/lib.rs") {
+        return Err(
+            "Run this from the root of a Loco app (migration/src/lib.rs not found).".into(),
+        );
+    }
+    crate::install::migration_template(g, MIGRATION_SUFFIX, MIGRATION);
+    g.note("\n  Then run: cargo loco db migrate");
+    Ok(())
 }

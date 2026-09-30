@@ -106,6 +106,8 @@ pub struct SpeakOptions<'a> {
     pub provider_options: Value,
     /// `context:`: use this configuration instead of the global one.
     pub config: Option<Arc<Config>>,
+    /// `metadata:`: added to the `speech.rust_llm` event payload, never sent to the provider.
+    pub metadata: Option<Value>,
 }
 
 impl Speech {
@@ -196,7 +198,62 @@ pub async fn speak_stream(
     .await
 }
 
+/// `Speech.speak`'s `speech.rust_llm` event around the provider call.
 async fn run(
+    input: &str,
+    options: SpeakOptions<'_>,
+    on_chunk: Option<&mut (dyn FnMut(&SpeechChunk) + Send)>,
+) -> Result<Speech> {
+    let config = options.config.clone().unwrap_or_else(crate::config);
+    let model_id = options
+        .model
+        .unwrap_or(&config.default_speech_model)
+        .to_string();
+    let (model, provider) =
+        resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let mut event = crate::instrumentation::Event::start(&config, "speech.rust_llm", || {
+        let empty = Tokens::default();
+        crate::instrumentation::payload([
+            ("provider", provider.slug().into()),
+            ("provider_class", provider.display().into()),
+            ("model", model.id.clone().into()),
+            ("input", input.into()),
+            ("voice", options.voice.into()),
+            ("format", options.format.into()),
+            ("provider_options", options.provider_options.clone()),
+            (
+                "metadata",
+                crate::instrumentation::metadata(&options.metadata),
+            ),
+            ("streaming", on_chunk.is_some().into()),
+            ("tokens", crate::instrumentation::tokens_h(&empty)),
+            (
+                "cost",
+                crate::instrumentation::cost_h(&Cost::audio(&empty, Some(&model))),
+            ),
+        ])
+    });
+    let result =
+        tracing::Instrument::instrument(run_inner(input, options, on_chunk), event.span()).await;
+    if let Ok(speech) = &result {
+        crate::instrumentation::usages(&config, &speech.usage_entries);
+        event.set("result", || {
+            json!({ "model": speech.model, "voice": speech.voice, "format": speech.format, "mime_type": speech.mime_type })
+        });
+        event.set("response_model", || speech.model.clone().into());
+        event.set("voice", || speech.voice.clone().into());
+        event.set("format", || speech.format.clone().into());
+        event.set("audio_bytes", || speech.to_blob().len().into());
+        event.set("tokens", || {
+            crate::instrumentation::tokens_h(&speech.tokens())
+        });
+        event.set("cost", || crate::instrumentation::cost_h(&speech.cost()));
+    }
+    event.finish(result.as_ref().err());
+    result
+}
+
+async fn run_inner(
     input: &str,
     options: SpeakOptions<'_>,
     on_chunk: Option<&mut (dyn FnMut(&SpeechChunk) + Send)>,

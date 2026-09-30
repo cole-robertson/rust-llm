@@ -408,7 +408,15 @@ pub fn parse_completion(
     raw: RawResponse,
 ) -> Result<Message> {
     let body = raw.body.clone();
-    if body.is_null() || body.as_object().is_some_and(Map::is_empty) {
+    // `Protocol#parse_completion_response`: `body.nil? || body.empty?` (nil, {}, [], '').
+    let empty = match &body {
+        Value::Null => true,
+        Value::Object(m) => m.is_empty(),
+        Value::Array(a) => a.is_empty(),
+        Value::String(s) => s.is_empty(),
+        _ => false,
+    };
+    if empty {
         return Err(Error::Api(
             "Provider returned an empty response body".into(),
             None,
@@ -575,6 +583,8 @@ pub fn streaming_error_status(protocol: ProtocolName) -> fn(&str) -> Option<u16>
                 _ => 400,
             })
         },
+        // `Interactions < Protocol` keeps `Protocol::Streaming#parse_streaming_error`: always 500.
+        ProtocolName::Interactions => |_| Some(500),
         _ => |data| {
             let v: Value = serde_json::from_str(data).ok()?;
             let kind = v
@@ -613,6 +623,11 @@ impl StreamAccumulator {
     /// Usage reported so far, for billing a stream that fails partway.
     pub fn tokens(&self) -> &Tokens {
         &self.tokens
+    }
+
+    /// `attr_reader :tool_calls`: the calls started so far, keyed by id, arguments still partial.
+    pub fn tool_calls(&self) -> &IndexMap<ToolCall> {
+        &self.tool_calls
     }
 
     pub fn add(&mut self, chunk: &Message) {
@@ -727,8 +742,16 @@ impl StreamAccumulator {
         for (id, call) in self.tool_calls.0 {
             let arguments = match call.arguments {
                 ToolArguments::Partial(s) if s.is_empty() => Map::new(),
+                // `parse_tool_call_arguments`: `ToolCallParseError.new(response:, finish_reason:)`
+                // raised with the `JSON::ParserError` as its cause.
                 ToolArguments::Partial(s) => serde_json::from_str::<Map<String, Value>>(&s)
-                    .map_err(|_| Error::tool_call_parse(finish.as_deref()))?,
+                    .map_err(|e| {
+                        let response = crate::error::ErrorResponse {
+                            status: raw.status,
+                            body: raw.body.to_string(),
+                        };
+                        Error::tool_call_parse_from(finish.as_deref(), response, e)
+                    })?,
                 ToolArguments::Parsed(m) => m,
             };
             tool_calls.insert(
@@ -805,8 +828,9 @@ pub(crate) fn str_of(v: Option<&Value>) -> Option<String> {
     v.and_then(Value::as_str).map(str::to_string)
 }
 
-/// Ruby's `deep_merge` for `provider_options` and tool `provider_options`.
-pub(crate) fn deep_merge(base: &mut Value, overlay: &Value) {
+/// `Support::Utils.deep_merge` (used for `provider_options` and tool `provider_options`): nested
+/// objects merge key by key, and anything else in `overlay` replaces what `base` has.
+pub fn deep_merge(base: &mut Value, overlay: &Value) {
     match (base, overlay) {
         (Value::Object(b), Value::Object(o)) => {
             for (k, v) in o {

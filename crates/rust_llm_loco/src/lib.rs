@@ -39,11 +39,15 @@
 //! resolution RubyLLM keeps on the Active Storage blob), since Loco has no Active Storage. See the
 //! [persistence guide](https://github.com/cole-robertson/rust-llm/blob/main/docs/persistence-loco.md).
 
+pub mod batch;
 pub mod entities;
 mod mcp_credential;
 pub mod migrations;
+pub mod model_store;
 
+pub use batch::BatchStore;
 pub use mcp_credential::McpCredentialStore;
+pub use model_store::ModelStore;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -60,6 +64,17 @@ use sea_orm::{
     EntityTrait, QueryFilter, QueryOrder, TransactionTrait,
 };
 use serde_json::{Map, Value};
+
+/// Usage rows written as attempts finished: `(UsageEntry.id, rust_llm_usages.id)`, not yet linked.
+type UsageRows = Arc<Mutex<Vec<(u64, i32)>>>;
+
+/// Where a message's usage comes from when it is persisted.
+enum Usages<'a> {
+    /// Rows already written as the attempts finished; persisting only links them.
+    Written(&'a UsageRows),
+    /// Entries not written yet (batch results, out-of-band completions); persisting inserts them.
+    Pending(&'a Mutex<Vec<UsageEntry>>),
+}
 
 use entities::{
     chats, messages, rust_llm_attachments, rust_llm_models, rust_llm_tool_calls, rust_llm_usages,
@@ -90,7 +105,7 @@ pub fn migrations() -> Vec<Box<dyn sea_orm_migration::MigrationTrait>> {
     migrations::all()
 }
 
-fn now() -> sea_orm::prelude::DateTimeWithTimeZone {
+pub(crate) fn now() -> sea_orm::prelude::DateTimeWithTimeZone {
     chrono::Utc::now().into()
 }
 
@@ -111,22 +126,46 @@ fn parse_time(value: &str) -> Option<sea_orm::prelude::DateTimeWithTimeZone> {
 /// `ChatMethods#find_or_create_model`: `Model.find_or_create_by!(provider:, model_id:)` with the
 /// registry's metadata, reusing the row another process inserted between the lookup and the insert.
 ///
-/// RubyLLM also copies the whole registry into an empty `ruby_llm_models` table first, because its
-/// registry can read from that table on the next boot. RustLLM's registry never reads the table,
-/// so only the rows chats use are written.
+/// Like RubyLLM (`load_model_registry_into_store`), an empty `rust_llm_models` table is first filled
+/// with the whole registry, so a [`model_store::ModelStore`] can load it on the next boot. A
+/// unique violation from a concurrent fill is ignored, as Ruby rescues `RecordNotUnique`.
 pub async fn find_or_create_model(
+    db: &(impl ConnectionTrait + TransactionTrait),
+    model: &rust_llm::Model,
+) -> Result<rust_llm_models::Model> {
+    if rust_llm_models::Entity::find().one(db).await?.is_none() {
+        match model_store::save_to_database(db, &rust_llm::models()).await {
+            Err(Error::Db(e))
+                if matches!(
+                    e.sql_err(),
+                    Some(sea_orm::SqlErr::UniqueConstraintViolation(_))
+                ) => {}
+            other => other?,
+        }
+    }
+    if let Some(found) = find_model_row(db, model).await? {
+        return Ok(found);
+    }
+    insert_model(db, model).await
+}
+
+async fn find_model_row(
+    db: &impl ConnectionTrait,
+    model: &rust_llm::Model,
+) -> Result<Option<rust_llm_models::Model>> {
+    Ok(rust_llm_models::Entity::find()
+        .filter(rust_llm_models::Column::Provider.eq(&model.provider))
+        .filter(rust_llm_models::Column::ModelId.eq(&model.id))
+        .one(db)
+        .await?)
+}
+
+/// The insert half of [`find_or_create_model`], after its lookup missed: inserts the row, or
+/// returns the one another process inserted in between (the unique index rejects ours).
+pub async fn insert_model(
     db: &impl ConnectionTrait,
     model: &rust_llm::Model,
 ) -> Result<rust_llm_models::Model> {
-    let existing = || {
-        rust_llm_models::Entity::find()
-            .filter(rust_llm_models::Column::Provider.eq(&model.provider))
-            .filter(rust_llm_models::Column::ModelId.eq(&model.id))
-            .one(db)
-    };
-    if let Some(found) = existing().await? {
-        return Ok(found);
-    }
     let record = rust_llm_models::ActiveModel {
         model_id: Set(model.id.clone()),
         name: Set(if model.name.is_empty() {
@@ -159,7 +198,7 @@ pub async fn find_or_create_model(
     };
     match record.insert(db).await {
         Ok(row) => Ok(row),
-        Err(e) => existing().await?.ok_or(Error::Db(e)),
+        Err(e) => find_model_row(db, model).await?.ok_or(Error::Db(e)),
     }
 }
 
@@ -196,17 +235,48 @@ pub struct ChatRecord {
     /// `assume_model_exists`: accept a model id the registry does not know. Not persisted; set
     /// it again after loading the record, as in RubyLLM.
     pub assume_model_exists: bool,
+    /// `protocol`: the wire protocol the chat is built with. Not persisted; set it again after
+    /// loading the record, as in RubyLLM.
+    pub protocol: Option<rust_llm::providers::ProtocolName>,
+    /// `context`: the [`rust_llm::Context`] whose configuration `to_llm` builds the chat with.
+    /// Runtime-only, like RubyLLM's.
+    context: Option<rust_llm::Context>,
     /// `@unpersisted_instructions`, reapplied whenever the chat is rebuilt from rows.
     runtime_instructions: Vec<RuntimeInstruction>,
+    /// `@last_cancellation_poll_at`.
+    last_cancellation_poll: Arc<Mutex<Option<std::time::Instant>>>,
 }
 
 impl ChatRecord {
-    fn from_row(record: chats::Model) -> ChatRecord {
+    pub(crate) fn from_row(record: chats::Model) -> ChatRecord {
         ChatRecord {
             record,
             assume_model_exists: false,
+            protocol: None,
+            context: None,
             runtime_instructions: Vec::new(),
+            last_cancellation_poll: Arc::default(),
         }
+    }
+
+    /// `context`.
+    pub fn context(&self) -> Option<&rust_llm::Context> {
+        self.context.as_ref()
+    }
+
+    /// `chat.with_context(context)`: later `to_llm` calls build with the context's
+    /// configuration, and `chat` (the chat already built, if any) is rebound to it. `None` goes
+    /// back to the global configuration. Not persisted.
+    pub fn with_context(
+        &mut self,
+        context: Option<rust_llm::Context>,
+        chat: Option<Chat>,
+    ) -> Result<Option<Chat>> {
+        self.context = context;
+        Ok(match chat {
+            Some(chat) => Some(chat.with_context(self.context.as_ref())?),
+            None => None,
+        })
     }
 
     /// `Chat.create!(model:, provider:)`.
@@ -294,6 +364,17 @@ impl ChatRecord {
         })
     }
 
+    /// `chat.with_model(nil)`: falls back to the configured `default_model` (the context's, when
+    /// the record has one).
+    pub async fn with_default_model(
+        &mut self,
+        db: &DatabaseConnection,
+        chat: Chat,
+    ) -> Result<Chat> {
+        let default = chat.config().default_model.clone();
+        self.with_model(db, chat, &default, None).await
+    }
+
     /// `chat.messages`, oldest first.
     pub async fn messages(&self, db: &impl ConnectionTrait) -> Result<Vec<messages::Model>> {
         Ok(messages::Entity::find()
@@ -335,7 +416,12 @@ impl ChatRecord {
     /// `chat.to_llm`: an in-memory `rust_llm::Chat` rebuilt from rows, including approval
     /// decisions, paused MCP input requests, and attachments.
     pub async fn to_llm(&self, db: &DatabaseConnection) -> Result<Chat> {
-        self.to_llm_with(db, rust_llm::config()).await
+        let config = self
+            .context
+            .as_ref()
+            .map(|c| c.config().clone())
+            .unwrap_or_else(rust_llm::config);
+        self.to_llm_with(db, config).await
     }
 
     /// `to_llm` with an explicit configuration (RubyLLM's `context:`).
@@ -349,6 +435,9 @@ impl ChatRecord {
         let assume = self.assume_model_exists || provider.is_some_and(|p| p.assume_models_exist());
         let mut chat =
             Chat::with_config(config, Some(&model.model_id), Some(&model.provider), assume)?;
+        if let Some(protocol) = self.protocol {
+            chat = chat.with_protocol(protocol);
+        }
         self.sync_messages(db, &mut chat).await?;
         Ok(chat)
     }
@@ -372,70 +461,10 @@ impl ChatRecord {
             .map(|u| (u.id, u.message_id, usage_entry(u)))
             .collect();
 
-        let mut restored = Vec::new();
-        for row in &rows {
-            let own_calls: Vec<&rust_llm_tool_calls::Model> = calls
-                .iter()
-                .filter(|c| c.message_id == row.id as i64)
-                .collect();
-            let parent = calls.iter().find(|c| {
-                c.result_id == Some(row.id as i64) && c.result_type.as_deref() == Some(MESSAGE_TYPE)
-            });
-            let mut m = Message::new(Role::parse(&row.role)?, row.content.clone());
-            m.cache_until_here = row.cache_until_here;
-            m.thinking = Thinking::build(row.thinking_text.clone(), row.thinking_signature.clone());
-            m.citations = row
-                .citations
-                .clone()
-                .and_then(|c| serde_json::from_value::<Vec<Citation>>(c).ok())
-                .unwrap_or_default();
-            m.server_tool_calls = row
-                .server_tool_calls
-                .clone()
-                .and_then(|c| serde_json::from_value(c).ok())
-                .unwrap_or_default();
-            m.raw_content = row.raw_content.clone();
-            m.raw_reasoning = row.raw_reasoning.clone();
-            m.finish_reason = row.finish_reason.as_deref().map(FinishReason::from_symbol);
-            m.tool_call_id = parent.map(|p| p.tool_call_id.clone());
-            m.attachments = files
-                .iter()
-                .filter(|f| f.message_id == row.id as i64)
-                .map(attachment)
-                .collect();
-            if !own_calls.is_empty() {
-                let map: IndexMap<ToolCall> = own_calls
-                    .iter()
-                    .map(|c| {
-                        let mut call = ToolCall::new(
-                            c.tool_call_id.clone(),
-                            c.name.clone(),
-                            c.arguments
-                                .clone()
-                                .and_then(|a| a.as_object().cloned())
-                                .unwrap_or_default(),
-                        );
-                        call.thought_signature = c.thought_signature.clone();
-                        call.remote = c.remote;
-                        (c.tool_call_id.clone(), call)
-                    })
-                    .collect();
-                m.tool_calls = Some(map);
-            }
-            m.usage_entries = entries
-                .iter()
-                .filter(|(_, message_id, _)| *message_id == Some(row.id as i64))
-                .map(|(_, _, e)| e.clone())
-                .collect();
-            m.model = m
-                .usage_entries
-                .iter()
-                .rev()
-                .find(|e| e.status == UsageStatus::Succeeded)
-                .map(|e| e.model.clone());
-            m.record_id = Some(row.id as i64);
-            restored.push(m);
-        }
+        let restored = rows
+            .iter()
+            .map(|row| restore_message(row, &calls, &files, &entries))
+            .collect::<Result<Vec<_>>>()?;
         chat.set_messages(restored);
         chat.set_usage_entries(entries.into_iter().map(|(_, _, e)| e).collect());
         apply_tool_call_state(chat, &calls);
@@ -553,13 +582,101 @@ impl ChatRecord {
         chat: &mut Chat,
         mut message: Message,
     ) -> Result<messages::Model> {
-        let id = self.persist(db, &message, &[]).await?;
+        let id = self.persist(db, &message, &[], &[]).await?;
         message.record_id = Some(id);
         chat.add_message(message);
         messages::Entity::find_by_id(id as i32)
             .one(db)
             .await?
             .ok_or_else(|| Error::NotFound(format!("message {id}")))
+    }
+
+    /// `chat.add_message(message_record)`: copies an existing message row (from any chat) into
+    /// this conversation as a new row, through its `to_llm`. The original stays where it is.
+    pub async fn add_message_record(
+        &self,
+        db: &DatabaseConnection,
+        chat: &mut Chat,
+        row: &messages::Model,
+    ) -> Result<messages::Model> {
+        let mut message = message_to_llm(db, row).await?;
+        message.record_id = None;
+        self.add_message(db, chat, message).await
+    }
+
+    /// `chat.add_completion(response)`: appends an answer produced out of band (a batch) to
+    /// `chat` and persists it with its usage, as RubyLLM's persistence callbacks do.
+    pub async fn add_completion(
+        &self,
+        db: &DatabaseConnection,
+        chat: &mut Chat,
+        message: Message,
+    ) -> Result<Message> {
+        let pending: Arc<Mutex<Vec<UsageEntry>>> = Arc::default();
+        let sink = pending.clone();
+        chat.set_usage_recorder(Box::new(move |e| sink.lock().unwrap().push(e.clone())));
+        chat.add_completion(message, false);
+        self.persist_unsaved(db, chat, Usages::Pending(&pending))
+            .await?;
+        let orphans = std::mem::take(&mut *pending.lock().unwrap()); // poisoned lock only
+        for entry in orphans {
+            insert_usage(db, self.record.id, None, &entry).await?;
+        }
+        Ok(chat
+            .messages()
+            .last()
+            .cloned()
+            .unwrap_or_else(|| Message::new(Role::Assistant, None)))
+    }
+
+    /// Persists the messages a batch appended to `chat` (`add_completion(record_usage: true)`),
+    /// with the usage entries they carry, as the record's persistence callbacks do in Ruby.
+    pub async fn persist_collected(&self, db: &DatabaseConnection, chat: &mut Chat) -> Result<()> {
+        let pending: Arc<Mutex<Vec<UsageEntry>>> = Arc::new(Mutex::new(
+            chat.messages()
+                .iter()
+                .filter(|m| m.record_id.is_none())
+                .flat_map(|m| m.usage_entries.clone())
+                .collect(),
+        ));
+        self.persist_unsaved(db, chat, Usages::Pending(&pending))
+            .await
+    }
+
+    /// `chat.destroy!`: deletes the chat with its messages, and the internal rows that belong to
+    /// them (`dependent: :destroy` on messages, tool calls, usages, and attachments).
+    pub async fn destroy(self, db: &DatabaseConnection) -> Result<()> {
+        let ids: Vec<i64> = self
+            .messages(db)
+            .await?
+            .iter()
+            .map(|m| m.id as i64)
+            .collect();
+        let txn = db.begin().await?;
+        rust_llm_tool_calls::Entity::delete_many()
+            .filter(rust_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
+            .filter(rust_llm_tool_calls::Column::MessageId.is_in(ids.clone()))
+            .exec(&txn)
+            .await?;
+        rust_llm_attachments::Entity::delete_many()
+            .filter(rust_llm_attachments::Column::MessageType.eq(MESSAGE_TYPE))
+            .filter(rust_llm_attachments::Column::MessageId.is_in(ids))
+            .exec(&txn)
+            .await?;
+        rust_llm_usages::Entity::delete_many()
+            .filter(rust_llm_usages::Column::ChatType.eq(CHAT_TYPE))
+            .filter(rust_llm_usages::Column::ChatId.eq(self.record.id as i64))
+            .exec(&txn)
+            .await?;
+        messages::Entity::delete_many()
+            .filter(messages::Column::ChatId.eq(self.record.id))
+            .exec(&txn)
+            .await?;
+        chats::Entity::delete_by_id(self.record.id)
+            .exec(&txn)
+            .await?;
+        txn.commit().await?;
+        Ok(())
     }
 
     /// `chat.cache_until_here`: marks the latest persisted message as a prompt cache boundary, or
@@ -630,8 +747,8 @@ impl ChatRecord {
         attachments: Vec<Attachment>,
     ) -> Result<()> {
         chat.ask_later_with(message, attachments)?;
-        let pending: Arc<Mutex<Vec<UsageEntry>>> = Arc::default();
-        self.persist_unsaved(db, chat, &pending).await
+        self.persist_unsaved(db, chat, Usages::Written(&UsageRows::default()))
+            .await
     }
 
     /// `chat.complete`: continue a staged or parked (awaiting approval or input) chat.
@@ -643,23 +760,19 @@ impl ChatRecord {
     /// (`consume_persisted_cancellation_request`), so [`ChatRecord::cancel`] from another process
     /// stops it with `rust_llm::Error::Cancelled`.
     pub async fn complete(&self, db: &DatabaseConnection, chat: &mut Chat) -> Result<Message> {
-        let pending_usages: Arc<Mutex<Vec<UsageEntry>>> = Arc::default();
-        let sink = pending_usages.clone();
-        chat.set_usage_recorder(Box::new(move |e| sink.lock().unwrap().push(e.clone())));
+        let pending_usages = self.record_usages_as_they_finish(db, chat);
 
         // Anything not yet stored (ask_later on the plain chat) is written first, in order.
-        self.persist_unsaved(db, chat, &pending_usages).await?;
+        self.persist_unsaved(db, chat, Usages::Written(&pending_usages))
+            .await?;
         if self.consume_cancellation_request(db).await? {
             chat.cancel();
         }
         let poller = self.watch_cancellation(db, chat.cancel_handle());
         let outcome = self.run_loop(db, chat, &pending_usages).await;
         poller.abort();
-        // Attempts that produced no message still land in the ledger, as RubyLLM keeps them.
-        let orphans = std::mem::take(&mut *pending_usages.lock().unwrap());
-        for entry in orphans {
-            insert_usage(db, self.record.id, None, &entry).await?;
-        }
+        chat.clear_async_usage_recorder();
+        // Attempts that produced no message stay in the ledger unlinked, as RubyLLM keeps them.
         if let Err(e) = outcome {
             if let Error::Llm(llm) = &e {
                 self.cleanup_after_failure(db, chat, llm).await?;
@@ -676,11 +789,48 @@ impl ChatRecord {
             .unwrap_or_else(|| Message::new(Role::Assistant, None)))
     }
 
+    /// `chat.compact`: compacts the model context and persists the returned assistant message
+    /// (carrying the compacted context) with its usage, without deleting earlier messages. A
+    /// cancellation another process wrote stops it before the request.
+    pub async fn compact(&self, db: &DatabaseConnection, chat: &mut Chat) -> Result<Message> {
+        let pending_usages = self.record_usages_as_they_finish(db, chat);
+        self.persist_unsaved(db, chat, Usages::Written(&pending_usages))
+            .await?;
+        if self.consume_cancellation_request(db).await? {
+            chat.cancel();
+        }
+        let outcome = chat.compact().await;
+        self.persist_unsaved(db, chat, Usages::Written(&pending_usages))
+            .await?;
+        chat.clear_async_usage_recorder();
+        match outcome {
+            Ok(message) => Ok(message),
+            Err(e) => {
+                self.cleanup_after_failure(db, chat, &e).await?;
+                Err(e.into())
+            }
+        }
+    }
+
+    /// `chat.run_tools`: runs the pending tool calls (answering remote approvals with the
+    /// recorded decisions) and persists their results, without calling the model.
+    pub async fn run_tools(&self, db: &DatabaseConnection, chat: &mut Chat) -> Result<()> {
+        let pending_usages: UsageRows = Arc::default();
+        self.refresh_tool_call_state(db, chat).await?;
+        let inputs_before = chat.tool_call_inputs().clone();
+        let outcome = chat.run_tools().await.map(|_| ());
+        self.persist_unsaved(db, chat, Usages::Written(&pending_usages))
+            .await?;
+        self.persist_tool_call_inputs(db, chat, &inputs_before)
+            .await?;
+        Ok(outcome?)
+    }
+
     async fn run_loop(
         &self,
         db: &DatabaseConnection,
         chat: &mut Chat,
-        pending_usages: &Arc<Mutex<Vec<UsageEntry>>>,
+        pending_usages: &UsageRows,
     ) -> Result<()> {
         loop {
             self.refresh_tool_call_state(db, chat).await?;
@@ -689,7 +839,8 @@ impl ChatRecord {
             }
             let inputs_before = chat.tool_call_inputs().clone();
             let step = chat.step().await;
-            self.persist_unsaved(db, chat, pending_usages).await?;
+            self.persist_unsaved(db, chat, Usages::Written(pending_usages))
+                .await?;
             self.persist_tool_call_inputs(db, chat, &inputs_before)
                 .await?;
             match step {
@@ -700,6 +851,28 @@ impl ChatRecord {
         }
     }
 
+    /// `persist_usage_entry`: installs a recorder that writes each finished attempt's
+    /// `rust_llm_usages` row as it finishes, before `usage.rust_llm` is published (Ruby's tracker
+    /// `on_finish`). Rows start unlinked; `persist` links them to the message they produced.
+    fn record_usages_as_they_finish(&self, db: &DatabaseConnection, chat: &mut Chat) -> UsageRows {
+        let rows: UsageRows = Arc::default();
+        let (db, chat_id, sink) = (db.clone(), self.record.id, rows.clone());
+        chat.set_async_usage_recorder(Arc::new(move |entry: UsageEntry| {
+            let (db, sink) = (db.clone(), sink.clone());
+            Box::pin(async move {
+                match insert_usage(&db, chat_id, None, &entry).await {
+                    Ok(id) => {
+                        if let Ok(mut rows) = sink.lock() {
+                            rows.push((entry.id, id));
+                        }
+                    }
+                    Err(e) => tracing::error!("RustLLM: failed to persist usage row: {e}"),
+                }
+            })
+        }));
+        rows
+    }
+
     /// Writes every non-system message without a `record_id`, in history order, and stamps the
     /// new ids. System messages reach the table only through `with_instructions`/`add_message`,
     /// as in RubyLLM, so runtime instructions stay runtime-only.
@@ -707,7 +880,7 @@ impl ChatRecord {
         &self,
         db: &DatabaseConnection,
         chat: &mut Chat,
-        usages: &Arc<Mutex<Vec<UsageEntry>>>,
+        usages: Usages<'_>,
     ) -> Result<()> {
         let unsaved: Vec<usize> = chat
             .messages()
@@ -718,16 +891,27 @@ impl ChatRecord {
             .collect();
         for i in unsaved {
             let message = chat.messages()[i].clone();
-            let mut linked: Vec<UsageEntry> = Vec::new();
-            {
-                let mut pending = usages.lock().unwrap();
-                for entry in &message.usage_entries {
-                    if let Some(p) = pending.iter().position(|u| u.id == entry.id) {
-                        linked.push(pending.remove(p));
+            let mut insert: Vec<UsageEntry> = Vec::new();
+            let mut link: Vec<i32> = Vec::new();
+            match &usages {
+                Usages::Pending(pending) => {
+                    let mut pending = pending.lock().unwrap(); // poisoned lock only
+                    for entry in &message.usage_entries {
+                        if let Some(p) = pending.iter().position(|u| u.id == entry.id) {
+                            insert.push(pending.remove(p));
+                        }
+                    }
+                }
+                Usages::Written(rows) => {
+                    let mut rows = rows.lock().unwrap(); // poisoned lock only
+                    for entry in &message.usage_entries {
+                        if let Some(p) = rows.iter().position(|(id, _)| *id == entry.id) {
+                            link.push(rows.remove(p).1);
+                        }
                     }
                 }
             }
-            let id = self.persist(db, &message, &linked).await?;
+            let id = self.persist(db, &message, &insert, &link).await?;
             chat.messages_mut()[i].record_id = Some(id);
         }
         Ok(())
@@ -738,6 +922,7 @@ impl ChatRecord {
         db: &DatabaseConnection,
         m: &Message,
         usages: &[UsageEntry],
+        written_usages: &[i32],
     ) -> Result<i64> {
         // `persist_content`: read the bytes before the transaction, since a URL may be fetched.
         let mut files = Vec::new();
@@ -801,6 +986,24 @@ impl ChatRecord {
         // `link_usage_entries`: every attempt behind this message, retries included.
         for entry in usages {
             insert_usage(&txn, self.record.id, Some(row.id), entry).await?;
+        }
+        if !written_usages.is_empty() {
+            rust_llm_usages::Entity::update_many()
+                .col_expr(
+                    rust_llm_usages::Column::MessageId,
+                    sea_orm::sea_query::Expr::value(row.id as i64),
+                )
+                .col_expr(
+                    rust_llm_usages::Column::MessageType,
+                    sea_orm::sea_query::Expr::value(MESSAGE_TYPE),
+                )
+                .col_expr(
+                    rust_llm_usages::Column::UpdatedAt,
+                    sea_orm::sea_query::Expr::value(now()),
+                )
+                .filter(rust_llm_usages::Column::Id.is_in(written_usages.to_vec()))
+                .exec(&txn)
+                .await?;
         }
         txn.commit().await?;
         Ok(row.id as i64)
@@ -877,6 +1080,27 @@ impl ChatRecord {
         } else {
             "API call failed"
         };
+        self.cleanup_orphaned_tool_results_for(db, chat, reason)
+            .await
+    }
+
+    /// `cleanup_orphaned_tool_results`: destroys a trailing tool-call message, or a whole round
+    /// whose tool calls are not all answered. A completed round and a plain conversation stay.
+    pub async fn cleanup_orphaned_tool_results(
+        &self,
+        db: &DatabaseConnection,
+        chat: &mut Chat,
+    ) -> Result<()> {
+        self.cleanup_orphaned_tool_results_for(db, chat, "cleaning up orphaned tool results")
+            .await
+    }
+
+    async fn cleanup_orphaned_tool_results_for(
+        &self,
+        db: &DatabaseConnection,
+        chat: &mut Chat,
+        reason: &str,
+    ) -> Result<()> {
         let rows = self.messages(db).await?;
         let Some(last) = rows.last() else {
             return Ok(());
@@ -957,6 +1181,33 @@ impl ChatRecord {
             .exec(db)
             .await?;
         Ok(())
+    }
+
+    /// `chat.cancel` on a record whose chat is already built: persisted like [`ChatRecord::cancel`]
+    /// and forwarded to `chat` (`@chat&.cancel`), so it stops at its next checkpoint without
+    /// waiting for a poll.
+    pub async fn cancel_chat(&self, db: &DatabaseConnection, chat: &Chat) -> Result<()> {
+        self.cancel(db).await?;
+        chat.cancel();
+        Ok(())
+    }
+
+    /// `consume_persisted_cancellation_request`: reads the row at most once per
+    /// [`CANCELLATION_POLL_INTERVAL`] (`cancellation_poll_due?`), and clears and reports a
+    /// request it finds there.
+    pub async fn consume_persisted_cancellation_request(
+        &self,
+        db: &DatabaseConnection,
+    ) -> Result<bool> {
+        {
+            let mut last = self.last_cancellation_poll.lock().unwrap(); // poisoned lock only
+            let now = std::time::Instant::now();
+            if last.is_some_and(|at| now.duration_since(at) < CANCELLATION_POLL_INTERVAL) {
+                return Ok(false);
+            }
+            *last = Some(now);
+        }
+        consume_cancellation(db, self.record.id).await
     }
 
     /// `chat.cancelled?`: whether a cancellation request is waiting on the row.
@@ -1133,23 +1384,26 @@ impl ChatRecord {
     // ---- agents ----------------------------------------------------------------------------
 
     /// `Agent.create!` with `chat_model Chat` (`with_rails_chat_record`): a new record on the
-    /// agent's model with its configuration applied. Its instructions are persisted.
+    /// agent's model, built with its context, `assume_model_exists`, and protocol, with its
+    /// configuration applied. Its instruction declarations are persisted unless declared
+    /// `persist: false`.
     pub async fn create_for_agent<A: Agent + Sync + ?Sized>(
         db: &DatabaseConnection,
         agent: &A,
     ) -> Result<(ChatRecord, Chat)> {
-        let default_model = rust_llm::config().default_model.clone();
-        let mut record = Self::create(
+        let context = agent.context();
+        let default_model = context
+            .as_ref()
+            .map(|c| c.config().default_model.clone())
+            .unwrap_or_else(|| rust_llm::config().default_model.clone());
+        let record = Self::create_with(
             db,
             agent.model().unwrap_or(&default_model),
             agent.provider(),
+            agent.assume_model_exists(),
         )
         .await?;
-        let chat = agent.apply(record.to_llm(db).await?)?;
-        record
-            .apply_agent_instructions(db, agent, chat, true)
-            .await
-            .map(|chat| (record, chat))
+        record.configure_for_agent(db, agent, context, true).await
     }
 
     /// `Agent.find(id)`: the record with the agent's configuration applied at runtime. Its
@@ -1159,28 +1413,204 @@ impl ChatRecord {
         id: i32,
         agent: &A,
     ) -> Result<(ChatRecord, Chat)> {
-        let mut record = Self::find(db, id).await?;
-        let chat = agent.apply(record.to_llm(db).await?)?;
-        record
-            .apply_agent_instructions(db, agent, chat, false)
-            .await
-            .map(|chat| (record, chat))
+        let record = Self::find(db, id).await?;
+        record.apply_agent(db, agent, false).await
     }
 
-    /// `apply_instructions`: an empty prompt means no instructions (`blank_instruction?`).
+    /// `Agent.new(chat: record)`: this (reloaded) record with the agent's configuration applied,
+    /// its instructions persisted like `create!`.
+    pub async fn apply_agent<A: Agent + Sync + ?Sized>(
+        self,
+        db: &DatabaseConnection,
+        agent: &A,
+        persist_instructions: bool,
+    ) -> Result<(ChatRecord, Chat)> {
+        let context = agent.context();
+        self.configure_for_agent(db, agent, context, persist_instructions)
+            .await
+    }
+
+    /// `Agent.sync_instructions(record_or_id)`: re-renders the agent's instructions and persists
+    /// the persistent declarations on the record, leaving `persist: false` ones out.
+    pub async fn sync_instructions<A: Agent + Sync + ?Sized>(
+        db: &DatabaseConnection,
+        id: i32,
+        agent: &A,
+    ) -> Result<(ChatRecord, Chat)> {
+        let mut record = Self::find(db, id).await?;
+        record.apply_chat_options(agent);
+        if let Some(context) = agent.context() {
+            record.context = Some(context);
+        }
+        let mut chat = record.to_llm(db).await?;
+        record
+            .apply_agent_instructions(db, agent, &mut chat, true, true)
+            .await?;
+        Ok((record, chat))
+    }
+
+    /// `apply_chat_options`: the agent's `assume_model_exists` and `protocol` reach the record.
+    fn apply_chat_options<A: Agent + Sync + ?Sized>(&mut self, agent: &A) {
+        if agent.assume_model_exists() {
+            self.assume_model_exists = true;
+        }
+        if let Some(protocol) = agent.protocol() {
+            self.protocol = Some(protocol);
+        }
+    }
+
+    /// `apply_configuration` on a record: chat options, then the context, then the
+    /// instructions, then the rest of the agent's configuration.
+    async fn configure_for_agent<A: Agent + Sync + ?Sized>(
+        mut self,
+        db: &DatabaseConnection,
+        agent: &A,
+        context: Option<rust_llm::Context>,
+        persist_instructions: bool,
+    ) -> Result<(ChatRecord, Chat)> {
+        self.apply_chat_options(agent);
+        if context.is_some() {
+            self.context = context;
+        }
+        let mut chat = agent.apply_except_instructions(self.to_llm(db).await?)?;
+        self.apply_agent_instructions(db, agent, &mut chat, persist_instructions, false)
+            .await?;
+        Ok((self, chat))
+    }
+
+    /// `apply_instructions`: each declaration, rendered with this record as `chat`, applied with
+    /// `persist: persist && declaration.persist`. Blank ones are skipped (`blank_instruction?`).
     async fn apply_agent_instructions<A: Agent + Sync + ?Sized>(
         &mut self,
         db: &DatabaseConnection,
         agent: &A,
-        mut chat: Chat,
+        chat: &mut Chat,
         persist: bool,
-    ) -> Result<Chat> {
-        if let Some(text) = agent.instructions().filter(|t| !t.trim().is_empty()) {
-            self.set_instructions(db, &mut chat, Some(&text), false, persist, false)
-                .await?;
+        persistent_only: bool,
+    ) -> Result<()> {
+        let runtime_chat = serde_json::json!({ "id": self.record.id });
+        let config = chat.config().clone();
+        for d in agent.instruction_declarations(&config, &runtime_chat)? {
+            if (persistent_only && !d.persist) || d.text.trim().is_empty() {
+                continue;
+            }
+            self.set_instructions(
+                db,
+                chat,
+                Some(&d.text),
+                d.append,
+                persist && d.persist,
+                d.cache_until_here,
+            )
+            .await?;
         }
-        Ok(chat)
+        Ok(())
     }
+}
+
+/// `message.to_llm` for a `messages` row read from the database: its tool calls, the tool call it
+/// answers, attachments, and usage entries are loaded with it, so `model`, `model_info`, and the
+/// finish predicates answer as they do on the in-memory message.
+pub async fn message_to_llm(db: &impl ConnectionTrait, row: &messages::Model) -> Result<Message> {
+    let id = row.id as i64;
+    let calls = rust_llm_tool_calls::Entity::find()
+        .filter(rust_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
+        .filter(
+            sea_orm::Condition::any()
+                .add(rust_llm_tool_calls::Column::MessageId.eq(id))
+                .add(rust_llm_tool_calls::Column::ResultId.eq(id)),
+        )
+        .order_by_asc(rust_llm_tool_calls::Column::Id)
+        .all(db)
+        .await?;
+    let files = rust_llm_attachments::Entity::find()
+        .filter(rust_llm_attachments::Column::MessageType.eq(MESSAGE_TYPE))
+        .filter(rust_llm_attachments::Column::MessageId.eq(id))
+        .order_by_asc(rust_llm_attachments::Column::Id)
+        .all(db)
+        .await?;
+    let entries: Vec<(i32, Option<i64>, UsageEntry)> = rust_llm_usages::Entity::find()
+        .filter(rust_llm_usages::Column::MessageType.eq(MESSAGE_TYPE))
+        .filter(rust_llm_usages::Column::MessageId.eq(id))
+        .order_by_asc(rust_llm_usages::Column::Id)
+        .all(db)
+        .await?
+        .iter()
+        .map(|u| (u.id, u.message_id, usage_entry(u)))
+        .collect();
+    restore_message(row, &calls, &files, &entries)
+}
+
+/// `MessageMethods#to_llm`: one `messages` row as a `rust_llm::Message`, with its tool calls, the
+/// tool call it answers, its attachments, and its usage entries (`entries` are
+/// `(usage id, message id, entry)`).
+fn restore_message(
+    row: &messages::Model,
+    calls: &[rust_llm_tool_calls::Model],
+    files: &[rust_llm_attachments::Model],
+    entries: &[(i32, Option<i64>, UsageEntry)],
+) -> Result<Message> {
+    let own_calls: Vec<&rust_llm_tool_calls::Model> = calls
+        .iter()
+        .filter(|c| c.message_id == row.id as i64)
+        .collect();
+    let parent = calls.iter().find(|c| {
+        c.result_id == Some(row.id as i64) && c.result_type.as_deref() == Some(MESSAGE_TYPE)
+    });
+    let mut m = Message::new(Role::parse(&row.role)?, row.content.clone());
+    m.cache_until_here = row.cache_until_here;
+    m.thinking = Thinking::build(row.thinking_text.clone(), row.thinking_signature.clone());
+    m.citations = row
+        .citations
+        .clone()
+        .and_then(|c| serde_json::from_value::<Vec<Citation>>(c).ok())
+        .unwrap_or_default();
+    m.server_tool_calls = row
+        .server_tool_calls
+        .clone()
+        .and_then(|c| serde_json::from_value(c).ok())
+        .unwrap_or_default();
+    m.raw_content = row.raw_content.clone();
+    m.raw_reasoning = row.raw_reasoning.clone();
+    m.finish_reason = row.finish_reason.as_deref().map(FinishReason::from_symbol);
+    m.tool_call_id = parent.map(|p| p.tool_call_id.clone());
+    m.attachments = files
+        .iter()
+        .filter(|f| f.message_id == row.id as i64)
+        .map(attachment)
+        .collect();
+    if !own_calls.is_empty() {
+        let map: IndexMap<ToolCall> = own_calls
+            .iter()
+            .map(|c| {
+                let mut call = ToolCall::new(
+                    c.tool_call_id.clone(),
+                    c.name.clone(),
+                    c.arguments
+                        .clone()
+                        .and_then(|a| a.as_object().cloned())
+                        .unwrap_or_default(),
+                );
+                call.thought_signature = c.thought_signature.clone();
+                call.remote = c.remote;
+                (c.tool_call_id.clone(), call)
+            })
+            .collect();
+        m.tool_calls = Some(map);
+    }
+    m.usage_entries = entries
+        .iter()
+        .filter(|(_, message_id, _)| *message_id == Some(row.id as i64))
+        .map(|(_, _, e)| e.clone())
+        .collect();
+    m.model = m
+        .usage_entries
+        .iter()
+        .rev()
+        .find(|e| e.status == UsageStatus::Succeeded)
+        .map(|e| e.model.clone());
+    m.record_id = Some(row.id as i64);
+    Ok(m)
 }
 
 async fn consume_cancellation(db: &DatabaseConnection, id: i32) -> Result<bool> {
@@ -1286,9 +1716,9 @@ async fn insert_usage(
     chat_id: i32,
     message_id: Option<i32>,
     e: &UsageEntry,
-) -> Result<()> {
+) -> Result<i32> {
     let i = |v: Option<i64>| v.map(|v| v as i32);
-    rust_llm_usages::ActiveModel {
+    Ok(rust_llm_usages::ActiveModel {
         chat_type: Set(CHAT_TYPE.into()),
         chat_id: Set(chat_id as i64),
         message_type: Set(message_id.map(|_| MESSAGE_TYPE.to_string())),
@@ -1313,8 +1743,8 @@ async fn insert_usage(
         ..Default::default()
     }
     .insert(db)
-    .await?;
-    Ok(())
+    .await?
+    .id)
 }
 
 /// `rust_llm_usages` row -> `Accounting::Usage::Entry` (`Usage#to_entry`). The cost comes from

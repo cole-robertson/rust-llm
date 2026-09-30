@@ -135,7 +135,7 @@ The chat UI polls for new messages while a reply is pending; it doesn't stream t
 These are listed so nothing is silently missing:
 - Bedrock, Vertex AI, Azure (cloud auth); Cohere; ElevenLabs; Deepgram.
 - Gemini's Interactions protocol for chat (only its transcription is ported); Mistral's
-  Conversations API (so Mistral can't `paint`); WebSocket transcription streaming (xAI, Gemini Live).
+  Conversations API (so Mistral can't `paint`).
 - `research` / `research_later` (Perplexity agents, Vertex research).
 - MCP OAuth; Gemini embedding batches; multipart image edits for non-gpt-image models (dall-e-2).
 - Prompt templates are Jinja, not ERB. Instrumentation covers chat, compaction, tool calls,

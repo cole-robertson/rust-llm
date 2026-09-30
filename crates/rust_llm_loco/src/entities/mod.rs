@@ -1,6 +1,6 @@
 //! SeaORM entities for the tables `migrations` creates: `RubyLLM::ActiveRecord::Model`,
 //! `ToolCall`, `Usage`, and the app's `Chat`/`Message` (`acts_as_chat`/`acts_as_message`), plus
-//! `rust_llm_attachments`, which stands in for Active Storage.
+//! `rust_llm_attachments`, which stands in for Active Storage, and `rust_llm_batches`.
 
 pub mod chats {
     use sea_orm::entity::prelude::*;
@@ -223,6 +223,39 @@ pub mod rust_llm_mcp_credentials {
         pub owner_id: Option<i64>,
         pub key: String,
         pub data: Option<String>,
+        pub created_at: DateTimeWithTimeZone,
+        pub updated_at: DateTimeWithTimeZone,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod rust_llm_batches {
+    use sea_orm::entity::prelude::*;
+
+    /// `RubyLLM::ActiveRecord::Batch`: a submitted provider batch and the chats it answers, so any
+    /// process can pick it back up by the provider's id.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "rust_llm_batches")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub id: i32,
+        pub provider_batch_id: String,
+        pub provider: String,
+        /// `"pending"` / `"succeeded"` / `"failed"` / `"cancelled"`.
+        pub status: String,
+        pub raw_status: Option<String>,
+        pub completed: bool,
+        pub chat_type: Option<String>,
+        pub batch_protocol: Option<String>,
+        /// The chats' ids in submission order.
+        pub chat_ids: Option<Json>,
+        pub request_counts: Option<Json>,
+        /// `Cost#to_h` of the provider-reported invoice.
+        pub reported_cost: Option<Json>,
         pub created_at: DateTimeWithTimeZone,
         pub updated_at: DateTimeWithTimeZone,
     }

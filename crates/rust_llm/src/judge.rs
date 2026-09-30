@@ -343,6 +343,8 @@ pub struct JudgeOptions {
     /// `context:`: an isolated configuration for this call (its keys and default judgment model),
     /// taking precedence over `with_config`.
     pub config: Option<Arc<Config>>,
+    /// `metadata:`: added to the `judgment.rust_llm` event payload, never sent to the provider.
+    pub metadata: Option<Value>,
 }
 
 impl Judge {
@@ -555,6 +557,7 @@ impl Judge {
                 .unwrap_or(self.model.assume_model_exists),
             provider_options,
             options.config.or_else(|| self.config.clone()),
+            options.metadata,
         )
         .await
     }
@@ -578,6 +581,7 @@ pub async fn judge(
 
 /// `Judgment.judge` + `Provider#judge` + the System One protocol, inside a `judgment.rust_llm`
 /// event.
+#[allow(clippy::too_many_arguments)]
 async fn judge_request(
     input: Value,
     questions: &[Resolved],
@@ -586,6 +590,7 @@ async fn judge_request(
     assume_model_exists: bool,
     provider_options: Value,
     config: Option<Arc<Config>>,
+    metadata: Option<Value>,
 ) -> Result<Judgment> {
     let config = config.unwrap_or_else(crate::config);
     let model_id = model
@@ -609,6 +614,7 @@ async fn judge_request(
             ("model", id.into()),
             ("question_count", questions.len().into()),
             ("provider_options", provider_options.clone()),
+            ("metadata", crate::instrumentation::metadata(&metadata)),
             ("tokens", crate::instrumentation::tokens_h(&empty)),
             ("cost", crate::instrumentation::cost_h(&cost)),
         ])
@@ -624,6 +630,7 @@ async fn judge_request(
     );
     let result = tracing::Instrument::instrument(request, event.span()).await;
     if let Ok(j) = &result {
+        crate::instrumentation::usages(&config, &j.usage_entries);
         event.set("result", || {
             serde_json::json!(j.answers.iter().map(|(k, _)| k.clone()).collect::<Vec<_>>())
         });
@@ -996,8 +1003,24 @@ fn probability_value(v: Option<&Value>) -> Result<f64> {
     }
 }
 
-/// `Responses#parse_judgment_response`.
+/// `Responses#parse_judgment_response`: every invalid judgment is raised as
+/// `Error.new(..., response:)`, so the error carries the response it came from.
 fn parse_response(raw: RawResponse, questions: &[Resolved], model: &Model) -> Result<Judgment> {
+    let response = crate::error::ErrorResponse {
+        status: raw.status,
+        body: raw.body.to_string(),
+    };
+    parse_response_body(raw, questions, model).map_err(|e| match e {
+        Error::Api(message, None) => Error::Api(message, Some(response)),
+        other => other,
+    })
+}
+
+fn parse_response_body(
+    raw: RawResponse,
+    questions: &[Resolved],
+    model: &Model,
+) -> Result<Judgment> {
     let body = &raw.body;
     let valid = body
         .get("model")

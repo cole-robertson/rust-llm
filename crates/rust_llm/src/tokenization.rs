@@ -49,7 +49,8 @@ pub struct TokenizeOptions<'a> {
     pub config: Option<Arc<Config>>,
 }
 
-/// `RubyLLM.tokenize(text, model:, provider:)`. Records no usage: tokenizing is not generation.
+/// `RubyLLM.tokenize(text, model:, provider:)`, inside a `tokenization.rust_llm` event. Records no
+/// usage: tokenizing is not generation.
 pub async fn tokenize(text: &str, options: TokenizeOptions<'_>) -> Result<Tokenization> {
     let TokenizeOptions {
         model,
@@ -60,6 +61,30 @@ pub async fn tokenize(text: &str, options: TokenizeOptions<'_>) -> Result<Tokeni
     let config = config.unwrap_or_else(crate::config);
     let model_id = model.unwrap_or(&config.default_model).to_string();
     let (model, provider) = resolve_model(&model_id, provider, assume_model_exists)?;
+    let mut event = crate::instrumentation::Event::start(&config, "tokenization.rust_llm", || {
+        crate::instrumentation::payload([
+            ("model", model.id.clone().into()),
+            ("provider", provider.slug().into()),
+        ])
+    });
+    let result = tracing::Instrument::instrument(
+        tokenize_inner(text, config.clone(), model, provider),
+        event.span(),
+    )
+    .await;
+    if let Ok(t) = &result {
+        event.set("result", || json!({ "ids": t.ids, "model": t.model }));
+    }
+    event.finish(result.as_ref().err());
+    result
+}
+
+async fn tokenize_inner(
+    text: &str,
+    config: Arc<Config>,
+    model: Model,
+    provider: Provider,
+) -> Result<Tokenization> {
     provider.ensure_configured(&config)?;
     let (path, payload) = match provider {
         Provider::XAI => (
@@ -111,7 +136,7 @@ pub async fn tokenize(text: &str, options: TokenizeOptions<'_>) -> Result<Tokeni
 }
 
 /// `GPUStack#backend_api_base`: the model proxy root, without its `/v1`.
-fn gpustack_backend_base(api_base: &str) -> Result<String> {
+pub(crate) fn gpustack_backend_base(api_base: &str) -> Result<String> {
     let trimmed = api_base.trim_end_matches('/');
     let proxy = trimmed.strip_suffix("/v1").filter(|base| {
         let mut parts = base.rsplit('/');

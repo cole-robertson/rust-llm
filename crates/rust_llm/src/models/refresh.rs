@@ -44,8 +44,9 @@ const MODELS_DEV_PROVIDER_MAP: &[(&str, &str)] = &[
     ("perplexity-agent", "perplexity"),
     ("xai", "xai"),
 ];
-const MODELS_DEV_INPUT_MODALITIES: &[&str] = &["text", "image", "audio", "pdf", "video", "file"];
-const MODELS_DEV_OUTPUT_MODALITIES: &[&str] = &[
+pub(crate) const MODELS_DEV_INPUT_MODALITIES: &[&str] =
+    &["text", "image", "audio", "pdf", "video", "file"];
+pub(crate) const MODELS_DEV_OUTPUT_MODALITIES: &[&str] = &[
     "text",
     "image",
     "audio",
@@ -109,8 +110,8 @@ pub async fn refresh_with_config(config: Arc<Config>, remote_only: bool) -> Resu
         let catalog = published.models.clone().unwrap_or_default();
         let current = models();
         let merged = merge_discovered_models(&config, &current, &catalog, remote_only).await;
-        persist(file.as_ref(), &merged, &published)?;
-        Models::install(merged);
+        persist(&config, file.as_ref(), &merged, &published)?;
+        Models::install(stored_models(&config).unwrap_or(merged));
         Ok((models(), published.not_modified))
     }
     .await;
@@ -150,14 +151,15 @@ pub async fn fetch_merged_models(config: &Arc<Config>, remote_only: bool) -> Vec
         )
     });
     let models_dev = fetch_models_dev_models(config, &existing).await;
+    log_models_dev_fetch(&models_dev);
     let merged = merge_with_existing(&existing, &provider_fetch, &models_dev);
     event.set("model_count", || merged.len().into());
     event.finish(None);
     merged
 }
 
-/// `Models.read_existing_models`.
-fn read_existing_models() -> Vec<Model> {
+/// `Models.read_existing_models`: the registry's models, or the loaded registry when it is empty.
+pub fn read_existing_models() -> Vec<Model> {
     let current = models();
     if current.all().is_empty() {
         super::load_models()
@@ -204,7 +206,7 @@ pub async fn fetch_provider_models(config: &Arc<Config>, remote_only: bool) -> P
 }
 
 /// `Models.log_provider_fetch`.
-fn log_provider_fetch(fetch: &ProviderFetch) {
+pub fn log_provider_fetch(fetch: &ProviderFetch) {
     tracing::info!(
         "Fetching models from providers: {}",
         fetch.configured_names.join(", ")
@@ -258,12 +260,18 @@ pub async fn fetch_models_dev_models(config: &Config, existing: &[Model]) -> Mod
         },
         Err(e) => {
             tracing::warn!("Failed to fetch models.dev ({e}). Keeping existing.");
-            tracing::warn!("Using cached models.dev data due to fetch failure.");
             ModelsDevFetch {
                 models: models_dev_entries(existing),
                 fetched: false,
             }
         }
+    }
+}
+
+/// `Models.log_models_dev_fetch`: quiet on a fresh fetch, a warning when cached data stands in.
+pub fn log_models_dev_fetch(fetch: &ModelsDevFetch) {
+    if !fetch.fetched {
+        tracing::warn!("Using cached models.dev data due to fetch failure.");
     }
 }
 
@@ -313,12 +321,13 @@ fn models_dev_provider_models(key: &str, data: &Value) -> Vec<Model> {
     };
     entries
         .values()
-        .filter_map(|m| models_dev_model(m, slug, key))
+        .filter_map(|m| models_dev_model_attributes(m, slug, key))
         .collect()
 }
 
-/// `Models.models_dev_model_attributes`.
-fn models_dev_model(data: &Value, slug: &str, key: &str) -> Option<Model> {
+/// `Models.models_dev_model_attributes`: one models.dev entry as a registry `Model` for the
+/// provider `slug` (`key` is the models.dev provider key). `None` when the entry has no id.
+pub fn models_dev_model_attributes(data: &Value, slug: &str, key: &str) -> Option<Model> {
     let raw_id = data.get("id").and_then(Value::as_str)?;
     let modalities = normalize_models_dev_modalities(data.get("modalities"));
     let capabilities = models_dev_capabilities(data, &modalities, slug, raw_id);
@@ -339,7 +348,7 @@ fn models_dev_model(data: &Value, slug: &str, key: &str) -> Option<Model> {
             .get("family")
             .and_then(Value::as_str)
             .map(str::to_string),
-        created_at: created.and_then(iso_date_prefix_to_utc_midnight),
+        created_at: created.and_then(iso_date_prefix_to_utc_midnight_string),
         context_window: data.pointer("/limit/context").and_then(Value::as_i64),
         max_output_tokens: data.pointer("/limit/output").and_then(Value::as_i64),
         knowledge_cutoff: data
@@ -356,8 +365,9 @@ fn models_dev_model(data: &Value, slug: &str, key: &str) -> Option<Model> {
     Some(model)
 }
 
-/// `Provider.models_dev_model_id`: Vertex AI drops the `@version` pin models.dev adds.
-fn models_dev_model_id(id: &str, slug: &str) -> String {
+/// `Models.models_dev_model_id` (`Provider.models_dev_model_id`): Vertex AI drops the `@version`
+/// pin models.dev adds; every other provider keeps the id as is.
+pub fn models_dev_model_id(id: &str, slug: &str) -> String {
     if slug == "vertexai" {
         id.split('@').next().unwrap_or(id).to_string()
     } else {
@@ -365,16 +375,26 @@ fn models_dev_model_id(id: &str, slug: &str) -> String {
     }
 }
 
-/// `Support::Utils.iso_date_prefix_to_utc_midnight_string`.
-fn iso_date_prefix_to_utc_midnight(value: &str) -> Option<String> {
+/// `Support::Utils.parse_iso_date_prefix`: `YYYY-MM-DD`, `YYYY-MM` (first of the month), or
+/// `YYYY` (first of the year); `None` for anything else or an impossible date.
+pub fn parse_iso_date_prefix(value: &str) -> Option<chrono::NaiveDate> {
     let v = value.trim();
-    let full = match v.len() {
-        10 => v.to_string(),
-        7 => format!("{v}-01"),
-        4 => format!("{v}-01-01"),
+    let shape: String = v
+        .chars()
+        .map(|c| if c.is_ascii_digit() { '9' } else { c })
+        .collect();
+    let full = match shape.as_str() {
+        "9999-99-99" => v.to_string(),
+        "9999-99" => format!("{v}-01"),
+        "9999" => format!("{v}-01-01"),
         _ => return None,
     };
-    let date = chrono::NaiveDate::parse_from_str(&full, "%Y-%m-%d").ok()?;
+    chrono::NaiveDate::parse_from_str(&full, "%Y-%m-%d").ok()
+}
+
+/// `Support::Utils.iso_date_prefix_to_utc_midnight_string`: `"YYYY-MM-DD 00:00:00 UTC"`.
+pub fn iso_date_prefix_to_utc_midnight_string(value: &str) -> Option<String> {
+    let date = parse_iso_date_prefix(value)?;
     Some(format!("{} 00:00:00 UTC", date.format("%Y-%m-%d")))
 }
 
@@ -579,7 +599,8 @@ pub fn merge_models(provider_models: &[Model], models_dev_models: &[Model]) -> V
                 .get(key)
                 .or_else(|| provider_by_alias.get(key))
                 .copied();
-            let dev_model = find_models_dev_model(key, &dev_by_key, provider_model);
+            let dev_model =
+                find_models_dev_alias(key, |k| dev_by_key.get(k).copied(), provider_model);
             match (dev_model, provider_model) {
                 (Some(dev), Some(p)) => Some(add_provider_metadata(&dev, p)),
                 (Some(dev), None) => Some(dev),
@@ -621,14 +642,23 @@ mod indexed {
     }
 }
 
-/// `Models.find_models_dev_model`: a direct hit, else the provider's `models_dev_alias`.
-fn find_models_dev_model(
+/// `Models.find_models_dev_model(key, models_dev_by_key, provider_model)`: a direct hit for
+/// `"provider:id"`, else the provider's `models_dev_alias`.
+pub fn find_models_dev_model(
     key: &str,
-    dev_by_key: &indexed::Map,
+    models_dev_by_key: &std::collections::HashMap<String, Model>,
     provider_model: Option<&Model>,
 ) -> Option<Model> {
-    if let Some(m) = dev_by_key.get(key) {
-        return Some((*m).clone());
+    find_models_dev_alias(key, |k| models_dev_by_key.get(k), provider_model)
+}
+
+fn find_models_dev_alias<'a>(
+    key: &str,
+    dev_by_key: impl Fn(&str) -> Option<&'a Model>,
+    provider_model: Option<&Model>,
+) -> Option<Model> {
+    if let Some(m) = dev_by_key(key) {
+        return Some(m.clone());
     }
     let (provider, model_id) = key.split_once(':')?;
     let with_id = |source: &Model| Model {
@@ -639,7 +669,7 @@ fn find_models_dev_model(
         "openai" => {
             // `OpenAI::Models.models_dev_alias`: a snapshot reuses its base entry.
             if let Some((_, base)) = OPENAI_SNAPSHOT_BASES.iter().find(|(s, _)| *s == model_id)
-                && let Some(source) = dev_by_key.get(&format!("openai:{base}"))
+                && let Some(source) = dev_by_key(&format!("openai:{base}"))
             {
                 return Some(with_id(source));
             }
@@ -654,7 +684,7 @@ fn find_models_dev_model(
                         .all(|p| p.chars().all(|c| c.is_ascii_digit()));
                 dated.then(|| (base, format!("{year}-{month}-{day}")))
             })?;
-            let source = dev_by_key.get(&format!("openai:{base}"))?;
+            let source = dev_by_key(&format!("openai:{base}"))?;
             (source.created_at.as_deref()?.get(..10)? == date).then(|| with_id(source))
         }
         "mistral" => provider_model?
@@ -663,14 +693,12 @@ fn find_models_dev_model(
             .and_then(Value::as_array)?
             .iter()
             .filter_map(Value::as_str)
-            .find_map(|a| dev_by_key.get(&format!("mistral:{a}")))
-            .map(|source| with_id(source)),
-        "vertexai" => dev_by_key
-            .get(&format!("gemini:{model_id}"))
-            .map(|s| Model {
-                provider: "vertexai".into(),
-                ..(*s).clone()
-            }),
+            .find_map(|a| dev_by_key(&format!("mistral:{a}")))
+            .map(with_id),
+        "vertexai" => dev_by_key(&format!("gemini:{model_id}")).map(|s| Model {
+            provider: "vertexai".into(),
+            ..s.clone()
+        }),
         _ => None,
     }
 }
@@ -997,7 +1025,11 @@ async fn merge_discovered_models(
     merge_models(&provider_models, published)
 }
 
+/// `Models#file_store`: the registry file, unless a `model_registry_store` takes precedence.
 fn file_store(config: &Config) -> Result<Option<registry::FileStore>> {
+    if config.model_registry_store.is_some() {
+        return Ok(None);
+    }
     config
         .model_registry_file
         .as_ref()
@@ -1033,12 +1065,27 @@ async fn fetch_published_models(
     }
 }
 
-/// `Models#persist_registry!`: writes the published snapshot and the merged registry with its ETag.
+/// `Models#persist_registry!`: writes the merged registry to the configured store, or else the
+/// published snapshot and the merged registry with its ETag to the registry file.
 fn persist(
+    config: &Config,
     file: Option<&registry::FileStore>,
     models: &[Model],
     published: &registry::Published,
 ) -> Result<()> {
+    let wrap = |destination: String| {
+        move |e: Error| match e {
+            Error::ModelRegistry(_) => e,
+            other => Error::ModelRegistry(format!(
+                "Could not save the model registry to {destination}: {other}"
+            )),
+        }
+    };
+    if let Some(store) = &config.model_registry_store {
+        return store
+            .write(&Models::new(models.to_vec()))
+            .map_err(wrap(store.description()));
+    }
     let file = file.ok_or_else(|| {
         Error::ModelRegistry("No writable model registry store is configured".into())
     })?;
@@ -1051,13 +1098,20 @@ fn persist(
         let listed: Vec<&Model> = models.iter().filter(|m| !m.is_unlisted()).collect();
         file.write(&listed, published.etag.as_deref())
     };
-    write().map_err(|e| match e {
-        Error::ModelRegistry(_) => e,
-        other => Error::ModelRegistry(format!(
-            "Could not save the model registry to {}: {other}",
-            file.path.display()
-        )),
-    })
+    write().map_err(wrap(file.path.display().to_string()))
+}
+
+/// `Models#stored_models`: what the store holds after a write. A store keeps entries the merge
+/// dropped (unlisted models still referenced), so its answer wins over the merge.
+fn stored_models(config: &Config) -> Option<Vec<Model>> {
+    match config.model_registry_store.as_ref()?.read() {
+        Ok(models) if !models.is_empty() => Some(models),
+        Ok(_) => None,
+        Err(e) => {
+            tracing::debug!("Could not re-read the model registry store: {e}");
+            None
+        }
+    }
 }
 
 /// Rebuilds the registry from the bundled copy (`load_from_json` after a test changed it).
@@ -1123,11 +1177,7 @@ pub async fn list_models(provider: Provider, config: Arc<Config>) -> Result<Vec<
             &conn.get("models", &[]).await?.body,
             slug,
         )),
-        Provider::XAI => {
-            let mut models = parse_openai_models(&conn.get("models", &[]).await?.body, slug, true);
-            models.extend(xai_audio_models(slug));
-            Ok(models)
-        }
+        Provider::XAI => Ok(parse_xai_models(&conn.get("models", &[]).await?.body, slug)),
         Provider::OpenRouter => {
             let mut models: Vec<Model> = Vec::new();
             for url in OPENROUTER_CATALOGS {
@@ -1290,6 +1340,14 @@ pub fn parse_openai_models(body: &Value, slug: &str, compact: bool) -> Vec<Model
             Some(model)
         })
         .collect()
+}
+
+/// `XAI::Models.parse_list_models_response`: the listing, plus the model-less TTS and STT services
+/// it omits.
+pub fn parse_xai_models(body: &Value, slug: &str) -> Vec<Model> {
+    let mut models = parse_openai_models(body, slug, true);
+    models.extend(xai_audio_models(slug));
+    models
 }
 
 fn xai_audio_models(slug: &str) -> Vec<Model> {
@@ -1495,16 +1553,6 @@ const OPENROUTER_CATALOGS: &[&str] = &[
 
 /// `OpenRouter::Models.parse_list_models_response`.
 pub fn parse_openrouter_models(body: &Value, slug: &str) -> Vec<Model> {
-    const PARAMS: &[(&str, &[&str])] = &[
-        ("function_calling", &["tools", "tool_choice"]),
-        ("tool_choice", &["tool_choice"]),
-        ("parallel_tool_calls", &["parallel_tool_calls"]),
-        (
-            "structured_output",
-            &["response_format", "structured_outputs"],
-        ),
-        ("batch", &["batch"]),
-    ];
     data(body)
         .iter()
         .filter_map(|m| {
@@ -1561,20 +1609,7 @@ pub fn parse_openrouter_models(body: &Value, slug: &str) -> Vec<Model> {
                     serde_json::from_value(json!({ "text_tokens": { "standard": standard } }))
                         .unwrap_or_default();
             }
-            let mut caps: Vec<String> = Vec::new();
-            if let Some(params) = m.get("supported_parameters").and_then(Value::as_array) {
-                let p: Vec<&str> = params.iter().filter_map(Value::as_str).collect();
-                caps.push("streaming".into());
-                caps.extend(
-                    PARAMS
-                        .iter()
-                        .filter(|(_, ps)| ps.iter().any(|x| p.contains(x)))
-                        .map(|(c, _)| c.to_string()),
-                );
-                if p.contains(&"logit_bias") && p.contains(&"top_k") {
-                    caps.push("predicted_outputs".into());
-                }
-            }
+            let caps = supported_parameters_to_capabilities(m.get("supported_parameters"));
             let by_output: Vec<&str> = outputs
                 .iter()
                 .filter_map(|o| match o.as_str() {
@@ -1601,6 +1636,37 @@ pub fn parse_openrouter_models(body: &Value, slug: &str) -> Vec<Model> {
             Some(model)
         })
         .collect()
+}
+
+/// `OpenRouter::Models#supported_parameters_to_capabilities`. `params` is the listing's array of
+/// names, or the image catalog's hash of parameter definitions, whose keys Ruby's `include?` checks.
+pub fn supported_parameters_to_capabilities(params: Option<&Value>) -> Vec<String> {
+    const PARAMS: &[(&str, &[&str])] = &[
+        ("function_calling", &["tools", "tool_choice"]),
+        ("tool_choice", &["tool_choice"]),
+        ("parallel_tool_calls", &["parallel_tool_calls"]),
+        (
+            "structured_output",
+            &["response_format", "structured_outputs"],
+        ),
+        ("batch", &["batch"]),
+    ];
+    let p: Vec<&str> = match params {
+        Some(Value::Array(a)) => a.iter().filter_map(Value::as_str).collect(),
+        Some(Value::Object(o)) => o.keys().map(String::as_str).collect(),
+        _ => return Vec::new(),
+    };
+    let mut caps = vec!["streaming".to_string()];
+    caps.extend(
+        PARAMS
+            .iter()
+            .filter(|(_, ps)| ps.iter().any(|x| p.contains(x)))
+            .map(|(c, _)| c.to_string()),
+    );
+    if p.contains(&"logit_bias") && p.contains(&"top_k") {
+        caps.push("predicted_outputs".into());
+    }
+    caps
 }
 
 /// Ruby's `to_f` on a JSON price, which OpenRouter sends as a string.
@@ -1729,8 +1795,9 @@ pub fn parse_perplexity_models(body: &Value, slug: &str) -> Vec<Model> {
     models
 }
 
-/// `Ollama::Models.parse_list_models_response`; Ollama Cloud drops `structured_output`.
-fn parse_ollama_models(
+/// `Ollama::Models.parse_list_models_response`; Ollama Cloud drops `structured_output`. `details`
+/// holds what `/api/show` reported for each id.
+pub fn parse_ollama_models(
     body: &Value,
     slug: &str,
     details: &std::collections::HashMap<String, Vec<String>>,
@@ -1793,6 +1860,14 @@ const GPUSTACK_CATEGORIES: &[&str] = &[
     "text_to_speech",
     "unknown",
 ];
+
+/// `GPUStack::Models#parse_list_models_response`: a plain OpenAI list, without categories.
+pub fn parse_gpustack_models(body: &Value, slug: &str) -> Vec<Model> {
+    data(body)
+        .iter()
+        .map(|m| gpustack_model(m, &[], slug))
+        .collect()
+}
 
 /// `GPUStack::Models#build_model`.
 pub fn gpustack_model(m: &Value, categories: &[String], slug: &str) -> Model {

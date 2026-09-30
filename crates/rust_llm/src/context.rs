@@ -15,11 +15,13 @@ use crate::chat::Chat;
 use crate::config::Config;
 use crate::embedding::{EmbedInput, EmbedOptions, Embedding};
 use crate::error::Result;
+use crate::files::{DownloadedFile, FileOptions, UploadOptions, UploadedFile};
 use crate::image::{Images, PaintOptions};
 use crate::judge::{Judge, JudgeOptions, Judgment};
 use crate::moderation::{ModerateOptions, Moderation, ModerationInput};
 use crate::ocr::{Ocr, OcrOptions};
 use crate::rerank::{Rerank, RerankOptions};
+use crate::speech::{SpeakOptions, Speech, SpeechChunk};
 use crate::tokenization::{Tokenization, TokenizeOptions};
 use crate::video::{AnimateOptions, Video, VideoJob};
 
@@ -157,6 +159,36 @@ impl Context {
         .await
     }
 
+    /// `ctx.speak(input, ...)`.
+    pub async fn speak(&self, input: &str, options: SpeakOptions<'_>) -> Result<Speech> {
+        crate::speech::speak(
+            input,
+            SpeakOptions {
+                config: Some(self.config.clone()),
+                ..options
+            },
+        )
+        .await
+    }
+
+    /// `ctx.speak(input, ...) { |chunk| ... }`.
+    pub async fn speak_stream(
+        &self,
+        input: &str,
+        options: SpeakOptions<'_>,
+        on_chunk: impl FnMut(&SpeechChunk) + Send,
+    ) -> Result<Speech> {
+        crate::speech::speak_stream(
+            input,
+            SpeakOptions {
+                config: Some(self.config.clone()),
+                ..options
+            },
+            on_chunk,
+        )
+        .await
+    }
+
     /// `ctx.moderate(input, ...)`.
     pub async fn moderate(
         &self,
@@ -220,6 +252,35 @@ impl Context {
             documents,
             model,
             RerankOptions {
+                config: Some(self.config.clone()),
+                ..options
+            },
+        )
+        .await
+    }
+
+    /// `ctx.upload(file, ...)`: `UploadedFile.upload(..., context: self)`. Without `provider`,
+    /// the provider of this context's default model is used.
+    pub async fn upload(
+        &self,
+        file: impl Into<Attachment>,
+        options: UploadOptions<'_>,
+    ) -> Result<UploadedFile> {
+        UploadedFile::upload(
+            file,
+            UploadOptions {
+                config: Some(self.config.clone()),
+                ..options
+            },
+        )
+        .await
+    }
+
+    /// `ctx.download(id, ...)`: `UploadedFile.download(..., context: self)`.
+    pub async fn download(&self, id: &str, options: FileOptions<'_>) -> Result<DownloadedFile> {
+        UploadedFile::download(
+            id,
+            FileOptions {
                 config: Some(self.config.clone()),
                 ..options
             },

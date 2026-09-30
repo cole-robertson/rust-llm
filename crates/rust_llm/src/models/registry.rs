@@ -19,21 +19,25 @@ pub fn cache_path() -> Option<PathBuf> {
     let home = std::env::var_os("HOME")
         .filter(|h| !h.is_empty())
         .map(PathBuf::from);
-    let directory = if cfg!(target_os = "macos") {
-        home?.join("Library/Caches/RustLLM")
-    } else if cfg!(windows) {
-        let local = std::env::var_os("LOCALAPPDATA")
-            .filter(|v| !v.is_empty())
-            .map(PathBuf::from);
-        local
+    cache_path_for(std::env::consts::OS, home, |name| std::env::var(name).ok())
+}
+
+/// `Registry.cache_path` for a given operating system (`std::env::consts::OS`), home directory,
+/// and environment, the way Ruby branches on `RbConfig::CONFIG['host_os']`.
+pub fn cache_path_for(
+    os: &str,
+    home: Option<PathBuf>,
+    env: impl Fn(&str) -> Option<String>,
+) -> Option<PathBuf> {
+    let var = |name: &str| env(name).filter(|v| !v.is_empty()).map(PathBuf::from);
+    let directory = match os {
+        "macos" => home?.join("Library/Caches/RustLLM"),
+        "windows" => var("LOCALAPPDATA")
             .or_else(|| home.map(|h| h.join("AppData/Local")))?
-            .join("RustLLM/Cache")
-    } else {
-        let xdg = std::env::var_os("XDG_CACHE_HOME")
-            .filter(|v| !v.is_empty())
-            .map(PathBuf::from);
-        xdg.or_else(|| home.map(|h| h.join(".cache")))?
-            .join("rust_llm")
+            .join("RustLLM/Cache"),
+        _ => var("XDG_CACHE_HOME")
+            .or_else(|| home.map(|h| h.join(".cache")))?
+            .join("rust_llm"),
     };
     Some(directory.join("models.json"))
 }
@@ -56,23 +60,55 @@ pub fn read(path: &Path) -> Result<Option<Vec<Model>>> {
             path.display()
         ))
     })?;
-    models_from_data(data, &path.display().to_string()).map(Some)
+    models_from_data(data, Some(&path.display().to_string())).map(Some)
 }
 
-/// `Registry.models_from_data`.
-pub fn models_from_data(data: Value, source: &str) -> Result<Vec<Model>> {
+/// `Registry.models_from_data`: `source` names where the data came from in the error.
+pub fn models_from_data(data: Value, source: Option<&str>) -> Result<Vec<Model>> {
+    let location = source.map(|s| format!(" in {s}")).unwrap_or_default();
     if !data.is_array() {
         return Err(Error::ModelRegistry(format!(
-            "Model registry in {source} must be a JSON array"
+            "Model registry{location} must be a JSON array"
         )));
     }
     serde_json::from_value(data)
-        .map_err(|e| Error::ModelRegistry(format!("Invalid model registry entry in {source}: {e}")))
+        .map_err(|e| Error::ModelRegistry(format!("Invalid model registry entry{location}: {e}")))
 }
 
 /// `Registry.pretty_json`.
 pub fn pretty_json(models: &[&Model]) -> Result<String> {
     Ok(format!("{}\n", serde_json::to_string_pretty(models)?))
+}
+
+/// `config.model_registry_store`: where the registry lives instead of `model_registry_file`, such
+/// as an application's database. A store wins over the file: the registry loads from it when it
+/// holds models, and `refresh` saves to it and then adopts what it reads back, so a store that
+/// keeps entries the merge dropped (unlisted models still referenced) reports them.
+///
+/// `write` is optional in RubyLLM (`respond_to?(:write)`); the default here reports the store as
+/// read-only, which is the error Ruby raises for one.
+pub trait ModelRegistryStore: Send + Sync {
+    /// `store.read`: the stored models (empty when there are none).
+    fn read(&self) -> Result<Vec<Model>>;
+
+    /// `store.write(models)`: replaces the stored registry.
+    fn write(&self, _models: &super::Models) -> Result<()> {
+        Err(Error::ModelRegistry(format!(
+            "Model registry store {} is read-only",
+            std::any::type_name::<Self>()
+        )))
+    }
+
+    /// `store.description`, else the store's type name: names the store in save errors.
+    fn description(&self) -> String {
+        std::any::type_name::<Self>().to_string()
+    }
+}
+
+impl std::fmt::Debug for dyn ModelRegistryStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ModelRegistryStore({})", self.description())
+    }
 }
 
 /// `Registry::FileStore`: a registry file plus the `<file>.etag` of the catalog it came from.
@@ -213,7 +249,7 @@ pub async fn fetch_published(config: &Config, etag: Option<&str>) -> Result<Publ
         )));
     }
     let body: Value = response.json().await.map_err(|e| wrap(e.to_string()))?;
-    let models = models_from_data(body, &url)?;
+    let models = models_from_data(body, Some(&url))?;
     if models.is_empty() {
         return Err(Error::ModelRegistry(
             "Published model registry is empty".into(),

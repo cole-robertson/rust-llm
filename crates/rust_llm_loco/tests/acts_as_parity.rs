@@ -13,7 +13,7 @@ use rust_llm_loco::entities::{
 use rust_llm_loco::{ChatRecord, migrations};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, Database, DatabaseConnection, EntityTrait,
-    QueryFilter,
+    PaginatorTrait, QueryFilter,
 };
 use sea_orm_migration::SchemaManager;
 use serde_json::{Map, Value, json};
@@ -768,6 +768,7 @@ async fn belongs_to_rust_llms_internal_model_record() {
     ChatRecord::create(&db, MODEL, None).await.unwrap();
     let rows = rust_llm_models::Entity::find()
         .filter(rust_llm_models::Column::ModelId.eq(MODEL))
+        .filter(rust_llm_models::Column::Provider.eq("openai"))
         .all(&db)
         .await
         .unwrap();
@@ -1369,4 +1370,80 @@ async fn renders_the_payload_with_before_request_hooks_applied() {
         1,
         "ask_later persists the user message"
     );
+}
+
+// spec: active_record/acts_as_spec.rb:95 persists each attempt before publishing its usage event
+#[tokio::test]
+async fn persists_each_attempt_before_publishing_its_usage_event() {
+    // A file-backed database, so the probe below can read on its own connection while the chat
+    // holds one (the shared `sqlite::memory:` pool has a single connection).
+    let path = std::env::temp_dir().join(format!(
+        "rust_llm_usage_order_{}.sqlite",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_file(&path);
+    let db = Database::connect(format!("sqlite://{}?mode=rwc", path.display()))
+        .await
+        .unwrap();
+    let manager = SchemaManager::new(&db);
+    for m in migrations() {
+        m.up(&manager).await.unwrap();
+    }
+    let probe_url = format!("sqlite://{}?mode=ro", path.display());
+    let server = MockServer::start().await;
+    // One failed attempt (retried), then the answer: two usage events, like Ruby's tracker run.
+    Mock::given(matchers::method("POST"))
+        .respond_with(
+            ResponseTemplate::new(500).set_body_json(json!({ "error": { "message": "retry" } })),
+        )
+        .up_to_n_times(1)
+        .with_priority(1)
+        .mount(&server)
+        .await;
+    Mock::given(matchers::method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "id": "resp_1", "object": "response", "status": "completed", "model": MODEL,
+            "output": [{ "type": "message", "role": "assistant",
+                         "content": [{ "type": "output_text", "text": "Hello" }] }],
+            "usage": { "input_tokens": 8, "output_tokens": 3 }
+        })))
+        .with_priority(2)
+        .mount(&server)
+        .await;
+
+    let record = ChatRecord::create(&db, MODEL, None).await.unwrap();
+    let observed: Arc<Mutex<Vec<u64>>> = Arc::default();
+    let (sink, chat_id) = (observed.clone(), record.id());
+    let mut config = (*openai_config(&server)).clone();
+    config.max_retries = 1;
+    config.retry_interval = 0.001;
+    // The instrumenter counts the chat's persisted usage rows at the moment each event fires.
+    config.instrumenter = Some(Arc::new(move |name: &str, _: &Map<String, Value>, _| {
+        if name == "usage.rust_llm" {
+            let (url, sink) = (probe_url.clone(), sink.clone());
+            let count = std::thread::spawn(move || {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(async move {
+                        let probe = Database::connect(url).await.unwrap();
+                        rust_llm_usages::Entity::find()
+                            .filter(rust_llm_usages::Column::ChatId.eq(chat_id as i64))
+                            .count(&probe)
+                            .await
+                            .unwrap()
+                    })
+            })
+            .join()
+            .unwrap();
+            sink.lock().unwrap().push(count);
+        }
+    }));
+    let mut chat = record.to_llm_with(&db, Arc::new(config)).await.unwrap();
+
+    record.ask(&db, &mut chat, "Hello").await.unwrap();
+
+    assert_eq!(*observed.lock().unwrap(), vec![1, 2]);
+    let _ = std::fs::remove_file(&path);
 }

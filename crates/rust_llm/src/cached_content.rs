@@ -93,6 +93,16 @@ pub async fn cache(content: &str, options: CacheOptions<'_>) -> Result<CachedCon
 }
 
 impl CachedContent {
+    /// `CachedContent.new(name:)`: a handle on an existing Gemini cache, e.g. to pass to
+    /// `with_caching` (`json!({ "id": cache.as_ref() })`) without fetching it first.
+    pub fn new(name: impl Into<String>) -> CachedContent {
+        CachedContent {
+            name: name.into(),
+            metadata: json!({}),
+            ..cache_from(&Value::Null)
+        }
+    }
+
     /// `CachedContent.create`. The content must exceed the model's minimum cacheable size.
     pub async fn create(content: &str, options: CacheOptions<'_>) -> Result<CachedContent> {
         let config = options.config.clone().unwrap_or_else(crate::config);
@@ -156,7 +166,7 @@ impl CachedContent {
     /// `renew(ttl:)`: extends the lifetime to `ttl` from now and updates `expires_at`.
     pub async fn renew(&mut self, ttl: impl Into<Ttl>) -> Result<&mut Self> {
         let connection = self.connection()?.clone();
-        let payload = json!({ "ttl": ttl.into().render() });
+        let payload = render_cache_update_payload(&ttl.into());
         let resp = connection
             .send(
                 reqwest::Method::PATCH,
@@ -216,8 +226,22 @@ pub fn render_cache_payload(
     Ok(payload)
 }
 
-/// `Caches#cache_name`: bare ids get the collection prefix.
-pub fn cache_name(name: &str) -> String {
+/// `Caches#render_cache_update_payload`: numeric ttls become duration strings.
+pub fn render_cache_update_payload(ttl: &Ttl) -> Value {
+    json!({ "ttl": ttl.render() })
+}
+
+/// `CachedContent` stands in for its name wherever a cache name is taken (`cache_name`).
+impl AsRef<str> for CachedContent {
+    fn as_ref(&self) -> &str {
+        &self.name
+    }
+}
+
+/// `Caches#cache_name`: bare ids get the collection prefix; a `CachedContent` is unwrapped to its
+/// name.
+pub fn cache_name(name: impl AsRef<str>) -> String {
+    let name = name.as_ref();
     if name.contains('/') {
         name.to_string()
     } else {
@@ -233,6 +257,14 @@ fn time(v: Option<&Value>) -> Option<DateTime<Utc>> {
 
 /// `Caches#parse_cache_response`.
 fn parse_cache_response(data: &Value, connection: Connection) -> CachedContent {
+    CachedContent {
+        connection: Some(connection),
+        ..cache_from(data)
+    }
+}
+
+/// The resource fields of `parse_cache_response`, before a connection is attached.
+fn cache_from(data: &Value) -> CachedContent {
     CachedContent {
         name: data
             .get("name")
@@ -251,7 +283,7 @@ fn parse_cache_response(data: &Value, connection: Connection) -> CachedContent {
             .pointer("/usageMetadata/totalTokenCount")
             .and_then(Value::as_i64),
         metadata: data.clone(),
-        connection: Some(connection),
+        connection: None,
     }
 }
 
@@ -259,7 +291,7 @@ fn parse_cache_response(data: &Value, connection: Connection) -> CachedContent {
 mod tests {
     use super::*;
 
-    // spec: protocols/gemini/caches_spec.rb
+    // spec: protocols/gemini/caches_spec.rb:9 #render_cache_payload > renders the model, contents, system instruction, and ttl
     #[test]
     fn renders_the_model_contents_system_instruction_and_ttl() {
         let payload = render_cache_payload(
@@ -281,6 +313,7 @@ mod tests {
         );
     }
 
+    // spec: protocols/gemini/caches_spec.rb:27 #render_cache_payload > omits system instruction and ttl when not given
     #[test]
     fn omits_system_instruction_and_ttl_when_not_given() {
         let payload = render_cache_payload("Prefix.", "gemini-2.5-flash", None, None, &[]).unwrap();
@@ -290,6 +323,7 @@ mod tests {
         );
     }
 
+    // spec: protocols/gemini/caches_spec.rb:47 #render_cache_payload > passes duration strings through as ttl
     #[test]
     fn passes_duration_strings_through_as_ttl() {
         let payload = render_cache_payload(
@@ -303,9 +337,75 @@ mod tests {
         assert_eq!(payload["ttl"], "450s");
     }
 
+    // spec: protocols/gemini/caches_spec.rb:91 #cache_name > prefixes bare ids with the collection name
     #[test]
-    fn prefixes_bare_ids_and_keeps_full_names() {
+    fn prefixes_bare_ids_with_the_collection_name() {
         assert_eq!(cache_name("abc123"), "cachedContents/abc123");
+    }
+
+    // spec: protocols/gemini/caches_spec.rb:95 #cache_name > keeps full resource names unchanged
+    #[test]
+    fn keeps_full_resource_names_unchanged() {
         assert_eq!(cache_name("cachedContents/abc123"), "cachedContents/abc123");
+    }
+
+    // spec: protocols/gemini/caches_spec.rb:99 #cache_name > unwraps CachedContent instances
+    #[test]
+    fn unwraps_cached_content_instances() {
+        let cache = cache_from(&json!({ "name": "cachedContents/abc123" }));
+        assert_eq!(cache_name(&cache), "cachedContents/abc123");
+    }
+
+    // spec: protocols/gemini/caches_spec.rb:35 #render_cache_payload > formats attachments through the Gemini media handling
+    #[test]
+    fn formats_attachments_through_the_gemini_media_handling() {
+        let attachment = Attachment::from_bytes(b"fake-png".to_vec(), "diagram.png", None);
+        let payload = render_cache_payload(
+            "See the diagram.",
+            "gemini-2.5-flash",
+            None,
+            None,
+            &[attachment],
+        )
+        .unwrap();
+        let parts = payload["contents"][0]["parts"].as_array().unwrap();
+        assert_eq!(
+            parts.first().unwrap(),
+            &json!({ "text": "See the diagram." })
+        );
+        assert_eq!(
+            parts.last().unwrap()["inline_data"]["mime_type"],
+            "image/png"
+        );
+    }
+
+    // spec: protocols/gemini/caches_spec.rb:57 #render_cache_update_payload > converts numeric ttls into duration strings
+    #[test]
+    fn converts_numeric_ttls_into_duration_strings() {
+        assert_eq!(
+            render_cache_update_payload(&600.into()),
+            json!({ "ttl": "600s" })
+        );
+    }
+
+    // spec: protocols/gemini/caches_spec.rb:76 #parse_cache_response > builds a CachedContent from the resource
+    #[test]
+    fn builds_a_cached_content_from_the_resource() {
+        let data = json!({
+            "name": "cachedContents/abc123",
+            "model": "models/gemini-2.5-flash",
+            "createTime": "2026-08-11T10:00:00Z",
+            "expireTime": "2026-08-11T11:00:00Z",
+            "usageMetadata": { "totalTokenCount": 7809 }
+        });
+        let cache = cache_from(&data);
+        let at = |s| DateTime::parse_from_rfc3339(s).unwrap().with_timezone(&Utc);
+        assert_eq!(cache.name, "cachedContents/abc123");
+        assert_eq!(cache.model.as_deref(), Some("gemini-2.5-flash"));
+        assert_eq!(cache.provider, "gemini");
+        assert_eq!(cache.created_at, Some(at("2026-08-11T10:00:00Z")));
+        assert_eq!(cache.expires_at, Some(at("2026-08-11T11:00:00Z")));
+        assert_eq!(cache.tokens, Some(7809));
+        assert_eq!(cache.metadata, data);
     }
 }

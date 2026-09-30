@@ -251,11 +251,7 @@ pub(crate) async fn upload_file(
             None,
         ));
     }
-    // `file_attachment(file, filename:)`
-    let mut attachment = match options.filename {
-        Some(name) => file.with_filename(name),
-        None => file,
-    };
+    let mut attachment = file_attachment(file, options.filename);
     attachment.load(connection.client()).await?;
     let mut visibility = None;
     let mut display_name = None;
@@ -295,6 +291,22 @@ pub(crate) async fn upload_file(
     parse_file_response(provider, &raw.body)
 }
 
+/// `Files#file_attachment(file, filename:)`: the attachment as given, or rewrapped under `filename`.
+fn file_attachment(file: Attachment, filename: Option<&str>) -> Attachment {
+    match filename {
+        Some(name) => file.with_filename(name),
+        None => file,
+    }
+}
+
+/// `Files#file_size`: a path's size on disk, otherwise the length of the loaded content.
+fn file_size(attachment: &Attachment) -> Result<u64> {
+    match &attachment.source {
+        crate::attachment::Source::Path(path) => Ok(std::fs::metadata(path)?.len()),
+        _ => Ok(attachment.bytes()?.len() as u64),
+    }
+}
+
 /// Each provider's `render_upload_payload` after the `file` part, as flat multipart fields
 /// (Faraday encodes a nested hash as `key[sub]`).
 fn upload_fields(
@@ -318,7 +330,7 @@ fn upload_fields(
                         crate::protocols::anthropic::unsupported(&attachment.mime_type),
                     ));
                 }
-                if attachment.bytes()?.len() > DEEPSEEK_MAX_FILE_SIZE {
+                if file_size(attachment)? > DEEPSEEK_MAX_FILE_SIZE as u64 {
                     return Err(Error::Argument(
                         "DeepSeek image uploads cannot exceed 64 MiB".into(),
                     ));
@@ -1005,6 +1017,134 @@ mod tests {
         assert!(headers.is_empty(), "no file reference, no beta");
     }
 
+    fn ruby_txt() -> String {
+        format!("{}/tests/fixtures/ruby.txt", env!("CARGO_MANIFEST_DIR"))
+    }
+
+    // spec: protocols/files_spec.rb:110 passes expires_in as expires_after seconds
+    #[test]
+    fn xai_passes_expires_in_as_expires_after_seconds() {
+        let options = UploadOptions {
+            expires_in: Some(3600),
+            ..Default::default()
+        };
+        let fields =
+            upload_fields(Provider::XAI, &Attachment::new(ruby_txt()), &options, None).unwrap();
+        assert_eq!(fields, vec![("expires_after".into(), "3600".into())]);
+    }
+
+    // spec: protocols/files_spec.rb:125 normalizes file metadata
+    #[test]
+    fn openrouter_normalizes_file_metadata() {
+        let file = parse_file_response(
+            Provider::OpenRouter,
+            &json!({
+                "id": "file_123", "filename": "document.pdf", "mime_type": "application/pdf",
+                "size_bytes": 1024, "created_at": "2025-01-01T00:00:00Z", "downloadable": false
+            }),
+        )
+        .unwrap();
+        assert_eq!(file.id, "file_123");
+        assert_eq!(file.provider, "openrouter");
+        assert_eq!(file.filename.as_deref(), Some("document.pdf"));
+        assert_eq!(file.byte_size, Some(1024));
+        assert_eq!(file.mime_type.as_deref(), Some("application/pdf"));
+        assert_eq!(file.downloadable, Some(false));
+    }
+
+    // spec: protocols/files_spec.rb:213 prefixes a bare file id with the collection name
+    #[test]
+    fn gemini_prefixes_a_bare_file_id_with_the_collection_name() {
+        assert_eq!(gemini_file_name("abc"), "files/abc");
+        assert_eq!(gemini_file_name("files/abc"), "files/abc");
+    }
+
+    // spec: protocols/files_spec.rb:411 rewraps an attachment when a new filename is given
+    #[test]
+    fn file_attachment_rewraps_only_for_a_new_filename() {
+        let attachment = Attachment::new(ruby_txt());
+        assert_eq!(file_attachment(attachment.clone(), None), attachment);
+        let renamed = file_attachment(attachment, Some("renamed.txt"));
+        assert_eq!(renamed.filename.as_deref(), Some("renamed.txt"));
+    }
+
+    // spec: protocols/files_spec.rb:425 sizes a file from disk or from its content
+    #[test]
+    fn file_size_reads_disk_or_content() {
+        let on_disk = std::fs::metadata(ruby_txt()).unwrap().len();
+        assert_eq!(file_size(&Attachment::new(ruby_txt())).unwrap(), on_disk);
+        let bytes = Attachment::from_bytes(b"12345".to_vec(), "a.txt", None);
+        assert_eq!(file_size(&bytes).unwrap(), 5);
+    }
+
+    fn ruby_png() -> Attachment {
+        Attachment::new(format!(
+            "{}/tests/fixtures/ruby.png",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+    }
+
+    // spec: protocols/deepseek/files_spec.rb:29 rejects unsupported file purposes
+    #[test]
+    fn deepseek_rejects_unsupported_file_purposes() {
+        let options = UploadOptions {
+            purpose: Some("batch"),
+            ..Default::default()
+        };
+        let err = upload_fields(Provider::DeepSeek, &ruby_png(), &options, None).unwrap_err();
+        assert!(matches!(err, Error::Argument(_)), "{err:?}");
+        assert!(err.to_string().contains("user_data"), "{err}");
+    }
+
+    // spec: protocols/deepseek/files_spec.rb:34 rejects images larger than the upload limit
+    #[test]
+    fn deepseek_rejects_images_larger_than_the_upload_limit() {
+        let image = Attachment::from_bytes(vec![0; DEEPSEEK_MAX_FILE_SIZE + 1], "ruby.png", None);
+        let err =
+            upload_fields(Provider::DeepSeek, &image, &UploadOptions::default(), None).unwrap_err();
+        assert!(matches!(err, Error::Argument(_)), "{err:?}");
+        assert!(err.to_string().contains("64 MiB"), "{err}");
+    }
+
+    // spec: protocols/deepseek/files_spec.rb:40 reports that stored images cannot be downloaded
+    #[tokio::test]
+    async fn deepseek_reports_that_stored_images_cannot_be_downloaded() {
+        let file = parse_file_response(
+            Provider::DeepSeek,
+            &json!({ "id": "file-api-image", "filename": "ruby.png", "bytes": 10 }),
+        )
+        .unwrap();
+        assert_eq!(file.downloadable, Some(false));
+        let mut config = Config::default();
+        config.set("deepseek_api_key", "test");
+        let connection = Connection::new(Provider::DeepSeek, Arc::new(config)).unwrap();
+        let err = download_file(&connection, Provider::DeepSeek, &file.id)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, Error::Api(..)), "{err:?}");
+        assert!(
+            err.to_string().contains("does not support downloading"),
+            "{err}"
+        );
+    }
+
+    // spec: protocols/perplexity/files_spec.rb:12 binds a generated file to its response and preserves native metadata
+    #[test]
+    fn perplexity_binds_a_generated_file_to_its_response() {
+        let data =
+            json!({ "id": "file_123", "filename": "numbers.csv", "bytes": 9, "created_at": 100 });
+        let file = parse_perplexity_file("resp_123", &data).unwrap();
+        assert_eq!(file.id, "resp_123/files/file_123");
+        assert_eq!(file.filename.as_deref(), Some("numbers.csv"));
+        assert_eq!(file.byte_size, Some(9));
+        assert_eq!(file.provider, "perplexity");
+        assert_eq!(file.created_at, DateTime::from_timestamp(100, 0));
+        assert_eq!(file.downloadable, Some(true));
+        let mut expected = data.clone();
+        expected["response_id"] = json!("resp_123");
+        assert_eq!(file.metadata, expected);
+    }
+
     #[test]
     fn perplexity_ids_must_name_their_response() {
         assert_eq!(
@@ -1012,5 +1152,16 @@ mod tests {
             ("resp_1".into(), "f_2".into())
         );
         assert!(split_perplexity_id("f_2").is_err());
+    }
+}
+
+/// `protocol_spec.rb`'s `format_bytes` example; `format_bytes` is private to this module.
+#[cfg(test)]
+mod protocol_spec {
+    // spec: protocol_spec.rb:126 provider file defaults > formats sizes for its error messages
+    #[test]
+    fn formats_sizes_for_its_error_messages() {
+        assert_eq!(super::format_bytes(None), "unknown size");
+        assert_eq!(super::format_bytes(Some(1024 * 1024 * 3)), "3.0 MB");
     }
 }

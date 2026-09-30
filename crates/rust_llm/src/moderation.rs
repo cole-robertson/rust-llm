@@ -178,32 +178,80 @@ pub struct ModerateOptions<'a> {
     pub provider_options: Value,
     /// `context:`: use this configuration instead of the global one.
     pub config: Option<Arc<Config>>,
+    /// `metadata:`: added to the `moderation.rust_llm` event payload, never sent to the provider.
+    pub metadata: Option<Value>,
 }
 
-/// `RubyLLM.moderate(input, model:, with:, provider:, assume_model_exists:, provider_options:)`.
+/// `RubyLLM.moderate(input, model:, with:, provider:, assume_model_exists:, provider_options:,
+/// metadata:)`, inside a `moderation.rust_llm` event.
 pub async fn moderate(
     input: impl Into<ModerationInput>,
     options: ModerateOptions<'_>,
 ) -> Result<Moderation> {
     let input = input.into();
-    let ModerateOptions {
-        model,
-        provider,
-        assume_model_exists,
-        mut with,
-        provider_options,
-        config,
-    } = options;
-    if matches!(input, ModerationInput::None) && with.is_empty() {
+    if matches!(input, ModerationInput::None) && options.with.is_empty() {
         return Err(Error::Argument(
             "must provide input text, image attachment, or both".into(),
         ));
     }
-    let config = config.unwrap_or_else(crate::config);
-    let model_id = model
+    let config = options.config.clone().unwrap_or_else(crate::config);
+    let model_id = options
+        .model
         .unwrap_or(&config.default_moderation_model)
         .to_string();
-    let (model, provider) = resolve_model(&model_id, provider, assume_model_exists)?;
+    let (model, provider) =
+        resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let mut event = crate::instrumentation::Event::start(&config, "moderation.rust_llm", || {
+        let empty = Tokens::default();
+        crate::instrumentation::payload([
+            ("provider", provider.slug().into()),
+            ("provider_class", provider.display().into()),
+            ("model", model.id.clone().into()),
+            ("input", input.to_value().unwrap_or(Value::Null)),
+            ("attachment_count", options.with.len().into()),
+            ("provider_options", options.provider_options.clone()),
+            (
+                "metadata",
+                crate::instrumentation::metadata(&options.metadata),
+            ),
+            ("tokens", crate::instrumentation::tokens_h(&empty)),
+            (
+                "cost",
+                crate::instrumentation::cost_h(&Cost::new(&empty, Some(&model), Tier::Standard)),
+            ),
+        ])
+    });
+    let result = tracing::Instrument::instrument(
+        moderate_inner(input, options, config.clone(), model, provider),
+        event.span(),
+    )
+    .await;
+    if let Ok(m) = &result {
+        crate::instrumentation::usages(&config, &m.usage_entries);
+        event.set(
+            "result",
+            || json!({ "id": m.id, "model": m.model, "results": m.raw.get("results") }),
+        );
+        event.set("flagged", || m.is_flagged().into());
+        event.set("tokens", || crate::instrumentation::tokens_h(&m.tokens()));
+        event.set("cost", || crate::instrumentation::cost_h(&m.cost()));
+    }
+    event.finish(result.as_ref().err());
+    result
+}
+
+async fn moderate_inner(
+    input: ModerationInput,
+    options: ModerateOptions<'_>,
+    config: Arc<Config>,
+    model: crate::model::Model,
+    provider: crate::providers::Provider,
+) -> Result<Moderation> {
+    let ModerateOptions {
+        mut with,
+        provider_options,
+        ..
+    } = options;
     provider.ensure_configured(&config)?;
     // `ChatCompletions::Moderation` reaches every protocol built on Chat Completions.
     if !matches!(
@@ -331,5 +379,37 @@ mod tests {
         );
         assert!(moderation.is_flagged());
         assert_eq!(moderation.flagged_categories(), vec!["hate"]);
+    }
+
+    // spec: protocols/chat_completions/moderation_spec.rb:6 preserves the raw response alongside normalized verdicts
+    #[test]
+    fn preserves_the_raw_response_alongside_normalized_verdicts() {
+        let body = json!({ "id": "moderation-request", "results": [{ "flagged": false, "categories": {},
+                                                                    "category_scores": { "violence": 0.02 } }] });
+        let result =
+            parse_response(&body, &crate::Config::default().default_moderation_model).unwrap();
+        assert_eq!(result.raw, body);
+        assert!(!result.is_flagged());
+        assert_eq!(
+            result.category_scores(),
+            json!({ "violence": 0.02 }).as_object().unwrap().clone()
+        );
+    }
+
+    // spec: protocols/chat_completions/moderation_spec.rb:74 .render_moderation_payload > rejects non-image attachments
+    #[test]
+    fn rejects_non_image_attachments() {
+        let attachment = Attachment::from_bytes(b"hello".to_vec(), "note.txt", None);
+        let err = render_payload(
+            &ModerationInput::None,
+            "omni-moderation-latest",
+            &[attachment],
+            &Value::Null,
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, Error::UnsupportedAttachment(m) if m.contains("text/plain")),
+            "{err:?}"
+        );
     }
 }

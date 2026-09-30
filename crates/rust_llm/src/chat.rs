@@ -50,6 +50,13 @@ type FallbackCallback = Box<dyn FnMut(&FallbackAttempt) + Send + Sync>;
 type RequestCallback = Box<dyn FnMut(&mut Value) + Send + Sync>;
 /// Called with each persisted-state change; the Loco integration uses these to write rows.
 pub type UsageRecorder = Box<dyn FnMut(&UsageEntry) + Send + Sync>;
+/// An async `usage_recorder` (Ruby's tracker `on_finish`): awaited for each finished attempt
+/// *before* its `usage.rust_llm` event is published, so persistence can write the row first.
+pub type AsyncUsageRecorder = Arc<
+    dyn Fn(UsageEntry) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+        + Send
+        + Sync,
+>;
 
 /// A model to try when generation fails (`with_fallbacks`).
 #[derive(Debug, Clone)]
@@ -134,6 +141,7 @@ pub struct Chat {
     callbacks: Callbacks,
     usage_entries: Vec<UsageEntry>,
     usage_recorder: Option<UsageRecorder>,
+    async_usage_recorder: Option<AsyncUsageRecorder>,
     tool_call_decisions: HashMap<String, bool>,
     cancelled: Arc<AtomicBool>,
     /// `@cancellation_checker`: an outside signal (e.g. a persisted record) consulted with the flag.
@@ -243,6 +251,7 @@ impl Chat {
             callbacks: Callbacks::default(),
             usage_entries: Vec::new(),
             usage_recorder: None,
+            async_usage_recorder: None,
             tool_call_decisions: HashMap::new(),
             cancelled: Arc::new(AtomicBool::new(false)),
             cancellation_checker: None,
@@ -757,6 +766,16 @@ impl Chat {
         self.usage_recorder = Some(recorder);
     }
 
+    /// Registers an async recorder awaited for each finished attempt before its usage event is
+    /// published (Ruby persists each attempt through the tracker's `on_finish` first).
+    pub fn set_async_usage_recorder(&mut self, recorder: AsyncUsageRecorder) {
+        self.async_usage_recorder = Some(recorder);
+    }
+
+    pub fn clear_async_usage_recorder(&mut self) {
+        self.async_usage_recorder = None;
+    }
+
     // ---- messages --------------------------------------------------------------------------
 
     /// `add_message`: append without calling the model.
@@ -782,10 +801,10 @@ impl Chat {
                 cost: message.cost(None),
             };
             message.usage_entries = vec![entry.clone()];
-            self.record_usage(entry);
+            self.record_usage_now(entry);
         } else if record_usage {
             for entry in message.usage_entries.clone() {
-                self.record_usage(entry);
+                self.record_usage_now(entry);
             }
         }
         for cb in &mut self.callbacks.before_message {
@@ -1048,11 +1067,25 @@ impl Chat {
         result
     }
 
-    fn record_usage(&mut self, entry: UsageEntry) {
-        crate::instrumentation::usage(&self.config, &entry);
+    /// `Tracker#finish`: record the attempt (sync recorder, then any async recorder, which
+    /// persistence uses to write the row), and only then publish `usage.rust_llm`.
+    async fn record_usage(&mut self, entry: UsageEntry) {
         if let Some(r) = &mut self.usage_recorder {
             r(&entry);
         }
+        if let Some(r) = self.async_usage_recorder.clone() {
+            r(entry.clone()).await;
+        }
+        crate::instrumentation::usage(&self.config, &entry);
+        self.usage_entries.push(entry);
+    }
+
+    /// `record_usage` for the synchronous `add_completion` path: no async recorder can run here.
+    fn record_usage_now(&mut self, entry: UsageEntry) {
+        if let Some(r) = &mut self.usage_recorder {
+            r(&entry);
+        }
+        crate::instrumentation::usage(&self.config, &entry);
         self.usage_entries.push(entry);
     }
 
@@ -1446,7 +1479,7 @@ impl Chat {
         let mut call_entries = Vec::new();
         for tokens in retried {
             let entry = self.entry(UsageStatus::Failed, tokens, None);
-            self.record_usage(entry.clone());
+            self.record_usage(entry.clone()).await;
             call_entries.push(entry);
         }
         let mut message = match result {
@@ -1459,7 +1492,8 @@ impl Chat {
                 };
                 if attempts > 0 {
                     let observed = (!observed.is_empty()).then_some(observed);
-                    self.record_usage(self.entry(status, failure_tokens(&e, observed), None));
+                    self.record_usage(self.entry(status, failure_tokens(&e, observed), None))
+                        .await;
                 }
                 return Err(e);
             }
@@ -1474,7 +1508,7 @@ impl Chat {
             message.tokens.clone(),
             Some(&billed_model),
         );
-        self.record_usage(entry.clone());
+        self.record_usage(entry.clone()).await;
         // `record_generated_message`: the tracker has already billed the attempt, so a cancel
         // during the request keeps the usage but adds no message.
         self.raise_if_cancelled()?;
@@ -1616,7 +1650,7 @@ impl Chat {
         let mut entries = Vec::new();
         for tokens in retried {
             let entry = self.entry(UsageStatus::Failed, tokens, None);
-            self.record_usage(entry.clone());
+            self.record_usage(entry.clone()).await;
             entries.push(entry);
         }
         let mut message = match result {
@@ -1627,13 +1661,14 @@ impl Chat {
                         UsageStatus::Failed,
                         failure_tokens(&e, None),
                         None,
-                    ));
+                    ))
+                    .await;
                 }
                 return Err(e);
             }
         };
         let entry = self.entry(UsageStatus::Succeeded, message.tokens.clone(), None);
-        self.record_usage(entry.clone());
+        self.record_usage(entry.clone()).await;
         entries.push(entry);
         message.usage_entries = entries;
         // `record_generated_message`: a cancel during the request keeps the billed usage but adds no message.
