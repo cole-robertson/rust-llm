@@ -1911,3 +1911,20 @@ fn tool_name_overrides_win() {
     }
     assert_eq!(InstanceNamed.name(), "custom");
 }
+
+// Port of `Configuration#inspect` (configuration.rb): credentials never reach logs.
+#[test]
+fn config_debug_never_prints_credentials() {
+    let mut config = rust_llm::Config::default();
+    config.set("openai_api_key", "sk-proj-SECRET-openai");
+    config.set("anthropic_api_key", "sk-ant-SECRET-anthropic");
+    config.set("openai_organization_id", "org-SECRET");
+    config.set("openai_api_base", "https://gateway.example/v1");
+    config.http_proxy = Some("http://user:SECRET-pass@proxy:8080".into());
+    let shown = format!("{config:?}");
+    assert!(!shown.contains("SECRET"), "{shown}");
+    assert!(
+        shown.contains("gateway.example"),
+        "non-secret options stay visible: {shown}"
+    );
+}

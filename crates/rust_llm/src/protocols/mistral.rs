@@ -132,7 +132,7 @@ fn parse_conversation_file(part: &Value) -> Attachment {
 // ---- Conversations::Chat --------------------------------------------------------------------
 
 /// `Conversations::Chat#render_payload` (with `#render`'s tool checks applied by the caller via
-/// [`finish_render`]): the Chat Completions options, moved into `completion_args`.
+/// `finish_render`): the Chat Completions options, moved into `completion_args`.
 pub fn render_payload(req: &Request) -> Result<Value> {
     let chat_request = Request {
         provider: req.provider,

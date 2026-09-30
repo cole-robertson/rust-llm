@@ -99,20 +99,17 @@ record.complete(&ctx.db, &mut chat).await?;
 
 ## Verification
 
-| Check | What it proves |
-|---|---|
-| `tests/cassette_replay.rs`: 11 specs × 12 providers | basic, multi-turn, system prompt, replace instructions, raw responses, streaming, tools, multi-turn tools, parameterless tools, streaming tools, parallel tool calls: request bodies are JSON-equal to RubyLLM's recordings, and responses satisfy the Ruby spec's assertions |
-| `tests/cassette_replay_more.rs` | JSON schema, typed schema (vs Schematist), removing a schema mid-chat, embeddings (single, batch, dimensions), human-readable auth errors |
-| `rust_llm_loco/tests/acts_as_chat.rs` | a replayed tool-calling chat writes the same rows as RubyLLM, reloads intact, and an approval-parked chat resumes from the DB |
-| unit tests | error mapping, cost/tier pricing, token aggregation, aliases and provider preference, tool naming, SSE framing |
-| `examples/readme.rs` | the README run live against Anthropic |
+- **Cassette replay:** tests replay RubyLLM's own recorded VCR cassettes (HTTP and WebSocket), and
+  every request RustLLM sends must be JSON-equal to the one RubyLLM recorded.
+- **Spec parity:** every applicable RubyLLM spec example is ported as a Rust test that cites it
+  (`// spec: file:line`); see the parity section below.
+- **Live:** `examples/readme.rs` (chat, streaming, tools, agents, structured output, cost) and
+  `examples/judge.rs` (TypeSafe Jev) run against real providers.
+- **Benchmarks:** [`docs/BENCHMARK.md`](docs/BENCHMARK.md) compares RustLLM with RubyLLM + YJIT.
 
-`bin/fw cargo test --workspace` builds and tests on the `framework` box; `bin/convert-cassettes`
-turns more upstream cassettes into test fixtures.
-
-[`docs/PARITY.md`](docs/PARITY.md) lists every example in RubyLLM's spec suite with its status
-here: ported (the Rust test that cites it), replayed from its own cassette, not applicable (and
-why), or missing. `bin/parity` regenerates it.
+Over 2,000 tests; CI runs them with rustfmt, `clippy -D warnings`, docs, MSRV builds, and a
+package check. `bin/fw cargo test --workspace` runs them on the `framework` build box;
+`bin/convert-cassettes` turns more upstream cassettes into fixtures.
 
 ## Generators
 
@@ -130,14 +127,20 @@ Verified against a copy of the Loco + Inertia starter kit: it builds with no war
 run up and down, the frontend passes check/lint/build, and a chat round-trips through the worker.
 The chat UI polls for new messages while a reply is pending; it doesn't stream tokens.
 
-## Not ported yet
+## Parity and what is left out
 
-These are listed so nothing is silently missing:
-- Bedrock, Vertex AI, Azure (cloud auth); Cohere; ElevenLabs; Deepgram.
-- Gemini's Interactions protocol for chat (only its transcription is ported); Mistral's
-  Conversations API (so Mistral can't `paint`).
-- `research` / `research_later` (Perplexity agents, Vertex research).
-- MCP OAuth; Gemini embedding batches; multipart image edits for non-gpt-image models (dall-e-2).
-- Prompt templates are Jinja, not ERB. Instrumentation covers chat, compaction, tool calls,
-  requests, usage, embeddings, images, judgments, batches, workflows, and model refreshes, not
-  the other one-shot operations.
+[`docs/PARITY.md`](docs/PARITY.md) classifies all 3,747 examples in RubyLLM 2.0's spec suite:
+2,157 ported as Rust tests, 177 replayed from their own recorded cassettes, 1,413 not applicable
+(each with its reason), and **0 missing**. `bin/parity` regenerates it.
+
+Deliberately left out:
+- Providers: Bedrock, Vertex AI, Azure, Cohere, ElevenLabs, Deepgram (and so Vertex's
+  `research` / `research_later`).
+- Ruby-only mechanics with no Rust counterpart (ActiveRecord internals, Faraday adapters,
+  metaprogrammed DSLs). The persistence layer covers the same behavior with SeaORM.
+
+Differences worth knowing:
+- Prompt templates are Jinja (minijinja) rather than ERB; see `docs/prompts.md`.
+- Instrumentation events end in `.rust_llm` instead of `.ruby_llm`; payload keys match.
+- MCP OAuth credentials stored by `rust_llm_loco` are encrypted with AES-256-GCM, but not in a
+  format Rails can read (and vice versa).

@@ -66,6 +66,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo doc --workspace --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
 
   package:
     runs-on: ubuntu-latest
@@ -85,3 +87,12 @@ jobs:
           done
       # The library verifies standalone: it builds from its own .crate with no workspace around it.
       - run: cargo package -p rust_llm --allow-dirty
+
+  # Security advisories, licenses, and crate sources (deny.toml).
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources

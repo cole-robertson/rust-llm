@@ -1,0 +1,47 @@
+# cargo-deny configuration: `cargo deny check` (run by bin/ci and the CI security job).
+# https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+all-features = false
+
+# Security advisories from the RustSec database (the same data `cargo audit` uses).
+[advisories]
+version = 2
+yanked = "deny"
+# Add an advisory ID here only with a comment explaining why it does not affect this app.
+ignore = []
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+# Permissive licenses only; add one here after checking it is compatible with shipping the binary.
+unused-allowed-license = "allow"
+allow = [
+  "0BSD",
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "BSL-1.0",
+  "CC0-1.0",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Zlib",
+]
+
+[licenses.private]
+# The app and its migration crate are `publish = false` and unlicensed at the crate level.
+ignore = true
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

@@ -464,3 +464,162 @@ fn cost_splits_image_input_by_modality_like_chat_costs() {
     assert!((cost.output.unwrap() - 0.002).abs() < 1e-10);
     assert!((cost.total().unwrap() - 0.005).abs() < 1e-10);
 }
+
+/// One multipart part: `(name, filename, content_type, bytes)`.
+type Part = (String, Option<String>, Option<String>, Vec<u8>);
+
+/// Multipart parts parsed from a request body.
+fn multipart_parts(body: &[u8], content_type: &str) -> Vec<Part> {
+    let boundary = content_type
+        .split("boundary=")
+        .nth(1)
+        .expect("boundary")
+        .trim_matches('"');
+    let delimiter = format!("--{boundary}");
+    let text = body;
+    let mut parts = Vec::new();
+    let find = |hay: &[u8], needle: &[u8], from: usize| {
+        hay[from..]
+            .windows(needle.len())
+            .position(|w| w == needle)
+            .map(|p| p + from)
+    };
+    let mut pos = find(text, delimiter.as_bytes(), 0).expect("first delimiter") + delimiter.len();
+    while let Some(next) = find(text, delimiter.as_bytes(), pos) {
+        let section = &text[pos..next];
+        let section = section.strip_prefix(b"\r\n").unwrap_or(section);
+        let split = find(section, b"\r\n\r\n", 0).expect("header end");
+        let headers = String::from_utf8_lossy(&section[..split]).to_string();
+        let mut data = section[split + 4..].to_vec();
+        if data.ends_with(b"\r\n") {
+            data.truncate(data.len() - 2);
+        }
+        let attr = |key: &str| {
+            headers.split(['\r', '\n', ';']).find_map(|h| {
+                h.trim()
+                    .strip_prefix(&format!("{key}=\""))
+                    .map(|v| v.trim_end_matches('"').to_string())
+            })
+        };
+        let ctype = headers.lines().find_map(|l| {
+            l.to_ascii_lowercase()
+                .strip_prefix("content-type:")
+                .map(|v| v.trim().to_string())
+        });
+        parts.push((
+            attr("name").unwrap_or_default(),
+            attr("filename"),
+            ctype,
+            data,
+        ));
+        pos = next + delimiter.len();
+        if text[pos..].starts_with(b"--") {
+            break;
+        }
+    }
+    parts
+}
+
+// Ruby's `render_edit_payload` for a model without JSON image references (dall-e-2): a
+// multipart upload of model, prompt, n, the image file, and the mask file.
+#[tokio::test]
+async fn dall_e_edits_upload_the_image_and_mask_as_multipart_parts() {
+    let server = wiremock::MockServer::start().await;
+    wiremock::Mock::given(wiremock::matchers::method("POST"))
+        .and(wiremock::matchers::path("/v1/images/edits"))
+        .respond_with(wiremock::ResponseTemplate::new(200).set_body_json(json!({
+            "created": 1, "data": [{ "b64_json": "aGVsbG8=" }]
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let mut config = Config::default();
+    config.set("openai_api_base", format!("{}/v1", server.uri()));
+    config.set("openai_api_key", "test");
+    config.max_retries = 0;
+    let png = std::fs::read(format!(
+        "{}/tests/fixtures/ruby.png",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+
+    let image = paint(
+        "Add a hat",
+        PaintOptions {
+            model: Some("dall-e-2"),
+            provider: Some("openai"),
+            assume_model_exists: true,
+            with: vec![Attachment::from_bytes(
+                png.clone(),
+                "ruby.png",
+                Some("image/png"),
+            )],
+            mask: Some(Attachment::from_bytes(
+                png.clone(),
+                "mask.png",
+                Some("image/png"),
+            )),
+            provider_options: json!({ "response_format": "b64_json" }),
+            config: Some(Arc::new(config)),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let Images::One(image) = image else {
+        panic!("one image")
+    };
+    assert!(image.is_base64());
+
+    let requests = server.received_requests().await.unwrap();
+    let content_type = requests[0]
+        .headers
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        content_type.starts_with("multipart/form-data"),
+        "{content_type}"
+    );
+    let parts = multipart_parts(&requests[0].body, &content_type);
+    let names: Vec<&str> = parts.iter().map(|p| p.0.as_str()).collect();
+    assert_eq!(
+        names,
+        ["model", "prompt", "n", "image", "mask", "response_format"]
+    );
+    assert_eq!(parts[0].3, b"dall-e-2");
+    assert_eq!(parts[1].3, b"Add a hat");
+    assert_eq!(parts[2].3, b"1");
+    assert_eq!(parts[3].1.as_deref(), Some("ruby.png"));
+    assert_eq!(parts[3].2.as_deref(), Some("image/png"));
+    assert_eq!(parts[3].3, png);
+    assert_eq!(parts[4].1.as_deref(), Some("mask.png"));
+    assert_eq!(parts[5].3, b"b64_json");
+}
+
+#[tokio::test]
+async fn dall_e_edits_reject_non_image_uploads() {
+    let mut config = Config::default();
+    config.set("openai_api_base", "http://127.0.0.1:9/v1");
+    config.set("openai_api_key", "test");
+    let err = paint(
+        "Add a hat",
+        PaintOptions {
+            model: Some("dall-e-2"),
+            provider: Some("openai"),
+            assume_model_exists: true,
+            with: vec![Attachment::from_bytes(
+                b"%PDF-1.4".to_vec(),
+                "doc.pdf",
+                Some("application/pdf"),
+            )],
+            config: Some(Arc::new(config)),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(err, Error::UnsupportedAttachment(_)), "{err:?}");
+}

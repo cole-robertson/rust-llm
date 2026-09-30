@@ -6,7 +6,7 @@ use std::time::Duration;
 
 /// `RubyLLM::Configuration`. Provider keys live in `values` under RubyLLM's option names
 /// (`openai_api_key`, `anthropic_api_base`, ...) so every provider reads its settings the same way.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Config {
     pub default_model: String,
     pub default_embedding_model: String,
@@ -62,6 +62,34 @@ pub struct Config {
     /// back without contacting the provider. `None` keeps nothing (`crate::batch::BatchStore`).
     pub batch_store: Option<Arc<dyn crate::batch::BatchStore>>,
     values: HashMap<String, String>,
+}
+
+/// `Configuration#inspect`: credentials never reach logs or error output. Like RubyLLM, options
+/// ending in `_id`, `_key`, `_secret`, `_token`, or `_credential_provider` are left out entirely.
+impl std::fmt::Debug for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        const SECRET: &[&str] = &["_id", "_key", "_secret", "_token", "_credential_provider"];
+        let mut values: Vec<(&String, &String)> = self
+            .values
+            .iter()
+            .filter(|(k, _)| !SECRET.iter().any(|s| k.ends_with(s)))
+            .collect();
+        values.sort();
+        f.debug_struct("Config")
+            .field("default_model", &self.default_model)
+            .field("default_embedding_model", &self.default_embedding_model)
+            .field("default_image_model", &self.default_image_model)
+            .field("default_judgment_model", &self.default_judgment_model)
+            .field("request_timeout", &self.request_timeout)
+            .field("max_retries", &self.max_retries)
+            .field("http_proxy", &self.http_proxy.as_ref().map(|_| "[set]"))
+            .field("tool_concurrency", &self.tool_concurrency)
+            .field("auto_upload_large_files", &self.auto_upload_large_files)
+            .field("instrumenter", &self.instrumenter.is_some())
+            .field("mcp_client_name", &self.mcp_client_name)
+            .field("values", &values)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Provider options RubyLLM reads, and the environment variable each falls back to.

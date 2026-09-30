@@ -283,8 +283,12 @@ async fn paint_inner(prompt: &str, options: PaintOptions<'_>) -> Result<Images> 
         ..
     } = options;
     family.validate(&model.id, &with, mask.as_ref())?;
+    // A multipart edit uploads the bytes, so even a URL reference is downloaded first.
+    let multipart = matches!(family, Family::OpenAI)
+        && (!with.is_empty() || mask.is_some())
+        && !json_image_references(&model.id);
     for a in with.iter_mut().chain(mask.iter_mut()) {
-        if family.loads(a) {
+        if multipart || family.loads(a) {
             a.load(connection.client()).await?;
         }
     }
@@ -305,7 +309,32 @@ async fn paint_inner(prompt: &str, options: PaintOptions<'_>) -> Result<Images> 
             retried.push(failure_tokens(e, None));
         }
     };
-    let result = connection.post(&path, &payload, &[], &mut on_attempt).await;
+    let result = if payload.is_null() {
+        let form = multipart_edit(
+            prompt,
+            &model.id,
+            count,
+            &with,
+            mask.as_ref(),
+            &provider_options,
+        )?;
+        match connection
+            .send_tracked(
+                reqwest::Method::POST,
+                &path,
+                &[],
+                true,
+                &|req| req.multipart(form.build()),
+                &mut on_attempt,
+            )
+            .await
+        {
+            Ok(resp) => crate::transport::json_response(resp, Value::Null).await,
+            Err(e) => Err(e),
+        }
+    } else {
+        connection.post(&path, &payload, &[], &mut on_attempt).await
+    };
     let entry = |status, tokens: Tokens, cost: Option<Cost>| UsageEntry {
         id: UsageEntry::next_id(),
         operation: Operation::Image,
@@ -443,13 +472,12 @@ impl Family {
                     provider_options,
                 )?,
             )),
+            // `json_image_references?`: other models (dall-e-2) edit through a multipart upload,
+            // sent by `paint` from `multipart_edit`.
+            Family::OpenAI if editing && !json_image_references(model) => {
+                Ok(("images/edits".into(), Value::Null))
+            }
             Family::OpenAI if editing => {
-                if !(model.starts_with("gpt-image") || model.starts_with("chatgpt-image")) {
-                    return Err(Error::Argument(format!(
-                        "Editing with {model} needs a multipart upload, which rust_llm has not ported yet; \
-                         gpt-image and chatgpt-image models take JSON image references"
-                    )));
-                }
                 let mut payload =
                     json!({ "model": model, "prompt": prompt, "n": count.unwrap_or(1) });
                 payload["images"] = with
@@ -731,6 +759,105 @@ fn reference_url(a: &Attachment) -> Result<String> {
     }
     require_image(a)?;
     a.for_llm()
+}
+
+/// `Images#json_image_references?`: gpt-image and chatgpt-image models take JSON image references;
+/// older models (dall-e-2) take multipart file uploads.
+fn json_image_references(model: &str) -> bool {
+    model.starts_with("gpt-image") || model.starts_with("chatgpt-image")
+}
+
+/// One file part of a multipart image edit (`build_upload_part`).
+#[derive(Clone)]
+struct UploadPart {
+    bytes: Vec<u8>,
+    filename: String,
+    mime_type: String,
+}
+
+impl UploadPart {
+    fn from(a: &Attachment) -> Result<UploadPart> {
+        if a.kind() != crate::attachment::AttachmentType::Image {
+            return Err(Error::UnsupportedAttachment(
+                crate::protocols::anthropic::unsupported(&a.mime_type),
+            ));
+        }
+        Ok(UploadPart {
+            bytes: a.bytes()?.to_vec(),
+            filename: a.filename.clone().unwrap_or_else(|| "image.png".into()),
+            mime_type: a.mime_type.clone(),
+        })
+    }
+
+    fn part(&self) -> reqwest::multipart::Part {
+        reqwest::multipart::Part::bytes(self.bytes.clone())
+            .file_name(self.filename.clone())
+            .mime_str(&self.mime_type)
+            // An image mime type is always a valid mime string; fall back to a bare part otherwise.
+            .unwrap_or_else(|_| {
+                reqwest::multipart::Part::bytes(self.bytes.clone()).file_name(self.filename.clone())
+            })
+    }
+}
+
+/// The multipart body of `render_edit_payload` for models without JSON references, rebuilt per
+/// attempt: `model`, `prompt`, `n`, `image` (one part, or `image[]` parts for several, as Faraday
+/// encodes an array), optional `mask`, then any provider options as text fields.
+struct MultipartEdit {
+    fields: Vec<(String, String)>,
+    images: Vec<UploadPart>,
+    mask: Option<UploadPart>,
+}
+
+impl MultipartEdit {
+    fn build(&self) -> reqwest::multipart::Form {
+        let mut form = reqwest::multipart::Form::new();
+        for (k, v) in &self.fields[..3.min(self.fields.len())] {
+            form = form.text(k.clone(), v.clone());
+        }
+        let key = if self.images.len() == 1 {
+            "image"
+        } else {
+            "image[]"
+        };
+        for image in &self.images {
+            form = form.part(key, image.part());
+        }
+        if let Some(mask) = &self.mask {
+            form = form.part("mask", mask.part());
+        }
+        for (k, v) in self.fields.iter().skip(3) {
+            form = form.text(k.clone(), v.clone());
+        }
+        form
+    }
+}
+
+fn multipart_edit(
+    prompt: &str,
+    model: &str,
+    count: Option<i64>,
+    with: &[Attachment],
+    mask: Option<&Attachment>,
+    provider_options: &Value,
+) -> Result<MultipartEdit> {
+    let mut fields = vec![
+        ("model".to_string(), model.to_string()),
+        ("prompt".to_string(), prompt.to_string()),
+        ("n".to_string(), count.unwrap_or(1).to_string()),
+    ];
+    for (k, v) in provider_options.as_object().into_iter().flatten() {
+        let text = v
+            .as_str()
+            .map(str::to_string)
+            .unwrap_or_else(|| v.to_string());
+        fields.push((k.clone(), text));
+    }
+    Ok(MultipartEdit {
+        fields,
+        images: with.iter().map(UploadPart::from).collect::<Result<_>>()?,
+        mask: mask.map(UploadPart::from).transpose()?,
+    })
 }
 
 fn openai_reference(a: &Attachment) -> Result<Value> {
