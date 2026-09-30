@@ -108,7 +108,8 @@ let _ = writer.await;
 ```
 
 The generated Loco chat UI does not stream tokens; it polls for persisted messages (see
-[Generators](generators.md)).
+[Generators](generators.md)). `speak_stream` and `transcribe_stream` stream audio and transcripts
+the same way (see [Audio](audio.md)).
 
 ## Cancelling a Stream
 
@@ -143,14 +144,17 @@ match chat.ask_stream("Write a long report", |chunk| {
 Cancellation is checked before each model request, before each tool runs, and after every chunk.
 A cancelled attempt is still recorded in `chat.usage_entries()` with status `Cancelled`.
 
+A persisted chat can also be cancelled from another process: `ChatRecord::cancel` writes the
+`chats.cancelled` column, and a `complete` running in a job notices it (see
+[Persistence with Loco](persistence-loco.md#cancellation)).
+
 ## Errors During Streaming
 
 The closure runs for every chunk received before an error; then `ask_stream` returns the error.
 Keep what you printed if you want the partial text. A stream that already delivered a chunk is
 never retried. See [Errors and Retries](errors-and-retries.md).
 
-## Not ported
+## Differences from RubyLLM
 
-- Persisted cancellation (`acts_as_chat`'s `cancel` writing the `cancelled` column). The column
-  exists, but `ChatRecord` does not read or write it.
-- Turbo Streams broadcasting from the chat UI generator.
+- The chat UI generator polls instead of broadcasting chunks over Turbo Streams (see
+  [Generators](generators.md)).

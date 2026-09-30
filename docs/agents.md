@@ -74,6 +74,15 @@ The declarations map to the chat builders:
 | `fallbacks` | `fallbacks` | `with_fallbacks` |
 | `mcp` | `mcp` | `with_mcp` |
 | `provider_tools` | `provider_tools` | `with_provider_tools` |
+| `model ..., assume_model_exists: true` | `assume_model_exists` | `Chat::with_config` |
+| `context` | `context` (a `rust_llm::Context`) | `with_context` |
+| `tool_options calls:`, `concurrency:` | `tool_calls`, `tool_concurrency` | `with_tool_calls`, `with_tool_concurrency` |
+| `fallbacks ..., on:` | `fallback_errors` | `with_fallback_errors` |
+| `citations` | `citations` | `with_citations` |
+| `caching` | `caching` (what `with_caching` takes) | `with_caching` |
+| `compaction` | `compaction` (what `with_compaction` takes) | `with_compaction` |
+| `end_user` | `end_user` | `with_end_user` |
+| `headers` | `headers` | `with_headers` |
 
 ## Runtime Values
 
@@ -153,10 +162,59 @@ agent's other prompts. See [Prompt Templates](prompts.md) for the template synta
 `rust-llm generate agent Support` still writes an empty `src/prompts/support_agent/instructions.txt`
 that the generated agent embeds with `include_str!`.
 
+## Request Options
+
+```ruby
+class SupportAgent < RubyLLM::Agent
+  model "claude-haiku-4-5"
+  caching ttl: "1h"
+  compaction at: 50_000
+  citations
+  headers "X-Team" => "support"
+  context TenantContext
+end
+```
+
+```rust,no_run
+use rust_llm::{Agent, Context};
+use serde_json::{Value, json};
+
+struct SupportAgent {
+    tenant: Context,
+    account_id: String,
+}
+
+impl Agent for SupportAgent {
+    fn model(&self) -> Option<&str> {
+        Some("claude-haiku-4-5")
+    }
+    fn caching(&self) -> Option<Value> {
+        Some(json!({ "ttl": "1h" }))
+    }
+    fn compaction(&self) -> Option<Value> {
+        Some(json!({ "at": 50_000 }))
+    }
+    fn citations(&self) -> Option<bool> {
+        Some(true)
+    }
+    fn end_user(&self) -> Option<String> {
+        Some(self.account_id.clone())
+    }
+    fn headers(&self) -> Vec<(String, String)> {
+        vec![("X-Team".into(), "support".into())]
+    }
+    fn context(&self) -> Option<Context> {
+        Some(self.tenant.clone())
+    }
+}
+```
+
+`caching`, `compaction`, and `citations` accept `false` (`Some(json!(false))`, `Some(false)`) to
+switch the feature off; `None` leaves the chat's setting alone.
+
 ## Applying an Agent to an Existing Chat
 
-`apply` configures a chat you already have, which is how a persisted chat picks its agent back up
-(RubyLLM's `Agent.new(chat:)` / `Agent.find`):
+`apply` configures a chat you already have (RubyLLM's `Agent.new(chat:)`):
 
 ```rust,no_run
 # use rust_llm::Agent;
@@ -171,12 +229,32 @@ record.ask(db, &mut chat, "Any update on my ticket?").await?;
 # Ok(()) }
 ```
 
-## Not ported
+## Persisted Agents
 
-- Rails mode (`chat_model`, `Agent.create!`/`find`): use `rust_llm_loco::ChatRecord` with `apply`.
-- `inputs` and block/lambda macros: use struct fields.
-- `context`: build the chat with `Chat::with_config` and call `apply` on it.
-- `rescue_from`, `headers`, `end_user`, `caching`, `citations`, `compaction`, and fallback
-  `on:` (call `with_fallback_errors` on the chat).
-- `tool_options calls:`/`concurrency:`: only `tool_choice` has an agent method.
-- ERB itself: prompt templates are Jinja (see [Prompt Templates](prompts.md)).
+RubyLLM's Rails mode (`chat_model Chat`, `Agent.create!`, `Agent.find`) is on `ChatRecord`:
+
+```rust,no_run
+# use rust_llm::Agent;
+# struct SupportAgent;
+# impl Agent for SupportAgent {}
+# async fn run(db: &sea_orm::DatabaseConnection, id: i32) -> rust_llm_loco::Result<()> {
+use rust_llm_loco::ChatRecord;
+
+let (record, mut chat) = ChatRecord::create_for_agent(db, &SupportAgent).await?; // Agent.create!
+record.ask(db, &mut chat, "Hello").await?;
+
+let (record, mut chat) = ChatRecord::find_for_agent(db, id, &SupportAgent).await?; // Agent.find(id)
+record.ask(db, &mut chat, "Any update on my ticket?").await?;
+# Ok(()) }
+```
+
+`create_for_agent` persists the agent's instructions; `find_for_agent` applies them without
+rewriting history, and `sync_instructions` rewrites the persisted ones. See
+[Persistence with Loco](persistence-loco.md).
+
+## Differences from RubyLLM
+
+- Class macros and their blocks and lambdas become trait methods, and `inputs` become struct
+  fields, so there is no inheritance of declarations and nothing is evaluated lazily from inputs.
+- `rescue_from` is a Ruby exception-class DSL; match on `rust_llm::Error` where you call the agent.
+- Prompt templates are Jinja, not ERB (see [Prompt Templates](prompts.md)).

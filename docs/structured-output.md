@@ -126,6 +126,6 @@ let json = response.parsed()?;
 # Ok(()) }
 ```
 
-## Not ported
+## Differences from RubyLLM
 
 - `Schematist::Schema` and the agent `schema do ... end` DSL: use `schemars` types or JSON.

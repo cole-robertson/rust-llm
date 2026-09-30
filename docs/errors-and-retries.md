@@ -24,6 +24,9 @@ Each RubyLLM error class is a variant of `rust_llm::Error`. Every fallible call 
 | `UnsupportedServerToolError` | `UnsupportedServerTool(..)` |
 | `ConfigurationError` | `Configuration(..)` |
 | `ModelNotFoundError` | `ModelNotFound(..)` |
+| `ModelRegistryError` | `ModelRegistry(..)` |
+| `PromptNotFoundError` | `PromptNotFound(..)` |
+| an ERB error while rendering a prompt | `Prompt(..)` |
 | `InvalidToolChoiceError` | `InvalidToolChoice(..)` |
 | `PendingToolCallsError` | `PendingToolCalls(..)` |
 | `CancelledError` | `Cancelled` |
@@ -165,9 +168,10 @@ Every attempt, retried or not, is recorded in the usage ledger (see
 RustLLM logs retries and unparseable stream data through the `tracing` crate at `debug` level. It
 does not log request or response bodies. Use `chat.render()` or `message.raw` to inspect them.
 
-## Not ported
+## Differences from RubyLLM
 
-- Agent-level `rescue_from`.
-- `ModelRegistryError`, `PromptNotFoundError`: there is no registry refresh or prompt rendering.
-- Fallbacks given as `RubyLLM::Model` objects: pass the id, with the provider if needed.
-- `RUBYLLM_DEBUG` request and response logging.
+- Agent-level `rescue_from` is a Ruby exception-class DSL: match on `rust_llm::Error` where you
+  call the agent.
+- Fallbacks name a model id (`"gpt-4.1-mini".into()`) or a `Fallback { model, provider }`, not a
+  `RubyLLM::Model` object.
+- `RUBYLLM_DEBUG` request and response logging is Ruby-only (Faraday's logger).

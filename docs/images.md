@@ -44,7 +44,8 @@ for (i, image) in images.into_vec().into_iter().enumerate() {
 ```
 
 Fields: `model`, `provider`, `assume_model_exists`, `size`, `count`, `with` (source images to edit),
-`mask`, `provider_options` (merged into the request), and `config`. The default model is
+`mask`, `provider_options` (merged into the request), `config`, and `metadata` (for the
+`image.rust_llm` event). The default model is
 `config.default_image_model` (`gpt-image-2`). Some providers ignore `size` or `count` and log that
 at `debug` level. For Gemini, `size` may be an aspect ratio such as `"16:9"`.
 
@@ -68,6 +69,16 @@ let options = PaintOptions {
 let edited = rust_llm::paint("Replace only the background with a sunset sky", options).await?.into_image();
 # Ok(()) }
 ```
+
+`gpt-image` models take the source images as JSON references. Other OpenAI image models, such as
+`dall-e-2`, get a multipart upload of the image and mask, which are downloaded first when given as
+URLs.
+
+## Providers
+
+OpenAI and OpenAI-compatible providers, xAI, OpenRouter, Gemini, and Mistral paint. Mistral
+generates through its Conversations API's image tool; the images come back as files that RustLLM
+downloads for you. Anthropic returns `Error::Api("Anthropic doesn't support image generation")`.
 
 ## Working with the Result
 
@@ -93,8 +104,7 @@ let total = image.cost().total(); // None when pricing or usage is unknown
 
 Usage for the request is on the first image, so a multi-image call is billed once.
 
-## Not ported
+## Differences from RubyLLM
 
-- Multipart image edits for non-`gpt-image` models (dall-e-2).
-- ElevenLabs image generation.
-- Active Storage integration and IO-object sources.
+- Sources are paths, URLs, or `Attachment`s (`Attachment::from_bytes` for data in memory), not IO
+  objects or Active Storage attachments.

@@ -35,7 +35,7 @@ Ruby idiom turns into Rust.
 | `c.mistral_api_key = k` (any option) | `c.set("mistral_api_key", k)` |
 | `c.default_model = "..."` | `c.default_model = "...".into()` |
 | `RubyLLM.config` | `rust_llm::config()` |
-| `RubyLLM.context { \|c\| ... }` | `let mut c = (*rust_llm::config()).clone(); ...; Arc::new(c)` |
+| `RubyLLM.context { \|c\| ... }` | `rust_llm::context(\|c\| { ... })` (a `Context`; `ctx.config()` is its `Arc<Config>`) |
 | `RubyLLM.models.find(id, provider:)` | `rust_llm::models().find(id, Some(provider))` |
 | `RubyLLM.models.chat_models` / `embedding_models` / `by_provider(:x)` | `models().chat_models()` / `embedding_models()` / `by_provider("x")` |
 | `model.supports?(:vision)` | `model.supports("vision")` |
@@ -82,6 +82,13 @@ Ruby idiom turns into Rust.
 | `chat.with_fallbacks(a, on: [..])` | `.with_fallbacks(..).with_fallback_errors(vec![ErrorKind::..])` |
 | `chat.tokens` / `chat.cost` | `chat.tokens()` / `chat.cost()` |
 | `chat.cancel` / `cancelled?` | `chat.cancel()` / `is_cancelled()`; `cancel_handle()` for other tasks |
+| `chat.with_caching` / `(ttl: "1h")` / `(false)` | `.with_caching(json!(true))?` / `(json!({ "ttl": "1h" }))?` / `(json!(false))?` |
+| `chat.with_citations` | `.with_citations(true)` |
+| `chat.with_compaction(at: n)` / `chat.compact` | `.with_compaction(json!({ "at": n }))?` / `chat.compact().await?` |
+| `chat.with_end_user(id)` | `.with_end_user(Some(id))` |
+| `chat.with_context(ctx)` | `.with_context(Some(&ctx))?` |
+| `chat.with_tool_options(concurrency: true)` | `.with_tool_concurrency(true)` |
+| `chat.count_tokens(msg)` / `RubyLLM.count_tokens(text, model:)` | `chat.count_tokens(Some(msg)).await?` / `rust_llm::count_tokens(text, Some(model), None).await?` |
 
 ### Callbacks
 
@@ -130,6 +137,8 @@ Ruby idiom turns into Rust.
 | raise | `Err(e)` (surfaces as `Error::Tool`) |
 | `self.tool_name` | `fn name(&self) -> String` |
 | `requires_approval` | `fn requires_approval(&self) -> bool { true }` |
+| `requires_approval { \|call\| ... }` | `fn approval(&self, call: &ToolCall) -> Option<Option<bool>>` |
+| return `RubyLLM::SearchResults.new(...)` | `Ok(SearchResults::new(vec![json!(..)])?.into())` |
 | `provider_options cache_control: ..` | `fn provider_options(&self) -> Map<String, Value>` |
 | `progress "msg", value:, total:` | `rust_llm::progress::report(Progress { .. })` |
 | `chat.with_tools(Weather, Calc)` | `.with_tool(Weather).with_tool(Calc)` or `.with_tools(vec![Arc::new(..)])` |
@@ -146,11 +155,13 @@ Ruby idiom turns into Rust.
 | `class X < RubyLLM::Agent` | `struct X; impl Agent for X` |
 | `model "id", provider: :p` | `fn model` / `fn provider` |
 | `instructions`, `tools`, `temperature`, `max_output_tokens`, `thinking`, `schema`, `provider_options`, `fallbacks`, `mcp`, `provider_tools` | the method of the same name |
-| `tool_options choice:` | `fn tool_choice` |
+| `tool_options choice:`, `calls:`, `concurrency:` | `fn tool_choice`, `fn tool_calls`, `fn tool_concurrency` |
+| `caching`, `compaction`, `citations`, `end_user`, `headers`, `context` | the method of the same name |
 | `model ..., protocol:` | `fn protocol` |
 | `inputs :user` | fields on the struct |
 | `X.new.ask(..)` / `X.chat` | `X.chat()?.ask(..).await?` |
-| `X.new(chat: existing)` / `X.find(id)` | `X.apply(chat)?`, e.g. on `record.to_llm(db).await?` |
+| `X.new(chat: existing)` | `X.apply(chat)?`, e.g. on `record.to_llm(db).await?` |
+| `X.create!` / `X.find(id)` (Rails mode) | `ChatRecord::create_for_agent(db, &X)` / `ChatRecord::find_for_agent(db, id, &X)` |
 
 ### MCP
 
@@ -171,6 +182,8 @@ Ruby idiom turns into Rust.
 | `chat.with_mcp(a, b)` / `with_mcp(nil)` | `.with_mcp(a).with_mcp(b)` / `chat.clear_mcp()` |
 | `chat.mcp[:files]` | `chat.mcp().get("files")` |
 | `chat.awaiting_input?`, `pending_inputs`, `answer(req, **values)`, `decline(req)` | `is_awaiting_input()`, `pending_inputs()`, `answer(&req, map)?`, `decline(&req)?` |
+| `oauth owner: :user` | `.oauth(OAuthSettings::new().owner(..))` |
+| `mcp.authorization_url(redirect_uri:)` / `authorize(params)` / `authorized?` | `authorization_url(uri).await?` / `authorize(params).await?` / `is_authorized().await?` |
 
 ### One-shot operations
 
@@ -194,6 +207,14 @@ Ruby idiom turns into Rust.
 | `RubyLLM.cache(text, model:, ttl:)`, `CachedContent.find`, `cache.renew(ttl:)`, `cache.delete` | `rust_llm::cache(text, CacheOptions { .. }).await?`, `CachedContent::find`, `cache.renew(ttl).await?`, `cache.delete().await?` |
 | `batch.messages` / `results` / `statuses` / `cancel` | `messages().await?` / `results().await?` / `statuses()` / `cancel().await?` |
 | `RubyLLM.embed_later(text, ..)` | `rust_llm::embed_later(text, EmbedOptions { .. })?` |
+| `RubyLLM.speak(text, voice:, format:)` / with a block | `rust_llm::speak(text, SpeakOptions { .. }).await?` / `speak_stream(text, opts, \|chunk\| ..)` |
+| `RubyLLM.transcribe(file, language:, ...)` / with a block | `rust_llm::transcribe(file, TranscribeOptions { .. }).await?` / `transcribe_stream(file, opts, \|chunk\| ..)` |
+| `RubyLLM.moderate(input, with:)` / `result.flagged?` | `rust_llm::moderate(input, ModerateOptions { .. }).await?` / `is_flagged()` |
+| `RubyLLM.ocr(file, pages:)` / `ocr.markdown` | `rust_llm::ocr(file, OcrOptions { .. }).await?` / `ocr.markdown()` |
+| `RubyLLM.rerank(query, docs, model:, top_n:)` | `rust_llm::rerank(query, &docs, model, RerankOptions { .. }).await?` |
+| `RubyLLM.tokenize(text, model:, provider:)` | `rust_llm::tokenize(text, TokenizeOptions { .. }).await?` |
+| `RubyLLM.animate(prompt, ...)` / `animate_later` | `rust_llm::animate(Some(prompt), AnimateOptions { .. }).await?` / `animate_later(..)` |
+| `job.refresh` / `job.wait(timeout:, interval:)` / `job.video` | `job.refresh().await?` / `job.wait(Some(..), Some(..)).await?` / `job.video().await?` |
 | `class X < RubyLLM::Judge; probability :a, "..."; end` | `Judge::new().probability("a", "...")?` |
 | `choice :d, "..." do ... end` / `score :s, "...", [..]` | `.choice("d", Some(..), json!({..}))?` / `.score("s", Some(..), json!([..]))?` |
 | `inputs :teams` + `-> { teams }` | `.inputs(["teams"])` + `Dynamic::from_fn(\|inputs\| ..)` |
@@ -221,6 +242,10 @@ See [Errors and Retries](errors-and-retries.md) for every variant.
 | `chat_record.complete` | `record.complete(db, &mut chat).await?` |
 | `chat_record.approve(id)` / `deny(id)` | `record.approve(db, &mut chat, id).await?` / `deny(..)` |
 | `chat_record.cost.total` | `record.total_cost(db).await?` |
+| `chat_record.compact` / `cancel` | `record.compact(db, &mut chat).await?` / `record.cancel(db).await?` |
+| `config.model_registry_store = RubyLLM::ActiveRecord::Model` | `c.model_registry_store = Some(Arc::new(ModelStore::new(db)))` |
+| batch persistence (`RubyLLM::ActiveRecord::Batch`) | `c.batch_store = Some(Arc::new(BatchStore::new(db)))`, `rust_llm_loco::batch::submit` / `collect` |
+| `config.mcp_credential_store` (`MCPCredential`) | `c.mcp_credential_store = Some(Arc::new(McpCredentialStore::new(db, key)))` |
 | `rails g ruby_llm:install` (and `tool`, `agent`, `schema`, `chat_ui`, `upgrade`) | `rust-llm generate install` (same names) |
 
 ## A Full Example
@@ -269,14 +294,19 @@ async fn main() -> rust_llm::Result<()> {
 }
 ```
 
-## What Is Not Ported
+## What Is Left Out
 
-- Providers: Bedrock, Vertex AI, Azure, Cohere, ElevenLabs, Deepgram.
-- Operations: `animate`, `speak`, `transcribe`, `ocr`, `rerank`, `moderate`, `research`,
-  `count_tokens`, `tokenize`.
-- Chat options: `with_caching`, `with_citations`, `with_compaction` / `compact`, `with_end_user`,
-  `with_context`, tool concurrency.
-- MCP OAuth; Gemini embedding batches; multipart image edits for non-gpt-image models.
-- `RUBYLLM_DEBUG` logging.
-- Rails-only pieces: Active Storage, persisted batches, persisted cancellation, Turbo streaming,
-  agent `chat_model` mode, `rescue_from`.
+- Providers: Bedrock, Vertex AI (including hosted research), Azure, Cohere, ElevenLabs, and
+  Deepgram.
+- Ruby-only mechanics: class-level DSL inheritance and lazily evaluated blocks, `rescue_from`,
+  `method_missing` tool methods on MCP servers, Active Storage and Action Text, IO objects as
+  attachments, Turbo Streams, Faraday adapters and logging (`RUBYLLM_DEBUG`), and custom or
+  namespaced Rails model classes.
+
+## Differences to Know
+
+- Prompt templates are Jinja (`.txt.jinja`), not ERB (see [Prompt Templates](prompts.md)).
+- Instrumentation events end in `.rust_llm` instead of `.ruby_llm`.
+- `rust_llm_loco::McpCredentialStore` uses Active Record encryption's message layout, but its key
+  is not derived the Rails way, so a Rails app and a Loco app cannot share the credentials table.
+- Tables use the `rust_llm_` prefix, and Loco message attachments live in `rust_llm_attachments`.

@@ -146,11 +146,39 @@ for result in batch.results().await? {
 ```
 
 `embed_later` accepts `model`, `provider`, and `dimensions`, with the same defaults as `embed`. A
-batch takes chats or embedding requests, not both.
+batch takes chats or embedding requests, not both. OpenAI, Gemini, Mistral, and OpenRouter batch
+embeddings; OpenRouter accepts text only, without `task_type` or provider preferences.
 
-## Not ported
+## Persisted Batches
 
-- Gemini embedding batches.
-- Persisted batch state (`Batch.find(id)` without a provider in Rails, and the batch table).
-  `rust_llm_loco` does not store batches; keep the id and provider yourself.
-- Azure, Bedrock, Vertex AI, and Cohere batches.
+With a `config.batch_store`, submitted chat batches are recorded, and `Batch::find` returns a stored
+batch without asking for the provider. `rust_llm_loco::BatchStore` keeps them in the
+`rust_llm_batches` table with the chat records they answer:
+
+```ruby
+batch = RubyLLM.batch(chats)          # records are persisted by the Railtie's batch store
+RubyLLM::Batch.find(batch.id).messages # answers land on the chat records
+```
+
+```rust,no_run
+use std::sync::Arc;
+use rust_llm_loco::{BatchStore, ChatRecord};
+
+# async fn run(db: sea_orm::DatabaseConnection) -> rust_llm_loco::Result<()> {
+rust_llm::configure(|c| c.batch_store = Some(Arc::new(BatchStore::new(db.clone()))));
+
+let record = ChatRecord::create(&db, "claude-haiku-4-5", None).await?;
+let mut chat = record.to_llm(&db).await?;
+record.ask_later(&db, &mut chat, "What is 2 + 2?").await?;
+let batch = rust_llm_loco::batch::submit(&db, vec![(record, chat)]).await?;
+
+// Later, in a job: no provider needed.
+let mut batch = rust_llm::Batch::find(batch.id(), None).await?;
+if batch.refresh().await?.is_complete() {
+    rust_llm_loco::batch::collect(&db, &mut batch).await?; // persists each answer on its record
+}
+# Ok(()) }
+```
+
+`collect` appends each answer to its record once, however often it runs. Without a store,
+`Batch::find` needs the provider, and you keep the id and provider yourself.

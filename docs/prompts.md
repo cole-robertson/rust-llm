@@ -63,6 +63,6 @@ An agent that declares no `instructions` uses `app/prompts/<agent>/instructions.
 exists, rendered with the agent's `prompt_locals`. `WorkAssistant` reads
 `app/prompts/work_assistant/`. An empty file means no instructions. See [Agents](agents.md).
 
-## Not ported
+## Differences from RubyLLM
 
-- ERB itself, and Ruby constants in templates.
+- Templates are Jinja (`.txt.jinja`), not ERB, so they cannot call Ruby constants or methods.

@@ -216,10 +216,12 @@ let total = judgment.cost().total(); // None: the catalog carries no pricing
 `model`, `state`, and `questions` are reserved. Judgments use the shared timeouts, retries, and
 error types.
 
-## Not ported
+`JudgeOptions::metadata` is added to the `judgment.rust_llm` [instrumentation](instrumentation.md)
+event and never sent to the provider.
 
-- Block DSLs for questions and input (`choice ... do billing "..." end`, `judge do ... end`): use
+## Differences from RubyLLM
+
+- Block DSLs for questions and input (`choice ... do billing "..." end`, `judge do ... end`) become
   JSON.
-- Symbol-vs-String option names: options are always strings.
-- Method-style readers (`judgment.urgent`): use `get`/`probability`/`choice`/`score`.
-- `metadata:` and the `judgment.ruby_llm` instrumentation event.
+- Option names are always strings; there are no Symbol-vs-String variants.
+- Method-style readers (`judgment.urgent`) become `get`/`probability`/`choice`/`score`.

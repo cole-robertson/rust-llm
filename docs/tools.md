@@ -373,11 +373,62 @@ An alias the protocol does not define fails at request time with `Error::Unsuppo
 
 `with_mcp` gives the model an MCP server's tools. See [MCP](mcp.md).
 
-## Not ported
+## Deciding Approvals in Code
 
-- Signature inference: Rust cannot read `execute`'s parameters, so declare them with
-  `parameters()` or `parameters_schema()`.
-- `requires_approval { |tool_call| ... }` resolver blocks: `requires_approval` is a `bool`.
-- `concurrency: :threads` vs `:fibers`: concurrency is a `bool`; calls run as futures on the chat's task.
-- `RubyLLM::SearchResults` (citable tool results).
-- `RUBYLLM_DEBUG`: enable `tracing` at `debug` level instead.
+RubyLLM's `requires_approval { |tool_call| ... }` block is the `approval` method:
+
+```rust,no_run
+use rust_llm::{Tool, ToolCall, ToolError, ToolResult};
+use serde_json::{Map, Value};
+
+struct Transfer;
+
+#[async_trait::async_trait]
+impl Tool for Transfer {
+    fn description(&self) -> String {
+        "Moves money between accounts".into()
+    }
+    fn requires_approval(&self) -> bool {
+        true
+    }
+    // Some(true) runs the call, Some(false) denies it, None waits for approve/deny.
+    fn approval(&self, call: &ToolCall) -> Option<Option<bool>> {
+        let small = call.arguments().get("amount").and_then(Value::as_f64).is_some_and(|a| a < 100.0);
+        small.then_some(Some(true))
+    }
+    async fn execute(&self, _args: Map<String, Value>, _call: &ToolCall) -> Result<ToolResult, ToolError> {
+        Ok("Done".into())
+    }
+}
+```
+
+It can be consulted more than once per call, so keep it a pure read.
+
+## Citable Results
+
+Return `SearchResults` from a tool so the model can cite each document (Anthropic renders them in
+its citation format; other providers receive JSON text):
+
+```ruby
+RubyLLM::SearchResults.new(title: "Q4 Report", url: report_url, text: report_text)
+```
+
+```rust,no_run
+use rust_llm::{SearchResults, ToolError, ToolResult};
+use serde_json::json;
+
+fn search(report_url: &str, report_text: &str) -> Result<ToolResult, ToolError> {
+    let results = SearchResults::new(vec![json!({ "title": "Q4 Report", "url": report_url, "text": report_text })])?;
+    Ok(results.into())
+}
+```
+
+Cited passages come back on `response.citations`.
+
+## Differences from RubyLLM
+
+- Rust cannot read `execute`'s parameters, so declare them with `parameters()` or
+  `parameters_schema()`.
+- Concurrency is a `bool`: calls run as futures on the chat's task (RubyLLM's `:fibers`); there is
+  no `:threads` mode.
+- `RUBYLLM_DEBUG` is Ruby-only: enable `tracing` at `debug` level instead.

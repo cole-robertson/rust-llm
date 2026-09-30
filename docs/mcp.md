@@ -270,9 +270,65 @@ stops a server call the chat is waiting on.
 A server that answers with a protocol error fails with `Error::Mcp`, whose `McpError` has the
 JSON-RPC `code` and `data`.
 
-## Not ported
+## OAuth
 
-- OAuth (`oauth owner:`, `authorization_url`, `authorize`, credential stores,
-  `mcp_client_id`), and the `rust-llm generate upgrade` migration for MCP credentials.
-- Tool methods on the server object (`docs.microsoft_docs_search(...)`): use `call`.
-- `with_mcp` on persisted chat records: build the `Chat` with `to_llm` and call `with_mcp` on it.
+A server that requires OAuth declares an owner: whose credentials these are. RustLLM discovers the
+authorization server, registers a client when needed, and runs PKCE, token refresh, and issuer
+checks:
+
+```ruby
+class Linear < RubyLLM::MCP
+  url "https://mcp.linear.app/mcp"
+  inputs :user
+  oauth owner: :user
+end
+redirect_to Linear.new(user: current_user).authorization_url(redirect_uri: mcp_callback_url)
+Linear.new(user: current_user).authorize(params)
+```
+
+```rust,no_run
+use rust_llm::Mcp;
+use rust_llm::mcp::OAuthSettings;
+
+# async fn run(user_gid: String, callback_params: Vec<(String, String)>) -> rust_llm::Result<()> {
+let linear = Mcp::url("https://mcp.linear.app/mcp")
+    .oauth(OAuthSettings::new().owner(user_gid))
+    .build()?;
+
+if !linear.is_authorized().await? {
+    // Redirect the user here; the authorization server sends them back to the callback.
+    let url = linear.authorization_url("https://app.example.com/mcp/callback").await?;
+    println!("{url}");
+}
+// In the callback handler, with the query parameters it received:
+linear.authorize(callback_params).await?;
+# Ok(()) }
+```
+
+`OAuthSettings` also takes `owner_with(|| ...)`, `scopes(&[..])`, and `client_id`/`client_secret`
+for servers that need a registered app. `deauthorize()` forgets the owner's credentials. Set
+`config.mcp_client_id` to your client metadata document URL for servers that support client ID
+metadata documents; `config.mcp_client_name` names the client when it registers.
+
+Credentials live in `config.mcp_credential_store`: a process-wide in-memory store by default,
+or `rust_llm_loco::McpCredentialStore`, which keeps them encrypted in `rust_llm_mcp_credentials`:
+
+```rust,no_run
+# async fn run(db: sea_orm::DatabaseConnection, key: [u8; 32]) {
+let store = rust_llm_loco::McpCredentialStore::new(db, key);
+rust_llm::configure(|c| c.mcp_credential_store = Some(std::sync::Arc::new(store)));
+# }
+```
+
+Implement `rust_llm::mcp::CredentialStore` (`read`, `write`, `delete`) to keep them elsewhere.
+Existing apps add the table with `rust-llm generate upgrade` (see [Generators](generators.md)).
+
+## Differences from RubyLLM
+
+- Tool methods on the server object (`docs.microsoft_docs_search(...)`) are Ruby metaprogramming:
+  use `call`.
+- `with_mcp` on a persisted chat record: build the `Chat` with `to_llm` and call `with_mcp` on it.
+- `McpCredentialStore` writes Active Record encryption's AES-256-GCM message layout with a
+  32-byte key you pass in. It is not Rails-compatible: Rails derives its key from
+  `active_record_encryption.primary_key` and a salt, and can compress payloads, so do not share
+  the table between a Rails app and a Loco app.

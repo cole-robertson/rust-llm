@@ -411,6 +411,15 @@ fn chat_ui_wires_routes_controllers_worker_and_sidebar() {
         "rustfmt-shaped"
     );
     assert!(table.find("\"models.show\"").unwrap() < table.find("// scaffold:routes").unwrap());
+    // RubyLLM's `refresh` action: POST /models/refresh, handled by the models controller.
+    assert!(table.contains("pub const MODELS_REFRESH: &str = \"/models/refresh\";"));
+    assert!(table.contains("        route(\n            \"models.refresh\",\n            Post,\n            MODELS_REFRESH,\n"));
+    let models = read(root, "src/controllers/models.rs");
+    assert!(models.contains("rust_llm::models::refresh(false).await"));
+    assert!(models.contains(".add(route_table::MODELS_REFRESH, post(refresh))"));
+    assert!(
+        read(root, "frontend/pages/models/index.tsx").contains("router.post(routes.refresh().url)")
+    );
 
     let sidebar = read(root, "frontend/components/app-sidebar.tsx");
     assert!(

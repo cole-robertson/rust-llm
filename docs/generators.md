@@ -115,11 +115,20 @@ Writes `migration/src/m<timestamp>_upgrade_rust_llm_to_2_1.rs` (RubyLLM's
 `rust_llm_tool_calls.pending_input` when they are missing, so it is safe on an up-to-date schema.
 Then run `cargo loco db migrate`.
 
-## Not ported
+## Not Generated
 
-- `--skip-active-storage`, custom model names, and namespaced generator names (`admin/weather`).
-- `ruby_llm:load_models` and `POST /models/refresh`: models come from the bundled registry.
-- Turbo Streams token streaming, and the `tailwind`/`scaffold` UI variants (there is one shadcn
-  variant).
-- ERB prompt templates (`instructions.txt.erb`).
-- The provider generator's `provider-gem` mode.
+- `ruby_llm:load_models` and the chat UI's `POST /models/refresh` action: the generated app has
+  neither. Call `rust_llm::models::refresh` yourself, from a Loco task for example; with
+  `rust_llm_loco::ModelStore` configured it saves into `rust_llm_models` (see
+  [Persistence with Loco](persistence-loco.md#the-model-registry-in-the-database)).
+
+## Differences from RubyLLM
+
+- The chat UI is one Inertia + React (shadcn/ui) variant that polls. There are no ERB
+  `tailwind`/`scaffold` variants and no Turbo Streams broadcasting.
+- `--skip-active-storage`, custom model names, and namespaced names (`admin/weather`) are Rails
+  generator options; the Loco tables keep RubyLLM's names, and attachments always go to
+  `rust_llm_attachments`.
+- The agent generator writes a plain `instructions.txt` embedded with `include_str!` instead of an
+  ERB template. Agents can also render Jinja prompts at runtime (see [Prompt Templates](prompts.md)).
+- The provider generator has no `provider-gem` mode: providers are modules in the `rust_llm` crate.

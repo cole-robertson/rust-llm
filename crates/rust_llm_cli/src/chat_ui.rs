@@ -17,8 +17,7 @@
 //! page polls with Inertia's `usePoll` (a partial reload of `messages`, once a second) while the
 //! last message still waits for the model.
 //!
-//! Not ported: `POST /models/refresh` (the registry has no live refresh), and the `tailwind` vs
-//! `scaffold` UI variants (there is one shadcn/ui variant).
+//! One UI variant (shadcn/ui) replaces RubyLLM's `tailwind` and `scaffold` variants.
 
 use crate::{Anchor, Generator};
 
@@ -52,6 +51,7 @@ pub const NEW_CHAT: &str = "/chats/new";
 pub const CHAT: &str = "/chats/{id}";
 pub const CHAT_MESSAGES: &str = "/chats/{chat_id}/messages";
 pub const MODELS: &str = "/models";
+pub const MODELS_REFRESH: &str = "/models/refresh";
 pub const MODEL: &str = "/models/{id}";
 
 /// `/chats/{id}` with the id filled in.
@@ -103,6 +103,12 @@ const ROUTES: &str = r#"        route(
             Get,
             MODELS,
             ts("ModelsController", "models", "index", None),
+        ),
+        route(
+            "models.refresh",
+            Post,
+            MODELS_REFRESH,
+            ts("ModelsController", "models", "refresh", None),
         ),
         route(
             "models.show",

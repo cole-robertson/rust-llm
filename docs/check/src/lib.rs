@@ -24,6 +24,12 @@ pub mod attachments_and_files {}
 pub mod embeddings {}
 #[doc = include_str!("../../images.md")]
 pub mod images {}
+#[doc = include_str!("../../audio.md")]
+pub mod audio {}
+#[doc = include_str!("../../video.md")]
+pub mod video {}
+#[doc = include_str!("../../moderation-ocr-rerank.md")]
+pub mod moderation_ocr_rerank {}
 #[doc = include_str!("../../batches.md")]
 pub mod batches {}
 #[doc = include_str!("../../mcp.md")]

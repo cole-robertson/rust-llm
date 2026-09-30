@@ -114,8 +114,12 @@ let bytes: &[u8] = downloaded.to_blob();
 # Ok(()) }
 ```
 
-## Not ported
+## Attachments on Persisted Chats
 
-- Active Storage attachments and IO objects: pass a path, URL, or bytes.
-- ElevenLabs media assets and Cohere datasets.
-- Attachments on persisted messages in `rust_llm_loco`.
+`rust_llm_loco` stores message attachments in `rust_llm_attachments` and gives them back from
+`to_llm` (see [Persistence with Loco](persistence-loco.md#tables)).
+
+## Differences from RubyLLM
+
+- Attachments are paths, URLs, `UploadedFile`s, or bytes (`Attachment::from_bytes`); there are no
+  IO objects or Active Storage attachments.

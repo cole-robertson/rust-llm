@@ -1,9 +1,10 @@
 # rust_llm
 
 A 1:1 Rust port of [RubyLLM](https://github.com/crmne/ruby_llm) 2.0: one API for chat, tools,
-agents, structured output, streaming, embeddings, images, batches, files, MCP, and judgments across
-OpenAI, Anthropic, Gemini, DeepSeek, Mistral, OpenRouter, xAI, Perplexity, Ollama, GPUStack,
-Hetzner, and TypeSafe. Request bodies match the ones RubyLLM recorded, byte for byte as JSON.
+agents, structured output, streaming, embeddings, images, audio (speech and transcription), video,
+moderation, OCR, rerank, tokenization, batches, files, MCP (with OAuth), prompt templates,
+instrumentation, and judgments across OpenAI, Anthropic, Gemini, DeepSeek, Mistral, OpenRouter,
+xAI, Perplexity, Ollama, Ollama Cloud, GPUStack, Hetzner, and TypeSafe. Request bodies match the ones RubyLLM recorded, byte for byte as JSON.
 
 ```rust,no_run
 # async fn run() -> rust_llm::Result<()> {

@@ -8,6 +8,14 @@ continued in another request or job.
 The fastest setup is `rust-llm generate install` (see [Generators](generators.md)). This page
 describes what it wires up.
 
+In short:
+
+- `ChatRecord` persists chats, messages, tool calls, attachments, and billed attempts, and resumes
+  a chat parked on a tool approval or an MCP input request.
+- `ModelStore` keeps the model registry in `rust_llm_models`.
+- `BatchStore` keeps provider batches in `rust_llm_batches` (see [Batches](batches.md#persisted-batches)).
+- `McpCredentialStore` keeps MCP OAuth credentials, encrypted, in `rust_llm_mcp_credentials` (see [MCP](mcp.md#oauth)).
+
 ## Tables
 
 The same tables and columns RubyLLM creates, with the `rust_llm_` prefix:
@@ -16,10 +24,12 @@ The same tables and columns RubyLLM creates, with the `rust_llm_` prefix:
 |---|---|
 | `chats` | one row per conversation, pointing at its model row |
 | `messages` | role, content, thinking text and signature, citations, provider tool calls, raw content, finish reason |
-| `rust_llm_models` | registry entries used by chats, created on first use |
+| `rust_llm_models` | the model registry; filled from the registry when a chat first needs a model |
 | `rust_llm_tool_calls` | each tool call, its arguments, approval decision, and the tool-result message it links to |
 | `rust_llm_usages` | one row per provider attempt: operation, provider, model, status, token buckets, and cost components |
 | `rust_llm_attachments` | message files: bytes, filename, content type, byte size, and `{ "resolution": ... }` metadata |
+| `rust_llm_batches` | submitted provider batches: provider id, status, protocol, and the chat ids in submission order |
+| `rust_llm_mcp_credentials` | MCP OAuth credentials per owner and server, encrypted |
 
 RubyLLM stores message files with Active Storage (`has_many_attached :attachments`). Loco has no
 Active Storage, so `rust_llm_attachments` holds the bytes in the database, one row per file,
@@ -46,7 +56,8 @@ impl MigratorTrait for Migrator {
 ```
 
 The SeaORM entities are in `rust_llm_loco::entities` (`chats`, `messages`, `rust_llm_models`,
-`rust_llm_tool_calls`, `rust_llm_usages`).
+`rust_llm_tool_calls`, `rust_llm_usages`, `rust_llm_attachments`, `rust_llm_batches`,
+`rust_llm_mcp_credentials`).
 
 ## Working with Persisted Chats
 
@@ -97,6 +108,8 @@ database. Reapply them after `to_llm`, or keep them in an [Agent](agents.md) and
 | `ask(db, &mut chat, text)` / `ask_with(..., attachments)` | `chat.ask(text)` / `chat.ask(text, with: [...])` |
 | `ask_later(db, &mut chat, text)` / `ask_later_with` | `chat.ask_later(text)` (persisted) |
 | `complete(db, &mut chat)` | `chat.complete` |
+| `compact(db, &mut chat)` | `chat.compact` (persists the compaction message and its usage) |
+| `run_tools(db, &mut chat)` | `chat.run_tools` |
 | `add_message(db, &mut chat, message)` | `chat.add_message(message)` |
 | `with_instructions(db, &mut chat, text)` | `chat.with_instructions(text)` |
 | `set_instructions(db, &mut chat, text, append, persist, cache_until_here)` | `chat.with_instructions(text, append:, persist:, cache_until_here:)` |
@@ -104,8 +117,10 @@ database. Reapply them after `to_llm`, or keep them in an [Agent](agents.md) and
 | `approve` / `deny(db, &mut chat, tool_call_id)` | `chat.approve` / `chat.deny` (persisted) |
 | `is_awaiting_approval(db, &mut chat)`, `pending_approvals(db, &mut chat)` | `chat.awaiting_approval?`, `chat.pending_approvals` (tool-call rows) |
 | `answer` / `decline(db, &mut chat, request, ...)` | `chat.answer` / `chat.decline` (persisted) |
-| `cancel(db)`, `is_cancelled(db)` | `chat.cancel`, `chat.cancelled?` |
+| `cancel(db)` / `cancel_chat(db, &chat)`, `is_cancelled(db)` | `chat.cancel`, `chat.cancelled?` |
 | `create_for_agent(db, &agent)` / `find_for_agent(db, id, &agent)` | `Agent.create!` / `Agent.find(id)` with `chat_model Chat` |
+| `persist_collected(db, &mut chat)` | the answers a batch appended to the chat |
+| `destroy(db)` | `chat.destroy!` |
 | `messages(db)`, `usages(db)`, `model(db)` | `chat.messages`, the usage rows, `chat.model` |
 | `tokens(db)`, `cost(db)`, `total_cost(db)` | `chat.tokens`, `chat.cost`, `chat.cost.total` |
 
@@ -171,21 +186,47 @@ let total = record.total_cost(db).await?; // None when any attempt could not be 
 
 ## Cancellation
 
-`record.cancel(db)` sets `chats.cancelled`. A `complete` running anywhere, in a job for example,
-polls the column every second (`CANCELLATION_POLL_INTERVAL`), clears it, and stops with
-`rust_llm::Error::Cancelled`. The billed attempt stays in the ledger, unlinked, and the chat stays
+`record.cancel(db)` sets `chats.cancelled`. A `complete` or `compact` running anywhere, in a job for
+example, polls the column every second (`CANCELLATION_POLL_INTERVAL`), clears it, and stops with
+`rust_llm::Error::Cancelled`. `cancel_chat(db, &chat)` also cancels a chat you hold, so it stops
+without waiting for a poll. The billed attempt stays in the ledger, unlinked, and the chat stays
 usable.
+
+## The Model Registry in the Database
+
+```ruby
+RubyLLM.config.model_registry_store = RubyLLM::ActiveRecord::Model # set by the Railtie
+RubyLLM.models.refresh
+```
+
+```rust,no_run
+use std::sync::Arc;
+use rust_llm_loco::ModelStore;
+
+# async fn run(db: sea_orm::DatabaseConnection) -> rust_llm::Result<()> {
+rust_llm::configure(|c| c.model_registry_store = Some(Arc::new(ModelStore::new(db.clone()))));
+rust_llm::models::refresh(false).await?; // saves into rust_llm_models
+# Ok(()) }
+```
+
+With the store set, the registry loads from `rust_llm_models` when it has rows. `refresh` writes the
+new registry in one transaction; a model that dropped out of the catalog but is still referenced by
+a chat is kept and stamped `unlisted_at`, and `model_store::listed()` / `unlisted()` query each
+set. `ModelStore` bridges SeaORM's async API to the registry's sync one, so it needs a
+multi-threaded tokio runtime.
 
 ## Errors
 
 `rust_llm_loco::Error` wraps `Db(sea_orm::DbErr)`, `Llm(rust_llm::Error)`, and `NotFound`.
 
-## Not ported
+## Differences from RubyLLM
 
-- Streaming through a persisted chat (`chat.ask { |chunk| }` on a record) and Turbo broadcasting.
-- Custom or namespaced chat/message classes, a separate user-visible transcript, Action Text
-  content, the `ruby_llm_batches` and `ruby_llm_mcp_credentials` tables, and `compact`/`generate`
-  on a record.
-- Copying the whole registry into an empty `rust_llm_models` table on first use: RustLLM's
-  registry never reads that table, so only the rows chats use are written.
-- Registry refresh into `rust_llm_models` (`RubyLLM.models.refresh`, `ruby_llm:load_models`).
+- The record and the chat are separate values: `ChatRecord` methods take `&mut Chat`, and chat
+  methods the record does not persist (`generate`, `step`, `count_tokens`, callbacks) are called on
+  the `Chat` directly.
+- Streaming through a record (`chat.ask { |chunk| }`) and Turbo broadcasting: the record persists
+  each step, not each chunk. Stream with `Chat::ask_stream` if you persist yourself, or poll as the
+  generated chat UI does.
+- Custom or namespaced chat/message classes (`acts_as_chat messages:`, `message_class:`) and Action
+  Text content are Rails mechanisms. The tables keep RubyLLM's names.
+- Attachments live in `rust_llm_attachments` instead of Active Storage.

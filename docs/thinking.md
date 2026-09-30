@@ -89,7 +89,3 @@ chat.ask_stream("Solve step by step: what is 127 * 43?", |chunk| {
 `response.tokens().thinking` reports reasoning tokens separately. `tokens.output` is already the
 billable output, so do not add them. [Persistence with Loco](persistence-loco.md) stores
 `thinking_text` and `thinking_signature` on each message row.
-
-## Not ported
-
-- Bedrock and Cohere thinking. Other providers follow RubyLLM's per-protocol mapping.

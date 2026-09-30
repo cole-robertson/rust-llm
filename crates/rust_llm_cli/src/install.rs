@@ -154,8 +154,6 @@ fn show_install_info(g: &mut Generator) {
     g.note("     2. Set your API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, ...) in the environment or src/initializers/rust_llm.rs");
     g.note("     3. Start chatting: ChatRecord::create(&ctx.db, \"gpt-5.6-luna\", None).await? then record.ask(&ctx.db, &mut chat, \"Hello!\")");
     g.note("     4. Optional UI: rust-llm generate chat_ui");
-    g.note("\n  Not ported: Active Storage attachments on persisted messages, and `ruby_llm:load_models`");
-    g.note(
-        "  (models come from the bundled registry; rust_llm_models rows are created on first use).",
-    );
+    g.note("\n  Models come from the bundled registry; refresh it with rust_llm::models::refresh(false),");
+    g.note("  and rust_llm_models rows are filled from it on first use.");
 }

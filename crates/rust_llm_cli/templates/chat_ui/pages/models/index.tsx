@@ -1,4 +1,4 @@
-import { Head, Link } from "@inertiajs/react"
+import { Head, Link, router } from "@inertiajs/react"
 
 import Heading from "@/components/heading"
 import type { ChatModel } from "@/components/messages/types"
@@ -23,9 +23,14 @@ export default function ModelIndex({ models }: { models: ChatModel[] }) {
       <div className="space-y-6 p-4">
         <div className="flex items-start justify-between gap-4">
           <Heading title="Models" />
-          <Button variant="outline" asChild>
-            <Link href={chats.index()}>Chats</Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => router.post(routes.refresh().url)}>
+              Refresh
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href={chats.index()}>Chats</Link>
+            </Button>
+          </div>
         </div>
 
         {models.length === 0 ? (

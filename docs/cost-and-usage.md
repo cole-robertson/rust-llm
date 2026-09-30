@@ -31,8 +31,9 @@ Unknown values are `None`, so a missing price never looks like a free request. `
 `Message::cost(Some(&model))` prices the same tokens against another model instead of the one that
 answered.
 
-The same readers exist on `Embedding` (`tokens()`, `cost()`), `Image`, `Judgment`, `BatchResult`,
-and `Batch` (`tokens().await`, `cost().await`, at batch rates).
+The same readers exist on `Embedding` (`tokens()`, `cost()`), `Image`, `Judgment`, `Speech`,
+`Transcription`, `Moderation`, `Ocr`, `Rerank`, `BatchResult`, and `Batch` (`tokens().await`,
+`cost().await`, at batch rates).
 
 ## Token Buckets
 
@@ -99,14 +100,46 @@ exceeds the registry threshold.
 at that moment. `ChatRecord::tokens`, `cost`, and `total_cost` read them back. See
 [Persistence with Loco](persistence-loco.md).
 
+## Counting Tokens Before Sending
+
+```ruby
+RubyLLM.count_tokens("Explain Ruby blocks.", model: "claude-haiku-4-5")
+RubyLLM.tokenize("Ruby makes AI useful.", model: "grok-4.3", provider: :xai).count
+```
+
+```rust,no_run
+# async fn run() -> rust_llm::Result<()> {
+let input = rust_llm::count_tokens("Explain Rust closures.", Some("claude-haiku-4-5"), None).await?;
+let options = rust_llm::TokenizeOptions { model: Some("grok-4.3"), provider: Some("xai"), ..Default::default() };
+let tokens = rust_llm::tokenize("Rust makes AI useful.", options).await?.count();
+# Ok(()) }
+```
+
+These inspect input before generation; they do not predict billed usage. See
+[Chat](chat.md#counting-tokens) and [Tokenization](moderation-ocr-rerank.md#tokenization).
+
+## Usage Events
+
+Every finished provider attempt, for chats and one-shot operations alike, emits a
+`usage.rust_llm` [instrumentation](instrumentation.md) event with `operation`, `provider`,
+`model`, `status`, `tokens`, and `cost`. Results collected from a batch emit it once each.
+
 ## Keeping Pricing Fresh
 
-Prices come from the bundled `models.json`. `rust_llm::models::Models::install(models)` replaces
-the process-wide registry if you load a fresher list yourself.
+Prices come from the bundled `models.json` until you refresh the registry:
 
-## Not ported
+```ruby
+RubyLLM.models.refresh
+```
 
-- `count_tokens` and `tokenize`.
-- `RubyLLM.models.refresh`.
-- The `usage.ruby_llm` instrumentation event. `Chat::set_usage_recorder` receives each entry as it
-  is recorded, but it has a single slot that `rust_llm_loco` uses for persistence.
+```rust,no_run
+# async fn run() -> rust_llm::Result<()> {
+let models = rust_llm::models::refresh(false).await?; // `true` skips local providers (Ollama, GPUStack)
+# Ok(()) }
+```
+
+`refresh` fetches the published catalog (the same `models.json` RubyLLM publishes), merges each
+configured provider's model list, installs the result, and saves it to `model_registry_file` or
+`model_registry_store` (see [Configuration](configuration.md#other-options)).
+`rust_llm::models::Models::install(models)` replaces the process-wide registry with a list you
+built yourself.

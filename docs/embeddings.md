@@ -61,9 +61,36 @@ let embedding = rust_llm::embed("This is a test sentence", options).await?;
 # Ok(()) }
 ```
 
-The fields are `model`, `provider`, `dimensions`, `assume_model_exists`, and `config`. The default
-model is `config.default_embedding_model` (`text-embedding-3-small`). OpenAI-compatible providers
-and Gemini embed; Anthropic returns `Error::Api("Anthropic doesn't support embeddings")`.
+The fields are `model`, `provider`, `dimensions`, `assume_model_exists`, `config`, `with`,
+`task_type`, `title`, `provider_options`, and `metadata`. The default model is
+`config.default_embedding_model` (`text-embedding-3-small`). OpenAI-compatible providers and
+Gemini embed; Anthropic returns `Error::Api("Anthropic doesn't support embeddings")`.
+
+## Tasks, Media, and Sparse Vectors
+
+```ruby
+RubyLLM.embed("How do I reset my password?", model: "gemini-embedding-001", task_type: "RETRIEVAL_QUERY")
+RubyLLM.embed("A red bicycle", model: "gemini-embedding-2", with: "bike.jpg")
+```
+
+```rust,no_run
+use rust_llm::{Attachment, EmbedOptions};
+
+# async fn run() -> rust_llm::Result<()> {
+let query = EmbedOptions { model: Some("gemini-embedding-001"), task_type: Some("RETRIEVAL_QUERY"), ..Default::default() };
+rust_llm::embed("How do I reset my password?", query).await?;
+
+let media = EmbedOptions { model: Some("gemini-embedding-2"), with: vec![Attachment::new("bike.jpg")], ..Default::default() };
+let embedding = rust_llm::embed("A red bicycle", media).await?;
+let sparse = &embedding.sparse_vectors; // Some on sparse-capable models (e.g. BGE-M3)
+# Ok(()) }
+```
+
+`task_type` uses the provider's vocabulary (Gemini's `taskType`, OpenRouter's `input_type`) and
+`title` labels a Gemini retrieval document; providers without them ignore both. `with` embeds
+images, audio, video, or PDFs with the text on Gemini, OpenRouter, and GPUStack; pass
+`Option::<String>::None` as the input to embed attachments alone. `provider_options` is merged into
+the request.
 
 ## Usage and Cost
 
@@ -93,9 +120,3 @@ Store vectors in a `pgvector` column or any vector store.
 ## Batching Embeddings
 
 `rust_llm::embed_later` stages an embedding for a provider batch. See [Batches](batches.md).
-
-## Not ported
-
-- `task_type:` and `title:` (Vertex AI), and `with:` media embeddings.
-- Sparse vectors and extra `provider_options`.
-- Gemini embedding batches.

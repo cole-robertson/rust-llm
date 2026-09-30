@@ -45,20 +45,42 @@ RustLLM keeps RubyLLM's event names with `.rust_llm` in place of `.ruby_llm`:
 | `workflow.ruby_llm` | `workflow.rust_llm` | `rust_llm::workflow`, `Workflow::run` |
 | `workflow_step.ruby_llm` | `workflow_step.rust_llm` | `Workflow::step` |
 | `request.ruby_llm` | `request.rust_llm` | every HTTP call through a provider connection, retries included |
-| `usage.ruby_llm` | `usage.rust_llm` | every finished chat or compaction attempt (retries, failures, cancellations) |
+| `usage.ruby_llm` | `usage.rust_llm` | every finished provider attempt (retries, failures, cancellations), including one-shot operations and results collected from a batch |
 | `chat.ruby_llm` | `chat.rust_llm` | each completion (`ask`, `complete`, `step`, `generate`) |
 | `compaction.ruby_llm` | `compaction.rust_llm` | `Chat::compact` |
 | `tool_call.ruby_llm` | `tool_call.rust_llm` | each local tool execution |
 | `embedding.ruby_llm` | `embedding.rust_llm` | `rust_llm::embed` |
 | `image.ruby_llm` | `image.rust_llm` | `rust_llm::paint` |
+| `speech.ruby_llm` | `speech.rust_llm` | `rust_llm::speak`, `speak_stream` |
+| `transcription.ruby_llm` | `transcription.rust_llm` | `rust_llm::transcribe`, `transcribe_stream` |
+| `moderation.ruby_llm` | `moderation.rust_llm` | `rust_llm::moderate` |
+| `ocr.ruby_llm` | `ocr.rust_llm` | `rust_llm::ocr` |
+| `rerank.ruby_llm` | `rerank.rust_llm` | `rust_llm::rerank` |
+| `tokenization.ruby_llm` | `tokenization.rust_llm` | `rust_llm::tokenize` |
+| `video.ruby_llm` | `video.rust_llm` | `rust_llm::animate` |
+| `video_job.ruby_llm` | `video_job.rust_llm` | `rust_llm::animate_later` |
 | `judgment.ruby_llm` | `judgment.rust_llm` | `rust_llm::judge`, `Judge::judge` |
 | `batch.ruby_llm` | `batch.rust_llm` | `rust_llm::batch` submission |
 | `models.refresh.ruby_llm` | `models.refresh.rust_llm` | `rust_llm::models::refresh` |
 
 Payloads carry RubyLLM's keys. Value objects become their `to_h` (`tokens`, `cost`, `response`,
 `input_messages`), and Ruby objects without a JSON form (`chat`, `tool`, `model_info`) are left out.
-`tokens` and `cost` are always present on chat, embedding, and image events; their fields are
-missing when the provider did not report them.
+`tokens` and `cost` are always present on chat, embedding, image, and other billed one-shot
+events; their fields are missing when the provider did not report them.
+
+The one-shot options structs (`EmbedOptions`, `PaintOptions`, `SpeakOptions`,
+`TranscribeOptions`, `ModerateOptions`, `OcrOptions`, `RerankOptions`, `AnimateOptions`,
+`JudgeOptions`) take RubyLLM's `metadata:` as `metadata: Option<Value>`. It is added to the event
+payload and never sent to the provider:
+
+```rust,no_run
+use serde_json::json;
+
+# async fn run() -> rust_llm::Result<()> {
+let options = rust_llm::EmbedOptions { metadata: Some(json!({ "document_id": 42 })), ..Default::default() };
+rust_llm::embed("Rust", options).await?;
+# Ok(()) }
+```
 
 Payloads include message content, tool arguments, and provider responses. Only export or log them
 when your application policy allows it.
@@ -101,12 +123,9 @@ rust_llm::instrument(&config, "index.my_app", payload, async { Ok(()) }).await?;
 # Ok(()) }
 ```
 
-## Not ported
+## Differences from RubyLLM
 
-- Events for operations RustLLM does not instrument yet: `moderation`, `ocr`, `rerank`, `speech`,
-  `transcription`, `tokenization`, `video`, `video_job`, `research_job`. Their `usage.rust_llm`
-  events are not emitted either; only chat and compaction attempts report `usage.rust_llm`.
-- `usage.rust_llm` for results collected from a batch.
-- Per-call `metadata:` on one-shot operations (`embed`, `paint`, ...).
-- `ActiveSupport::Notifications` integration: write an instrumenter that forwards to your
-  observability stack.
+- Event names end in `.rust_llm` instead of `.ruby_llm`.
+- There is no `ActiveSupport::Notifications`: write an instrumenter that forwards to your
+  observability stack, or subscribe to the `tracing` spans.
+- Hosted research (`research_job.ruby_llm`) belongs to Vertex AI, which is not ported.

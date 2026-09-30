@@ -225,22 +225,154 @@ chat.add_message(rust_llm::Message::assistant("(earlier context trimmed)"));
 # }
 ```
 
-## Prompt Caching Boundaries
+## Prompt Caching
+
+```ruby
+chat.with_caching                 # provider-default prompt caching
+chat.with_caching(ttl: "1h")
+chat.with_instructions(policy).cache_until_here
+chat.with_caching(id: cache)      # a Gemini explicit cache
+chat.with_caching(false)
+```
 
 ```rust,no_run
-# fn run(mut chat: rust_llm::Chat) -> rust_llm::Result<()> {
-chat.add_message(rust_llm::Message::user("<a long shared document>"));
+use serde_json::json;
+
+# async fn run(policy: String) -> rust_llm::Result<()> {
+let mut chat = rust_llm::chat_with("claude-haiku-4-5")?
+    .with_caching(json!(true))?
+    .with_caching(json!({ "ttl": "1h" }))?
+    .with_instructions(policy);
 chat.cache_until_here()?; // marks the last message as a cache boundary
+
+// Gemini explicit caches: create the resource once, reference it from chats.
+let options = rust_llm::CacheOptions { model: "gemini-2.5-flash", ttl: Some(rust_llm::Ttl::Seconds(3600)), ..Default::default() };
+let cache = rust_llm::cache("<the handbook>", options).await?;
+let mut gemini = rust_llm::chat_with("gemini-2.5-flash")?.with_caching(json!({ "id": cache.name }))?;
+gemini.ask("What does the handbook say about releases?").await?;
 # Ok(()) }
 ```
 
-## Not ported
+`with_caching` takes `true`, `false`, or an object (`key`, `ttl`, `mode`, `id`); calling it again
+replaces the earlier options. `CachedContent` also has `find`, `renew(ttl)`, and `delete`. Read the
+result in `response.tokens().cache_read` and `cache_write`.
 
-- `with_caching`, `with_citations`, `with_compaction`, `compact`, `with_end_user`, `count_tokens`.
-  Citations that a provider returns anyway are still parsed into `message.citations`.
-- `with_context`: build the chat with `Chat::with_config` instead.
-- `with_model(nil)` is `with_default_model()`; `with_temperature(None)`, `with_max_output_tokens(None)`, `with_provider_options(Value::Null)`, and `with_headers([])` clear a setting.
-- Prompt rendering from `app/prompts` (`RubyLLM.render_prompt`).
-- Perplexity's `router_chat_completions` protocol. `ProtocolName` has `ChatCompletions`,
-  `Responses`, `Anthropic`, and `Gemini`.
-- Instrumentation events.
+## Citations
+
+```ruby
+chat = RubyLLM.chat(model: "claude-sonnet-4-6").with_citations
+response = chat.ask "Who created Ruby?", with: "facts.txt"
+response.citations.first.cited_text
+```
+
+```rust,no_run
+# async fn run() -> rust_llm::Result<()> {
+let mut chat = rust_llm::chat_with("claude-haiku-4-5")?.with_citations(true);
+let response = chat.ask_with("Who created Rust?", vec!["facts.txt".into()]).await?;
+for citation in &response.citations {
+    println!("{:?}: {:?}", citation.title, citation.cited_text);
+}
+# Ok(()) }
+```
+
+Citations from web search and grounding arrive without `with_citations`. A tool can return
+`rust_llm::SearchResults` so the model cites its documents (see [Tools](tools.md)).
+
+## End Users and Compaction
+
+```ruby
+chat.with_end_user("user-42")
+chat.with_compaction(at: 50_000, instructions: "Keep every decision.")
+summary = chat.compact
+```
+
+```rust,no_run
+use serde_json::json;
+
+# async fn run() -> rust_llm::Result<()> {
+let mut chat = rust_llm::chat_with("claude-haiku-4-5")?
+    .with_end_user(Some("user-42"))
+    .with_compaction(json!({ "at": 50_000, "instructions": "Keep every decision." }))?;
+chat.ask("Let's go through the whole migration plan.").await?;
+
+// Manual compaction (OpenAI and xAI Responses): later requests send the compacted context,
+// while `chat.messages()` keeps every earlier message.
+let mut grok = rust_llm::Chat::new(Some("grok-4.3"), Some("xai"))?;
+grok.ask("The project codename is Thimble.").await?;
+let summary = grok.compact().await?;
+println!("{:?}", summary.cost(None).total());
+# Ok(()) }
+```
+
+`with_end_user` sends an opaque per-user id where the provider has a field for it.
+`with_compaction` accepts `true`, `false`, or `at`, `instructions`, and `pause_after`; other keys
+fail with `Error::Argument`.
+
+## Counting Tokens
+
+```ruby
+RubyLLM.count_tokens("Explain Ruby blocks.", model: "claude-haiku-4-5")
+chat.count_tokens("What should I check in a renewal clause?")
+```
+
+```rust,no_run
+# async fn run(chat: rust_llm::Chat) -> rust_llm::Result<()> {
+let count = rust_llm::count_tokens("Explain Rust closures.", Some("claude-haiku-4-5"), None).await?;
+let next = chat.count_tokens(Some("What should I check in a renewal clause?")).await?;
+let history = chat.count_tokens(None).await?;
+# Ok(()) }
+```
+
+Anthropic, Gemini, and OpenAI's Responses API count tokens. The count covers instructions, tools,
+schema, thinking, and attachments; provider tools, provider options, compaction, and
+`before_request` hooks are not included. See [Cost and Usage](cost-and-usage.md) for
+`rust_llm::tokenize`.
+
+## Isolated Configuration
+
+```ruby
+ctx = RubyLLM.context { |config| config.openai_api_key = tenant.key }
+ctx.chat.ask "Hello"
+chat.with_context(ctx)
+```
+
+```rust,no_run
+# async fn run(tenant_key: String, chat: rust_llm::Chat) -> rust_llm::Result<()> {
+let ctx = rust_llm::context(|config| {
+    config.openai_api_key(tenant_key);
+});
+ctx.chat(None, None)?.ask("Hello").await?;
+let chat = chat.with_context(Some(&ctx))?; // `None` goes back to the global configuration
+# Ok(()) }
+```
+
+See [Configuration](configuration.md#isolated-configurations).
+
+## Protocols
+
+`ProtocolName` covers every protocol of the ported providers: `ChatCompletions`, `Responses`,
+`Anthropic`, `Gemini`, `Interactions` (Gemini's Interactions API), `Conversations` (Mistral's
+Conversations API), and `RouterChatCompletions` (Perplexity Router):
+
+```ruby
+RubyLLM.chat(model: "perplexity/kimi-k3", provider: :perplexity, protocol: :router_chat_completions)
+```
+
+```rust,no_run
+use rust_llm::{Chat, ProtocolName};
+
+# fn run() -> rust_llm::Result<()> {
+let router = Chat::new(Some("perplexity/kimi-k3"), Some("perplexity"))?
+    .with_protocol(ProtocolName::RouterChatCompletions);
+let conversations = Chat::new(Some("mistral-small-latest"), Some("mistral"))?
+    .with_protocol(ProtocolName::Conversations);
+# Ok(()) }
+```
+
+## Differences from RubyLLM
+
+- Clearing a setting: `with_model(nil)` is `with_default_model()`; `with_temperature(None)`,
+  `with_max_output_tokens(None)`, `with_provider_options(Value::Null)`, and `with_headers([])`
+  clear theirs.
+- Prompt templates are Jinja, not ERB (see [Prompt Templates](prompts.md)).
+- Instrumentation events end in `.rust_llm` (see [Instrumentation](instrumentation.md)).

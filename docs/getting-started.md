@@ -1,7 +1,7 @@
 # Getting Started
 
 Install RustLLM, configure a provider, and try chats, streaming, files, structured output, tools,
-agents, images, embeddings, and cost tracking. Each section shows one feature and links to its
+agents, images, embeddings, audio, and cost tracking. Each section shows one feature and links to its
 guide. The API follows [RubyLLM](https://github.com/crmne/ruby_llm) 2.0, so the Ruby original sits
 next to each Rust sample.
 
@@ -246,7 +246,26 @@ See [Cost and Usage](cost-and-usage.md).
 `Chat`/`Message` models to a Loco app; `rust-llm generate chat_ui` adds Inertia + React chat pages.
 See [Generators](generators.md) and [Persistence with Loco](persistence-loco.md).
 
-## Not ported
+## Audio, Video, and More
 
-`animate` (video), `speak`, `transcribe`, `ocr`, `moderate`, and `rerank` have no Rust
-equivalent yet. Neither do Active Storage attachments or `ruby_llm:load_models`.
+```ruby
+RubyLLM.speak("Hello, welcome to RubyLLM!").save("welcome.mp3")
+RubyLLM.transcribe("meeting.wav").text
+RubyLLM.moderate("I love programming in Ruby.").flagged?
+```
+
+```rust,no_run
+# async fn run() -> rust_llm::Result<()> {
+rust_llm::speak("Hello, welcome to RustLLM!", Default::default()).await?.save("welcome.mp3")?;
+let text = rust_llm::transcribe("meeting.wav", Default::default()).await?.text;
+let flagged = rust_llm::moderate("I love programming in Rust.", Default::default()).await?.is_flagged();
+# Ok(()) }
+```
+
+See [Audio](audio.md), [Video](video.md), and
+[Moderation, OCR, Rerank, and Tokenization](moderation-ocr-rerank.md).
+
+## What Is Left Out
+
+The Bedrock, Vertex AI, Azure, Cohere, ElevenLabs, and Deepgram providers, and Rails-only
+mechanics such as Active Storage. See [Migrating from RubyLLM](migrating-from-rubyllm.md#what-is-left-out).
