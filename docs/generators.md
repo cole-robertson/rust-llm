@@ -39,9 +39,8 @@ cargo fmt --all && cargo loco db migrate
 
 Adds:
 
-- `rust_llm` and `rust_llm_loco` to `Cargo.toml`, and `rust_llm_loco` to `migration/Cargo.toml`.
-  The crates are not on crates.io yet, so pass `--path` to a checkout (without it the generator
-  writes version `2.0.0` and prints a note).
+- `rust_llm` and `rust_llm_loco` to `Cargo.toml`, and `rust_llm_loco` to `migration/Cargo.toml`,
+  at version `2.0.0` from crates.io. Pass `--path` to a checkout to depend on a local copy instead.
 - `migration/src/m<timestamp>_create_rust_llm_records.rs`, registered in the migrator. It runs
   `rust_llm_loco::migrations()` (see [Persistence with Loco](persistence-loco.md)).
 - `src/models/chats.rs` and `src/models/messages.rs`, re-exporting the `rust_llm_loco` entities

@@ -46,9 +46,6 @@ fn add_dependencies(g: &mut Generator, rust_llm_path: Option<&str>) -> Result<()
     g.dependency("Cargo.toml", "rust_llm", &core);
     g.dependency("Cargo.toml", "rust_llm_loco", &loco);
     g.dependency("migration/Cargo.toml", "rust_llm_loco", &loco);
-    if rust_llm_path.is_none() {
-        g.note("  Note: rust_llm is not published to crates.io yet; re-run with --path <rust-llm checkout> --force or edit the version to a path/git dependency.");
-    }
     Ok(())
 }
 

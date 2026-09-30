@@ -7,13 +7,14 @@ next to each Rust sample.
 
 ## Installation
 
-`rust_llm` is not on crates.io yet. Depend on the repository:
-
 ```toml
 [dependencies]
-rust_llm = { git = "https://github.com/cole-robertson/rust-llm" }
+rust_llm = "2.0"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
+
+For unreleased changes, depend on the repository instead:
+`rust_llm = { git = "https://github.com/cole-robertson/rust-llm" }`.
 
 Every call that talks to a provider is `async` and returns `rust_llm::Result`.
 
