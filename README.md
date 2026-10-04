@@ -108,7 +108,7 @@ record.complete(&ctx.db, &mut chat).await?;
 - **Benchmarks:** [`docs/BENCHMARK.md`](docs/BENCHMARK.md) compares RustLLM with RubyLLM + YJIT.
 
 Over 2,000 tests; CI runs them with rustfmt, `clippy -D warnings`, docs, MSRV builds, and a
-package check. `bin/fw cargo test --workspace` runs them on the `framework` build box;
+package check. `bin/fw cargo test --workspace` runs them on the build box;
 `bin/convert-cassettes` turns more upstream cassettes into fixtures.
 
 ## Generators

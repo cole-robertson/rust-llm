@@ -29,8 +29,8 @@ No test touches the network or needs an API key. `cargo run -p rust_llm --exampl
 RubyLLM's README live against Anthropic (`ANTHROPIC_API_KEY`).
 
 Maintainers build on a remote box to keep laptops cool: `bin/fw <command>` rsyncs the tree
-(minus `target/`, `upstream/`, `.git`) to `framework:~/src/tries/rust-llm` and runs the command
-there, e.g. `bin/fw cargo test -p rust_llm --test cassette_replay`. The sync uses `--delete`, so
+(minus `target/`, `upstream/`, `.git`) to `rebulk:~/src/tries/rust-llm` (or `$BUILD_HOST`) and runs
+the command there, e.g. `bin/fw cargo test -p rust_llm --test cassette_replay`. The sync uses `--delete`, so
 don't keep files you care about only in the remote copy.
 
 ## Verifying against RubyLLM's cassettes
