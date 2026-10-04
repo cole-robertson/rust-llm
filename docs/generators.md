@@ -6,7 +6,8 @@
 ## Installing the CLI
 
 ```sh
-cargo install --path crates/rust_llm_cli   # from a checkout of this repository
+cargo install rust_llm_cli
+# or, from a checkout of this repository: cargo install --path crates/rust_llm_cli
 rust-llm --help
 ```
 

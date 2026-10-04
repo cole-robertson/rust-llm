@@ -113,7 +113,7 @@ package check. `bin/fw cargo test --workspace` runs them on the `framework` buil
 
 ## Generators
 
-`cargo install --path crates/rust_llm_cli`, then from a Loco app:
+`cargo install rust_llm_cli`, then from a Loco app:
 
 ```
 rust-llm generate install        # deps, migration, initializer, Chat/Message models
