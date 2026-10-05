@@ -1,21 +1,20 @@
 # RustLLM Guides
 
-User guides for RustLLM, a 1:1 Rust port of [RubyLLM](https://github.com/crmne/ruby_llm) 2.0. They
-follow the structure of RubyLLM's own guides, show the Ruby original next to the Rust, and cover
-what the port implements. Guides end with "Differences from RubyLLM" where the Rust API or
-behavior differs. The providers RustLLM leaves out (Bedrock, Vertex AI, Azure, Cohere,
-ElevenLabs, Deepgram) are listed in [Migrating from RubyLLM](migrating-from-rubyllm.md#what-is-left-out).
+Each guide covers one feature in depth. Every Rust sample compiles: `docs/check` includes each
+guide as a doctest (`cargo test -p rust_llm_docs --doc`). Samples are `no_run`, so nothing calls a
+provider.
 
-Every Rust sample compiles: `docs/check` includes each guide as a doctest
-(`cargo test -p rust_llm_docs --doc`). Samples are `no_run`, so nothing calls a provider.
+RustLLM is a port of [RubyLLM](https://github.com/crmne/ruby_llm) 2.0, and the guides follow the
+structure of RubyLLM's own, with the Ruby original shown next to the Rust.
+[RubyLLM vs RustLLM](rubyllm.md) maps the whole API and lists what is left out.
 
 ## Getting Started
 
 - [Getting Started](getting-started.md): install, configure, and try each feature once.
 - [Configuration](configuration.md): API keys, default models, timeouts and retries, isolated
   configurations.
-- [Migrating from RubyLLM](migrating-from-rubyllm.md): naming conventions and a Ruby-to-Rust cheat
-  sheet for the whole API.
+- [RubyLLM vs RustLLM](rubyllm.md): how the port is verified, naming conventions, and a
+  Ruby-to-Rust cheat sheet for the whole API.
 - [Benchmark](BENCHMARK.md): RustLLM vs RubyLLM 2.0 against a mock provider, including the cases
   where Ruby is close or wins.
 

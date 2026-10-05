@@ -1,6 +1,6 @@
 [package]
 name = "rust_llm_loco"
-description = "RubyLLM's acts_as_chat for Loco: persist chats, messages, tool calls, and usage with SeaORM."
+description = "Persist rust_llm chats, messages, tool calls, and usage in Loco apps with SeaORM."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

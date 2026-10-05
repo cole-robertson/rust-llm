@@ -1,146 +1,263 @@
 # RustLLM
 
-A 1:1 Rust port of [RubyLLM](https://github.com/crmne/ruby_llm) **2.0.0** (upstream `1e91b30`),
-plus `rust_llm_loco`, the port of its Rails `acts_as_chat` layer for Loco's default ORM, SeaORM.
+One Rust API for chat, tools, agents, structured output, streaming, embeddings, images, audio,
+batches, MCP, and judgments across OpenAI, Anthropic, Gemini, and ten more providers. Includes
+persistence for [Loco](https://loco.rs) apps and generators for a full chat UI.
 
-The API keeps RubyLLM's shape, and the wire format matches it exactly. The tests replay RubyLLM's
-own recorded VCR cassettes, and every request this crate sends must equal the body RubyLLM recorded.
+[![crates.io](https://img.shields.io/crates/v/rust_llm.svg)](https://crates.io/crates/rust_llm)
+[![docs.rs](https://img.shields.io/docsrs/rust_llm)](https://docs.rs/rust_llm)
+[![CI](https://github.com/cole-robertson/rust-llm/actions/workflows/ci.yml/badge.svg)](https://github.com/cole-robertson/rust-llm/actions/workflows/ci.yml)
 
-```rust
-// RubyLLM.chat.ask "What's the best way to learn Ruby?"
-rust_llm::chat()?.ask("What's the best way to learn Rust?").await?;
-
-// chat.with_tools(Weather).ask "What's the weather in Berlin?"
-let mut chat = rust_llm::chat_with("claude-haiku-4-5")?.with_tool(Weather);
-chat.ask("What's the weather in Berlin?").await?;
-
-// chat.ask("Tell me a story") { |chunk| print chunk.content }
-chat.ask_stream("Tell me a story", |chunk| print!("{}", chunk.content())).await?;
-
-// chat.with_schema(ProductSchema).ask(...).parsed
-chat.with_schema_for::<Product>().ask("Analyze this product").await?.parsed()?;
-
-// WeatherAssistant.new.ask "..."   (impl Agent for WeatherAssistant { fn model, fn instructions, fn tools })
-WeatherAssistant.chat()?.ask("What's the weather in Berlin?").await?;
-
-// RubyLLM.embed "Ruby is elegant and expressive"
-rust_llm::embed("Rust is fast and safe", Default::default()).await?.vectors;
-
-// RubyLLM.paint "a sunset over mountains in watercolor style"
-rust_llm::paint("a sunset over mountains in watercolor style", Default::default()).await?;
-
-// chats = tickets.map { |t| RubyLLM.chat.ask_later(t.body) }; RubyLLM.batch(chats)
-let batch = rust_llm::batch(chats).await?;   // later: batch.refresh().await?; batch.messages()
-
-// file = RubyLLM.upload("contract.pdf"); chat.ask "Summarize", with: file
-let file = rust_llm::upload("contract.pdf", Default::default()).await?;
-chat.ask_with("Summarize this", vec![file.into()]).await?;
-
-// class Urgency < RubyLLM::Judge; probability :urgent, "Does this need attention today?"; end
-let urgency = rust_llm::Judge::new().probability("urgent", "Does this need attention today?")?;
-urgency.judge("Please refund the duplicate charge today.").await?.probability("urgent"); // => Some(0.91)
-
-// chat.with_mcp(RubyLLM.mcp(command: ["npx", "-y", "@modelcontextprotocol/server-github"]))
-let github = rust_llm::mcp::Mcp::command(["npx", "-y", "@modelcontextprotocol/server-github"]).build()?;
-chat.with_mcp(github).ask("List my open PRs").await?;
+```toml
+[dependencies]
+rust_llm = "2.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
-`cargo run -p rust_llm --example readme` runs the whole RubyLLM README against a live provider.
+```rust,no_run
+#[tokio::main]
+async fn main() -> rust_llm::Result<()> {
+    let mut chat = rust_llm::chat()?;
+    let answer = chat.ask("What's the best way to learn Rust?").await?;
+    println!("{}", answer.content());
+    Ok(())
+}
+```
 
-## Mapping
+API keys come from the environment (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, ...),
+or set them in code:
 
-| RubyLLM | rust_llm |
-|---|---|
-| `RubyLLM.configure { \|c\| c.openai_api_key = ... }` | `rust_llm::configure(\|c\| { c.openai_api_key(...); })`. Env vars like `OPENAI_API_KEY` are read automatically |
-| `RubyLLM.chat(model:, provider:)` | `Chat::new(Some(model), Some(provider))`, `rust_llm::chat()` |
-| `ask`, `say`, `ask_later`, `complete`, `step`, `generate`, `run_tools`, `complete?` | same names; `is_complete()` |
-| `ask(msg, with: files)` | `ask_with(msg, vec![Attachment::new("ruby.png")])` |
-| `ask(msg) { \|chunk\| }` | `ask_stream(msg, \|chunk\| ..)` |
-| `with_instructions`, `with_tools`, `with_tool_options(choice:, calls:)`, `with_model`, `with_temperature`, `with_max_output_tokens`, `with_thinking`, `with_schema`, `with_provider_options`, `with_headers`, `with_fallbacks` | same names, builder style |
-| `before_message`, `after_message`, `before_tool_call`, `after_tool_result`, `before_fallback`, `after_fallback`, `before_request` | same names, closures |
-| `approve`, `deny`, `awaiting_approval?`, `pending_approvals`, `cancel` | same; `CancelHandle` for other tasks |
-| `class Weather < RubyLLM::Tool` (`description`, `parameter`, `execute`, `requires_approval`) | `impl Tool for Weather`, `Parameter::new(..)`, or a `schemars` schema |
-| `class X < RubyLLM::Agent` | `impl Agent for X` |
-| `Message`, `Chunk`, `ToolCall`, `Tokens`, `Cost`, `Thinking`, `Citation`, `Attachment` | same types |
-| `chat.tokens`, `chat.cost` (per-attempt usage ledger) | same; retries and fallbacks each get a `UsageEntry` |
-| `RubyLLM.models.find`, `aliases.json`, provider preference | `rust_llm::models().find(id, provider)`, same bundled `models.json`/`aliases.json` |
-| `Provider` + `Protocols::{ChatCompletions, Responses, Anthropic, Gemini}` | `Provider` enum + `protocols::{chat_completions, responses, anthropic, gemini}` |
-| Error classes + `ErrorMiddleware` status/pattern mapping, Faraday retry | `Error` enum, same mapping; same retry rules (never retries a stream that already delivered) |
-| `acts_as_chat` / `acts_as_message` / `acts_as_tool_call`, `rust_llm_models`, `rust_llm_usages` | `rust_llm_loco::ChatRecord`; same tables and columns via SeaORM migrations |
-| `RubyLLM.paint` (generate, edit with reference images) | `rust_llm::paint` → `Image` (`save`, `to_blob`, `cost`) |
-| `RubyLLM.batch`, `Batch.find`, `embed_later` | `rust_llm::batch`, `Batch::find`, `embed_later`; batch-tier pricing |
-| `RubyLLM.upload` / `download`, `UploadedFile`, auto-upload of large attachments | `rust_llm::upload` / `download`, `UploadedFile` |
-| `RubyLLM.mcp`, `chat.with_mcp`, MCP prompts/resources, input requests | `rust_llm::mcp` (stdio + streamable HTTP), `with_mcp`, `answer`/`decline` |
-| `with_provider_tools` (web search, code execution, remote MCP) | `with_provider_tools` |
-| `RubyLLM::Judge` (`probability`/`choice`/`score`, `inputs`), `RubyLLM.judge(questions:)`, TypeSafe/Jev and Jev-compatible servers | `rust_llm::Judge`, `rust_llm::judge`, `Provider::TypeSafe` (`typesafe_api_key`/`typesafe_api_base`, `default_judgment_model = "jev-latest"`) |
-| `rails g ruby_llm:install / tool / agent / schema / chat_ui / provider / upgrade` | `rust-llm generate install / tool / agent / schema / chat_ui / provider / upgrade` (Loco + Inertia + React + shadcn) |
+```rust,no_run
+rust_llm::configure(|c| {
+    c.anthropic_api_key(std::env::var("ANTHROPIC_API_KEY").unwrap_or_default());
+    c.default_model = "claude-haiku-4-5".into();
+});
+```
 
-Providers: OpenAI (Responses by default, Chat Completions for audio/search models), Anthropic,
-Gemini, DeepSeek, Mistral, OpenRouter, xAI, Perplexity (Agent API), Ollama, Ollama Cloud,
-GPUStack, Hetzner, and TypeSafe (Jev judgments over the System One API).
+## Chat
 
-## Loco / SeaORM
+```rust,no_run
+# async fn run() -> Result<(), Box<dyn std::error::Error>> {
+let mut chat = rust_llm::chat_with("claude-haiku-4-5")?
+    .with_instructions("You are a concise Rust mentor.")
+    .with_temperature(0.2);
 
-```rust
-// migration/src/lib.rs
-migrations.extend(rust_llm_loco::migrations());
+chat.ask("What is ownership?").await?;
+let reply = chat.ask("Show me an example.").await?; // the chat keeps its history
+println!("{}", reply.content());
 
-// a controller or job
+// Files: images, PDFs, audio, video, by path or URL
+chat.ask_with("What's in this picture?", vec!["photo.jpg".into()]).await?;
+
+// Streaming
+chat.ask_stream("Tell me a story", |chunk| print!("{}", chunk.content())).await?;
+# Ok(()) }
+```
+
+## Tools
+
+```rust,no_run
+use rust_llm::{Parameter, Tool, ToolCall, ToolError, ToolResult};
+use serde_json::{json, Map, Value};
+
+struct Weather;
+
+#[async_trait::async_trait]
+impl Tool for Weather {
+    fn description(&self) -> String {
+        "Get the current weather for a location".into()
+    }
+
+    fn parameters(&self) -> Vec<Parameter> {
+        vec![Parameter::new("latitude"), Parameter::new("longitude")]
+    }
+
+    async fn execute(&self, args: Map<String, Value>, _: &ToolCall) -> Result<ToolResult, ToolError> {
+        Ok(json!({ "temperature": 14.2, "lat": args["latitude"], "lon": args["longitude"] }).into())
+    }
+}
+
+# async fn run() -> Result<(), Box<dyn std::error::Error>> {
+let mut chat = rust_llm::chat()?.with_tool(Weather);
+chat.ask("What's the weather in Berlin?").await?;
+# Ok(()) }
+```
+
+Tools can require approval before they run (`requires_approval`), report progress, or come from an
+MCP server.
+
+## Agents
+
+```rust,no_run
+# use rust_llm::{Tool, ToolCall, ToolError, ToolResult};
+# struct Weather;
+# #[async_trait::async_trait]
+# impl Tool for Weather {
+#     fn description(&self) -> String { String::new() }
+#     async fn execute(&self, _: serde_json::Map<String, serde_json::Value>, _: &ToolCall) -> Result<ToolResult, ToolError> { Ok("".into()) }
+# }
+use std::sync::Arc;
+use rust_llm::{Agent, SharedTool};
+
+struct WeatherAssistant;
+
+impl Agent for WeatherAssistant {
+    fn model(&self) -> Option<&str> {
+        Some("claude-haiku-4-5")
+    }
+    fn instructions(&self) -> Option<String> {
+        Some("Be concise and always use tools for weather.".into())
+    }
+    fn tools(&self) -> Vec<SharedTool> {
+        vec![Arc::new(Weather)]
+    }
+}
+
+# async fn run() -> Result<(), Box<dyn std::error::Error>> {
+WeatherAssistant.chat()?.ask("What's the weather in Paris?").await?;
+# Ok(()) }
+```
+
+## Structured output
+
+```rust,no_run
+#[derive(schemars::JsonSchema)]
+struct Product {
+    name: String,
+    price: f64,
+    features: Vec<String>,
+}
+
+# async fn run() -> Result<(), Box<dyn std::error::Error>> {
+let reply = rust_llm::chat()?
+    .with_schema_for::<Product>()
+    .ask("Invent a mechanical keyboard for Rust programmers.")
+    .await?;
+let product = reply.parsed()?; // Some({"name": "...", "price": 149.0, "features": [...]})
+# Ok(()) }
+```
+
+## Embeddings, images, audio
+
+```rust,no_run
+# async fn run() -> Result<(), Box<dyn std::error::Error>> {
+let embedding = rust_llm::embed("Rust is fast and safe", Default::default()).await?;
+
+let image = rust_llm::paint("a sunset over mountains in watercolor", Default::default()).await?;
+image.into_image().save("sunset.png").await?;
+
+rust_llm::speak("Welcome aboard!", Default::default()).await?.save("welcome.mp3")?;
+let text = rust_llm::transcribe("meeting.wav", Default::default()).await?.text;
+# Ok(()) }
+```
+
+## MCP
+
+```rust,no_run
+use rust_llm::Mcp;
+
+# async fn run() -> Result<(), Box<dyn std::error::Error>> {
+let github = Mcp::command(["npx", "-y", "@modelcontextprotocol/server-github"]).build()?;
+let mut chat = rust_llm::chat()?.with_mcp(github);
+chat.ask("List my open pull requests.").await?;
+# Ok(()) }
+```
+
+Stdio and Streamable HTTP servers, their resources and prompts, input requests, and OAuth.
+
+## Batches
+
+Send many chats at the provider's batch discount and collect the answers later:
+
+```rust,no_run
+# async fn run(tickets: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
+let mut chats = Vec::new();
+for ticket in &tickets {
+    let mut chat = rust_llm::chat()?;
+    chat.ask_later(ticket.as_str())?;
+    chats.push(chat);
+}
+let mut batch = rust_llm::batch(chats).await?;
+
+// later
+if batch.refresh().await?.is_complete() {
+    for message in batch.messages().await?.into_iter().flatten() {
+        println!("{}", message.content());
+    }
+}
+# Ok(()) }
+```
+
+## Judgments
+
+Calibrated probabilities, choices, and scores from a judgment model such as TypeSafe's Jev:
+
+```rust,no_run
+# async fn run() -> Result<(), Box<dyn std::error::Error>> {
+let urgency = rust_llm::Judge::new().probability("urgent", "Does this need attention today?")?;
+let judgment = urgency.judge("Please refund the duplicate charge today.").await?;
+judgment.probability("urgent"); // Some(0.91)
+# Ok(()) }
+```
+
+## Cost and usage
+
+```rust,no_run
+# async fn run(mut chat: rust_llm::Chat) -> Result<(), Box<dyn std::error::Error>> {
+let reply = chat.ask("Summarize our conversation.").await?;
+reply.tokens().input;   // Some(812)
+chat.cost().total();    // Some(0.0042), across every request including retries and fallbacks
+# Ok(()) }
+```
+
+## Loco
+
+`rust_llm_loco` persists chats, messages, tool calls, and usage with SeaORM, so a conversation can
+continue in another request or background job:
+
+```rust,no_run
+# use rust_llm::{Tool, ToolCall, ToolError, ToolResult};
+# struct Weather;
+# #[async_trait::async_trait]
+# impl Tool for Weather {
+#     fn description(&self) -> String { String::new() }
+#     async fn execute(&self, _: serde_json::Map<String, serde_json::Value>, _: &ToolCall) -> Result<ToolResult, ToolError> { Ok("".into()) }
+# }
+use rust_llm_loco::ChatRecord;
+
+# struct Ctx { db: sea_orm::DatabaseConnection }
+# async fn run(ctx: Ctx) -> Result<(), Box<dyn std::error::Error>> {
 let record = ChatRecord::create(&ctx.db, "claude-haiku-4-5", None).await?;
 let mut chat = record.to_llm(&ctx.db).await?.with_tool(Weather);
 record.ask(&ctx.db, &mut chat, "What's the weather in Berlin?").await?;
-// rows: messages (user, assistant+tool call, tool, assistant), rust_llm_tool_calls, rust_llm_usages
-
-// a chat parked on requires_approval resumes from rows alone, in another request or job
-let mut chat = ChatRecord::find(&ctx.db, id).await?.to_llm(&ctx.db).await?.with_tool(DeleteEverything);
-record.approve(&ctx.db, &mut chat, &tool_call_id).await?;
-record.complete(&ctx.db, &mut chat).await?;
+# Ok(()) }
 ```
 
-## Verification
+The `rust-llm` CLI sets up a Loco app and generates an Inertia + React chat UI:
 
-- **Cassette replay:** tests replay RubyLLM's own recorded VCR cassettes (HTTP and WebSocket), and
-  every request RustLLM sends must be JSON-equal to the one RubyLLM recorded.
-- **Spec parity:** every applicable RubyLLM spec example is ported as a Rust test that cites it
-  (`// spec: file:line`); see the parity section below.
-- **Live:** `examples/readme.rs` (chat, streaming, tools, agents, structured output, cost) and
-  `examples/judge.rs` (TypeSafe Jev) run against real providers.
-- **Benchmarks:** [`docs/BENCHMARK.md`](docs/BENCHMARK.md) compares RustLLM with RubyLLM + YJIT.
-
-Over 2,000 tests; CI runs them with rustfmt, `clippy -D warnings`, docs, MSRV builds, and a
-package check. `bin/fw cargo test --workspace` runs them on the build box;
-`bin/convert-cassettes` turns more upstream cassettes into fixtures.
-
-## Generators
-
-`cargo install rust_llm_cli`, then from a Loco app:
-
-```
-rust-llm generate install        # deps, migration, initializer, Chat/Message models
-rust-llm generate chat_ui        # Inertia + React chat pages, controllers, a Loco worker
-rust-llm generate tool Weather   # src/tools/weather_tool.rs + React tool call/result components
-rust-llm generate agent Support  # src/agents/support.rs + src/prompts/support/instructions.txt
-rust-llm generate schema Product
+```sh
+cargo install rust_llm_cli
+rust-llm generate install        # dependencies, migration, initializer, Chat/Message models
+rust-llm generate chat_ui        # chat pages, controllers, and a background worker
+rust-llm generate tool Weather
+rust-llm generate agent Support
 ```
 
-Verified against a copy of the Loco + Inertia starter kit: it builds with no warnings, migrations
-run up and down, the frontend passes check/lint/build, and a chat round-trips through the worker.
-The chat UI polls for new messages while a reply is pending; it doesn't stream tokens.
+## Providers
 
-## Parity and what is left out
+OpenAI, Anthropic, Gemini, DeepSeek, Mistral, OpenRouter, xAI, Perplexity, Ollama, Ollama Cloud,
+GPUStack, Hetzner, and TypeSafe.
 
-[`docs/PARITY.md`](docs/PARITY.md) classifies all 3,747 examples in RubyLLM 2.0's spec suite:
-2,157 ported as Rust tests, 177 replayed from their own recorded cassettes, 1,413 not applicable
-(each with its reason), and **0 missing**. `bin/parity` regenerates it.
+## Docs
 
-Deliberately left out:
-- Providers: Bedrock, Vertex AI, Azure, Cohere, ElevenLabs, Deepgram (and so Vertex's
-  `research` / `research_later`).
-- Ruby-only mechanics with no Rust counterpart (ActiveRecord internals, Faraday adapters,
-  metaprogrammed DSLs). The persistence layer covers the same behavior with SeaORM.
+- [Guides](docs/README.md): every feature in depth, with samples that are compiled in CI
+- [API reference](https://docs.rs/rust_llm)
+- [RubyLLM vs RustLLM](docs/rubyllm.md): RustLLM is a port of
+  [RubyLLM](https://github.com/crmne/ruby_llm) 2.0; this page maps one to the other and explains
+  how the port is verified
+- [Benchmarks](docs/BENCHMARK.md)
+- [Contributing](CONTRIBUTING.md)
 
-Differences worth knowing:
-- Prompt templates are Jinja (minijinja) rather than ERB; see `docs/prompts.md`.
-- Instrumentation events end in `.rust_llm` instead of `.ruby_llm`; payload keys match.
-- MCP OAuth credentials stored by `rust_llm_loco` are encrypted with AES-256-GCM, but not in a
-  format Rails can read (and vice versa).
+## License
+
+MIT. RustLLM is a port of Carmine Paolino's RubyLLM; see [LICENSE](https://github.com/cole-robertson/rust-llm/blob/main/LICENSE).

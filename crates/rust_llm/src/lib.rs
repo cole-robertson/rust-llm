@@ -1,17 +1,13 @@
 //! # rust_llm
 //!
-//! A 1:1 Rust port of [RubyLLM](https://github.com/crmne/ruby_llm) 2.0: one API for chat, tools,
-//! agents, structured output, streaming, embeddings, images, batches, MCP, and judgments across
-//! providers. Requests match RubyLLM's wire format exactly; the tests replay RubyLLM's own recorded
-//! cassettes.
-//!
-//! ```ruby
-//! RubyLLM.chat.ask "What's the best way to learn Ruby?"
-//! ```
+//! One API for chat, tools, agents, structured output, streaming, embeddings, images, batches,
+//! MCP, and judgments across LLM providers.
 //!
 //! ```no_run
 //! # async fn run() -> rust_llm::Result<()> {
-//! rust_llm::chat()?.ask("What's the best way to learn Rust?").await?;
+//! let mut chat = rust_llm::chat()?;
+//! let answer = chat.ask("What's the best way to learn Rust?").await?;
+//! println!("{}", answer.content());
 //! # Ok(()) }
 //! ```
 //!
@@ -36,15 +32,12 @@
 //!
 //! ## Guides
 //!
-//! The [user guides](https://github.com/cole-robertson/rust-llm/tree/main/docs) follow RubyLLM's
-//! documentation, with the Ruby next to the Rust. The
-//! [migration guide](https://github.com/cole-robertson/rust-llm/blob/main/docs/migrating-from-rubyllm.md)
-//! maps the whole Ruby API to this crate.
-//!
-//! The module layout mirrors `lib/ruby_llm`: `chat`, `message`, `tool`, `agent`, `models`,
-//! `providers`, `protocols`, `transport`, `tokens`, `cost`. Names follow Ruby where Rust allows
-//! (`ask`, `ask_later`, `complete`, `step`, `with_tools`, `before_tool_call`, ...), with `?`-suffixed
-//! predicates spelled `is_*`.
+//! The [user guides](https://github.com/cole-robertson/rust-llm/tree/main/docs) cover each
+//! feature in depth. RustLLM is a port of [RubyLLM](https://github.com/crmne/ruby_llm) 2.0, and
+//! keeps its names where Rust allows (`ask`, `ask_later`, `complete`, `with_tools`,
+//! `before_tool_call`, ...), with `?`-suffixed predicates spelled `is_*`;
+//! [RubyLLM vs RustLLM](https://github.com/cole-robertson/rust-llm/blob/main/docs/rubyllm.md)
+//! maps one to the other.
 
 // `XAI` mirrors RubyLLM's provider name and is public API.
 #![allow(clippy::upper_case_acronyms)]

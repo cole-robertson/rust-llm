@@ -1,6 +1,6 @@
 # Contributing to RustLLM
 
-RustLLM is a 1:1 port of [RubyLLM](https://github.com/crmne/ruby_llm) 2.0. The rule for every
+RustLLM is a port of [RubyLLM](https://github.com/crmne/ruby_llm) 2.0. The rule for every
 change: **do what RubyLLM does**. Same public names (with `?` predicates spelled `is_*`), same
 behavior, same wire format. Cite the Ruby file you ported in a doc comment
 (`/// Port of lib/ruby_llm/...`).

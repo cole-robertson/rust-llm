@@ -1,22 +1,22 @@
 # rust_llm
 
-A 1:1 Rust port of [RubyLLM](https://github.com/crmne/ruby_llm) 2.0: one API for chat, tools,
-agents, structured output, streaming, embeddings, images, audio (speech and transcription), video,
-moderation, OCR, rerank, tokenization, batches, files, MCP (with OAuth), prompt templates,
-instrumentation, and judgments across OpenAI, Anthropic, Gemini, DeepSeek, Mistral, OpenRouter,
-xAI, Perplexity, Ollama, Ollama Cloud, GPUStack, Hetzner, and TypeSafe. Request bodies match the ones RubyLLM recorded, byte for byte as JSON.
+One API for chat, tools, agents, structured output, streaming, embeddings, images, audio, video,
+moderation, batches, files, MCP, and judgments across OpenAI, Anthropic, Gemini, DeepSeek, Mistral,
+OpenRouter, xAI, Perplexity, Ollama, Ollama Cloud, GPUStack, Hetzner, and TypeSafe.
 
 ```rust,no_run
 # async fn run() -> rust_llm::Result<()> {
-// RubyLLM.chat.ask "What's the best way to learn Ruby?"
-let answer = rust_llm::chat()?.ask("What's the best way to learn Rust?").await?;
+let mut chat = rust_llm::chat()?;
+let answer = chat.ask("What's the best way to learn Rust?").await?;
 println!("{}", answer.content());
 # Ok(()) }
 ```
 
+- Examples and overview: <https://github.com/cole-robertson/rust-llm>
 - Guides: <https://github.com/cole-robertson/rust-llm/tree/main/docs>
 - API docs: <https://docs.rs/rust_llm>
 - Persistence for Loco/SeaORM: [`rust_llm_loco`](https://crates.io/crates/rust_llm_loco)
 - Generators: [`rust_llm_cli`](https://crates.io/crates/rust_llm_cli)
 
-MIT licensed. RustLLM is a port of Carmine Paolino's RubyLLM; see LICENSE.
+MIT licensed. RustLLM is a port of Carmine Paolino's [RubyLLM](https://github.com/crmne/ruby_llm);
+see LICENSE.

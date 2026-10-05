@@ -2,6 +2,8 @@
 //! Samples define `async fn`s that are never called, so the doctests compile the code without
 //! touching the network.
 
+#[doc = include_str!("../../../README.md")]
+pub mod readme {}
 #[doc = include_str!("../../getting-started.md")]
 pub mod getting_started {}
 #[doc = include_str!("../../configuration.md")]
@@ -44,8 +46,8 @@ pub mod generators {}
 pub mod errors_and_retries {}
 #[doc = include_str!("../../cost-and-usage.md")]
 pub mod cost_and_usage {}
-#[doc = include_str!("../../migrating-from-rubyllm.md")]
-pub mod migrating_from_rubyllm {}
+#[doc = include_str!("../../rubyllm.md")]
+pub mod rubyllm {}
 #[doc = include_str!("../../instrumentation.md")]
 pub mod instrumentation {}
 #[doc = include_str!("../../prompts.md")]

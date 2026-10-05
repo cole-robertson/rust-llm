@@ -1,6 +1,6 @@
 [package]
 name = "rust_llm"
-description = "A 1:1 Rust port of RubyLLM 2.0: one API for chat, tools, agents, and embeddings across providers."
+description = "One API for chat, tools, agents, structured output, embeddings, images, audio, batches, MCP, and judgments across LLM providers."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

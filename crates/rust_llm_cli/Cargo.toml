@@ -1,6 +1,6 @@
 [package]
 name = "rust_llm_cli"
-description = "RubyLLM's Rails generators as a CLI for Loco + Inertia + React apps: install, tool, agent, schema, chat_ui, provider, upgrade."
+description = "Generators for rust_llm in Loco + Inertia + React apps: install, chat_ui, tool, agent, schema, provider, upgrade."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

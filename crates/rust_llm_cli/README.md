@@ -1,6 +1,7 @@
 # rust_llm_cli
 
-RubyLLM's Rails generators as a `rust-llm` CLI for Loco + Inertia + React apps.
+The `rust-llm` CLI sets up [`rust_llm`](https://crates.io/crates/rust_llm) in a Loco + Inertia + React app
+and generates a chat UI, tools, agents, and schemas.
 
 ```text
 cargo install rust_llm_cli
@@ -15,4 +16,5 @@ rust-llm generate upgrade
 
 - Guide: <https://github.com/cole-robertson/rust-llm/blob/main/docs/generators.md>
 
-MIT licensed. RustLLM is a port of Carmine Paolino's RubyLLM; see LICENSE.
+MIT licensed. Ports the Rails generators of Carmine Paolino's
+[RubyLLM](https://github.com/crmne/ruby_llm); see LICENSE.

@@ -1,8 +1,22 @@
-# Migrating from RubyLLM
+# RubyLLM vs RustLLM
 
-RustLLM keeps RubyLLM 2.0's names, behavior, and wire format. Its tests replay RubyLLM's own
-recorded cassettes and require identical request bodies. So this page is mostly spelling: how a
-Ruby idiom turns into Rust.
+RustLLM is a port of [RubyLLM](https://github.com/crmne/ruby_llm) **2.0.0** (upstream
+`1e91b30`) by Carmine Paolino, plus `rust_llm_loco`, a port of its Rails `acts_as_chat` layer to
+SeaORM, Loco's default ORM. It keeps RubyLLM's names, behavior, and wire format, so this page is
+mostly spelling: how a Ruby idiom turns into Rust.
+
+## How the port is verified
+
+- **Cassette replay:** the tests replay RubyLLM's own recorded VCR cassettes (HTTP and WebSocket),
+  and every request RustLLM sends must be JSON-equal to the one RubyLLM recorded.
+  `bin/convert-cassettes` turns upstream cassettes into fixtures.
+- **Spec parity:** [`PARITY.md`](PARITY.md) classifies all 3,747 examples in RubyLLM 2.0's spec
+  suite: 2,157 ported as Rust tests that cite them (`// spec: file:line`), 177 replayed from their
+  own cassettes, 1,413 not applicable (each with its reason), and 0 missing. `bin/parity`
+  regenerates it.
+- **Live:** `examples/readme.rs` runs RubyLLM's README against a real provider, and
+  `examples/judge.rs` runs a Jev judgment.
+- **Benchmarks:** [`BENCHMARK.md`](BENCHMARK.md) compares RustLLM with RubyLLM on YJIT.
 
 ## Conventions
 
