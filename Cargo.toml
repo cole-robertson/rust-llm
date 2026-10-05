@@ -1,5 +1,5 @@
 [workspace]
-resolver = "2"
+resolver = "3"
 members = ["crates/rust_llm", "crates/rust_llm_loco", "crates/rust_llm_cli", "docs/check"]
 
 [workspace.package]
