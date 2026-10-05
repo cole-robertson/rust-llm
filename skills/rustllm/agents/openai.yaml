@@ -1,0 +1,4 @@
+interface:
+  display_name: "RustLLM"
+  short_description: "Build Rust and Loco apps with RustLLM"
+  default_prompt: "Use $rustllm to implement this AI feature with the application's installed RustLLM version."

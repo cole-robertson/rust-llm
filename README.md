@@ -8,6 +8,15 @@ The API follows [RubyLLM](https://github.com/crmne/ruby_llm) 2.0: if you know Ru
 know RustLLM. Same method names, same behavior, Rust types.
 [RubyLLM vs RustLLM](docs/rubyllm.md) maps one to the other.
 
+- **Fast:** 0.08 ms of library overhead per request, a streamed chunk in under 3 µs, and
+  13,000+ requests/second across 1,000 concurrent chats on one process.
+  [Benchmarks](docs/BENCHMARK.md) compare it with RubyLLM 2.0 on YJIT (3× less overhead per
+  request, 7× faster streaming, 5× the concurrent throughput).
+- **Schemas from your types:** derive `JsonSchema` on a struct and get structured output back,
+  no hand-written JSON Schema.
+- **Verified against real traffic:** the tests replay RubyLLM's recorded provider sessions, and
+  every request RustLLM sends must match the recorded one exactly.
+
 [![crates.io](https://img.shields.io/crates/v/rust_llm.svg)](https://crates.io/crates/rust_llm)
 [![docs.rs](https://img.shields.io/docsrs/rust_llm)](https://docs.rs/rust_llm)
 [![CI](https://github.com/cole-robertson/rust-llm/actions/workflows/ci.yml/badge.svg)](https://github.com/cole-robertson/rust-llm/actions/workflows/ci.yml)
@@ -61,6 +70,12 @@ let mut chat = rust_llm::chat_with("claude-opus-5-5")?;
 
 chat.ask_with("What's in this picture?", vec!["photo.jpg".into()])
     .await?;
+
+chat.ask_with(
+    "Analyze these files",
+    vec!["diagram.png".into(), "report.pdf".into(), "notes.txt".into()],
+)
+.await?;
 ```
 
 Stream the reply as it arrives:
@@ -113,8 +128,46 @@ let mut chat = rust_llm::chat_with("claude-opus-5-5")?.with_tool(Weather);
 chat.ask("What's the weather in Berlin?").await?;
 ```
 
-Tools can require approval before they run (`requires_approval`), report progress, or come from an
-MCP server.
+A tool can wait for a person to approve it before it runs:
+
+```rust
+use rust_llm::{Parameter, Tool, ToolCall, ToolError, ToolResult};
+use serde_json::{Map, Value};
+
+struct IssueRefund;
+
+#[async_trait::async_trait]
+impl Tool for IssueRefund {
+    fn description(&self) -> String {
+        "Issue a refund for an order".into()
+    }
+
+    fn parameters(&self) -> Vec<Parameter> {
+        vec![Parameter::new("order_id")]
+    }
+
+    fn requires_approval(&self) -> bool {
+        true
+    }
+
+    async fn execute(
+        &self,
+        args: Map<String, Value>,
+        _call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
+        Ok(format!("Refunded order {}", args["order_id"]).into())
+    }
+}
+
+let mut chat = rust_llm::chat_with("claude-opus-5-5")?.with_tool(IssueRefund);
+chat.ask("Refund order 42").await?; // returns without running the tool
+
+if chat.is_awaiting_approval() {
+    let call = chat.pending_approvals().remove(0);
+    chat.approve(&call.id); // or chat.deny(&call.id)
+    chat.complete().await?;
+}
+```
 
 ## Agents
 
@@ -164,13 +217,15 @@ let reply = rust_llm::chat_with("claude-opus-5-5")?
 let product = reply.parsed()?;
 ```
 
-## Embeddings, images, audio
+## Images, video, and audio
 
 ```rust
-let embedding = rust_llm::embed("Rust is fast and safe", Default::default()).await?;
-
 let images = rust_llm::paint("A sunset over mountains in watercolor", Default::default()).await?;
 images.into_image().save("sunset.png").await?;
+
+let video = rust_llm::animate(Some("A paper boat sailing down a rainy gutter"), Default::default())
+    .await?;
+video.save("paper_boat.mp4").await?;
 
 let speech = rust_llm::speak("Welcome aboard!", Default::default()).await?;
 speech.save("welcome.mp3")?;
@@ -179,7 +234,33 @@ let transcript = rust_llm::transcribe("meeting.wav", Default::default()).await?;
 println!("{}", transcript.text.unwrap_or_default());
 ```
 
-Each call uses the configured default model for that task; pass options to choose another.
+## Documents, search, and moderation
+
+```rust
+// Extract a document's text as markdown
+let document = rust_llm::ocr("contract.pdf", Default::default()).await?;
+println!("{}", document.markdown());
+
+// Create embeddings
+let embedding = rust_llm::embed("Rust is fast and safe", Default::default()).await?;
+
+// Rank search results by relevance
+let documents = ["Reset your password in Settings.", "Invoices arrive by email."];
+let ranked = rust_llm::rerank(
+    "How do I reset my password?",
+    &documents,
+    "rerank-v3.5",
+    Default::default(),
+)
+.await?;
+println!("{}", ranked.results[0].document);
+
+// Check whether a moderation model flags content
+let moderation = rust_llm::moderate("Some user-generated content", Default::default()).await?;
+println!("{}", moderation.is_flagged());
+```
+
+Each operation uses the configured default model for that task; pass options to choose another.
 
 ## MCP
 
@@ -271,10 +352,54 @@ rust-llm generate tool Weather
 rust-llm generate agent Support
 ```
 
+## AI coding assistants
+
+Give your coding assistant the RustLLM API and the guides that match your application by installing
+the `rustllm` skill:
+
+```sh
+npx skills add cole-robertson/rust-llm --skill rustllm
+```
+
+Choose your assistant and installation scope when prompted. The skill lives in
+[`skills/rustllm`](skills/rustllm/SKILL.md).
+
+## Everything included
+
+- **Chat:** conversations with `rust_llm::chat`, instructions, temperature, and request options
+- **Vision and documents:** ask about images, video, audio, PDFs, and text files with `ask_with`
+- **Streaming:** replies chunk by chunk with `ask_stream`
+- **Tools:** let the model call your Rust code; `requires_approval` parks a run for a human
+- **The agentic loop:** drive it yourself with `ask_later`, `step`, `run_tools`, and `is_complete`
+- **Provider tools:** web search, code execution, and remote MCP with `with_provider_tools`
+- **MCP:** stdio and Streamable HTTP servers, resources, prompts, input requests, and OAuth
+- **Agents:** reusable assistants with the `Agent` trait
+- **Structured output:** `with_schema_for::<T>()` from any `schemars::JsonSchema` type
+- **Prompt templates:** Jinja prompts on disk, rendered with `render_prompt`
+- **Workflows:** correlate multi-agent runs in your telemetry with `rust_llm::workflow`
+- **Extended thinking:** control, read, and persist model reasoning with `with_thinking`
+- **Citations:** normalized sources from documents, search, and grounding
+- **Images and video:** `paint` and `animate`
+- **Audio:** `transcribe` and `speak`, including streaming and WebSocket transcription
+- **OCR, embeddings, reranking, moderation:** `ocr`, `embed`, `rerank`, and `moderate`
+- **Judgments:** probabilities, choices, and scores with `Judge` and `rust_llm::judge`
+- **Files:** upload once and reuse across chats with `rust_llm::upload`
+- **Batches:** provider batch APIs at their discount with `rust_llm::batch`
+- **Prompt caching:** `with_caching` and `cache_until_here`
+- **Compaction:** let the provider condense long conversations with `with_compaction`
+- **Token counting:** count a request before sending it with `count_tokens`
+- **Fallbacks and cancellation:** retry on backup models with `with_fallbacks`, stop a run with
+  `cancel`
+- **Retries:** automatic, honoring `Retry-After` and rate-limit headers
+- **Cost tracking:** a per-attempt usage ledger behind `tokens()` and `cost()`
+- **Model registry:** capabilities, context limits, and pricing for every model, refreshable
+- **Instrumentation:** events for every request, tool call, and usage record
+- **Loco:** SeaORM persistence and generators for an Inertia + React chat UI
+
 ## Providers
 
 OpenAI, Anthropic, Gemini, DeepSeek, Mistral, OpenRouter, xAI, Perplexity, Ollama, Ollama Cloud,
-GPUStack, Hetzner, and TypeSafe.
+GPUStack, Hetzner, TypeSafe, and any OpenAI-compatible API.
 
 ## Docs
 
