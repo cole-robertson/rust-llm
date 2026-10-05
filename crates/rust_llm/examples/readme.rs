@@ -36,7 +36,7 @@ impl Tool for Weather {
 
 /// ```ruby
 /// class WeatherAssistant < RubyLLM::Agent
-///   model "claude-haiku-4-5"
+///   model "claude-opus-5-5"
 ///   instructions "Be concise and always use tools for weather."
 ///   tools Weather
 /// end
@@ -45,7 +45,7 @@ struct WeatherAssistant;
 
 impl Agent for WeatherAssistant {
     fn model(&self) -> Option<&str> {
-        Some("claude-haiku-4-5")
+        Some("claude-opus-5-5")
     }
     fn provider(&self) -> Option<&str> {
         Some("anthropic")
@@ -66,16 +66,16 @@ struct Product {
     features: Vec<String>,
 }
 
-/// `RubyLLM.chat(model: "claude-haiku-4-5", provider: :anthropic)`: with a provider the alias
-/// resolves to Anthropic's dated id, which the local proxy requires.
+/// `RubyLLM.chat(model: "claude-opus-5-5", provider: :anthropic)`: pinning the provider keeps
+/// the request on Anthropic even when other providers are configured.
 fn new_chat() -> rust_llm::Result<rust_llm::Chat> {
-    rust_llm::Chat::new(Some("claude-haiku-4-5"), Some("anthropic"))
+    rust_llm::Chat::new(Some("claude-opus-5-5"), Some("anthropic"))
 }
 
 #[tokio::main]
 async fn main() -> rust_llm::Result<()> {
     rust_llm::configure(|c| {
-        c.default_model = "claude-haiku-4-5".into();
+        c.default_model = "claude-opus-5-5".into();
         if let Ok(base) = std::env::var("ANTHROPIC_BASE_URL") {
             c.set("anthropic_api_base", base);
         }

@@ -2,7 +2,7 @@
 //! Samples define `async fn`s that are never called, so the doctests compile the code without
 //! touching the network.
 
-#[doc = include_str!("../../../README.md")]
+#[doc = include_str!(concat!(env!("OUT_DIR"), "/readme.md"))]
 pub mod readme {}
 #[doc = include_str!("../../getting-started.md")]
 pub mod getting_started {}

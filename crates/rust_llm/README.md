@@ -6,7 +6,8 @@ OpenRouter, xAI, Perplexity, Ollama, Ollama Cloud, GPUStack, Hetzner, and TypeSa
 
 ```rust,no_run
 # async fn run() -> rust_llm::Result<()> {
-let mut chat = rust_llm::chat()?;
+let mut chat = rust_llm::chat_with("claude-opus-5-5")?;
+
 let answer = chat.ask("What's the best way to learn Rust?").await?;
 println!("{}", answer.content());
 # Ok(()) }

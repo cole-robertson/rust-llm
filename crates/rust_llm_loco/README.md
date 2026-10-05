@@ -7,7 +7,7 @@ after a tool approval. It also stores the model registry, provider batches, and 
 credentials.
 
 ```rust,ignore
-let record = ChatRecord::create(&ctx.db, "claude-haiku-4-5", None).await?;
+let record = ChatRecord::create(&ctx.db, "claude-opus-5-5", None).await?;
 let mut chat = record.to_llm(&ctx.db).await?.with_tool(Weather);
 record.ask(&ctx.db, &mut chat, "What's the weather in Berlin?").await?;
 ```
