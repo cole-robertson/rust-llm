@@ -26,7 +26,10 @@ export default function ModelIndex({ models }: { models: ChatModel[] }) {
         <div className="flex items-start justify-between gap-4">
           <Heading title="Models" />
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => router.post(routes.refresh(accountSlug).url)}>
+            <Button
+              variant="outline"
+              onClick={() => router.post(routes.refresh(accountSlug).url)}
+            >
               Refresh
             </Button>
             <Button variant="outline" asChild>
@@ -55,9 +58,12 @@ export default function ModelIndex({ models }: { models: ChatModel[] }) {
                     <td className="p-3">{model.provider_name}</td>
                     <td className="p-3">
                       <Link
-                        href={routes.show({ accountSlug, id: model.id }, {
-                          query: { provider: model.provider },
-                        })}
+                        href={routes.show(
+                          { accountSlug, id: model.id },
+                          {
+                            query: { provider: model.provider },
+                          },
+                        )}
                         className="underline-offset-4 hover:underline"
                       >
                         {model.name}

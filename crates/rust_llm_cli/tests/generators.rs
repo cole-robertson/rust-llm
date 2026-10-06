@@ -5,7 +5,9 @@
 use std::fs;
 use std::path::Path;
 
-use rust_llm_cli::{Generator, agent, chat_ui, install, provider, schema, tool, upgrade};
+use rust_llm_cli::{
+    Generator, agent, chat_ui, install, provider, public_chat, schema, tool, upgrade,
+};
 
 mod support;
 use support::app;
@@ -329,7 +331,7 @@ fn chat_ui_requires_install_first() {
 }
 
 #[test]
-fn chat_ui_writes_controllers_worker_pages_and_components() {
+fn chat_ui_writes_controllers_channel_worker_pages_and_tests() {
     let dir = installed();
     let mut g = Generator::new(dir.path(), false);
     chat_ui::generate(&mut g).unwrap();
@@ -346,43 +348,93 @@ fn chat_ui_writes_controllers_worker_pages_and_components() {
     ] {
         assert!(chats.contains(handler), "{handler}");
     }
-    assert!(chats.contains("ChatResponseWorker::perform_later"));
-    assert!(
-        read(root, "src/controllers/messages.rs").contains("ChatResponseWorker::perform_later")
+    // Account-scoped: every handler takes CurrentAccount and finds chats in the account.
+    assert!(!chats.contains("Authenticated"), "no global handlers");
+    assert_eq!(count(&chats, "current: CurrentAccount"), 4);
+    assert!(chats.contains("chats::list_in_account(&ctx.db, current.account.id)"));
+    assert!(chats.contains("chats::create_in_account(&ctx.db, current.account.id,"));
+    assert_eq!(
+        count(&chats, "chats::find_in_account(&ctx.db, current.account.id, id)"),
+        2
     );
-    assert!(read(root, "src/controllers/models.rs").contains("pub fn available_chat_models()"));
-    let worker = read(root, "src/workers/chat_response.rs");
-    assert!(worker.contains("record.complete(db, &mut chat)"));
-    // `complete`'s future is `Send`, so the worker awaits it directly on the Loco runtime.
-    assert!(worker.contains("respond(&self.ctx.db, args.chat_id).await"));
-    assert!(!worker.contains("spawn_blocking"));
+    let messages = read(root, "src/controllers/messages.rs");
+    assert!(messages.contains("chats::find_in_account(&ctx.db, account_id, chat_id)"));
+    assert!(messages.contains("ChatResponseWorker::perform_later"));
+    assert!(!read(root, "src/controllers/models.rs").contains("Authenticated"));
 
-    for page in [
-        "chats/index",
-        "chats/new",
-        "chats/show",
-        "models/index",
-        "models/show",
-    ] {
+    // The worker streams and broadcasts on ChatChannel, keyed by account and chat.
+    let worker = read(root, "src/workers/chat_response.rs");
+    assert!(worker.contains("record\n        .complete_stream(db, &mut chat,"));
+    assert!(worker.contains("ChatChannel::broadcast_to(account_id, chat_id, payload)"));
+    for event in ["message_start", "chunk", "message_end", "error"] {
         assert!(
-            root.join(format!("frontend/pages/{page}.tsx")).exists(),
-            "{page}"
+            worker.contains(&format!("\"type\": \"{event}\"")),
+            "{event}"
         );
     }
-    assert!(
-        read(root, "frontend/pages/chats/show.tsx").contains("usePoll("),
-        "polling, not streaming"
-    );
+    let channel = read(root, "src/channels/chat.rs");
+    assert!(channel.contains("format!(\"{account_id}:{id}\")"));
+    assert!(channel.contains("chats::find_in_account(&ctx.db, membership.account_id, id)"));
+
+    // The page subscribes with useChannel; no polling.
+    let show = read(root, "frontend/pages/chats/show.tsx");
+    assert!(show.contains("useChannel<ChatEvent>(\"ChatChannel\", at,"));
+    assert!(show.contains("only: [\"messages\", \"awaiting_response\"]"));
+    assert!(!show.contains("usePoll"), "streaming, not polling");
+    for page in ["chats/index", "chats/new", "models/index", "models/show"] {
+        let source = read(root, &format!("frontend/pages/{page}.tsx"));
+        assert!(source.contains("useCurrentAccount()"), "{page}");
+    }
     let list = read(root, "frontend/components/messages/message-list.tsx");
     assert!(list.contains("import.meta.glob") && list.contains("\"./tool_calls/*.tsx\""));
     assert!(
         read(root, "frontend/components/messages/model-picker.tsx")
             .contains("from \"@/components/ui/select\"")
     );
+
+    // Request tests, importing the app by its package name.
+    let test = read(root, "tests/requests/chats.rs");
+    assert!(test.contains("use app::{"), "{}", &test[..400]);
+    assert!(test.contains("async fn another_accounts_chat_is_a_404()"));
+    assert!(test.contains("async fn a_non_member_cannot_subscribe_to_a_chat()"));
+    assert!(root.join("tests/requests/anthropic_stub.rs").exists());
+    assert!(read(root, "tests/requests/mod.rs").contains("mod accounts;\nmod anthropic_stub;\nmod chats;\nmod live;"));
 }
 
 #[test]
-fn chat_ui_wires_routes_controllers_worker_and_sidebar() {
+fn chat_ui_adds_the_account_to_chats() {
+    let dir = installed();
+    chat_ui::generate(&mut Generator::new(dir.path(), false)).unwrap();
+    let root = dir.path();
+    let migrations: Vec<String> = fs::read_dir(root.join("migration/src"))
+        .unwrap()
+        .filter_map(|e| e.unwrap().file_name().into_string().ok())
+        .filter(|n| n.ends_with(&format!("{}.rs", chat_ui::MIGRATION_SUFFIX)))
+        .collect();
+    assert_eq!(migrations.len(), 1, "{migrations:?}");
+    let module = migrations[0].trim_end_matches(".rs");
+    let lib = read(root, "migration/src/lib.rs");
+    // After the install migration, so `chats` exists when it runs.
+    let install = lib.find(&format!("Box::new({}::Migration)", migration_module(root))).unwrap();
+    let account = lib.find(&format!("Box::new({module}::Migration)")).unwrap();
+    assert!(install < account, "{lib}");
+    let model = read(root, "src/models/chats.rs");
+    assert!(model.starts_with(include_str!("../templates/install/chat_model.rs")));
+    assert!(model.ends_with(chat_ui::CHAT_MODEL_ACCOUNTS));
+}
+
+#[test]
+fn chat_ui_refuses_an_app_without_accounts_or_live_updates() {
+    let dir = installed();
+    fs::remove_file(dir.path().join("src/live/mod.rs")).unwrap();
+    let mut g = Generator::new(dir.path(), false);
+    let err = chat_ui::generate(&mut g).unwrap_err();
+    assert!(err.contains("src/live/mod.rs"), "{err}");
+    assert!(!dir.path().join("src/controllers/chats.rs").exists());
+}
+
+#[test]
+fn chat_ui_wires_routes_controllers_channel_worker_and_sidebar() {
     let dir = installed();
     chat_ui::generate(&mut Generator::new(dir.path(), false)).unwrap();
     let root = dir.path();
@@ -400,9 +452,13 @@ fn chat_ui_wires_routes_controllers_worker_and_sidebar() {
     }
     assert!(app.contains("fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {\n        queue\n            .register(crate::workers::chat_response::ChatResponseWorker::build(\n"));
     assert!(read(root, "src/workers/mod.rs").contains("pub mod chat_response;"));
+    let channels = read(root, "src/channels/mod.rs");
+    assert!(channels.contains("pub mod account;\npub mod chat;"));
+    assert!(channels.contains("        Arc::new(chat::ChatChannel),\n        // channels-inject"));
 
     let table = read(root, "src/route_table.rs");
-    assert!(table.contains("pub const CHAT_MESSAGES: &str = \"/chats/{chat_id}/messages\";"));
+    assert!(table.contains("pub const CHAT_MESSAGES: &str = \"/{account_slug}/chats/{chat_id}/messages\";"));
+    assert!(table.contains("pub fn chat_path(slug: &str, id: i32) -> String {"));
     assert!(table.find("pub fn chat_path").unwrap() < table.find("// scaffold:paths").unwrap());
     assert!(
         table.contains(
@@ -411,16 +467,18 @@ fn chat_ui_wires_routes_controllers_worker_and_sidebar() {
         "rustfmt-shaped"
     );
     assert!(table.find("\"models.show\"").unwrap() < table.find("// scaffold:routes").unwrap());
-    // RubyLLM's `refresh` action: POST /models/refresh, handled by the models controller.
-    assert!(table.contains("pub const MODELS_REFRESH: &str = \"/models/refresh\";"));
-    assert!(table.contains("        route(\n            \"models.refresh\",\n            Post,\n            MODELS_REFRESH,\n"));
+    // RubyLLM's `refresh` action, for the account's managers.
+    assert!(table.contains("pub const MODELS_REFRESH: &str = \"/{account_slug}/models/refresh\";"));
     let models = read(root, "src/controllers/models.rs");
     assert!(models.contains("rust_llm::models::refresh(false).await"));
+    assert!(models.contains("if !current.is_manager() {"));
     assert!(models.contains(".add(route_table::MODELS_REFRESH, post(refresh))"));
     assert!(
-        read(root, "frontend/pages/models/index.tsx").contains("router.post(routes.refresh().url)")
+        read(root, "frontend/pages/models/index.tsx")
+            .contains("router.post(routes.refresh(accountSlug).url)")
     );
 
+    // The link goes in the account's nav (`// scaffold:nav`), not the global one.
     let sidebar = read(root, "frontend/components/app-sidebar.tsx");
     assert!(
         sidebar.contains("import { chats, dashboard } from \"@/routes\""),
@@ -433,8 +491,9 @@ fn chat_ui_wires_routes_controllers_worker_and_sidebar() {
         "{sidebar}"
     );
     assert!(sidebar.contains(
-        "  { title: \"Chats\", href: chats.index().url, icon: MessagesSquare },\n  // scaffold:nav"
-    ));
+        "        {\n          title: \"Chats\",\n          href: chats.index(account.slug).url,\n          icon: MessagesSquare,\n        },\n        // scaffold:nav\n"
+    ), "{sidebar}");
+    assert!(sidebar.contains("const globalNavItems: NavItem[] = [\n  // scaffold:nav-global\n]"));
 }
 
 #[test]
@@ -605,6 +664,91 @@ fn cli_parses_generators_and_options() {
         0
     );
     assert!(dir.path().join("src/tools/weather_tool.rs").exists());
+}
+
+#[test]
+fn public_chat_needs_the_kit_and_install() {
+    let dir = app();
+    let err = public_chat::generate(&mut Generator::new(dir.path(), false)).unwrap_err();
+    assert!(err.contains("rust-llm generate install"), "{err}");
+    fs::remove_file(dir.path().join("src/controllers/rate_limit.rs")).unwrap();
+    let err = public_chat::generate(&mut Generator::new(dir.path(), false)).unwrap_err();
+    assert!(err.contains("src/controllers/rate_limit.rs"), "{err}");
+    assert!(!dir.path().join("src/controllers/public_chat.rs").exists());
+}
+
+#[test]
+fn public_chat_writes_an_unauthenticated_streaming_page_with_limits() {
+    let dir = installed();
+    let mut g = Generator::new(dir.path(), false);
+    public_chat::generate(&mut g).unwrap();
+    assert!(g.failures.is_empty(), "{:?}", g.failures);
+    let root = dir.path();
+
+    let controller = read(root, "src/controllers/public_chat.rs");
+    // No sign-in, and no shared channel: the reply streams back in the POST's response.
+    assert!(!controller.contains("Authenticated") && !controller.contains("CurrentAccount"));
+    assert!(!controller.contains("broadcast_to(") && !controller.contains("crate::live"));
+    assert!(controller.contains("Sse::new(events)"));
+    for (var, default) in [
+        ("PUBLIC_CHAT_IP_MESSAGES", "20"),
+        ("PUBLIC_CHAT_SESSION_MESSAGES", "10"),
+        ("PUBLIC_CHAT_WINDOW_SECS", "600"),
+        ("PUBLIC_CHAT_MAX_INPUT_CHARS", "4_000"),
+        ("PUBLIC_CHAT_MAX_OUTPUT_TOKENS", "1_024"),
+        ("PUBLIC_CHAT_MAX_TURNS", "20"),
+    ] {
+        assert!(
+            controller.contains(&format!("var(\"{var}\", {default})")),
+            "{var}"
+        );
+    }
+    assert!(controller.contains(".with_max_output_tokens(limits.max_output_tokens)"));
+    assert!(controller.contains("cookie.set_http_only(true);"));
+    assert!(root.join("frontend/pages/public_chat/show.tsx").exists());
+
+    let test = read(root, "tests/requests/public_chat.rs");
+    assert!(test.contains("use app::{"));
+    for name in [
+        "guests_never_see_each_others_conversations",
+        "one_ip_is_rate_limited_across_conversations",
+        "one_conversation_is_rate_limited",
+        "a_message_over_the_length_limit_is_refused",
+        "a_conversation_stops_at_its_turn_limit",
+        "the_output_token_cap_is_sent_to_the_model",
+    ] {
+        assert!(test.contains(&format!("async fn {name}()")), "{name}");
+    }
+
+    let table = read(root, "src/route_table.rs");
+    assert!(table.contains("pub const PUBLIC_CHAT: &str = \"/chat\";"));
+    assert!(table.contains("pub const PUBLIC_CHAT_MESSAGES: &str = \"/chat/messages\";"));
+    assert_eq!(
+        count(&read(root, "src/app.rs"), ".add_route(controllers::public_chat::routes())"),
+        1
+    );
+    // `/chat` can't also be an account's slug.
+    assert!(read(root, "src/models/accounts.rs").contains("RESERVED_SLUGS: &[&str] = &[\n    \"chat\",\n"));
+    assert!(read(root, "tests/requests/mod.rs").contains("mod anthropic_stub;\nmod live;\nmod public_chat;"));
+}
+
+#[test]
+fn public_chat_and_chat_ui_share_the_stub_and_run_twice_unchanged() {
+    let dir = installed();
+    chat_ui::generate(&mut Generator::new(dir.path(), false)).unwrap();
+    let mut g = Generator::new(dir.path(), false);
+    public_chat::generate(&mut g).unwrap();
+    assert!(g.failures.is_empty(), "{:?}", g.failures);
+    assert!(
+        actions(&g).contains(&("identical", "tests/requests/anthropic_stub.rs")),
+        "{:?}",
+        g.actions
+    );
+    let before = walk(dir.path());
+    let mut g = Generator::new(dir.path(), false);
+    public_chat::generate(&mut g).unwrap();
+    assert!(actions(&g).iter().all(|(a, _)| *a == "identical"), "{:?}", g.actions);
+    assert_eq!(walk(dir.path()), before);
 }
 
 fn walk(root: &Path) -> Vec<(String, String)> {

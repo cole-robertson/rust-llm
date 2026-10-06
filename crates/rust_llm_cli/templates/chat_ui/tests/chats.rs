@@ -10,6 +10,7 @@ use {{pkg_name}}::{
     channels::chat::ChatChannel,
     live,
     models::{chats, messages, sessions as session_model},
+    route_table,
 };
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde_json::{json, Value};
