@@ -228,6 +228,22 @@ fn resolve_model_info(
 /// An instruction applied with `persist: false`: `(text, append, cache_until_here)`.
 type RuntimeInstruction = (String, bool, bool);
 
+/// What [`ChatRecord::complete_stream`] reports while it runs: RubyLLM's `on_new_message`, each
+/// streamed chunk, and `on_end_message`, each with the `messages` row it belongs to.
+#[derive(Debug)]
+pub enum StreamEvent<'a> {
+    /// A message row exists. For a response this is the empty assistant row created before its
+    /// first chunk (`persist_new_message`); for a tool result, the row just written.
+    NewMessage(&'a messages::Model),
+    /// A chunk of the response being written into row `message_id`.
+    Chunk {
+        message_id: i32,
+        chunk: &'a Message,
+    },
+    /// The row is final: content, tool calls, and usage are written (`persist_message_completion`).
+    EndMessage(&'a messages::Model),
+}
+
 /// A persisted chat: the `Chat` model that `acts_as_chat`.
 #[derive(Debug, Clone)]
 pub struct ChatRecord {
@@ -779,14 +795,56 @@ impl ChatRecord {
             }
             return Err(e);
         }
-        Ok(chat
-            .messages()
-            .iter()
-            .rev()
-            .find(|m| m.role != Role::System)
-            .or(chat.messages().last())
-            .cloned()
-            .unwrap_or_else(|| Message::new(Role::Assistant, None)))
+        Ok(latest_message(chat))
+    }
+
+    /// `chat.ask(message) { |chunk| ... }`: [`ChatRecord::ask_later`], then
+    /// [`ChatRecord::complete_stream`].
+    pub async fn ask_stream(
+        &self,
+        db: &DatabaseConnection,
+        chat: &mut Chat,
+        message: &str,
+        on_event: impl FnMut(StreamEvent<'_>) + Send,
+    ) -> Result<Message> {
+        self.ask_later(db, chat, message).await?;
+        self.complete_stream(db, chat, on_event).await
+    }
+
+    /// `chat.complete { |chunk| ... }`: [`ChatRecord::complete`], streaming each response.
+    ///
+    /// As with RubyLLM's persistence callbacks, the assistant row is created (empty) before the
+    /// first chunk arrives ([`StreamEvent::NewMessage`]), every chunk names that row
+    /// ([`StreamEvent::Chunk`]), and the row is updated in place once the response is complete,
+    /// with its tool calls and usage ([`StreamEvent::EndMessage`]). Tool results are written as
+    /// they finish and reported as a `NewMessage` and an `EndMessage`. Chunk content is not
+    /// written while streaming, so a failed or cancelled response leaves no row behind: the empty
+    /// row is destroyed, as `cleanup_after_failure` does, along with an unfinished tool round.
+    pub async fn complete_stream(
+        &self,
+        db: &DatabaseConnection,
+        chat: &mut Chat,
+        mut on_event: impl FnMut(StreamEvent<'_>) + Send,
+    ) -> Result<Message> {
+        let pending_usages = self.record_usages_as_they_finish(db, chat);
+        self.persist_unsaved(db, chat, Usages::Written(&pending_usages))
+            .await?;
+        if self.consume_cancellation_request(db).await? {
+            chat.cancel();
+        }
+        let poller = self.watch_cancellation(db, chat.cancel_handle());
+        let outcome = self
+            .run_stream_loop(db, chat, &pending_usages, &mut on_event)
+            .await;
+        poller.abort();
+        chat.clear_async_usage_recorder();
+        if let Err(e) = outcome {
+            if let Error::Llm(llm) = &e {
+                self.cleanup_after_failure(db, chat, llm).await?;
+            }
+            return Err(e);
+        }
+        Ok(latest_message(chat))
     }
 
     /// `chat.compact`: compacts the model context and persists the returned assistant message
@@ -851,6 +909,68 @@ impl ChatRecord {
         }
     }
 
+    /// [`ChatRecord::run_loop`] for [`ChatRecord::complete_stream`]: a response gets its row
+    /// before the request (`persist_new_message`) and is written into it afterwards; tool results
+    /// are written as they finish.
+    async fn run_stream_loop(
+        &self,
+        db: &DatabaseConnection,
+        chat: &mut Chat,
+        pending_usages: &UsageRows,
+        on_event: &mut (dyn FnMut(StreamEvent<'_>) + Send),
+    ) -> Result<()> {
+        loop {
+            self.refresh_tool_call_state(db, chat).await?;
+            if chat.is_complete() || chat.is_awaiting_approval() || chat.is_awaiting_input() {
+                return Ok(());
+            }
+            let inputs_before = chat.tool_call_inputs().clone();
+            if has_unanswered_tool_calls(chat) {
+                // `run_tools`: each result is written and reported once it has finished.
+                let step = chat.step().await;
+                let ids = self
+                    .persist_unsaved_into(db, chat, Usages::Written(pending_usages), None)
+                    .await?;
+                self.persist_tool_call_inputs(db, chat, &inputs_before)
+                    .await?;
+                for id in ids {
+                    let row = find_message(db, id).await?;
+                    on_event(StreamEvent::NewMessage(&row));
+                    on_event(StreamEvent::EndMessage(&row));
+                }
+                match step {
+                    Ok(Some(_)) => continue,
+                    Ok(None) => return Ok(()),
+                    Err(e) => return Err(e.into()),
+                }
+            }
+            // `persist_new_message`: the response's row exists before its first chunk.
+            let blank = Message::new(Role::Assistant, Some(String::new()));
+            let placeholder = insert_message(db, self.record.id, &blank).await?;
+            on_event(StreamEvent::NewMessage(&placeholder));
+            let message_id = placeholder.id;
+            let step = chat
+                .step_stream(|chunk| on_event(StreamEvent::Chunk { message_id, chunk }))
+                .await;
+            if let Err(e) = step {
+                // `cleanup_failed_messages`: the blank row goes; usage stays in the ledger.
+                messages::Entity::delete_by_id(message_id).exec(db).await?;
+                return Err(e.into());
+            }
+            self.persist_unsaved_into(
+                db,
+                chat,
+                Usages::Written(pending_usages),
+                Some(&placeholder),
+            )
+            .await?;
+            self.persist_tool_call_inputs(db, chat, &inputs_before)
+                .await?;
+            let row = find_message(db, i64::from(message_id)).await?;
+            on_event(StreamEvent::EndMessage(&row));
+        }
+    }
+
     /// `persist_usage_entry`: installs a recorder that writes each finished attempt's
     /// `rust_llm_usages` row as it finishes, before `usage.rust_llm` is published (Ruby's tracker
     /// `on_finish`). Rows start unlinked; `persist` links them to the message they produced.
@@ -882,6 +1002,21 @@ impl ChatRecord {
         chat: &mut Chat,
         usages: Usages<'_>,
     ) -> Result<()> {
+        self.persist_unsaved_into(db, chat, usages, None)
+            .await
+            .map(|_| ())
+    }
+
+    /// [`ChatRecord::persist_unsaved`], writing the first unsaved message into `placeholder` (the
+    /// row `persist_new_message` created for it) instead of a new row. Returns the ids written.
+    async fn persist_unsaved_into(
+        &self,
+        db: &DatabaseConnection,
+        chat: &mut Chat,
+        usages: Usages<'_>,
+        mut placeholder: Option<&messages::Model>,
+    ) -> Result<Vec<i64>> {
+        let mut written = Vec::new();
         let unsaved: Vec<usize> = chat
             .messages()
             .iter()
@@ -911,10 +1046,13 @@ impl ChatRecord {
                     }
                 }
             }
-            let id = self.persist(db, &message, &insert, &link).await?;
+            let id = self
+                .persist_into(db, &message, &insert, &link, placeholder.take())
+                .await?;
             chat.messages_mut()[i].record_id = Some(id);
+            written.push(id);
         }
-        Ok(())
+        Ok(written)
     }
 
     async fn persist(
@@ -923,6 +1061,19 @@ impl ChatRecord {
         m: &Message,
         usages: &[UsageEntry],
         written_usages: &[i32],
+    ) -> Result<i64> {
+        self.persist_into(db, m, usages, written_usages, None).await
+    }
+
+    /// Writes `m` as a new row, or into `existing` (`persist_message_completion` assigning the
+    /// placeholder's attributes), with its tool calls, attachments, and usage.
+    async fn persist_into(
+        &self,
+        db: &DatabaseConnection,
+        m: &Message,
+        usages: &[UsageEntry],
+        written_usages: &[i32],
+        existing: Option<&messages::Model>,
     ) -> Result<i64> {
         // `persist_content`: read the bytes before the transaction, since a URL may be fetched.
         let mut files = Vec::new();
@@ -937,7 +1088,15 @@ impl ChatRecord {
             }
         }
         let txn = db.begin().await?;
-        let row = insert_message(&txn, self.record.id, m).await?;
+        let row = match existing {
+            Some(existing) => {
+                let mut row = message_active_model(self.record.id, m);
+                row.id = Set(existing.id);
+                row.created_at = Set(existing.created_at);
+                row.update(&txn).await?
+            }
+            None => insert_message(&txn, self.record.id, m).await?,
+        };
         if let Some(calls) = &m.tool_calls {
             for call in calls.values() {
                 rust_llm_tool_calls::ActiveModel {
@@ -1680,6 +1839,11 @@ async fn insert_message(
     chat_id: i32,
     m: &Message,
 ) -> Result<messages::Model> {
+    Ok(message_active_model(chat_id, m).insert(db).await?)
+}
+
+/// `message_attributes`: the row's columns for `m`.
+fn message_active_model(chat_id: i32, m: &Message) -> messages::ActiveModel {
     let json_list = |v: Value| {
         if v.as_array().is_some_and(|a| a.is_empty()) {
             None
@@ -1687,7 +1851,7 @@ async fn insert_message(
             Some(v)
         }
     };
-    Ok(messages::ActiveModel {
+    messages::ActiveModel {
         chat_id: Set(chat_id),
         role: Set(m.role.as_str().into()),
         content: Set(m.content.clone()),
@@ -1707,8 +1871,46 @@ async fn insert_message(
         updated_at: Set(now()),
         ..Default::default()
     }
-    .insert(db)
-    .await?)
+}
+
+async fn find_message(db: &impl ConnectionTrait, id: i64) -> Result<messages::Model> {
+    messages::Entity::find_by_id(id as i32)
+        .one(db)
+        .await?
+        .ok_or_else(|| Error::NotFound(format!("message {id}")))
+}
+
+/// The message `complete` returns: the latest non-system one.
+fn latest_message(chat: &Chat) -> Message {
+    chat.messages()
+        .iter()
+        .rev()
+        .find(|m| m.role != Role::System)
+        .or(chat.messages().last())
+        .cloned()
+        .unwrap_or_else(|| Message::new(Role::Assistant, None))
+}
+
+/// `pending_tool_response`: the latest response asks for tools that have no result yet, so the
+/// next `step` runs tools rather than calling the model.
+fn has_unanswered_tool_calls(chat: &Chat) -> bool {
+    let Some(response) = chat
+        .messages()
+        .iter()
+        .rev()
+        .find(|m| m.role != Role::System && !m.is_tool_result())
+    else {
+        return false;
+    };
+    let Some(calls) = response.tool_calls.as_ref().filter(|_| response.is_tool_call()) else {
+        return false;
+    };
+    calls.values().any(|call| {
+        !chat
+            .messages()
+            .iter()
+            .any(|m| m.tool_call_id.as_deref() == Some(call.id.as_str()))
+    })
 }
 
 async fn insert_usage(
