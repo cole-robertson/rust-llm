@@ -667,6 +667,31 @@ fn cli_parses_generators_and_options() {
 }
 
 #[test]
+fn named_imports_wrap_past_prettiers_print_width_and_stay_idempotent() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("a.tsx");
+    fs::write(
+        &file,
+        "import { BookOpen, Folder, LayoutGrid, Settings, Users } from \"lucide-react\"\nimport { a } from \"@/routes\"\n",
+    )
+    .unwrap();
+    let mut g = Generator::new(dir.path(), false);
+    g.named_import("a.tsx", "lucide-react", "MessagesSquare");
+    assert_eq!(
+        read(dir.path(), "a.tsx"),
+        "import {\n  BookOpen,\n  Folder,\n  LayoutGrid,\n  MessagesSquare,\n  Settings,\n  Users,\n} from \"lucide-react\"\nimport { a } from \"@/routes\"\n"
+    );
+    // A wrapped import is still found: an existing name is `identical`, a new one joins it.
+    g.named_import("a.tsx", "lucide-react", "Folder");
+    g.named_import("a.tsx", "@/routes", "b");
+    assert!(g.failures.is_empty(), "{:?}", g.failures);
+    assert_eq!(g.actions[1].0, "identical");
+    let text = read(dir.path(), "a.tsx");
+    assert!(text.contains("  MessagesSquare,\n"), "{text}");
+    assert!(text.ends_with("import { a, b } from \"@/routes\"\n"), "{text}");
+}
+
+#[test]
 fn public_chat_needs_the_kit_and_install() {
     let dir = app();
     let err = public_chat::generate(&mut Generator::new(dir.path(), false)).unwrap_err();
