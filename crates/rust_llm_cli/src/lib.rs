@@ -239,8 +239,8 @@ impl Generator {
         let suffix = format!(" }} from \"{module}\"");
         let mut found = false;
         let mut changed = false;
-        let lines: Vec<String> = existing
-            .lines()
+        let lines: Vec<String> = join_wrapped_imports(&existing)
+            .iter()
             .map(|line| {
                 let Some(names) = line
                     .strip_prefix("import { ")
@@ -258,10 +258,11 @@ impl Generator {
                 changed = true;
                 format!("import {{ {} }} from \"{module}\"", names.join(", "))
             })
+            .map(|line| wrap_import(&line))
             .collect();
         if !found {
             return self.fail(format!(
-                "{rel}: no one-line import from \"{module}\"; import `{name}` yourself"
+                "{rel}: no import {{ ... }} from \"{module}\"; import `{name}` yourself"
             ));
         }
         if !changed {
@@ -325,6 +326,47 @@ impl Generator {
             Err(e) => self.fail(format!("{rel}: {e}")),
         }
     }
+}
+
+/// Prettier's print width: an `import { a, b } from "m"` longer than 80 characters gets one
+/// name per line.
+fn wrap_import(line: &str) -> String {
+    let Some((names, module)) = line
+        .strip_prefix("import { ")
+        .and_then(|l| l.split_once(" } from "))
+    else {
+        return line.to_string();
+    };
+    if line.len() <= 80 {
+        return line.to_string();
+    }
+    let list: Vec<String> = names.split(", ").map(|n| format!("  {n},\n")).collect();
+    format!("import {{\n{}}} from {module}", list.concat())
+}
+
+/// `source`'s lines, with each prettier-wrapped `import {\n  a,\n  b,\n} from "m"` joined
+/// back into one `import { a, b } from "m"` line.
+fn join_wrapped_imports(source: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut open: Option<Vec<String>> = None;
+    for line in source.lines() {
+        match open.as_mut() {
+            None if line == "import {" => open = Some(Vec::new()),
+            None => out.push(line.to_string()),
+            Some(names) => match line.strip_prefix("} from ") {
+                Some(module) => {
+                    out.push(format!("import {{ {} }} from {module}", names.join(", ")));
+                    open = None;
+                }
+                None => names.push(line.trim().trim_end_matches(',').to_string()),
+            },
+        }
+    }
+    if let Some(names) = open {
+        out.push("import {".to_string());
+        out.extend(names.into_iter().map(|n| format!("  {n},")));
+    }
+    out
 }
 
 /// Scaffold's `sorted_line_index`: after the last smaller line, above the attributes and doc
