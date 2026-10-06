@@ -1,13 +1,21 @@
-import { Form, Head, Link, usePoll } from "@inertiajs/react"
-import { useEffect } from "react"
+import { Form, Head, Link, router } from "@inertiajs/react"
+import { useState } from "react"
 
-import { MessageList } from "@/components/messages/message-list"
-import type { Chat, Message } from "@/components/messages/types"
+import { Bubble, MessageList } from "@/components/messages/message-list"
+import type {
+  Chat,
+  ChatEvent,
+  Message,
+  StreamingMessage,
+} from "@/components/messages/types"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
+import { useCurrentAccount } from "@/hooks/use-current-account"
 import AppLayout from "@/layouts/app-layout"
+import { useChannel } from "@/lib/live"
 import { chatMessages, chats as routes } from "@/routes"
 import type { BreadcrumbItem } from "@/types"
 
@@ -22,25 +30,55 @@ export default function ChatShow({
   awaiting_response: boolean
   default_model_label: string
 }) {
+  const { slug: accountSlug } = useCurrentAccount()
+  const at = { accountSlug, id: chat.id }
   const breadcrumbs: BreadcrumbItem[] = [
-    { title: "Chats", href: routes.index().url },
-    { title: `Chat ${chat.id}`, href: routes.show(chat.id).url },
+    { title: "Chats", href: routes.index(accountSlug).url },
+    { title: `Chat ${chat.id}`, href: routes.show(at).url },
   ]
 
-  // RubyLLM streams chunks over Turbo. Here the worker persists each message as it lands and
-  // the page polls for them (a partial reload of `messages`) while a response is pending.
-  const { start, stop } = usePoll(
-    1000,
-    { only: ["messages", "awaiting_response"] },
-    { autoStart: false },
-  )
-  useEffect(() => {
-    if (awaiting_response) {
-      start()
-    } else {
-      stop()
+  // RubyLLM appends each chunk over Turbo; here the worker broadcasts on ChatChannel. The
+  // reply grows in `streaming` until its row is written, then `messages` is reloaded.
+  const [streaming, setStreaming] = useState<StreamingMessage | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  useChannel<ChatEvent>("ChatChannel", at, (event) => {
+    switch (event.type) {
+      case "message_start":
+        setError(null)
+        setStreaming(
+          event.role === "assistant"
+            ? { id: event.message_id, content: "" }
+            : null,
+        )
+        break
+      case "chunk":
+        setStreaming((current) =>
+          current?.id === event.message_id
+            ? { ...current, content: current.content + event.content }
+            : { id: event.message_id, content: event.content },
+        )
+        break
+      case "message_end":
+        router.reload({
+          only: ["messages", "awaiting_response"],
+          onSuccess: () =>
+            setStreaming((current) =>
+              current?.id === event.message_id ? null : current,
+            ),
+        })
+        break
+      case "error":
+        setStreaming(null)
+        setError(event.message)
+        router.reload({ only: ["messages", "awaiting_response"] })
+        break
     }
-  }, [awaiting_response, start, stop])
+  })
+
+  // The streamed text replaces the (still empty) row it is being written into.
+  const shown = streaming
+    ? messages.filter((message) => message.id !== streaming.id)
+    : messages
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
@@ -55,16 +93,31 @@ export default function ChatShow({
           </p>
         </div>
 
-        <MessageList messages={messages} />
+        <MessageList messages={shown} />
 
-        {awaiting_response && (
+        {streaming && (
+          <Bubble
+            id={streaming.id}
+            label="Assistant"
+            content={streaming.content}
+            className="border-green-600"
+          />
+        )}
+
+        {awaiting_response && !streaming && !error && (
           <p className="text-muted-foreground flex items-center gap-2 text-sm">
             <Spinner /> Waiting for the assistant…
           </p>
         )}
 
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
         <Form
-          action={chatMessages.create(chat.id)}
+          action={chatMessages.create({ accountSlug, chatId: chat.id })}
           resetOnSuccess
           options={{ preserveScroll: true }}
           className="flex items-start gap-2"
@@ -91,7 +144,7 @@ export default function ChatShow({
         </Form>
 
         <Button variant="ghost" asChild>
-          <Link href={routes.index()}>Back to chats</Link>
+          <Link href={routes.index(accountSlug)}>Back to chats</Link>
         </Button>
       </div>
     </AppLayout>

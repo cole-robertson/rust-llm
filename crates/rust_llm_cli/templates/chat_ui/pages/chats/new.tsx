@@ -15,14 +15,10 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
+import { useCurrentAccount } from "@/hooks/use-current-account"
 import AppLayout from "@/layouts/app-layout"
 import { chats as routes } from "@/routes"
 import type { BreadcrumbItem } from "@/types"
-
-const breadcrumbs: BreadcrumbItem[] = [
-  { title: "Chats", href: routes.index().url },
-  { title: "New chat", href: routes.new().url },
-]
 
 export default function ChatNew({
   chat_models,
@@ -33,13 +29,19 @@ export default function ChatNew({
   selected_model: string | null
   default_model_label: string
 }) {
+  const { slug: accountSlug } = useCurrentAccount()
+  const breadcrumbs: BreadcrumbItem[] = [
+    { title: "Chats", href: routes.index(accountSlug).url },
+    { title: "New chat", href: routes.new(accountSlug).url },
+  ]
+
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
       <Head title="New chat" />
       <div className="max-w-2xl p-4">
         <Heading title="New chat" />
         <Form
-          action={routes.create()}
+          action={routes.create(accountSlug)}
           transform={withDefaultModel}
           disableWhileProcessing
           className="flex flex-col gap-6"

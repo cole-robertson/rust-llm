@@ -51,3 +51,16 @@ export interface ToolCallProps {
 export interface ToolResultProps {
   message: Message
 }
+
+// The reply being streamed into row `id` (ChatChannel `chunk` events).
+export interface StreamingMessage {
+  id: number
+  content: string
+}
+
+// What ChatChannel broadcasts (src/channels/chat.rs).
+export type ChatEvent =
+  | { type: "message_start"; message_id: number; role: Message["role"] }
+  | { type: "chunk"; message_id: number; content: string }
+  | { type: "message_end"; message_id: number }
+  | { type: "error"; message: string }

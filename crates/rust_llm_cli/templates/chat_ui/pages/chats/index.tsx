@@ -3,15 +3,17 @@ import { Head, Link } from "@inertiajs/react"
 import Heading from "@/components/heading"
 import type { ChatSummary } from "@/components/messages/types"
 import { Button } from "@/components/ui/button"
+import { useCurrentAccount } from "@/hooks/use-current-account"
 import AppLayout from "@/layouts/app-layout"
 import { chats as routes, models } from "@/routes"
 import type { BreadcrumbItem } from "@/types"
 
-const breadcrumbs: BreadcrumbItem[] = [
-  { title: "Chats", href: routes.index().url },
-]
-
 export default function ChatIndex({ chats }: { chats: ChatSummary[] }) {
+  const { slug: accountSlug } = useCurrentAccount()
+  const breadcrumbs: BreadcrumbItem[] = [
+    { title: "Chats", href: routes.index(accountSlug).url },
+  ]
+
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
       <Head title="Chats" />
@@ -20,10 +22,10 @@ export default function ChatIndex({ chats }: { chats: ChatSummary[] }) {
           <Heading title="Chats" />
           <div className="flex gap-2">
             <Button variant="outline" asChild>
-              <Link href={models.index()}>Models</Link>
+              <Link href={models.index(accountSlug)}>Models</Link>
             </Button>
             <Button asChild>
-              <Link href={routes.new()}>New chat</Link>
+              <Link href={routes.new(accountSlug)}>New chat</Link>
             </Button>
           </div>
         </div>
@@ -40,7 +42,7 @@ export default function ChatIndex({ chats }: { chats: ChatSummary[] }) {
               >
                 <div className="space-y-1">
                   <Link
-                    href={routes.show(chat.id)}
+                    href={routes.show({ accountSlug, id: chat.id })}
                     className="font-medium underline-offset-4 hover:underline"
                   >
                     Chat {chat.id}
@@ -52,7 +54,7 @@ export default function ChatIndex({ chats }: { chats: ChatSummary[] }) {
                 </div>
                 <Button variant="destructive" size="sm" asChild>
                   <Link
-                    href={routes.destroy(chat.id)}
+                    href={routes.destroy({ accountSlug, id: chat.id })}
                     as="button"
                     onBefore={() => confirm("Are you sure?")}
                   >

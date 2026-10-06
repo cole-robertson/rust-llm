@@ -105,6 +105,21 @@ pub fn migrations() -> Vec<Box<dyn sea_orm_migration::MigrationTrait>> {
     migrations::all()
 }
 
+/// Begins a transaction that writes: `BEGIN IMMEDIATE` on SQLite (Rails 8's
+/// `default_transaction_mode: :immediate`), a plain `BEGIN` elsewhere. A deferred `BEGIN` that
+/// reads and then writes fails at once with `SQLITE_BUSY_SNAPSHOT` (517) when another connection
+/// committed after its first read, which a worker streaming a reply while the app takes requests
+/// runs into; `IMMEDIATE` takes the write lock up front, where `busy_timeout` applies.
+pub(crate) async fn begin_write<C: TransactionTrait>(
+    db: &C,
+) -> std::result::Result<C::Transaction, sea_orm::DbErr> {
+    db.begin_with_options(sea_orm::TransactionOptions {
+        sqlite_transaction_mode: Some(sea_orm::SqliteTransactionMode::Immediate),
+        ..Default::default()
+    })
+    .await
+}
+
 pub(crate) fn now() -> sea_orm::prelude::DateTimeWithTimeZone {
     chrono::Utc::now().into()
 }
@@ -560,7 +575,7 @@ impl ChatRecord {
         append: bool,
         cache_until_here: bool,
     ) -> Result<()> {
-        let txn = db.begin().await?;
+        let txn = begin_write(db).await?;
         let existing = messages::Entity::find()
             .filter(messages::Column::ChatId.eq(self.record.id))
             .filter(messages::Column::Role.eq("system"))
@@ -668,7 +683,7 @@ impl ChatRecord {
             .iter()
             .map(|m| m.id as i64)
             .collect();
-        let txn = db.begin().await?;
+        let txn = begin_write(db).await?;
         rust_llm_tool_calls::Entity::delete_many()
             .filter(rust_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
             .filter(rust_llm_tool_calls::Column::MessageId.is_in(ids.clone()))
@@ -1087,7 +1102,7 @@ impl ChatRecord {
                 ),
             }
         }
-        let txn = db.begin().await?;
+        let txn = begin_write(db).await?;
         let row = match existing {
             Some(existing) => {
                 let mut row = message_active_model(self.record.id, m);
@@ -1293,7 +1308,7 @@ impl ChatRecord {
         if doomed.is_empty() {
             return Ok(());
         }
-        let txn = db.begin().await?;
+        let txn = begin_write(db).await?;
         for id in &doomed {
             tracing::warn!("RustLLM: {reason}, destroying message: {id}");
             rust_llm_tool_calls::Entity::delete_many()
