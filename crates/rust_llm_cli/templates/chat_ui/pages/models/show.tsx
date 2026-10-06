@@ -3,14 +3,22 @@ import { Head, Link } from "@inertiajs/react"
 import Heading from "@/components/heading"
 import type { ChatModel } from "@/components/messages/types"
 import { Button } from "@/components/ui/button"
+import { useCurrentAccount } from "@/hooks/use-current-account"
 import AppLayout from "@/layouts/app-layout"
 import { chats, models as routes } from "@/routes"
 import type { BreadcrumbItem } from "@/types"
 
 export default function ModelShow({ model }: { model: ChatModel }) {
+  const { slug: accountSlug } = useCurrentAccount()
   const breadcrumbs: BreadcrumbItem[] = [
-    { title: "Models", href: routes.index().url },
-    { title: model.name, href: routes.show(model.id).url },
+    { title: "Models", href: routes.index(accountSlug).url },
+    {
+      title: model.name,
+      href: routes.show(
+        { accountSlug, id: model.id },
+        { query: { provider: model.provider } },
+      ).url,
+    },
   ]
 
   return (
@@ -54,12 +62,16 @@ export default function ModelShow({ model }: { model: ChatModel }) {
 
         <div className="flex gap-2">
           <Button asChild>
-            <Link href={chats.new({ query: { model: model.value } })}>
+            <Link
+              href={chats.new(accountSlug, {
+                query: { model: model.value },
+              })}
+            >
               Start chat with this model
             </Link>
           </Button>
           <Button variant="ghost" asChild>
-            <Link href={routes.index()}>All models</Link>
+            <Link href={routes.index(accountSlug)}>All models</Link>
           </Button>
         </div>
       </div>

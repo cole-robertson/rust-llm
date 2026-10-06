@@ -3,13 +3,10 @@ import { Head, Link, router } from "@inertiajs/react"
 import Heading from "@/components/heading"
 import type { ChatModel } from "@/components/messages/types"
 import { Button } from "@/components/ui/button"
+import { useCurrentAccount } from "@/hooks/use-current-account"
 import AppLayout from "@/layouts/app-layout"
 import { chats, models as routes } from "@/routes"
 import type { BreadcrumbItem } from "@/types"
-
-const breadcrumbs: BreadcrumbItem[] = [
-  { title: "Models", href: routes.index().url },
-]
 
 function price(model: ChatModel) {
   if (model.input_price == null || model.output_price == null) return null
@@ -17,6 +14,11 @@ function price(model: ChatModel) {
 }
 
 export default function ModelIndex({ models }: { models: ChatModel[] }) {
+  const { slug: accountSlug } = useCurrentAccount()
+  const breadcrumbs: BreadcrumbItem[] = [
+    { title: "Models", href: routes.index(accountSlug).url },
+  ]
+
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
       <Head title="Models" />
@@ -24,11 +26,11 @@ export default function ModelIndex({ models }: { models: ChatModel[] }) {
         <div className="flex items-start justify-between gap-4">
           <Heading title="Models" />
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => router.post(routes.refresh().url)}>
+            <Button variant="outline" onClick={() => router.post(routes.refresh(accountSlug).url)}>
               Refresh
             </Button>
             <Button variant="outline" asChild>
-              <Link href={chats.index()}>Chats</Link>
+              <Link href={chats.index(accountSlug)}>Chats</Link>
             </Button>
           </div>
         </div>
@@ -53,7 +55,7 @@ export default function ModelIndex({ models }: { models: ChatModel[] }) {
                     <td className="p-3">{model.provider_name}</td>
                     <td className="p-3">
                       <Link
-                        href={routes.show(model.id, {
+                        href={routes.show({ accountSlug, id: model.id }, {
                           query: { provider: model.provider },
                         })}
                         className="underline-offset-4 hover:underline"
@@ -67,7 +69,9 @@ export default function ModelIndex({ models }: { models: ChatModel[] }) {
                     <td className="p-3">{price(model)}</td>
                     <td className="p-3">
                       <Link
-                        href={chats.new({ query: { model: model.value } })}
+                        href={chats.new(accountSlug, {
+                          query: { model: model.value },
+                        })}
                         className="underline-offset-4 hover:underline"
                       >
                         Start chat

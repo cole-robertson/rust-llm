@@ -17,6 +17,7 @@
 //! | `bin/rails g ruby_llm:agent Support` | `rust-llm generate agent Support` |
 //! | `bin/rails g ruby_llm:schema Product` | `rust-llm generate schema Product` |
 //! | `bin/rails g ruby_llm:chat_ui` | `rust-llm generate chat_ui` |
+//! | (none) | `rust-llm generate public_chat`: a no-sign-in, rate-limited streaming chat page |
 //! | `script/generate-provider NAME` (core mode) | `rust-llm generate provider NAME [--dialect D] [--api-base URL] [--models-dev-provider KEY] [--dynamic-models] [--destination DIR]` |
 //! | `bin/rails g ruby_llm:upgrade` | `rust-llm generate upgrade` |
 //!
@@ -30,6 +31,7 @@ pub mod agent;
 pub mod chat_ui;
 pub mod install;
 pub mod provider;
+pub mod public_chat;
 pub mod schema;
 pub mod tool;
 pub mod upgrade;
@@ -47,6 +49,11 @@ pub enum Anchor<'a> {
     /// In name order among the lines starting with this prefix (above any attribute or doc comment
     /// of the next one), else at the end of the file. rustfmt keeps `mod` lines sorted this way.
     Sorted(&'a str),
+    /// Before the first line that is exactly this text, trimmed (`// scaffold:nav`, not
+    /// `// scaffold:nav-global`).
+    BeforeLine(&'a str),
+    /// At the end of the file.
+    End,
 }
 
 /// Runs one generator against an app directory, recording what it did.
@@ -166,10 +173,15 @@ impl Generator {
             Anchor::Before(marker) => lines.iter().position(|l| l.contains(marker)),
             Anchor::After(marker) => lines.iter().position(|l| l.contains(marker)).map(|i| i + 1),
             Anchor::Sorted(prefix) => Some(sorted_index(&lines, first, prefix)),
+            Anchor::BeforeLine(marker) => lines.iter().position(|l| l.trim() == marker),
+            Anchor::End => Some(lines.len()),
         };
         let Some(at) = at else {
             let marker = match anchor {
-                Anchor::Before(m) | Anchor::After(m) | Anchor::Sorted(m) => m,
+                Anchor::Before(m) | Anchor::After(m) | Anchor::Sorted(m) | Anchor::BeforeLine(m) => {
+                    m
+                }
+                Anchor::End => "end of file",
             };
             return self.fail(format!(
                 "{rel}: anchor `{marker}` not found; add this yourself:\n{content}"
@@ -397,6 +409,7 @@ pub const USAGE: &str = "Usage:
   rust-llm generate agent NAME [--force]
   rust-llm generate schema NAME [--force]
   rust-llm generate chat_ui [--force]
+  rust-llm generate public_chat [--force]
   rust-llm generate provider NAME [--dialect chat_completions|responses|anthropic|gemini|ollama]
                                   [--api-base URL] [--models-dev-provider KEY] [--dynamic-models]
                                   [--destination DIR] [--force]
@@ -453,7 +466,7 @@ pub fn run(args: &[String], cwd: &Path) -> i32 {
     }
     // `parse_provider_options`: `Unexpected arguments: ...` for positionals past the NAME.
     let arity = match generator.copied() {
-        Some("install" | "chat_ui" | "upgrade") => 2,
+        Some("install" | "chat_ui" | "public_chat" | "upgrade") => 2,
         Some("tool" | "agent" | "schema" | "provider") => 3,
         _ => usize::MAX,
     };
@@ -471,6 +484,7 @@ pub fn run(args: &[String], cwd: &Path) -> i32 {
             needs_name("schema").and_then(|n| schema::generate(&mut generator_run, n))
         }
         Some("chat_ui") => chat_ui::generate(&mut generator_run),
+        Some("public_chat") => public_chat::generate(&mut generator_run),
         Some("provider") => needs_name("provider").and_then(|n| {
             let root = option("--destination").map_or_else(|| cwd.to_path_buf(), |d| cwd.join(d));
             generator_run = Generator::new(root, force).echo();

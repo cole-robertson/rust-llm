@@ -50,7 +50,35 @@ function ToolResultItem(props: ToolResultProps) {
   )
 }
 
-function Bubble({
+export function Bubble({
+  id,
+  label,
+  content,
+  createdAt,
+  className,
+}: {
+  id: number
+  label: string
+  content: string | null
+  createdAt?: string
+  className: string
+}) {
+  return (
+    <div id={`message_${id}`} className={`rounded-md border-l-4 p-3 ${className}`}>
+      <div className="mb-1 font-semibold">{label}</div>
+      <div id={`message_${id}_content`} className="whitespace-pre-wrap">
+        {content}
+      </div>
+      {createdAt && (
+        <div className="text-muted-foreground mt-1 text-xs">
+          {formatTime(createdAt)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MessageBubble({
   message,
   label,
   className,
@@ -60,18 +88,13 @@ function Bubble({
   className: string
 }) {
   return (
-    <div
-      id={`message_${message.id}`}
-      className={`rounded-md border-l-4 p-3 ${className}`}
-    >
-      <div className="mb-1 font-semibold">{label}</div>
-      <div id={`message_${message.id}_content`} className="whitespace-pre-wrap">
-        {message.content}
-      </div>
-      <div className="text-muted-foreground mt-1 text-xs">
-        {formatTime(message.created_at)}
-      </div>
-    </div>
+    <Bubble
+      id={message.id}
+      label={label}
+      content={message.content}
+      createdAt={message.created_at}
+      className={className}
+    />
   )
 }
 
@@ -81,7 +104,7 @@ export function MessageItem({ message }: { message: Message }) {
     return (
       <div id={`message_${message.id}`} className="space-y-2">
         {message.content && (
-          <Bubble
+          <MessageBubble
             message={message}
             label="Assistant"
             className="border-green-600"
@@ -103,11 +126,11 @@ export function MessageItem({ message }: { message: Message }) {
       return <ToolResultItem message={message} />
     case "user":
       return (
-        <Bubble message={message} label="User" className="border-blue-600" />
+        <MessageBubble message={message} label="User" className="border-blue-600" />
       )
     case "system":
       return (
-        <Bubble
+        <MessageBubble
           message={message}
           label="System"
           className="border-muted-foreground bg-muted/50"
@@ -115,7 +138,7 @@ export function MessageItem({ message }: { message: Message }) {
       )
     default:
       return (
-        <Bubble
+        <MessageBubble
           message={message}
           label="Assistant"
           className="border-green-600"

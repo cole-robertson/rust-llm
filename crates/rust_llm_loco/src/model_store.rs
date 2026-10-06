@@ -80,7 +80,7 @@ pub async fn save_to_database<C>(db: &C, registry: &Models) -> Result<()>
 where
     C: ConnectionTrait + TransactionTrait,
 {
-    let txn = db.begin().await?;
+    let txn = crate::begin_write(db).await?;
     let existing: HashMap<(String, String), i32> = rust_llm_models::Entity::find()
         .all(&txn)
         .await?
