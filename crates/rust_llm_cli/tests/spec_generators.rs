@@ -35,6 +35,22 @@ mod chats;
 #[allow(dead_code, unused_imports)] // Items the generated app's controllers use.
 #[path = "../templates/install/message_model.rs"]
 mod messages;
+#[rustfmt::skip]
+#[path = "../templates/chat_ui/migration.rs"]
+mod chat_ui_migration;
+/// `src/models/chats.rs` after `rust-llm generate chat_ui`: the install template with the
+/// account functions appended (see `chat_ui_app_scopes_chats_to_their_account`).
+/// The appended part sees the install template's items, as it does in the one file.
+#[rustfmt::skip]
+#[allow(dead_code, unused_imports)]
+mod account_chats {
+    pub use super::chats::*;
+    use rust_llm_loco::entities::{messages, rust_llm_models};
+    use sea_orm::sea_query::{Expr, ExprTrait};
+    use sea_orm::{ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+    use serde_json::{json, Value};
+    include!("../templates/chat_ui/chat_model_accounts.rs");
+}
 
 const MODEL: &str = "gpt-4.1-nano";
 
@@ -297,6 +313,44 @@ async fn installed_chat_and_message_models_work() {
     assert_eq!(message.content.as_deref(), Some("Test"));
 }
 
+/// The chat UI's account functions, compiled as `src/models/chats.rs` ends up after
+/// `chat_ui`, against a schema with the chat UI's migration applied.
+#[tokio::test]
+async fn chat_ui_app_scopes_chats_to_their_account() {
+    let db = installed_db().await;
+    chat_ui_migration::Migration
+        .up(&SchemaManager::new(&db))
+        .await
+        .unwrap();
+    let (acme, globex) = (1_i64, 2_i64);
+    let mine = account_chats::create_in_account(&db, acme, MODEL, None)
+        .await
+        .unwrap();
+    let theirs = account_chats::create_in_account(&db, globex, MODEL, None)
+        .await
+        .unwrap();
+    messages::create_user(&db, mine.id(), "Hi").await.unwrap();
+
+    assert!(account_chats::find_in_account(&db, acme, mine.id()).await.unwrap().is_some());
+    assert!(
+        account_chats::find_in_account(&db, acme, theirs.id()).await.unwrap().is_none(),
+        "another account's chat is not found"
+    );
+    let listed = account_chats::list_in_account(&db, acme).await.unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0]["id"], mine.id());
+    assert_eq!(listed[0]["message_count"], 1);
+    // An unknown model creates nothing.
+    assert!(account_chats::create_in_account(&db, acme, "no-such-model", None).await.is_err());
+    assert_eq!(account_chats::list_in_account(&db, acme).await.unwrap().len(), 1);
+
+    chat_ui_migration::Migration
+        .down(&SchemaManager::new(&db))
+        .await
+        .unwrap();
+    assert!(!SchemaManager::new(&db).has_column("chats", "account_id").await.unwrap());
+}
+
 // spec: generators/chat_ui_generator_spec.rb:458 chat functionality works correctly
 #[tokio::test]
 async fn chat_ui_app_creates_a_chat_and_its_first_message() {
@@ -310,9 +364,9 @@ async fn chat_ui_app_creates_a_chat_and_its_first_message() {
     // The model functions below are the ones the generated controllers call.
     let controllers = read(dir.path(), "src/controllers/chats.rs");
     for call in [
-        "chats::ChatRecord::create(&ctx.db",
+        "chats::create_in_account(&ctx.db",
         "messages::create_user(&ctx.db",
-        "chats::list(&ctx.db",
+        "chats::list_in_account(&ctx.db",
         "chats::find_props(&ctx.db",
         "messages::transcript(&ctx.db",
         "chats::destroy(&ctx.db",

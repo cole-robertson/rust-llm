@@ -44,7 +44,22 @@ pub fn app() -> tempfile::TempDir {
         ),
         (
             "frontend/components/app-sidebar.tsx",
-            "import { Link } from \"@inertiajs/react\"\nimport { BookOpen, Folder, LayoutGrid } from \"lucide-react\"\n\nimport { dashboard } from \"@/routes\"\n\nconst mainNavItems: NavItem[] = [\n  {\n    title: \"Dashboard\",\n  },\n  // scaffold:nav\n]\n",
+            "import { Link } from \"@inertiajs/react\"\nimport { BookOpen, Folder, LayoutGrid } from \"lucide-react\"\n\nimport { dashboard } from \"@/routes\"\n\nconst globalNavItems: NavItem[] = [\n  // scaffold:nav-global\n]\n\nexport function AppSidebar() {\n  const mainNavItems: NavItem[] = inAccount\n    ? [\n        {\n          title: \"Overview\",\n        },\n        // scaffold:nav\n      ]\n    : []\n}\n",
+        ),
+        // Accounts, live updates, and rate limiting: what the chat UIs build on.
+        (
+            "src/models/accounts.rs",
+            "pub const RESERVED_SLUGS: &[&str] = &[\n    \"accounts\",\n    \"live\",\n];\n",
+        ),
+        ("src/live/mod.rs", "//! Live updates.\n"),
+        ("src/controllers/rate_limit.rs", "//! Rate limiting.\n"),
+        (
+            "src/channels/mod.rs",
+            "use std::sync::Arc;\n\npub mod account;\n\npub fn all() -> Vec<Arc<dyn Channel>> {\n    vec![\n        Arc::new(account::AccountChannel),\n        // channels-inject (do not remove this comment: `cargo loco generate channel` adds above it)\n    ]\n}\n",
+        ),
+        (
+            "tests/requests/mod.rs",
+            "mod accounts;\nmod live;\nmod users;\n\nuse super::*;\n",
         ),
     ];
     for (path, content) in files {

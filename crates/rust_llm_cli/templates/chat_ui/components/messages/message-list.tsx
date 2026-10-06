@@ -64,7 +64,10 @@ export function Bubble({
   className: string
 }) {
   return (
-    <div id={`message_${id}`} className={`rounded-md border-l-4 p-3 ${className}`}>
+    <div
+      id={`message_${id}`}
+      className={`rounded-md border-l-4 p-3 ${className}`}
+    >
       <div className="mb-1 font-semibold">{label}</div>
       <div id={`message_${id}_content`} className="whitespace-pre-wrap">
         {content}
@@ -126,7 +129,11 @@ export function MessageItem({ message }: { message: Message }) {
       return <ToolResultItem message={message} />
     case "user":
       return (
-        <MessageBubble message={message} label="User" className="border-blue-600" />
+        <MessageBubble
+          message={message}
+          label="User"
+          className="border-blue-600"
+        />
       )
     case "system":
       return (

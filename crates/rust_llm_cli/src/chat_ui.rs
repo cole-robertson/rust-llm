@@ -150,7 +150,14 @@ const ROUTES: &str = r#"        route(
             ts("ModelsController", "models", "show", Some("model")),
         ),"#;
 
-const NAV_ITEM: &str = r#"{ title: "Chats", href: chats.index(account.slug).url, icon: MessagesSquare },"#;
+/// Prettier-shaped, like the kit's own entries; each line is indented like the anchor.
+const NAV_ITEM: &[&str] = &[
+    "{",
+    "  title: \"Chats\",",
+    "  href: chats.index(account.slug).url,",
+    "  icon: MessagesSquare,",
+    "},",
+];
 
 /// What the kit provides that the account-scoped chat UI builds on.
 const KIT_FILES: &[(&str, &str)] = &[
@@ -284,9 +291,10 @@ fn link_sidebar(g: &mut Generator) {
         .find(|l| l.trim() == "// scaffold:nav")
         .map(|l| l.chars().take_while(|c| c.is_whitespace()).collect())
         .unwrap_or_else(|| "  ".to_string());
+    let item: Vec<String> = NAV_ITEM.iter().map(|l| format!("{indent}{l}")).collect();
     g.inject(
         SIDEBAR,
-        &format!("{indent}{NAV_ITEM}"),
+        &item.join("\n"),
         Anchor::BeforeLine("// scaffold:nav"),
     );
     g.named_import(SIDEBAR, "@/routes", "chats");

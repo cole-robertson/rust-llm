@@ -31,13 +31,16 @@ type Frame =
   | { type: "error"; message: string }
 
 // Each `data:` line of a Server-Sent Events body, as it arrives.
-async function* frames(body: ReadableStream<Uint8Array>): AsyncGenerator<Frame> {
-  const reader = body.pipeThrough(new TextDecoderStream()).getReader()
+async function* frames(
+  body: ReadableStream<Uint8Array>,
+): AsyncGenerator<Frame> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
   let buffer = ""
   for (;;) {
     const { value, done } = await reader.read()
     if (done) return
-    buffer += value
+    buffer += decoder.decode(value, { stream: true })
     let end
     while ((end = buffer.indexOf("\n\n")) >= 0) {
       const event = buffer.slice(0, end)
@@ -115,13 +118,19 @@ export default function PublicChat({
       <Head title="Chat" />
       <div className="bg-background flex min-h-screen flex-col items-center p-4 lg:p-8">
         <header className="mb-6 flex w-full max-w-3xl items-center gap-4 text-sm">
-          <Link href={home.index()} className="flex items-center gap-2 font-medium">
+          <Link
+            href={home.index()}
+            className="flex items-center gap-2 font-medium"
+          >
             <AppLogoIcon className="size-6" />
             {import.meta.env.VITE_APP_NAME ?? "Chat"}
           </Link>
           <span className="text-muted-foreground mr-auto">{model_label}</span>
           {!auth.user && (
-            <Link href={sessions.new()} className="underline-offset-4 hover:underline">
+            <Link
+              href={sessions.new()}
+              className="underline-offset-4 hover:underline"
+            >
               Sign in
             </Link>
           )}
@@ -136,7 +145,9 @@ export default function PublicChat({
           {messages.map((message, i) => (
             <Card
               key={i}
-              className={message.role === "user" ? "bg-muted/50 ml-12" : "mr-12"}
+              className={
+                message.role === "user" ? "bg-muted/50 ml-12" : "mr-12"
+              }
             >
               <CardContent className="whitespace-pre-wrap">
                 {message.content}
@@ -158,7 +169,10 @@ export default function PublicChat({
             </Alert>
           )}
 
-          <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-2">
+          <form
+            onSubmit={(e) => void submit(e)}
+            className="flex flex-col gap-2"
+          >
             <Textarea
               name="content"
               value={draft}
@@ -188,7 +202,11 @@ export default function PublicChat({
               >
                 Start over
               </Button>
-              <Button type="submit" size="sm" disabled={busy || tooLong || !draft.trim() || turnsLeft === 0}>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={busy || tooLong || !draft.trim() || turnsLeft === 0}
+              >
                 {busy && <Spinner />}
                 Send
               </Button>

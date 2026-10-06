@@ -30,7 +30,7 @@ const ROUTES: &str = r#"        route(
             "public_chat.show",
             Get,
             PUBLIC_CHAT,
-            ts("PublicChatController", "publicChat", "show", Some("chat")),
+            ts("PublicChatController", "publicChat", "show", None),
         ),
         route(
             "public_chat.destroy",

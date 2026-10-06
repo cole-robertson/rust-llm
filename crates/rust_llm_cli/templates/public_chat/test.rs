@@ -4,8 +4,12 @@
 
 use std::time::Duration;
 
-use axum_test::TestResponse;
-use {{pkg_name}}::controllers::public_chat::{self, Limits, COOKIE, SLOW_DOWN};
+use axum_test::{TestRequest, TestResponse};
+use cookie::Cookie;
+use {{pkg_name}}::{
+    controllers::public_chat::{self, Limits, COOKIE, SLOW_DOWN},
+    route_table,
+};
 use serde_json::{json, Value};
 use serial_test::serial;
 
@@ -54,6 +58,7 @@ fn frames(res: &TestResponse) -> Vec<Value> {
         .collect()
 }
 
+/// The server's own browser (it saves cookies).
 async fn say(server: &TestServer, content: &str) -> TestResponse {
     server
         .post(route_table::PUBLIC_CHAT_MESSAGES)
@@ -61,17 +66,49 @@ async fn say(server: &TestServer, content: &str) -> TestResponse {
         .await
 }
 
+/// Another browser: only the `public_chat` cookie it was given, if any, and nothing saved.
+fn as_browser(request: TestRequest, cookie: Option<&str>) -> TestRequest {
+    let request = request.clear_cookies().do_not_save_cookies();
+    match cookie {
+        Some(value) => request.add_cookie(Cookie::new(COOKIE, value.to_owned())),
+        None => request,
+    }
+}
+
+async fn say_in(server: &TestServer, cookie: Option<&str>, content: &str) -> TestResponse {
+    as_browser(server.post(route_table::PUBLIC_CHAT_MESSAGES), cookie)
+        .json(&json!({ "content": content }))
+        .await
+}
+
+/// A new browser (no cookie) at address `ip`.
 async fn say_as(server: &TestServer, ip: &str, content: &str) -> TestResponse {
-    server
-        .post(route_table::PUBLIC_CHAT_MESSAGES)
+    as_browser(server.post(route_table::PUBLIC_CHAT_MESSAGES), None)
         .add_header("x-forwarded-for", ip)
         .json(&json!({ "content": content }))
         .await
 }
 
-/// The `/chat` page's messages, as `(role, content)`.
+/// The `/chat` page's messages for the server's own browser, as `(role, content)`.
 async fn conversation(server: &TestServer, ctx: &AppContext) -> Vec<(String, String)> {
-    let page = inertia_get(server, ctx, route_table::PUBLIC_CHAT).await;
+    messages_of(inertia_get(server, ctx, route_table::PUBLIC_CHAT).await)
+}
+
+/// The `/chat` page's messages for another browser holding `cookie`.
+async fn conversation_in(
+    server: &TestServer,
+    ctx: &AppContext,
+    cookie: Option<&str>,
+) -> Vec<(String, String)> {
+    let res = as_browser(server.get(route_table::PUBLIC_CHAT), cookie)
+        .add_header("x-inertia", "true")
+        .add_header("x-inertia-version", asset_version(ctx))
+        .await;
+    assert_eq!(res.status_code(), 200, "{}", res.text());
+    messages_of(res.json())
+}
+
+fn messages_of(page: Value) -> Vec<(String, String)> {
     assert_eq!(page["component"], "public_chat/show");
     page["props"]["messages"]
         .as_array()
@@ -133,23 +170,26 @@ async fn guests_never_see_each_others_conversations() {
         assert_eq!(cookie.value().len(), 43, "256 random bits");
 
         // A second browser: no cookie, so a conversation of its own.
-        let mut other = server.clone();
-        other.clear_cookies();
-        assert!(conversation(&other, &ctx).await.is_empty());
-        let res = say(&other, "hello").await;
+        assert!(conversation_in(&server, &ctx, None).await.is_empty());
+        let res = say_in(&server, None, "hello").await;
         assert_eq!(
             frames(&res).last().unwrap()["content"],
             "You said: hello",
             "the reply carries only its own conversation"
         );
-        assert_ne!(res.cookie(COOKIE).value(), cookie.value());
-        assert_eq!(conversation(&other, &ctx).await.len(), 2);
+        let other = res.cookie(COOKIE).value().to_owned();
+        assert_ne!(other, cookie.value());
+        assert_eq!(
+            conversation_in(&server, &ctx, Some(&other)).await,
+            [
+                ("user".into(), "hello".into()),
+                ("assistant".into(), "You said: hello".into())
+            ]
+        );
 
-        // A made-up conversation id finds nothing (and gets a fresh one).
-        let mut forged = server.clone();
-        forged.clear_cookies();
-        forged.add_cookie(axum_test::CookieBuilder::new(COOKIE, "x".repeat(43)).build());
-        assert!(conversation(&forged, &ctx).await.is_empty());
+        // A made-up conversation id finds nothing.
+        let forged = "x".repeat(43);
+        assert!(conversation_in(&server, &ctx, Some(&forged)).await.is_empty());
 
         // The first browser still has only its own.
         assert_eq!(conversation(&server, &ctx).await[0].1, "my secret");
@@ -232,18 +272,14 @@ async fn one_ip_is_rate_limited_across_conversations() {
         ctx.shared_store.insert(limits);
         // A new browser (no cookie) for each message: only the IP links them.
         for n in 0..3 {
-            let mut fresh = server.clone();
-            fresh.clear_cookies();
-            let res = say_as(&fresh, "203.0.113.7", &format!("hi {n}")).await;
+            let res = say_as(&server, "203.0.113.7", &format!("hi {n}")).await;
             assert_eq!(res.status_code(), 200, "{}", res.text());
         }
-        let mut fresh = server.clone();
-        fresh.clear_cookies();
-        let res = say_as(&fresh, "203.0.113.7", "one more").await;
+        let res = say_as(&server, "203.0.113.7", "one more").await;
         assert_eq!(res.status_code(), 429);
         assert_eq!(res.json::<Value>()["error"], SLOW_DOWN);
         // Another address is not affected.
-        let res = say_as(&fresh, "203.0.113.8", "hello").await;
+        let res = say_as(&server, "203.0.113.8", "hello").await;
         assert_eq!(res.status_code(), 200);
     })
     .await;
