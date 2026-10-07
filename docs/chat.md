@@ -346,6 +346,24 @@ let chat = chat.with_context(Some(&ctx))?; // `None` goes back to the global con
 # Ok(()) }
 ```
 
+When you already have a `Config` of your own (one built from `Config::default()`, say), wrap it in
+a `Context` and start chats from that. `ctx.chat(model, provider)` is
+`Chat::with_config(config, model, provider, false)` with the last argument,
+`assume_model_exists`, left at `false`:
+
+```rust,no_run
+use rust_llm::{Config, Context};
+
+# async fn run() -> rust_llm::Result<()> {
+let mut config = Config::default();
+config.anthropic_api_key("sk-ant-...");
+let ctx = Context::new(config);
+
+let mut chat = ctx.chat(Some("claude-haiku-4-5"), None)?;
+chat.ask("Hello").await?;
+# Ok(()) }
+```
+
 See [Configuration](configuration.md#isolated-configurations).
 
 ## Protocols

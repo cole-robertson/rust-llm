@@ -173,6 +173,34 @@ Every one-shot options struct has a `config` field, and so do `Judge::with_confi
 `chat.with_context(Some(&ctx))` moves an existing chat onto a context, and an agent declares one
 with `fn context`.
 
+### A Configuration from Scratch
+
+`rust_llm::context` starts from the global configuration, which reads `OPENAI_API_KEY` and the
+rest from the environment. `Config::default()` reads nothing: it has the defaults above and no
+keys. Build one and wrap it in `Context::new` when nothing should come from the environment, such
+as a test that points providers at a local stub, so the developer's real keys are never used:
+
+```rust,no_run
+use rust_llm::{Config, Context, JudgeOptions};
+
+# async fn run(stub_url: String) -> rust_llm::Result<()> {
+let mut config = Config::default();
+config.set("anthropic_api_key", "test");
+config.set("anthropic_api_base", &stub_url);
+config.set("typesafe_api_key", "test");
+config.set("typesafe_api_base", &stub_url);
+config.max_retries = 0; // an error from the stub fails at once
+let ctx = Context::new(config);
+
+let mut chat = ctx.chat(Some("claude-haiku-4-5"), None)?;
+chat.ask("Hello").await?;
+
+let options = JudgeOptions { config: Some(ctx.config().clone()), ..Default::default() };
+# Ok(()) }
+```
+
+A provider whose key is not set fails with `Error::Configuration` instead of reaching the network.
+
 ## In a Loco App
 
 `rust-llm generate install` writes `src/initializers/rust_llm.rs`, a Loco initializer that calls

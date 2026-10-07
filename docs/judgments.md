@@ -195,6 +195,44 @@ let judgment = rust_llm::judge(
 # Ok(()) }
 ```
 
+## Judging Many Inputs
+
+A `Judge` is reusable and `Clone`, so judging a batch a few at a time is a stream of owned
+futures. Give each future its own input and its own clone of the judge:
+
+```rust,no_run
+use futures::{StreamExt, stream};
+use rust_llm::{Judge, Judgment, Result};
+
+async fn judge_all(judge: &Judge, texts: Vec<String>) -> Vec<(String, Result<Judgment>)> {
+    stream::iter(texts)
+        .map(|text| {
+            let judge = judge.clone();
+            async move {
+                let judgment = judge.judge(text.as_str()).await;
+                (text, judgment)
+            }
+        })
+        .buffer_unordered(8) // at most 8 requests in flight
+        .collect()
+        .await
+}
+# fn _futures_are_send(judge: &Judge, texts: Vec<String>) {
+#     fn is_send<T: Send>(_: T) {}
+#     is_send(judge_all(judge, texts));
+# }
+```
+
+Where the surrounding future must be `Send` (a Loco worker's `perform`, an axum handler,
+`tokio::spawn`), a closure that takes a reference, such as `stream::iter(&texts)` or
+`texts.iter()`, fails with "implementation of `FnOnce` is not general enough"
+([rust-lang/rust#102211](https://github.com/rust-lang/rust/issues/102211)). Iterate owned values
+(`into_iter()`, `to_vec()`) so the closure's argument is not a reference. Cloning the judge as
+above also makes each future `'static`, which `tokio::spawn` and `JoinSet` need; a clone copies the
+question definitions, which is small next to the request.
+
+Each judgment is retried on its own (see [Usage](#usage)), so size `max_retries` for the batch.
+
 ## Choosing a Model
 
 `config.default_judgment_model` defaults to `jev-latest`. A judge overrides it with `.model(..)`
@@ -208,13 +246,34 @@ configured default). `rust_llm::list_judgment_models(None)` lists the provider's
 # fn run(judgment: rust_llm::Judgment) {
 let model = &judgment.model;      // e.g. "jev-1.13.0"
 let input = judgment.tokens().input;
-let total = judgment.cost().total(); // None: the catalog carries no pricing
+let total = judgment.cost().total(); // Some(USD) for jev-latest and jev-preview
 # }
 ```
+
+The bundled registry prices `jev-latest` and `jev-preview` at TypeSafe's published rate, $0.042
+per million input tokens with output free ([TypeSafe models](https://docs.typesafe.ai/models.md)).
+A model id outside the registry (`assume_model_exists`) has no price, so its `cost().total()` is
+`None`. So is a judgment where an attempt failed with unknown usage (a timeout or a 5xx), as for
+chats (see [Cost and Usage](cost-and-usage.md)).
 
 `JudgeOptions::provider_options` (or `Judge::provider_options`) is merged into the request;
 `model`, `state`, and `questions` are reserved. Judgments use the shared timeouts, retries, and
 error types.
+
+Retries are per request: every judgment gets up to `max_retries` retries (default 3) on a 429, a
+500, a 502-504, a 529, a timeout, or a connection failure, and none on other errors such as a 401
+(see [Errors and Retries](errors-and-retries.md#automatic-retries)). During a TypeSafe outage a
+batch of 300 judgments therefore sends up to 1,200 requests (300 plus 900 retries), 8 at a time
+under `buffer_unordered(8)`, and each judgment spends 0.7 to 0.85 s in backoff, or longer when
+TypeSafe sends `Retry-After`, before it fails. To fail a batch fast, judge it with a configuration
+that retries less:
+
+```rust,no_run
+use rust_llm::JudgeOptions;
+
+let ctx = rust_llm::context(|config| config.max_retries = 1);
+let options = JudgeOptions { config: Some(ctx.config().clone()), ..Default::default() };
+```
 
 `JudgeOptions::metadata` is added to the `judgment.rust_llm` [instrumentation](instrumentation.md)
 event and never sent to the provider.
@@ -225,3 +284,7 @@ event and never sent to the provider.
   JSON.
 - Option names are always strings; there are no Symbol-vs-String variants.
 - Method-style readers (`judgment.urgent`) become `get`/`probability`/`choice`/`score`.
+- RubyLLM's bundled `models.json` has no price for `jev-latest` or `jev-preview`, so its
+  `judgment.cost.total` is `nil`. RustLLM's bundled copy adds TypeSafe's published price. Neither
+  TypeSafe's model catalog nor models.dev carries it, so `rust_llm::models::refresh` replaces it
+  with the published catalog's empty pricing.
