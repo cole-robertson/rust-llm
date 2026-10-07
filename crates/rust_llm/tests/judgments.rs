@@ -255,6 +255,43 @@ async fn judges_an_unlisted_local_model_on_a_jev_compatible_server() {
     );
 }
 
+// RustLLM-only: RubyLLM's bundled models.json has `"pricing": {}` for Jev, so its judgments cost
+// `nil`. The bundled registry here carries TypeSafe's published price
+// (https://docs.typesafe.ai/models.md): $0.042 per million input tokens, output free.
+#[tokio::test]
+async fn a_jev_judgment_is_priced_at_typesafes_published_rate() {
+    let server = MockServer::start().await;
+    Mock::given(matchers::method("POST"))
+        .and(matchers::path("/v1/systemone"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(ok_body("jev-1.13.0", 0.9)))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    for model in ["jev-latest", "jev-preview"] {
+        let pricing = rust_llm::models().find(model, None).unwrap().pricing;
+        let standard = pricing.text_tokens.unwrap().standard.unwrap();
+        assert_eq!(standard.input_per_million, Some(0.042), "{model}");
+        assert_eq!(standard.output_per_million, Some(0.0), "{model}");
+    }
+
+    let result = opts(config_at(&server.uri(), 0))
+        .model("jev-latest")
+        .judge_with("Please help today.", questions(urgent()))
+        .await
+        .unwrap();
+
+    // 100 input tokens at $0.042 per million; the 10 output tokens are free.
+    let cost = result.cost();
+    assert_eq!(cost.input, Some(100.0 * 0.042 / 1_000_000.0));
+    assert_eq!(cost.output, Some(0.0));
+    assert_eq!(cost.total(), Some(100.0 * 0.042 / 1_000_000.0));
+    assert_eq!(
+        result.to_value()["cost"]["total"],
+        json!(100.0 * 0.042 / 1_000_000.0)
+    );
+}
+
 #[tokio::test]
 async fn retries_overloads_and_accounts_for_both_attempts() {
     let server = MockServer::start().await;
