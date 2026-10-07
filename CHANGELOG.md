@@ -20,6 +20,16 @@ RustLLM's version follows the RubyLLM release it ports: 2.0.x ports RubyLLM 2.0 
 - `rust_llm_loco` opens write transactions with `BEGIN IMMEDIATE` on SQLite, so a worker streaming a
   reply while the app serves requests waits for the lock instead of failing with
   `SQLITE_BUSY_SNAPSHOT`.
+- The bundled registry prices `jev-latest` and `jev-preview` at TypeSafe's published rate ($0.042
+  per million input tokens, output free), so `judgment.cost().total()` is known. RubyLLM's
+  registry has no price for them; `rust_llm::models::refresh` still replaces the bundled copy
+  with the published catalog's.
+
+### Docs
+- Judgments: bounded concurrency with `buffer_unordered` and a cloned `Judge`, and how retries
+  add up for a batch.
+- Configuration: a `Config` built from `Config::default()` for tests, with no keys from the
+  environment. Chat: `Context::new(config).chat(..)` for your own configuration.
 
 ## [2.0.0] - unreleased
 
