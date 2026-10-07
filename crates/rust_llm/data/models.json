@@ -105101,7 +105101,14 @@
     "capabilities": [
       "judgment"
     ],
-    "pricing": {},
+    "pricing": {
+      "text_tokens": {
+        "standard": {
+          "input_per_million": 0.042,
+          "output_per_million": 0
+        }
+      }
+    },
     "metadata": {
       "description": "The latest iteration of TypeSafe's System One Model: Jev"
     }
@@ -105126,7 +105133,14 @@
     "capabilities": [
       "judgment"
     ],
-    "pricing": {},
+    "pricing": {
+      "text_tokens": {
+        "standard": {
+          "input_per_million": 0.042,
+          "output_per_million": 0
+        }
+      }
+    },
     "metadata": {
       "description": "A preview version of `jev-latest`: should be better in most ways"
     }

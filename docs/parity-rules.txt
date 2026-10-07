@@ -388,7 +388,7 @@ providers/perplexity_spec.rb:53	PORTED	crates/rust_llm/tests/protocols_replay.rs
 providers/typesafe_spec.rb:11	PORTED	crates/rust_llm/tests/judgments.rs::judges_an_unlisted_local_model_on_a_jev_compatible_server
 providers/typesafe_spec.rb:22	PORTED	crates/rust_llm/tests/judgments.rs::the_bundled_catalog_resolves_jev_without_an_explicit_provider
 providers/typesafe_spec.rb:31	PORTED	crates/rust_llm/tests/judgments.rs::judges_an_unlisted_local_model_on_a_jev_compatible_server
-providers/typesafe_spec.rb:58	PORTED	crates/rust_llm/tests/judgments.rs::retries_overloads_and_accounts_for_both_attempts
+providers/typesafe_spec.rb:58	PORTED	crates/rust_llm/tests/judgments.rs::retries_overloads_and_accounts_for_both_attempts (cost nil from the 529 attempt's unknown usage; jev-latest itself is priced)
 providers/typesafe_spec.rb:85	PORTED	crates/rust_llm/tests/judgments.rs::reports_normalized_errors_with_the_detail_message
 providers/typesafe_spec.rb:94	PORTED	crates/rust_llm/tests/judgments.rs::reports_normalized_errors_with_the_detail_message
 providers/typesafe_spec.rb:106	PORTED	crates/rust_llm/tests/judgments.rs::judges_all_three_question_types_through_the_compact_dsl
@@ -1718,7 +1718,7 @@ judge/question_spec.rb:23	MISSING	only the one-level score case of invalid quest
 judge/question_spec.rb:42	N/A	Rust type system: Dynamic is a value or a closure, not both
 judge/question_spec.rb:48	MISSING	no test for 'Unknown judgment type' / 'Unknown question options'
 judge/question_spec.rb:57	PORTED	crates/rust_llm/tests/judgments.rs::resolves_declared_inputs_into_questions_and_criteria
-judge_spec.rb:32	PORTED	crates/rust_llm/tests/judgments.rs::judges_an_unlisted_local_model_on_a_jev_compatible_server
+judge_spec.rb:32	PORTED	crates/rust_llm/tests/judgments.rs::judges_an_unlisted_local_model_on_a_jev_compatible_server (Ruby expects cost nil for jev-latest; RustLLM's bundled registry prices Jev, so nil is checked for an unlisted model and the price in a_jev_judgment_is_priced_at_typesafes_published_rate)
 judge_spec.rb:48	N/A	Ruby-only: block DSL building nested input data
 judge_spec.rb:63	PORTED	crates/rust_llm/tests/judgments.rs::preserves_structured_descriptions_and_arbitrary_choice_names (array input; procs Ruby-only)
 judge_spec.rb:76	N/A	Ruby-only: explicit block receiver

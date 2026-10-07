@@ -1889,7 +1889,7 @@ N/A splits into 900 examples for providers this port leaves out (Azure, Bedrock,
 
 | Line | Example | Status | Evidence / reason |
 |---:|---|---|---|
-| 32 | judges plain text and returns a typed probability with accounting | PORTED | crates/rust_llm/tests/judgments.rs::judges_an_unlisted_local_model_on_a_jev_compatible_server |
+| 32 | judges plain text and returns a typed probability with accounting | PORTED | crates/rust_llm/tests/judgments.rs::judges_an_unlisted_local_model_on_a_jev_compatible_server (Ruby expects cost nil for jev-latest; RustLLM's bundled registry prices Jev, so nil is checked for an unlisted model and the price in a_jev_judgment_is_priced_at_typesafes_published_rate) |
 | 48 | builds nested input data with one request | N/A | Ruby-only: block DSL building nested input data |
 | 63 | accepts arrays, hashes, procs, and blocks returning input | PORTED | crates/rust_llm/tests/judgments.rs::preserves_structured_descriptions_and_arbitrary_choice_names (array input; procs Ruby-only) |
 | 76 | accepts an explicit block receiver | N/A | Ruby-only: explicit block receiver |
@@ -4965,7 +4965,7 @@ N/A splits into 900 examples for providers this port leaves out (Azure, Bedrock,
 | 11 | registers its configuration and authenticates with a bearer token | PORTED | crates/rust_llm/tests/judgments.rs::judges_an_unlisted_local_model_on_a_jev_compatible_server |
 | 22 | uses the bundled catalog without requiring an explicit provider | PORTED | crates/rust_llm/tests/judgments.rs::the_bundled_catalog_resolves_jev_without_an_explicit_provider |
 | 31 | judges an unlisted local model without changing the hosted configuration | PORTED | crates/rust_llm/tests/judgments.rs::judges_an_unlisted_local_model_on_a_jev_compatible_server |
-| 58 | retries overloads, resolving dynamic input once and accounting for both attempts | PORTED | crates/rust_llm/tests/judgments.rs::retries_overloads_and_accounts_for_both_attempts |
+| 58 | retries overloads, resolving dynamic input once and accounting for both attempts | PORTED | crates/rust_llm/tests/judgments.rs::retries_overloads_and_accounts_for_both_attempts (cost nil from the 529 attempt's unknown usage; jev-latest itself is priced) |
 | 85 | reports normalized errors through the shared transport | PORTED | crates/rust_llm/tests/judgments.rs::reports_normalized_errors_with_the_detail_message |
 | 94 | reports the message of a refusal rather than its JSON envelope | PORTED | crates/rust_llm/tests/judgments.rs::reports_normalized_errors_with_the_detail_message |
 | 106 | with the TypeSafe API > judges all three question types through the compact DSL | REPLAYED | 1/1 cassettes, `judgments` |

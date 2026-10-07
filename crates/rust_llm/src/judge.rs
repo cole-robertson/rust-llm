@@ -968,7 +968,8 @@ impl Judgment {
         }
     }
 
-    /// Unknown prices stay `None`: the TypeSafe catalog carries no pricing.
+    /// Unknown prices stay `None`. The bundled registry prices `jev-latest` and `jev-preview`;
+    /// a model outside it (`assume_model_exists`) has no price.
     pub fn cost(&self) -> Cost {
         if self.usage_entries.is_empty() {
             return Cost::new(&self.tokens, self.model_info.as_ref(), Tier::Standard);
