@@ -5,6 +5,22 @@ RustLLM's version follows the RubyLLM release it ports: 2.0.x ports RubyLLM 2.0 
 
 ## [Unreleased]
 
+### Added
+- `rust_llm_loco`: `ChatRecord::ask_stream` and `complete_stream`, RubyLLM's streaming block on a
+  persisted chat. They persist like `ask`/`complete` and report `StreamEvent::NewMessage`,
+  `Chunk`, and `EndMessage` with the row each belongs to; a failed reply leaves no empty row.
+- `rust-llm generate chat_ui` streams: the worker runs `complete_stream` and broadcasts on a
+  generated `ChatChannel` (the starter kit's live updates), and the page shows the reply as it
+  arrives instead of polling. Chats belong to an account (`chats.account_id`, under
+  `/{account_slug}/chats`); another account's chat is a 404 and its stream refuses subscription.
+- `rust-llm generate public_chat`: a no-sign-in chat page at `/chat` that streams over Server-Sent
+  Events, with per-IP and per-conversation rate limits, input and output caps, and a turn limit.
+
+### Changed
+- `rust_llm_loco` opens write transactions with `BEGIN IMMEDIATE` on SQLite, so a worker streaming a
+  reply while the app serves requests waits for the lock instead of failing with
+  `SQLITE_BUSY_SNAPSHOT`.
+
 ## [2.0.0] - unreleased
 
 First release: `rust_llm`, `rust_llm_loco`, and `rust_llm_cli`, a full port of RubyLLM 2.0.

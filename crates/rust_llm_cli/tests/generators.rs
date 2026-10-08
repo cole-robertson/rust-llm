@@ -379,9 +379,13 @@ fn chat_ui_writes_controllers_channel_worker_pages_and_tests() {
     assert!(channel.contains("format!(\"{account_id}:{id}\")"));
     assert!(channel.contains("chats::find_in_account(&ctx.db, membership.account_id, id)"));
 
-    // The page subscribes with useChannel; no polling.
+    // The page subscribes with useChannel; no polling. The params are the ones
+    // ChatChannel#subscribed reads (`kit::membership` takes the slug from `account`): a page
+    // sending `accountSlug` was rejected and never showed a chunk.
     let show = read(root, "frontend/pages/chats/show.tsx");
-    assert!(show.contains("useChannel<ChatEvent>(\"ChatChannel\", at,"));
+    assert!(show.contains(
+        "useChannel<ChatEvent>(\n    \"ChatChannel\",\n    { account: accountSlug, id: chat.id },"
+    ));
     assert!(show.contains("only: [\"messages\", \"awaiting_response\"]"));
     assert!(!show.contains("usePoll"), "streaming, not polling");
     for page in ["chats/index", "chats/new", "models/index", "models/show"] {

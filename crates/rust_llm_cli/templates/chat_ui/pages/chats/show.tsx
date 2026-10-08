@@ -39,41 +39,46 @@ export default function ChatShow({
 
   // RubyLLM appends each chunk over Turbo; here the worker broadcasts on ChatChannel. The
   // reply grows in `streaming` until its row is written, then `messages` is reloaded.
+  // ChatChannel#subscribed reads `account` (a slug) and `id`, like the kit's channels.
   const [streaming, setStreaming] = useState<StreamingMessage | null>(null)
   const [error, setError] = useState<string | null>(null)
-  useChannel<ChatEvent>("ChatChannel", at, (event) => {
-    switch (event.type) {
-      case "message_start":
-        setError(null)
-        setStreaming(
-          event.role === "assistant"
-            ? { id: event.message_id, content: "" }
-            : null,
-        )
-        break
-      case "chunk":
-        setStreaming((current) =>
-          current?.id === event.message_id
-            ? { ...current, content: current.content + event.content }
-            : { id: event.message_id, content: event.content },
-        )
-        break
-      case "message_end":
-        router.reload({
-          only: ["messages", "awaiting_response"],
-          onSuccess: () =>
-            setStreaming((current) =>
-              current?.id === event.message_id ? null : current,
-            ),
-        })
-        break
-      case "error":
-        setStreaming(null)
-        setError(event.message)
-        router.reload({ only: ["messages", "awaiting_response"] })
-        break
-    }
-  })
+  useChannel<ChatEvent>(
+    "ChatChannel",
+    { account: accountSlug, id: chat.id },
+    (event) => {
+      switch (event.type) {
+        case "message_start":
+          setError(null)
+          setStreaming(
+            event.role === "assistant"
+              ? { id: event.message_id, content: "" }
+              : null,
+          )
+          break
+        case "chunk":
+          setStreaming((current) =>
+            current?.id === event.message_id
+              ? { ...current, content: current.content + event.content }
+              : { id: event.message_id, content: event.content },
+          )
+          break
+        case "message_end":
+          router.reload({
+            only: ["messages", "awaiting_response"],
+            onSuccess: () =>
+              setStreaming((current) =>
+                current?.id === event.message_id ? null : current,
+              ),
+          })
+          break
+        case "error":
+          setStreaming(null)
+          setError(event.message)
+          router.reload({ only: ["messages", "awaiting_response"] })
+          break
+      }
+    },
+  )
 
   // The streamed text replaces the (still empty) row it is being written into.
   const shown = streaming
