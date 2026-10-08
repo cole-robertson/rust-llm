@@ -19,6 +19,7 @@ Run app generators from the root of the Loco app.
 |---|---|
 | `bin/rails g ruby_llm:install` | `rust-llm generate install [--path RUST_LLM_CHECKOUT]` |
 | `bin/rails g ruby_llm:chat_ui` | `rust-llm generate chat_ui` |
+| (none) | `rust-llm generate public_chat` |
 | `bin/rails g ruby_llm:tool Weather` | `rust-llm generate tool Weather` |
 | `bin/rails g ruby_llm:agent Support` | `rust-llm generate agent Support` |
 | `bin/rails g ruby_llm:schema Product` | `rust-llm generate schema Product` |
@@ -55,17 +56,42 @@ Adds:
 ```sh
 rust-llm generate chat_ui
 cargo loco task routes:generate
+cargo fmt --all && cargo loco db migrate
 ```
 
-Adds Inertia + React pages (`frontend/pages/chats/*`, `frontend/pages/models/*`), message
-components under `frontend/components/messages/` (a shadcn `Select` model picker; per-tool call
-and result components looked up with `import.meta.glob`), controllers (`chats`, `messages`,
-`models`), routes in `src/route_table.rs`, a sidebar link, and a Loco worker,
-`src/workers/chat_response.rs`, that loads the chat with `to_llm` and runs `ChatRecord::complete`.
+Targets the [Loco + Inertia starter kit](https://github.com/cole-robertson/inertia-rust-starter-kit)
+and its accounts. Adds:
 
-The page does not stream tokens. The worker saves each message as it is produced, and the chat page
-polls (Inertia `usePoll`, once a second) while a reply is pending. To give the chat tools, add them
-in the worker, where the comment marks the spot.
+- Inertia + React pages (`frontend/pages/chats/*`, `frontend/pages/models/*`) and message
+  components under `frontend/components/messages/` (a shadcn `Select` model picker; per-tool call
+  and result components looked up with `import.meta.glob`).
+- Controllers (`chats`, `messages`, `models`) under `/{account_slug}`, with routes in
+  `src/route_table.rs` and a sidebar link. Chats belong to an account (`chats.account_id`, added by
+  a migration), and every query goes through `find_in_account`, so another account's chat is a 404.
+- `src/workers/chat_response.rs`, a Loco worker that loads the chat with `to_llm` and runs
+  `ChatRecord::complete_stream` (see [Streaming](persistence-loco.md#streaming)).
+- `src/channels/chat.rs`, a `ChatChannel` on the kit's live updates. The worker broadcasts
+  `message_start`, `chunk` (batched at most every 50 ms), `message_end`, and `error`; the chat page
+  shows the reply as it streams and reloads the saved messages when it ends. Only members of the
+  chat's account can subscribe.
+- Request tests (`tests/requests/chats.rs`) against a local stand-in for Anthropic's streaming API.
+
+To give the chat tools, add them in the worker, where the comment marks the spot.
+
+## public_chat
+
+```sh
+rust-llm generate public_chat
+cargo loco task routes:generate
+```
+
+A chat page at `/chat` that anyone can use without signing in, for a demo or a landing page. A
+guest's conversation lives in server memory under an unguessable cookie (no rows), and replies
+stream back on the request as Server-Sent Events. Limits come from `PUBLIC_CHAT_*` environment
+variables: messages per IP and per conversation in a window (20 and 10 per 10 minutes), input
+length (4,000 characters), output tokens per reply (1,024), and turns per conversation (20). The
+model is `PUBLIC_CHAT_MODEL`, or RustLLM's `default_model`. RubyLLM has no equivalent. Each reply is
+billed to the app's provider key, so keep the limits tight on a public deployment.
 
 ## tool
 
@@ -117,15 +143,16 @@ Then run `cargo loco db migrate`.
 
 ## Not Generated
 
-- `ruby_llm:load_models` and the chat UI's `POST /models/refresh` action: the generated app has
-  neither. Call `rust_llm::models::refresh` yourself, from a Loco task for example; with
-  `rust_llm_loco::ModelStore` configured it saves into `rust_llm_models` (see
+- `ruby_llm:load_models`: models come from the bundled registry. The chat UI's models page has a
+  Refresh button (`POST /{account_slug}/models/refresh`); with `rust_llm_loco::ModelStore`
+  configured, `rust_llm::models::refresh` saves into `rust_llm_models` (see
   [Persistence with Loco](persistence-loco.md#the-model-registry-in-the-database)).
 
 ## Differences from RubyLLM
 
-- The chat UI is one Inertia + React (shadcn/ui) variant that polls. There are no ERB
-  `tailwind`/`scaffold` variants and no Turbo Streams broadcasting.
+- The chat UI is one Inertia + React (shadcn/ui) variant that streams over a live channel instead of
+  Turbo Streams. There are no ERB `tailwind`/`scaffold` variants. It is scoped to the starter kit's
+  accounts, where RubyLLM's is not scoped to a user.
 - `--skip-active-storage`, custom model names, and namespaced names (`admin/weather`) are Rails
   generator options; the Loco tables keep RubyLLM's names, and attachments always go to
   `rust_llm_attachments`.

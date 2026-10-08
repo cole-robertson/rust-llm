@@ -184,6 +184,39 @@ let total = record.total_cost(db).await?; // None when any attempt could not be 
 # Ok(()) }
 ```
 
+## Streaming
+
+`record.ask_stream` and `record.complete_stream` are RubyLLM's `chat.ask(msg) { |chunk| }` and
+`chat.complete { |chunk| }` on a persisted chat. They persist exactly as `ask` and `complete` do,
+and report each step with the row it belongs to:
+
+- `StreamEvent::NewMessage(row)`: the assistant row exists, empty, before its first chunk
+  (`persist_new_message`), or a tool result was written.
+- `StreamEvent::Chunk { message_id, chunk }`: text for that row.
+- `StreamEvent::EndMessage(row)`: the row is final, with its tool calls and usage
+  (`persist_message_completion`).
+
+```rust,no_run
+use rust_llm_loco::{ChatRecord, StreamEvent};
+use sea_orm::DatabaseConnection;
+
+# async fn run(db: &DatabaseConnection, record: ChatRecord) -> rust_llm_loco::Result<()> {
+let mut chat = record.to_llm(db).await?;
+record
+    .ask_stream(db, &mut chat, "Tell me a story", |event| match event {
+        StreamEvent::NewMessage(row) => println!("message {} started", row.id),
+        StreamEvent::Chunk { chunk, .. } => print!("{}", chunk.content()),
+        StreamEvent::EndMessage(row) => println!("\nmessage {} saved", row.id),
+    })
+    .await?;
+# Ok(()) }
+```
+
+Chunks are not written while they stream, so a failed or cancelled reply leaves no row behind: the
+empty row is removed, as RubyLLM's `cleanup_after_failure` does. Broadcast the events however your
+app pushes updates; the generated chat UI sends them over a live channel (see
+[Generators](generators.md#chat_ui)).
+
 ## Cancellation
 
 `record.cancel(db)` sets `chats.cancelled`. A `complete` or `compact` running anywhere, in a job for
@@ -224,9 +257,8 @@ multi-threaded tokio runtime.
 - The record and the chat are separate values: `ChatRecord` methods take `&mut Chat`, and chat
   methods the record does not persist (`generate`, `step`, `count_tokens`, callbacks) are called on
   the `Chat` directly.
-- Streaming through a record (`chat.ask { |chunk| }`) and Turbo broadcasting: the record persists
-  each step, not each chunk. Stream with `Chat::ask_stream` if you persist yourself, or poll as the
-  generated chat UI does.
+- A streaming block on a record is `ask_stream`/`complete_stream` with a closure that receives
+  `StreamEvent`s; Turbo broadcasting is up to the app (the generated chat UI uses a live channel).
 - Custom or namespaced chat/message classes (`acts_as_chat messages:`, `message_class:`) and Action
   Text content are Rails mechanisms. The tables keep RubyLLM's names.
 - Attachments live in `rust_llm_attachments` instead of Active Storage.
