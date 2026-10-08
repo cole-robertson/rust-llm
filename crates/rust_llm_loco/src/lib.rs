@@ -251,10 +251,7 @@ pub enum StreamEvent<'a> {
     /// first chunk (`persist_new_message`); for a tool result, the row just written.
     NewMessage(&'a messages::Model),
     /// A chunk of the response being written into row `message_id`.
-    Chunk {
-        message_id: i32,
-        chunk: &'a Message,
-    },
+    Chunk { message_id: i32, chunk: &'a Message },
     /// The row is final: content, tool calls, and usage are written (`persist_message_completion`).
     EndMessage(&'a messages::Model),
 }
@@ -1917,7 +1914,11 @@ fn has_unanswered_tool_calls(chat: &Chat) -> bool {
     else {
         return false;
     };
-    let Some(calls) = response.tool_calls.as_ref().filter(|_| response.is_tool_call()) else {
+    let Some(calls) = response
+        .tool_calls
+        .as_ref()
+        .filter(|_| response.is_tool_call())
+    else {
         return false;
     };
     calls.values().any(|call| {

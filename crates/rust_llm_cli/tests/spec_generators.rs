@@ -331,9 +331,17 @@ async fn chat_ui_app_scopes_chats_to_their_account() {
         .unwrap();
     messages::create_user(&db, mine.id(), "Hi").await.unwrap();
 
-    assert!(account_chats::find_in_account(&db, acme, mine.id()).await.unwrap().is_some());
     assert!(
-        account_chats::find_in_account(&db, acme, theirs.id()).await.unwrap().is_none(),
+        account_chats::find_in_account(&db, acme, mine.id())
+            .await
+            .unwrap()
+            .is_some()
+    );
+    assert!(
+        account_chats::find_in_account(&db, acme, theirs.id())
+            .await
+            .unwrap()
+            .is_none(),
         "another account's chat is not found"
     );
     let listed = account_chats::list_in_account(&db, acme).await.unwrap();
@@ -341,14 +349,29 @@ async fn chat_ui_app_scopes_chats_to_their_account() {
     assert_eq!(listed[0]["id"], mine.id());
     assert_eq!(listed[0]["message_count"], 1);
     // An unknown model creates nothing.
-    assert!(account_chats::create_in_account(&db, acme, "no-such-model", None).await.is_err());
-    assert_eq!(account_chats::list_in_account(&db, acme).await.unwrap().len(), 1);
+    assert!(
+        account_chats::create_in_account(&db, acme, "no-such-model", None)
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        account_chats::list_in_account(&db, acme)
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
 
     chat_ui_migration::Migration
         .down(&SchemaManager::new(&db))
         .await
         .unwrap();
-    assert!(!SchemaManager::new(&db).has_column("chats", "account_id").await.unwrap());
+    assert!(
+        !SchemaManager::new(&db)
+            .has_column("chats", "account_id")
+            .await
+            .unwrap()
+    );
 }
 
 // spec: generators/chat_ui_generator_spec.rb:458 chat functionality works correctly

@@ -178,9 +178,10 @@ impl Generator {
         };
         let Some(at) = at else {
             let marker = match anchor {
-                Anchor::Before(m) | Anchor::After(m) | Anchor::Sorted(m) | Anchor::BeforeLine(m) => {
-                    m
-                }
+                Anchor::Before(m)
+                | Anchor::After(m)
+                | Anchor::Sorted(m)
+                | Anchor::BeforeLine(m) => m,
                 Anchor::End => "end of file",
             };
             return self.fail(format!(

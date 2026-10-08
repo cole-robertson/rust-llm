@@ -354,7 +354,10 @@ fn chat_ui_writes_controllers_channel_worker_pages_and_tests() {
     assert!(chats.contains("chats::list_in_account(&ctx.db, current.account.id)"));
     assert!(chats.contains("chats::create_in_account(&ctx.db, current.account.id,"));
     assert_eq!(
-        count(&chats, "chats::find_in_account(&ctx.db, current.account.id, id)"),
+        count(
+            &chats,
+            "chats::find_in_account(&ctx.db, current.account.id, id)"
+        ),
         2
     );
     let messages = read(root, "src/controllers/messages.rs");
@@ -398,7 +401,10 @@ fn chat_ui_writes_controllers_channel_worker_pages_and_tests() {
     assert!(test.contains("async fn another_accounts_chat_is_a_404()"));
     assert!(test.contains("async fn a_non_member_cannot_subscribe_to_a_chat()"));
     assert!(root.join("tests/requests/anthropic_stub.rs").exists());
-    assert!(read(root, "tests/requests/mod.rs").contains("mod accounts;\nmod anthropic_stub;\nmod chats;\nmod live;"));
+    assert!(
+        read(root, "tests/requests/mod.rs")
+            .contains("mod accounts;\nmod anthropic_stub;\nmod chats;\nmod live;")
+    );
 }
 
 #[test]
@@ -415,7 +421,9 @@ fn chat_ui_adds_the_account_to_chats() {
     let module = migrations[0].trim_end_matches(".rs");
     let lib = read(root, "migration/src/lib.rs");
     // After the install migration, so `chats` exists when it runs.
-    let install = lib.find(&format!("Box::new({}::Migration)", migration_module(root))).unwrap();
+    let install = lib
+        .find(&format!("Box::new({}::Migration)", migration_module(root)))
+        .unwrap();
     let account = lib.find(&format!("Box::new({module}::Migration)")).unwrap();
     assert!(install < account, "{lib}");
     let model = read(root, "src/models/chats.rs");
@@ -457,7 +465,11 @@ fn chat_ui_wires_routes_controllers_channel_worker_and_sidebar() {
     assert!(channels.contains("        Arc::new(chat::ChatChannel),\n        // channels-inject"));
 
     let table = read(root, "src/route_table.rs");
-    assert!(table.contains("pub const CHAT_MESSAGES: &str = \"/{account_slug}/chats/{chat_id}/messages\";"));
+    assert!(
+        table.contains(
+            "pub const CHAT_MESSAGES: &str = \"/{account_slug}/chats/{chat_id}/messages\";"
+        )
+    );
     assert!(table.contains("pub fn chat_path(slug: &str, id: i32) -> String {"));
     assert!(table.find("pub fn chat_path").unwrap() < table.find("// scaffold:paths").unwrap());
     assert!(
@@ -688,7 +700,10 @@ fn named_imports_wrap_past_prettiers_print_width_and_stay_idempotent() {
     assert_eq!(g.actions[1].0, "identical");
     let text = read(dir.path(), "a.tsx");
     assert!(text.contains("  MessagesSquare,\n"), "{text}");
-    assert!(text.ends_with("import { a, b } from \"@/routes\"\n"), "{text}");
+    assert!(
+        text.ends_with("import { a, b } from \"@/routes\"\n"),
+        "{text}"
+    );
 }
 
 #[test]
@@ -749,12 +764,21 @@ fn public_chat_writes_an_unauthenticated_streaming_page_with_limits() {
     assert!(table.contains("pub const PUBLIC_CHAT: &str = \"/chat\";"));
     assert!(table.contains("pub const PUBLIC_CHAT_MESSAGES: &str = \"/chat/messages\";"));
     assert_eq!(
-        count(&read(root, "src/app.rs"), ".add_route(controllers::public_chat::routes())"),
+        count(
+            &read(root, "src/app.rs"),
+            ".add_route(controllers::public_chat::routes())"
+        ),
         1
     );
     // `/chat` can't also be an account's slug.
-    assert!(read(root, "src/models/accounts.rs").contains("RESERVED_SLUGS: &[&str] = &[\n    \"chat\",\n"));
-    assert!(read(root, "tests/requests/mod.rs").contains("mod anthropic_stub;\nmod live;\nmod public_chat;"));
+    assert!(
+        read(root, "src/models/accounts.rs")
+            .contains("RESERVED_SLUGS: &[&str] = &[\n    \"chat\",\n")
+    );
+    assert!(
+        read(root, "tests/requests/mod.rs")
+            .contains("mod anthropic_stub;\nmod live;\nmod public_chat;")
+    );
 }
 
 #[test]
@@ -772,7 +796,11 @@ fn public_chat_and_chat_ui_share_the_stub_and_run_twice_unchanged() {
     let before = walk(dir.path());
     let mut g = Generator::new(dir.path(), false);
     public_chat::generate(&mut g).unwrap();
-    assert!(actions(&g).iter().all(|(a, _)| *a == "identical"), "{:?}", g.actions);
+    assert!(
+        actions(&g).iter().all(|(a, _)| *a == "identical"),
+        "{:?}",
+        g.actions
+    );
     assert_eq!(walk(dir.path()), before);
 }
 

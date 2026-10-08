@@ -104,7 +104,9 @@ pub fn generate(g: &mut Generator) -> Result<(), String> {
 /// `chat` becomes a reserved account slug, so no account's `/{slug}` pages hide behind `/chat`.
 fn reserve_slug(g: &mut Generator) {
     const ACCOUNTS: &str = "src/models/accounts.rs";
-    if g.read(ACCOUNTS).is_some_and(|s| s.contains("RESERVED_SLUGS")) {
+    if g.read(ACCOUNTS)
+        .is_some_and(|s| s.contains("RESERVED_SLUGS"))
+    {
         g.inject(
             ACCOUNTS,
             "    \"chat\",",
