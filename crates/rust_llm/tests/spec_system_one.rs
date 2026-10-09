@@ -63,7 +63,7 @@ fn judge(server: &MockServer) -> Judge {
         .unwrap()
 }
 
-// spec: protocols/system_one_spec.rb:49 enforces provider limits without putting them in the domain
+// UPSTREAM-REMOVED in 2.1 (was spec: protocols/system_one_spec.rb:49) enforces provider limits without putting them in the domain
 #[tokio::test]
 async fn enforces_provider_limits_without_putting_them_in_the_domain() {
     let server = answering(body()).await;
@@ -130,7 +130,7 @@ async fn parses_all_result_fields_and_preserves_declared_key_types() {
     assert_eq!(result.tokens().output, Some(20));
 }
 
-// spec: protocols/system_one_spec.rb:77 rejects missing and unexpected answers rather than returning partial results
+// UPSTREAM-REMOVED in 2.1 (was spec: protocols/system_one_spec.rb:77) rejects missing and unexpected answers rather than returning partial results
 #[tokio::test]
 async fn rejects_missing_and_unexpected_answers_rather_than_returning_partial_results() {
     let mut body = body();
@@ -141,7 +141,7 @@ async fn rejects_missing_and_unexpected_answers_rather_than_returning_partial_re
     assert!(err.to_string().contains("different question IDs"), "{err}");
 }
 
-// spec: protocols/system_one_spec.rb:84 rejects incorrect answer types, out-of-range probabilities, and unrecognized options
+// UPSTREAM-REMOVED in 2.1 (was spec: protocols/system_one_spec.rb:84) rejects incorrect answer types, out-of-range probabilities, and unrecognized options
 #[tokio::test]
 async fn rejects_incorrect_answer_types_out_of_range_probabilities_and_unrecognized_options() {
     let modifications: [fn(&mut Value); 6] = [
@@ -169,7 +169,7 @@ async fn rejects_incorrect_answer_types_out_of_range_probabilities_and_unrecogni
     }
 }
 
-// spec: protocols/system_one_spec.rb:103 preserves unknown usage rather than replacing it with zero
+// spec: protocols/system_one_spec.rb:96 preserves unknown usage rather than replacing it with zero
 #[tokio::test]
 async fn preserves_unknown_usage_rather_than_replacing_it_with_zero() {
     let mut body = body();
@@ -179,7 +179,7 @@ async fn preserves_unknown_usage_rather_than_replacing_it_with_zero() {
     assert_eq!(result.tokens().input, None);
 }
 
-// spec: protocols/system_one_spec.rb:109 normalizes validation error details
+// spec: protocols/system_one_spec.rb:102 normalizes validation error details
 #[tokio::test]
 async fn normalizes_validation_error_details() {
     let server = MockServer::start().await;
@@ -193,7 +193,7 @@ async fn normalizes_validation_error_details() {
     assert_eq!(err.to_string(), "body.questions.urgent: Invalid question");
 }
 
-// spec: protocols/system_one_spec.rb:133 parses catalog facts without inventing limits or pricing
+// spec: protocols/system_one_spec.rb:126 parses catalog facts without inventing limits or pricing
 #[tokio::test]
 async fn parses_catalog_facts_without_inventing_limits_or_pricing() {
     let server = MockServer::start().await;

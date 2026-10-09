@@ -435,7 +435,7 @@ mod tests {
         );
     }
 
-    // spec: protocols/xai/streaming_transcription_spec.rb:68 rejects unsupported WAV encodings before opening a socket
+    // spec: protocols/xai/streaming_transcription_spec.rb:76 rejects unsupported WAV encodings before opening a socket
     #[test]
     fn rejects_unsupported_wav_encodings_before_opening_a_socket() {
         let audio = WavAudio {
@@ -451,7 +451,7 @@ mod tests {
         );
     }
 
-    // spec: protocols/xai/streaming_transcription_spec.rb:75 keeps completion events separate for each audio channel and surfaces server errors
+    // spec: protocols/xai/streaming_transcription_spec.rb:83 keeps completion events separate for each audio channel and surfaces server errors
     #[test]
     fn keeps_completion_events_separate_for_each_audio_channel_and_surfaces_server_errors() {
         let mut segments = Vec::new();

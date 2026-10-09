@@ -97,7 +97,7 @@ async fn keeps_credentials_encrypted_with_their_owner() {
     );
 }
 
-// spec: active_record/mcp_credential_spec.rb:21 replaces and deletes credentials
+// spec: active_record/mcp_credential_spec.rb:72 replaces and deletes credentials
 #[tokio::test]
 async fn replaces_and_deletes_credentials() {
     let db = db().await;

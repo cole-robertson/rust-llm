@@ -252,7 +252,7 @@ fn render_config() -> std::sync::Arc<rust_llm::Config> {
     std::sync::Arc::new(c)
 }
 
-// spec: protocols/anthropic/chat_spec.rb:417 turns on adaptive thinking beside effort on generations without a budget
+// spec: protocols/anthropic/chat_spec.rb:438 turns on adaptive thinking beside effort on generations without a budget
 #[test]
 fn effort_without_a_budget_option_thinks_adaptively() {
     let p = thinking_payload("claude-opus-4-7", ThinkingConfig::effort("xhigh"));
@@ -260,7 +260,7 @@ fn effort_without_a_budget_option_thinks_adaptively() {
     assert_eq!(p["output_config"], json!({ "effort": "xhigh" }));
 }
 
-// spec: protocols/anthropic/chat_spec.rb:428 sizes a budget from the effort on generations that take one
+// spec: protocols/anthropic/chat_spec.rb:449 sizes a budget from the effort on generations that take one
 #[test]
 fn effort_sizes_a_budget_on_generations_that_take_one() {
     let p = thinking_payload("claude-opus-4-5", ThinkingConfig::effort("medium"));
@@ -271,7 +271,7 @@ fn effort_sizes_a_budget_on_generations_that_take_one() {
     assert_eq!(p["output_config"], json!({ "effort": "medium" }));
 }
 
-// spec: protocols/anthropic/chat_spec.rb:439 keeps the effort budget under max_tokens and above the minimum
+// spec: protocols/anthropic/chat_spec.rb:460 keeps the effort budget under max_tokens and above the minimum
 #[test]
 fn effort_budget_stays_above_the_minimum() {
     let p = thinking_payload("claude-sonnet-4-5", ThinkingConfig::effort("low"));
@@ -282,7 +282,7 @@ fn effort_budget_stays_above_the_minimum() {
     assert_eq!(p["output_config"], json!({ "effort": "low" }));
 }
 
-// spec: protocols/anthropic/chat_spec.rb:450 keeps the effort budget under the max_output_tokens of the request
+// spec: protocols/anthropic/chat_spec.rb:471 keeps the effort budget under the max_output_tokens of the request
 #[test]
 fn effort_budget_stays_under_the_request_max_output_tokens() {
     let p = thinking_payload_with(
@@ -298,7 +298,7 @@ fn effort_budget_stays_under_the_request_max_output_tokens() {
     );
 }
 
-// spec: protocols/anthropic/chat_spec.rb:471 resolves a bare with_thinking to a request Claude honors
+// spec: protocols/anthropic/chat_spec.rb:492 resolves a bare with_thinking to a request Claude honors
 #[test]
 fn bare_with_thinking_resolves_to_adaptive_medium() {
     let p = thinking_payload("claude-opus-4-8", ThinkingConfig::on());
@@ -306,7 +306,7 @@ fn bare_with_thinking_resolves_to_adaptive_medium() {
     assert_eq!(p["output_config"], json!({ "effort": "medium" }));
 }
 
-// spec: protocols/anthropic/chat_spec.rb:486 sends a budget the registry does not advertise
+// spec: protocols/anthropic/chat_spec.rb:507 sends a budget the registry does not advertise
 #[test]
 fn a_budget_goes_out_even_when_the_registry_lists_only_effort() {
     let p = thinking_payload("claude-opus-4-7", ThinkingConfig::budget(2048));
@@ -316,7 +316,7 @@ fn a_budget_goes_out_even_when_the_registry_lists_only_effort() {
     );
 }
 
-// spec: protocols/anthropic/chat_spec.rb:496 sends effort and budget side by side
+// spec: protocols/anthropic/chat_spec.rb:517 sends effort and budget side by side
 #[test]
 fn effort_and_budget_go_side_by_side() {
     let mut thinking = ThinkingConfig::effort("high");
@@ -329,7 +329,7 @@ fn effort_and_budget_go_side_by_side() {
     assert_eq!(p["output_config"], json!({ "effort": "high" }));
 }
 
-// spec: protocols/anthropic/chat_spec.rb:518 carries a display on enabled thinking when a budget is set
+// spec: protocols/anthropic/chat_spec.rb:539 carries a display on enabled thinking when a budget is set
 #[test]
 fn a_display_rides_on_budgeted_thinking() {
     let p = thinking_payload(
@@ -342,7 +342,7 @@ fn a_display_rides_on_budgeted_thinking() {
     );
 }
 
-// spec: protocols/anthropic/chat_spec.rb:528 merges thinking effort with schema output_config
+// spec: protocols/anthropic/chat_spec.rb:549 merges thinking effort with schema output_config
 #[test]
 fn effort_merges_with_the_schema_output_config() {
     let schema = json!({ "name": "response", "schema": { "type": "object", "properties": { "name": { "type": "string" } } } });
@@ -361,7 +361,7 @@ fn effort_merges_with_the_schema_output_config() {
     );
 }
 
-// spec: protocols/anthropic/chat_spec.rb:547 omits thinking when effort is none
+// spec: protocols/anthropic/chat_spec.rb:568 omits thinking when effort is none
 #[test]
 fn effort_none_omits_thinking() {
     let p = thinking_payload("claude-opus-4-7", ThinkingConfig::effort("none"));
@@ -386,7 +386,7 @@ fn haiku3(thinking: Option<ThinkingConfig>) -> Value {
     chat.render().unwrap()
 }
 
-// spec: protocols/anthropic/chat_spec.rb:711 is nil when thinking is off or explicitly none
+// spec: protocols/anthropic/chat_spec.rb:822 is nil when thinking is off or explicitly none
 #[test]
 fn no_thinking_fields_when_thinking_is_off_or_none() {
     for p in [haiku3(None), haiku3(Some(ThinkingConfig::effort("none")))] {
@@ -397,7 +397,7 @@ fn no_thinking_fields_when_thinking_is_off_or_none() {
     }
 }
 
-// spec: protocols/anthropic/chat_spec.rb:716 sends effort alone when the registry lists no thinking controls
+// spec: protocols/anthropic/chat_spec.rb:827 sends effort alone when the registry lists no thinking controls
 #[test]
 fn effort_goes_alone_when_the_registry_lists_no_controls() {
     let p = haiku3(Some(ThinkingConfig::effort("high")));
@@ -416,7 +416,7 @@ fn assistant_thinking(text: Option<&str>, signature: Option<&str>) -> Message {
     m
 }
 
-// spec: protocols/anthropic/chat_spec.rb:598 omits a missing signature
+// UPSTREAM-REMOVED in 2.1 (was spec: protocols/anthropic/chat_spec.rb:598) omits a missing signature
 #[tokio::test]
 async fn a_thinking_block_without_a_signature_omits_it() {
     let server = serve(vec![]).await;
@@ -430,7 +430,7 @@ async fn a_thinking_block_without_a_signature_omits_it() {
     );
 }
 
-// spec: protocols/anthropic/chat_spec.rb:635 replays a stored thinking block even when the request asks for no thinking
+// spec: protocols/anthropic/chat_spec.rb:745 replays a stored thinking block even when the request asks for no thinking
 #[tokio::test]
 async fn stored_thinking_replays_on_a_tool_turn_without_thinking_config() {
     let server = serve(vec![]).await;
@@ -449,7 +449,7 @@ async fn stored_thinking_replays_on_a_tool_turn_without_thinking_config() {
     assert_eq!(types, ["thinking", "tool_use"]);
 }
 
-// spec: protocols/anthropic/chat_spec.rb:647 keeps a display-omitted thinking block as thinking, not redacted data
+// spec: protocols/anthropic/chat_spec.rb:756 keeps a display-omitted thinking block as thinking, not redacted data
 #[tokio::test]
 async fn display_omitted_thinking_stays_thinking() {
     let reply = parse(body(
@@ -481,7 +481,7 @@ fn raw_boundary(raw: Value) -> Message {
     m
 }
 
-// spec: protocols/anthropic/chat_spec.rb:661 leaves empty blocks alone
+// spec: protocols/anthropic/chat_spec.rb:772 leaves empty blocks alone
 #[tokio::test]
 async fn cache_control_leaves_empty_blocks_alone() {
     let server = serve(vec![]).await;
@@ -495,7 +495,7 @@ async fn cache_control_leaves_empty_blocks_alone() {
     );
 }
 
-// spec: protocols/anthropic/chat_spec.rb:665 leaves a block that already carries cache_control alone
+// spec: protocols/anthropic/chat_spec.rb:776 leaves a block that already carries cache_control alone
 #[tokio::test]
 async fn cache_control_keeps_an_existing_cache_control() {
     let server = serve(vec![]).await;
@@ -509,7 +509,7 @@ async fn cache_control_keeps_an_existing_cache_control() {
     assert_eq!(payload["messages"][1]["content"], blocks);
 }
 
-// spec: protocols/anthropic/chat_spec.rb:671 leaves a trailing block it cannot annotate alone
+// spec: protocols/anthropic/chat_spec.rb:782 leaves a trailing block it cannot annotate alone
 #[tokio::test]
 async fn cache_control_leaves_a_non_object_block_alone() {
     let server = serve(vec![]).await;
@@ -520,7 +520,7 @@ async fn cache_control_leaves_a_non_object_block_alone() {
     assert_eq!(payload["messages"][1]["content"], json!(["plain"]));
 }
 
-// spec: protocols/anthropic/chat_spec.rb:685 reads the data field off a redacted thinking block
+// spec: protocols/anthropic/chat_spec.rb:796 reads the data field off a redacted thinking block
 #[test]
 fn the_signature_comes_from_redacted_thinking_data() {
     let reply = parse(body(
@@ -535,14 +535,14 @@ fn the_signature_comes_from_redacted_thinking_data() {
     );
 }
 
-// spec: protocols/anthropic/chat_spec.rb:691 is nil when no block carries thinking
+// spec: protocols/anthropic/chat_spec.rb:802 is nil when no block carries thinking
 #[test]
 fn no_thinking_without_thinking_blocks() {
     let reply = parse(body(json!([{ "type": "text" }])));
     assert_eq!(reply.thinking, None);
 }
 
-// spec: protocols/anthropic/chat_spec.rb:696 falls back to the text field of a thinking block
+// spec: protocols/anthropic/chat_spec.rb:807 falls back to the text field of a thinking block
 #[test]
 fn thinking_text_falls_back_to_the_text_field() {
     let reply = parse(body(json!([{ "type": "thinking", "text": "why" }])));
@@ -754,7 +754,7 @@ fn message_delta_usage_carries_thinking_tokens() {
     assert_eq!(chunk.tokens.thinking, Some(7));
 }
 
-// spec: protocols/anthropic/streaming_spec.rb:40 sends Accept-Encoding: identity on streaming requests
+// spec: protocols/anthropic/streaming_spec.rb:72 sends Accept-Encoding: identity on streaming requests
 #[tokio::test]
 async fn streaming_requests_ask_for_identity_encoding() {
     let server = serve_templates(vec![sse(text_stream(&["hi"]))]).await;
@@ -768,7 +768,7 @@ async fn stream_error(data: &str) -> Error {
     chat(&server).ask_stream("hi", |_| {}).await.unwrap_err()
 }
 
-// spec: protocols/anthropic/streaming_spec.rb:68 falls back to a 500 for other typed error objects
+// UPSTREAM-REMOVED in 2.1 (was spec: protocols/anthropic/streaming_spec.rb:68) falls back to a 500 for other typed error objects
 #[tokio::test]
 async fn other_typed_stream_errors_are_server_errors() {
     let err = stream_error(
@@ -781,7 +781,7 @@ async fn other_typed_stream_errors_are_server_errors() {
     );
 }
 
-// spec: protocols/anthropic/streaming_spec.rb:78 handles a string error value
+// spec: protocols/anthropic/streaming_spec.rb:124 handles a string error value
 #[tokio::test]
 async fn a_string_stream_error_is_a_server_error() {
     let err = stream_error(r#"{"type":"error","error":"Overloaded"}"#).await;
@@ -791,7 +791,7 @@ async fn a_string_stream_error_is_a_server_error() {
     );
 }
 
-// spec: protocols/anthropic/streaming_spec.rb:88 ignores a body that parses to a bare JSON string
+// spec: protocols/anthropic/streaming_spec.rb:134 ignores a body that parses to a bare JSON string
 // (`parse_streaming_error` is nil; the error is raised as the stream's default 500 with the string.)
 #[tokio::test]
 async fn a_bare_json_string_stream_error_has_no_parsed_status() {
@@ -908,7 +908,7 @@ async fn cache_tokens_sum_across_iterations() {
     );
 }
 
-// spec: protocols/anthropic_compaction_spec.rb:103 sums iterations reported mid-stream
+// spec: protocols/anthropic_compaction_spec.rb:114 sums iterations reported mid-stream
 #[test]
 fn streamed_iterations_sum() {
     let chunk = anthropic::build_chunk(

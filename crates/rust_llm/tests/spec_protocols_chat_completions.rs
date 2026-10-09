@@ -196,7 +196,7 @@ fn top_level_reasoning_tokens_are_captured() {
 
 // ---- chat_spec.rb: .format_messages -------------------------------------------------------------
 
-// spec: protocols/chat_completions/chat_spec.rb:242 .format_messages > keeps non-PDF documents disabled for OpenAI chat completions
+// spec: protocols/chat_completions/chat_spec.rb:253 .format_messages > keeps non-PDF documents disabled for OpenAI chat completions
 // spec: protocols/chat_completions/media_spec.rb:49 .format_content > raises an actionable error for arbitrary files unless the provider opts in
 #[tokio::test]
 async fn openai_chat_completions_rejects_docx() {
@@ -207,7 +207,7 @@ async fn openai_chat_completions_rejects_docx() {
     );
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:251 .format_messages > keeps unsupported files disabled for DeepSeek
+// spec: protocols/chat_completions/chat_spec.rb:262 .format_messages > keeps unsupported files disabled for DeepSeek
 #[tokio::test]
 async fn deepseek_rejects_docx() {
     let server = serve(vec![]).await;
@@ -218,7 +218,7 @@ async fn deepseek_rejects_docx() {
     );
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:287 .format_messages > uses Perplexity file_url parts for supported file attachments
+// spec: protocols/chat_completions/chat_spec.rb:298 .format_messages > uses Perplexity file_url parts for supported file attachments
 #[tokio::test]
 async fn perplexity_sends_supported_files_as_file_url_parts() {
     let server = serve(vec![]).await;
@@ -230,7 +230,7 @@ async fn perplexity_sends_supported_files_as_file_url_parts() {
     );
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:298 .format_messages > keeps Perplexity text file attachments as text parts
+// spec: protocols/chat_completions/chat_spec.rb:309 .format_messages > keeps Perplexity text file attachments as text parts
 #[tokio::test]
 async fn perplexity_keeps_text_files_as_text_parts() {
     let server = serve(vec![]).await;
@@ -248,7 +248,7 @@ async fn perplexity_keeps_text_files_as_text_parts() {
     }
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:314 .format_messages > keeps unsupported files disabled for xAI
+// spec: protocols/chat_completions/chat_spec.rb:325 .format_messages > keeps unsupported files disabled for xAI
 #[tokio::test]
 async fn xai_rejects_docx() {
     let server = serve(vec![]).await;
@@ -259,7 +259,7 @@ async fn xai_rejects_docx() {
     );
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:325 .format_messages > keeps PDF file parts disabled for xAI chat completions
+// spec: protocols/chat_completions/chat_spec.rb:336 .format_messages > keeps PDF file parts disabled for xAI chat completions
 #[tokio::test]
 async fn xai_chat_completions_rejects_pdf() {
     let server = serve(vec![]).await;
@@ -279,7 +279,7 @@ fn render_hello(chat: Chat) -> Value {
     chat.render().unwrap()
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:349 .render_payload > renders prompt cache params for any Chat Completions-compatible provider
+// spec: protocols/chat_completions/chat_spec.rb:360 .render_payload > renders prompt cache params for any Chat Completions-compatible provider
 #[tokio::test]
 async fn prompt_cache_params_render_for_any_chat_completions_provider() {
     let server = serve(vec![]).await;
@@ -304,7 +304,7 @@ fn person_schema(strict: bool) -> Value {
     })
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:391 .render_payload > with schema > uses custom schema name when provided in full format
+// spec: protocols/chat_completions/chat_spec.rb:402 .render_payload > with schema > uses custom schema name when provided in full format
 #[tokio::test]
 async fn a_custom_schema_name_is_used() {
     let server = serve(vec![]).await;
@@ -324,7 +324,7 @@ async fn a_custom_schema_name_is_used() {
     );
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:418 .render_payload > with schema > respects explicit strict: false
+// spec: protocols/chat_completions/chat_spec.rb:429 .render_payload > with schema > respects explicit strict: false
 #[tokio::test]
 async fn an_explicit_strict_false_is_respected() {
     let server = serve(vec![]).await;
@@ -341,7 +341,7 @@ fn strict_for(server: &MockServer, schema: Value) -> Value {
         .clone()
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:728 .render_payload with a schema > sends non-strict when a property is optional, since strict mode would reject it
+// spec: protocols/chat_completions/chat_spec.rb:740 .render_payload with a schema > sends non-strict when a property is optional, since strict mode would reject it
 #[tokio::test]
 async fn an_optional_property_sends_non_strict() {
     let server = serve(vec![]).await;
@@ -351,7 +351,7 @@ async fn an_optional_property_sends_non_strict() {
     assert_eq!(strict_for(&server, schema), json!(false));
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:741 .render_payload with a schema > sends non-strict when a nested object has optional properties
+// spec: protocols/chat_completions/chat_spec.rb:753 .render_payload with a schema > sends non-strict when a nested object has optional properties
 #[tokio::test]
 async fn a_nested_optional_property_sends_non_strict() {
     let server = serve(vec![]).await;
@@ -365,7 +365,7 @@ async fn a_nested_optional_property_sends_non_strict() {
     assert_eq!(strict_for(&server, schema), json!(false));
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:757 .render_payload with a schema > keeps an explicit strict choice
+// spec: protocols/chat_completions/chat_spec.rb:769 .render_payload with a schema > keeps an explicit strict choice
 #[tokio::test]
 async fn an_explicit_strict_choice_is_kept() {
     let server = serve(vec![]).await;
@@ -375,7 +375,7 @@ async fn an_explicit_strict_choice_is_kept() {
 
 // ---- chat_spec.rb: citations --------------------------------------------------------------------
 
-// spec: protocols/chat_completions/chat_spec.rb:464 citations > leaves the cited text nil when the annotation carries no offsets
+// spec: protocols/chat_completions/chat_spec.rb:475 citations > leaves the cited text nil when the annotation carries no offsets
 #[test]
 fn a_url_citation_without_offsets_has_no_text() {
     let message = json!({ "role": "assistant", "content": "Hello", "annotations": [{ "url_citation": { "url": "https://a.example" } }] });
@@ -396,7 +396,7 @@ fn root_citations(root: Value) -> Vec<rust_llm::Citation> {
     parse(Provider::Perplexity, data).citations
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:472 citations > falls back to root search results
+// spec: protocols/chat_completions/chat_spec.rb:483 citations > falls back to root search results
 #[test]
 fn root_search_results_are_the_fallback() {
     let citations = root_citations(json!({ "search_results": [
@@ -408,7 +408,7 @@ fn root_search_results_are_the_fallback() {
     assert_eq!(citations[0].source_index, Some(0));
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:487 citations > falls back to a root citation URL list
+// spec: protocols/chat_completions/chat_spec.rb:498 citations > falls back to a root citation URL list
 #[test]
 fn a_root_citation_url_list_is_the_fallback() {
     let citations = root_citations(json!({ "citations": ["https://a.example", 42] }));
@@ -416,7 +416,7 @@ fn a_root_citation_url_list_is_the_fallback() {
     assert_eq!(urls, vec![Some("https://a.example")]);
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:493 citations > is empty when the response carries none
+// spec: protocols/chat_completions/chat_spec.rb:504 citations > is empty when the response carries none
 #[test]
 fn no_citations_is_empty() {
     assert!(root_citations(json!({})).is_empty());
@@ -424,14 +424,14 @@ fn no_citations_is_empty() {
 
 // ---- chat_spec.rb: error and usage handling -----------------------------------------------------
 
-// spec: protocols/chat_completions/chat_spec.rb:499 .parse_completion_body error and usage handling > raises the error the provider reported
+// spec: protocols/chat_completions/chat_spec.rb:510 .parse_completion_body error and usage handling > raises the error the provider reported
 #[test]
 fn the_reported_error_is_raised() {
     let err = parse_err(json!({ "error": { "message": "model overloaded" } }));
     assert_eq!(err.to_string(), "model overloaded");
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:508 .parse_completion_body error and usage handling > raises when the response carries no message
+// spec: protocols/chat_completions/chat_spec.rb:520 .parse_completion_body error and usage handling > raises when the response carries no message
 #[test]
 fn a_response_without_a_message_is_an_error() {
     let err = parse_err(json!({ "choices": [] }));
@@ -442,7 +442,7 @@ fn a_response_without_a_message_is_an_error() {
     );
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:514 .parse_completion_body error and usage handling > derives generated tokens from the total when the provider omits them
+// spec: protocols/chat_completions/chat_spec.rb:526 .parse_completion_body error and usage handling > derives generated tokens from the total when the provider omits them
 #[test]
 fn generated_tokens_are_derived_from_the_total() {
     let data = json!({
@@ -468,7 +468,7 @@ fn thinking_signature(message: Value) -> Option<String> {
     reply(message).thinking.and_then(|t| t.signature)
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:528 thinking round-trips > reads reasoning out of the alternate field names
+// spec: protocols/chat_completions/chat_spec.rb:540 thinking round-trips > reads reasoning out of the alternate field names
 #[test]
 fn reasoning_is_read_from_the_alternate_field_names() {
     assert_eq!(
@@ -504,7 +504,7 @@ fn reasoning_is_read_from_the_alternate_field_names() {
     );
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:536 thinking round-trips > hands string content back untouched, markup and all
+// spec: protocols/chat_completions/chat_spec.rb:548 thinking round-trips > hands string content back untouched, markup and all
 #[test]
 fn string_content_is_returned_untouched() {
     let plain = reply(json!({ "content": "plain" }));
@@ -519,14 +519,14 @@ fn string_content_is_returned_untouched() {
     );
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:542 thinking round-trips > leaves a content shape it does not understand alone
+// spec: protocols/chat_completions/chat_spec.rb:554 thinking round-trips > leaves a content shape it does not understand alone
 #[test]
 fn nil_content_yields_no_content_and_no_thinking() {
     let m = reply(json!({ "content": null }));
     assert_eq!((m.content, m.thinking), (None, None));
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:572 thinking round-trips > sends only the signature when that is all the model returned
+// spec: protocols/chat_completions/chat_spec.rb:584 thinking round-trips > sends only the signature when that is all the model returned
 #[tokio::test]
 async fn a_signature_only_thinking_sends_only_the_signature() {
     let server = serve(vec![]).await;
@@ -553,7 +553,7 @@ fn long_context_boundary(chat: &mut Chat) -> Value {
     chat.render().unwrap()
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:603 prompt caching > marks cache boundaries without disabling implicit caching
+// spec: protocols/chat_completions/chat_spec.rb:615 prompt caching > marks cache boundaries without disabling implicit caching
 #[tokio::test]
 async fn cache_boundaries_are_marked_without_cache_options() {
     let server = serve(vec![]).await;
@@ -571,7 +571,7 @@ async fn cache_boundaries_are_marked_without_cache_options() {
     );
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:616 prompt caching > preserves cache options alongside explicit boundaries
+// spec: protocols/chat_completions/chat_spec.rb:628 prompt caching > preserves cache options alongside explicit boundaries
 #[tokio::test]
 async fn cache_options_survive_alongside_boundaries() {
     let server = serve(vec![]).await;
@@ -587,7 +587,7 @@ async fn cache_options_survive_alongside_boundaries() {
     );
 }
 
-// spec: protocols/chat_completions/chat_spec.rb:662 #max_output_tokens_field > always sends max_completion_tokens to OpenAI and Azure
+// spec: protocols/chat_completions/chat_spec.rb:674 #max_output_tokens_field > always sends max_completion_tokens to OpenAI and Azure
 // (Azure is a provider the port leaves out; the OpenAI half is asserted.)
 #[tokio::test]
 async fn openai_always_gets_max_completion_tokens() {
@@ -636,7 +636,7 @@ async fn low_resolution_maps_to_low_detail() {
     assert_eq!(message["content"][1]["image_url"]["detail"], json!("low"));
 }
 
-// spec: protocols/chat_completions/media_spec.rb:68 .format_content > maps higher resolutions to high image detail
+// UPSTREAM-REMOVED in 2.1 (was spec: protocols/chat_completions/media_spec.rb:68) .format_content > maps higher resolutions to high image detail
 #[tokio::test]
 async fn higher_resolutions_map_to_high_detail() {
     let server = serve(vec![]).await;
@@ -695,7 +695,7 @@ async fn server_stream_errors_are_500s() {
     );
 }
 
-// spec: protocols/chat_completions/streaming_spec.rb:79 #parse_streaming_error > falls back to a 400 for other typed error objects
+// spec: protocols/chat_completions/streaming_spec.rb:89 #parse_streaming_error > falls back to a 400 for other typed error objects
 #[tokio::test]
 async fn other_typed_stream_errors_are_400s() {
     let data = r#"{"error":{"type":"invalid_request_error","message":"Bad request"}}"#;
@@ -707,7 +707,7 @@ async fn other_typed_stream_errors_are_400s() {
     );
 }
 
-// spec: protocols/chat_completions/streaming_spec.rb:89 #parse_streaming_error > handles a body that parses to a bare JSON string
+// spec: protocols/chat_completions/streaming_spec.rb:99 #parse_streaming_error > handles a body that parses to a bare JSON string
 #[tokio::test]
 async fn a_bare_json_string_stream_error_has_no_status() {
     let data = r#""The model foo is not available in your region (error).""#;
@@ -720,7 +720,7 @@ async fn a_bare_json_string_stream_error_has_no_status() {
     );
 }
 
-// spec: protocols/chat_completions/streaming_spec.rb:99 #parse_streaming_error > handles a string error value
+// spec: protocols/chat_completions/streaming_spec.rb:109 #parse_streaming_error > handles a string error value
 #[tokio::test]
 async fn a_string_error_value_has_no_status() {
     let data = r#"{"error":"The model foo is not available in your region."}"#;
@@ -732,7 +732,7 @@ async fn a_string_error_value_has_no_status() {
     );
 }
 
-// spec: protocols/chat_completions/streaming_spec.rb:110 surfaces the provider message for a failed streaming response with a string error value
+// spec: protocols/chat_completions/streaming_spec.rb:120 surfaces the provider message for a failed streaming response with a string error value
 #[tokio::test]
 async fn a_failed_stream_with_a_string_error_surfaces_the_message() {
     let server =

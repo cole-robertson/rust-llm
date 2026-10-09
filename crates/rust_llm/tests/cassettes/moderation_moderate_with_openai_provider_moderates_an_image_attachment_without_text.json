@@ -5,7 +5,7 @@
     "request_body": "{\"model\":\"omni-moderation-latest\",\"input\":[{\"type\":\"image_url\",\"image_url\":{\"url\":\"https://upload.wikimedia.org/wikipedia/en/7/7d/Lenna_%28test_image%29.png\"}}]}",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:15:48 GMT",
+      "Date": "Wed, 07 Oct 2026 12:59:44 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
@@ -14,7 +14,7 @@
       "Openai-Organization": "<OPENAI_ORGANIZATION>",
       "Openai-Project": "<OPENAI_PROJECT>",
       "X-Request-Id": "<X_REQUEST_ID>",
-      "Openai-Processing-Ms": "400",
+      "Openai-Processing-Ms": "260",
       "X-Openai-Proxy-Wasm": "v0.1",
       "Cf-Cache-Status": "DYNAMIC",
       "Access-Control-Expose-Headers": "CF-Ray",
@@ -24,6 +24,6 @@
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\n  \"id\": \"modr-2008\",\n  \"model\": \"omni-moderation-latest\",\n  \"results\": [\n    {\n      \"flagged\": false,\n      \"categories\": {\n        \"harassment\": false,\n        \"harassment/threatening\": false,\n        \"sexual\": false,\n        \"hate\": false,\n        \"hate/threatening\": false,\n        \"illicit\": false,\n        \"illicit/violent\": false,\n        \"self-harm/intent\": false,\n        \"self-harm/instructions\": false,\n        \"self-harm\": false,\n        \"sexual/minors\": false,\n        \"violence\": false,\n        \"violence/graphic\": false\n      },\n      \"category_scores\": {\n        \"harassment\": 0.0,\n        \"harassment/threatening\": 0.0,\n        \"sexual\": 0.00009253848866495987,\n        \"hate\": 0.0,\n        \"hate/threatening\": 0.0,\n        \"illicit\": 0.0,\n        \"illicit/violent\": 0.0,\n        \"self-harm/intent\": 4.400118457925303e-6,\n        \"self-harm/instructions\": 1.9223170236538178e-6,\n        \"self-harm\": 0.00046901888401438977,\n        \"sexual/minors\": 0.0,\n        \"violence\": 0.0005493912805431325,\n        \"violence/graphic\": 0.00001488384825728813\n      },\n      \"category_applied_input_types\": {\n        \"harassment\": [],\n        \"harassment/threatening\": [],\n        \"sexual\": [\n          \"image\"\n        ],\n        \"hate\": [],\n        \"hate/threatening\": [],\n        \"illicit\": [],\n        \"illicit/violent\": [],\n        \"self-harm/intent\": [\n          \"image\"\n        ],\n        \"self-harm/instructions\": [\n          \"image\"\n        ],\n        \"self-harm\": [\n          \"image\"\n        ],\n        \"sexual/minors\": [],\n        \"violence\": [\n          \"image\"\n        ],\n        \"violence/graphic\": [\n          \"image\"\n        ]\n      }\n    }\n  ]\n}"
+    "response_body": "{\n  \"id\": \"modr-3297\",\n  \"model\": \"omni-moderation-latest\",\n  \"results\": [\n    {\n      \"flagged\": false,\n      \"categories\": {\n        \"harassment\": false,\n        \"harassment/threatening\": false,\n        \"sexual\": false,\n        \"hate\": false,\n        \"hate/threatening\": false,\n        \"illicit\": false,\n        \"illicit/violent\": false,\n        \"self-harm/intent\": false,\n        \"self-harm/instructions\": false,\n        \"self-harm\": false,\n        \"sexual/minors\": false,\n        \"violence\": false,\n        \"violence/graphic\": false\n      },\n      \"category_scores\": {\n        \"harassment\": 0.0,\n        \"harassment/threatening\": 0.0,\n        \"sexual\": 0.00009253848866495987,\n        \"hate\": 0.0,\n        \"hate/threatening\": 0.0,\n        \"illicit\": 0.0,\n        \"illicit/violent\": 0.0,\n        \"self-harm/intent\": 4.400118457925303e-6,\n        \"self-harm/instructions\": 1.9525885208642222e-6,\n        \"self-harm\": 0.00046941405001030257,\n        \"sexual/minors\": 0.0,\n        \"violence\": 0.0005508471799444582,\n        \"violence/graphic\": 0.000015598027633743823\n      },\n      \"category_applied_input_types\": {\n        \"harassment\": [],\n        \"harassment/threatening\": [],\n        \"sexual\": [\n          \"image\"\n        ],\n        \"hate\": [],\n        \"hate/threatening\": [],\n        \"illicit\": [],\n        \"illicit/violent\": [],\n        \"self-harm/intent\": [\n          \"image\"\n        ],\n        \"self-harm/instructions\": [\n          \"image\"\n        ],\n        \"self-harm\": [\n          \"image\"\n        ],\n        \"sexual/minors\": [],\n        \"violence\": [\n          \"image\"\n        ],\n        \"violence/graphic\": [\n          \"image\"\n        ]\n      }\n    }\n  ]\n}"
   }
 ]

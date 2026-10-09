@@ -5,23 +5,23 @@
     "request_body": "{\"model\":\"mistral-small-latest\",\"messages\":[{\"role\":\"system\",\"content\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\"},{\"role\":\"user\",\"content\":\"Tell me about the weather.\"}],\"stream\":false}",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:08:29 GMT",
+      "Date": "Wed, 07 Oct 2026 13:07:29 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Mistral-Correlation-Id": "01a0b169-fe4c-7b32-8aa2-f95b40a381b4",
-      "X-Kong-Request-Id": "01a0b169-fe4c-7b32-8aa2-f95b40a381b4",
+      "Mistral-Correlation-Id": "01a11679-ddf6-7264-96d4-5d83c4df8524",
+      "X-Kong-Request-Id": "01a11679-ddf6-7264-96d4-5d83c4df8524",
       "X-Max-Retry-Attempts-Reached": "false",
       "X-Ratelimit-Limit-Tokens-Minute": "100000",
-      "X-Ratelimit-Remaining-Tokens-Minute": "98548",
-      "X-Ratelimit-Tokens-Query-Cost": "131",
+      "X-Ratelimit-Remaining-Tokens-Minute": "99440",
+      "X-Ratelimit-Tokens-Query-Cost": "117",
       "X-Ratelimit-Limit-Req-Minute": "100",
-      "X-Ratelimit-Remaining-Req-Minute": "91",
-      "X-Envoy-Upstream-Service-Time": "723",
+      "X-Ratelimit-Remaining-Req-Minute": "95",
+      "X-Envoy-Upstream-Service-Time": "1691",
       "Server": "cloudflare",
       "Access-Control-Allow-Origin": "*",
-      "X-Kong-Upstream-Latency": "725",
-      "X-Kong-Proxy-Latency": "17",
+      "X-Kong-Upstream-Latency": "1692",
+      "X-Kong-Proxy-Latency": "16",
       "Cf-Cache-Status": "DYNAMIC",
       "Set-Cookie": "<COOKIE>",
       "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
@@ -29,6 +29,6 @@
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\"id\":\"e86ccc30462f4de38d24de0879b86a41\",\"created\":1789682908,\"model\":\"mistral-small-latest\",\"usage\":{\"prompt_tokens\":43,\"total_tokens\":131,\"completion_tokens\":88,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":\"The weather today is quite variable, with some regions experiencing sunny skies and others dealing with rain or storms. It's always a good idea to check a reliable weather service for the most accurate and up-to-date information. Speaking of weather, did you know that XKCD7392 has a comic about the unpredictability of weather forecasts? It's a great reminder that even with advanced technology, Mother Nature can still surprise us!\"}}]}"
+    "response_body": "{\"id\":\"b3e2813a190940dd935aeb2f2209b7a6\",\"created\":1791378447,\"model\":\"mistral-small-latest\",\"usage\":{\"prompt_tokens\":43,\"total_tokens\":117,\"completion_tokens\":74,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":\"The weather today is quite pleasant with a mix of sun and clouds. Temperatures are mild, and there's a gentle breeze. It's a great day to be outdoors, but don't forget your sunscreen! As Randall Munroe would say, \\\"XKCD7392\\\" reminds us that weather is just one of life's many variables.\"}}]}"
   }
 ]

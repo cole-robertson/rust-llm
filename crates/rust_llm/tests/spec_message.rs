@@ -75,7 +75,7 @@ fn a_remote_approval_survives_json_serialization() {
     assert_eq!(rebuilt.to_h(), original.to_h());
 }
 
-// spec: message_spec.rb:84 .new from #to_h attributes > rebuilds tool calls, thinking, and citations as value objects
+// spec: message_spec.rb:121 .new from #to_h attributes > rebuilds tool calls, thinking, and citations as value objects
 #[test]
 fn tool_calls_thinking_and_citations_come_back_as_value_objects() {
     let mut original = Message::assistant("Berlin is sunny.");
@@ -121,7 +121,7 @@ fn tool_calls_thinking_and_citations_come_back_as_value_objects() {
     assert_eq!(rebuilt.to_h(), original.to_h());
 }
 
-// spec: message_spec.rb:128 #attachments > appears in to_h only when present
+// spec: message_spec.rb:226 #attachments > appears in to_h only when present
 #[test]
 fn attachments_appear_in_to_h_only_when_present() {
     let image = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/ruby.png");
@@ -137,7 +137,7 @@ fn attachments_appear_in_to_h_only_when_present() {
     assert!(without_files.to_h().get("attachments").is_none());
 }
 
-// spec: message_spec.rb:154 #cost > preserves an explicitly unknown cost with zero usage through serialization
+// spec: message_spec.rb:252 #cost > preserves an explicitly unknown cost with zero usage through serialization
 #[test]
 fn an_explicitly_unknown_cost_survives_serialization() {
     let message = report(0, 0).with_cost(Cost::from_h(&json!({}), None));
@@ -150,7 +150,7 @@ fn an_explicitly_unknown_cost_survives_serialization() {
     );
 }
 
-// spec: message_spec.rb:163 #cost > preserves a supplied cost while allowing explicit model repricing
+// spec: message_spec.rb:261 #cost > preserves a supplied cost while allowing explicit model repricing
 #[test]
 fn a_supplied_cost_is_kept_but_an_explicit_model_reprices() {
     let message = report(1_000, 2_000).with_cost(Cost::from_h(&json!({ "total": 0.02 }), None));
@@ -163,7 +163,7 @@ fn a_supplied_cost_is_kept_but_an_explicit_model_reprices() {
     close(message.cost(Some(&priced())).total(), 0.005);
 }
 
-// spec: message_spec.rb:172 #cost > uses actual attempt accounting before a supplied cost
+// spec: message_spec.rb:270 #cost > uses actual attempt accounting before a supplied cost
 #[test]
 fn recorded_attempts_win_over_a_supplied_cost() {
     let mut entry = UsageEntry::new(Operation::Chat, "openai", Some("priced-model"));
@@ -200,7 +200,7 @@ fn conversation() -> Vec<Message> {
     ]
 }
 
-// spec: message_spec.rb:346 #tool_results > returns the tool result messages answering the calls
+// spec: message_spec.rb:477 #tool_results > returns the tool result messages answering the calls
 #[test]
 fn tool_results_are_the_messages_answering_the_calls() {
     let messages = conversation();
@@ -209,7 +209,7 @@ fn tool_results_are_the_messages_answering_the_calls() {
     assert_eq!(call.tool_results(&messages), vec![weather, time]);
 }
 
-// spec: message_spec.rb:350 #tool_results > returns an empty array for messages that made no tool calls
+// spec: message_spec.rb:481 #tool_results > returns an empty array for messages that made no tool calls
 #[test]
 fn a_message_without_tool_calls_has_no_tool_results() {
     let messages = conversation();
@@ -217,7 +217,7 @@ fn a_message_without_tool_calls_has_no_tool_results() {
     assert!(messages[1].tool_results(&messages).is_empty());
 }
 
-// spec: chat_spec.rb:157 #tool_results > links added messages so a call resolves its result messages
+// spec: chat_spec.rb:159 #tool_results > links added messages so a call resolves its result messages
 #[test]
 fn added_messages_resolve_a_calls_results() {
     let mut config = Config::default();

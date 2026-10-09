@@ -137,7 +137,7 @@ async fn gemini_inlines_a_reference_image_for_image_to_video() {
     assert_eq!(data, std::fs::read(&image_path).unwrap());
 }
 
-// spec: protocols/gemini/videos_spec.rb:58 rejects local videos without a generated Veo URI
+// spec: protocols/gemini/videos_spec.rb:71 rejects local videos without a generated Veo URI
 #[tokio::test]
 async fn gemini_rejects_local_videos_without_a_generated_veo_uri() {
     let server = veo_server(json!({})).await;
@@ -157,7 +157,7 @@ async fn gemini_rejects_local_videos_without_a_generated_veo_uri() {
     assert!(requests(&server).await.is_empty());
 }
 
-// spec: protocols/gemini/videos_spec.rb:64 preserves the original Veo video URI instead of downloading and reuploading it
+// spec: protocols/gemini/videos_spec.rb:77 preserves the original Veo video URI instead of downloading and reuploading it
 #[tokio::test]
 async fn gemini_preserves_the_original_veo_video_uri() {
     let server = veo_server(json!({})).await;
@@ -189,7 +189,7 @@ fn download_from(job: &mut VideoJob, base: &str) {
     *job.raw.pointer_mut(pointer).unwrap() = rewritten.into();
 }
 
-// spec: protocols/gemini/videos_spec.rb:76 extends a freshly generated Veo video through the public API
+// spec: protocols/gemini/videos_spec.rb:89 extends a freshly generated Veo video through the public API
 #[tokio::test]
 async fn gemini_extends_a_freshly_generated_veo_video_through_the_public_api() {
     // The extension request carries the generated file URI, which the recording names on the
@@ -238,7 +238,7 @@ async fn gemini_extends_a_freshly_generated_veo_video_through_the_public_api() {
     cassette.assert_all_matched().await;
 }
 
-// spec: protocols/gemini/videos_spec.rb:120 fails with the operation error message
+// spec: protocols/gemini/videos_spec.rb:133 fails with the operation error message
 #[tokio::test]
 async fn gemini_fails_with_the_operation_error_message() {
     let server = veo_server(
@@ -254,7 +254,7 @@ async fn gemini_fails_with_the_operation_error_message() {
     assert_eq!(job.error.as_deref(), Some("unsupported duration"));
 }
 
-// spec: protocols/gemini/videos_spec.rb:176 follows the redirect to the download host with the API key
+// spec: protocols/gemini/videos_spec.rb:189 follows the redirect to the download host with the API key
 #[tokio::test]
 async fn gemini_follows_the_download_redirect_with_the_api_key() {
     let server = MockServer::start().await;

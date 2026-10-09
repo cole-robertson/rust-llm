@@ -301,7 +301,7 @@ async fn serializes_documented_wav_audio_input_while_keeping_sonar_audio_unsuppo
     ));
 }
 
-// spec: protocols/perplexity/router_spec.rb:104
+// UPSTREAM-REMOVED in 2.1 (was spec: protocols/perplexity/router_spec.rb:104)
 #[tokio::test]
 async fn rejects_explicitly_unsupported_request_controls_before_making_a_request() {
     let server = MockServer::start().await;
@@ -323,7 +323,7 @@ async fn rejects_explicitly_unsupported_request_controls_before_making_a_request
     assert!(server.received_requests().await.unwrap().is_empty());
 }
 
-// spec: protocols/perplexity/router_spec.rb:113
+// UPSTREAM-REMOVED in 2.1 (was spec: protocols/perplexity/router_spec.rb:113)
 #[test]
 fn requires_tool_descriptions_and_strict_schemas_without_changing_the_default_protocol() {
     let mut chat = router(config(None)).with_tool(Undescribed);

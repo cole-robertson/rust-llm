@@ -5,7 +5,7 @@
     "request_body": "",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:10:25 GMT",
+      "Date": "Wed, 07 Oct 2026 13:18:18 GMT",
       "Content-Type": "video/mp4",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
@@ -16,13 +16,13 @@
       "Response": "200",
       "Server": "cloudflare",
       "Vary": "Accept-Encoding,Origin",
-      "X-Ezoic-Cdn": "Hit d2;mm;a5a37417aea9f9c846dc7ecd5311c50e;2-176527-2;0c6v0cWEDMH9pi4YHjPC1",
+      "X-Ezoic-Cdn": "Hit d2;mm;a5a37417aea9f9c846dc7ecd5311c50e;2-176527-2;dFrMj57uoraOXdWEy570g",
       "X-Middleton-Display": "staticcontent_sol",
       "X-Middleton-Response": "200",
       "X-Origin-Cache-Control": "",
-      "Age": "586438",
+      "Age": "95493",
       "Cf-Cache-Status": "HIT",
-      "Report-To": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=HEFCMyCGERv4yTqIW%2Bn0ATFU9hkjR47v%2BIQzg04lsncrggVsscXfzRbLX7RUQu2dIXxPJ%2FZ4DY2V3JGrJTce6DGvxtIxWRzZh1GnrziDrqShoLoIk6Pkh%2FlMWso%2BwBp%2BVb0%3D\"}]}",
+      "Report-To": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=jjVGnhJegQ%2BWtlKYUUdu7fbJTIxeHNcERKU4OnNoNv4yiRM8OGbzCcSHRGoiFtLE0INof0hqNWZkg8JllsHEW%2BcV%2F9S8CaA6xaFMUqkJrH8PiIHy2iD6lrMsoRplfTNK0s4%3D\"}]}",
       "Nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
@@ -39,15 +39,15 @@
       "X-Gemini-Service-Tier": "standard",
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Thu, 17 Sep 2026 22:10:34 GMT",
+      "Date": "Wed, 07 Oct 2026 13:18:27 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=8483",
+      "Server-Timing": "gfet4t7; dur=9042",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"The video shows a wide shot of a serene and beautiful beach scene on a clear, sunny day.\\n\\nIn the foreground, a person, likely a woman with long, dark hair, is sitting on the light brown sand with their back to the camera. They are wearing a light-colored (possibly peach or pink) top and white bottoms, looking out at the ocean. Their hair is gently blowing in the breeze. The sand itself appears natural, with some small bits of debris or driftwood scattered on it.\\n\\nBeyond the person is a vast expanse of the ocean. The water near the shore is a clear, light blue, transitioning to a deeper blue further out. Small, gentle waves lap at the shore. The ocean appears calm. In the far distance, one or two very tiny, indistinct figures can be seen in the water.\\n\\nThe sky above is bright blue with scattered, fluffy white clouds, indicating a beautiful, sunny day. The overall impression is one of peace, relaxation, and natural beauty.\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 4119,\n    \"candidatesTokenCount\": 203,\n    \"totalTokenCount\": 5320,\n    \"cachedContentTokenCount\": 3667,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 9\n      },\n      {\n        \"modality\": \"VIDEO\",\n        \"tokenCount\": 3682\n      },\n      {\n        \"modality\": \"AUDIO\",\n        \"tokenCount\": 428\n      }\n    ],\n    \"cacheTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 8\n      },\n      {\n        \"modality\": \"VIDEO\",\n        \"tokenCount\": 3278\n      },\n      {\n        \"modality\": \"AUDIO\",\n        \"tokenCount\": 381\n      }\n    ],\n    \"thoughtsTokenCount\": 998,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"UmWsatXPC8uX28oP1si1QA\"\n}\n"
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"The video shows a beautiful, serene beach scene. Here's a breakdown of what I see:\\n\\n*   **Subject:** A person, seen from behind, is sitting on the sandy beach, facing out towards the ocean. The person appears to be a woman with long, dark hair, wearing a light-colored top (possibly pink or coral) and white shorts or pants. Her hair is visibly blowing and swaying in the wind throughout the video.\\n*   **Foreground (Beach):** The sand is light golden-brown, with some scattered natural debris like small twigs or dried leaves.\\n*   **Midground (Ocean):** The vast blue ocean stretches across the horizon. The water near the shore is a lighter, clear turquoise, gradually transitioning to a deeper blue further out. Gentle waves are visible, softly lapping at the shore.\\n*   **Background (Sky):** The sky is a clear, bright blue with scattered, fluffy white clouds.\\n*   **Overall Impression:** The scene evokes a sense of peace, relaxation, and contemplation, suggesting a warm, breezy day at a tropical or scenic beach.\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 4119,\n    \"candidatesTokenCount\": 229,\n    \"totalTokenCount\": 5284,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 9\n      },\n      {\n        \"modality\": \"VIDEO\",\n        \"tokenCount\": 3682\n      },\n      {\n        \"modality\": \"AUDIO\",\n        \"tokenCount\": 428\n      }\n    ],\n    \"thoughtsTokenCount\": 936,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"m0bGapK6IeCivdIP8PfVoQU\"\n}\n"
   }
 ]

@@ -1477,7 +1477,7 @@ fn attributes(data: &Value, slug: &str, key: &str) -> Model {
     models_dev_model_attributes(data, slug, key).unwrap()
 }
 
-// spec: models_spec.rb:238 .models_dev_model_attributes converts models.dev payload into a Model attributes hash
+// spec: models_spec.rb:255 .models_dev_model_attributes converts models.dev payload into a Model attributes hash
 #[test]
 fn models_dev_model_attributes_converts_the_payload() {
     let data = model_data();
@@ -1532,7 +1532,7 @@ fn models_dev_model_attributes_converts_the_payload() {
     );
 }
 
-// spec: models_spec.rb:283 .models_dev_model_attributes derives transcription from audio input and text output
+// spec: models_spec.rb:300 .models_dev_model_attributes derives transcription from audio input and text output
 #[test]
 fn models_dev_model_attributes_derives_transcription() {
     let data =
@@ -1544,7 +1544,7 @@ fn models_dev_model_attributes_derives_transcription() {
     );
 }
 
-// spec: models_spec.rb:293 .models_dev_model_attributes does not mark audio-output models as transcription models
+// spec: models_spec.rb:310 .models_dev_model_attributes does not mark audio-output models as transcription models
 #[test]
 fn models_dev_model_attributes_skips_transcription_for_audio_output() {
     let data = merged_data(json!({ "modalities": { "input": ["text"], "output": ["audio"] } }));
@@ -1555,7 +1555,7 @@ fn models_dev_model_attributes_skips_transcription_for_audio_output() {
     );
 }
 
-// spec: models_spec.rb:303 .models_dev_model_attributes does not infer transcription for other providers
+// spec: models_spec.rb:320 .models_dev_model_attributes does not infer transcription for other providers
 #[test]
 fn models_dev_model_attributes_does_not_infer_transcription_for_other_providers() {
     let data = merged_data(json!({ "modalities": { "input": ["audio"], "output": ["text"] } }));
@@ -1566,7 +1566,7 @@ fn models_dev_model_attributes_does_not_infer_transcription_for_other_providers(
     );
 }
 
-// spec: models_spec.rb:313 .models_dev_model_attributes recognizes explicitly named OpenAI transcription models
+// spec: models_spec.rb:330 .models_dev_model_attributes recognizes explicitly named OpenAI transcription models
 #[test]
 fn models_dev_model_attributes_recognizes_openai_transcription_models() {
     let data = merged_data(json!({
@@ -1579,7 +1579,7 @@ fn models_dev_model_attributes_recognizes_openai_transcription_models() {
     );
 }
 
-// spec: models_spec.rb:323 .models_dev_model_attributes does not mark multimodal embedding models as transcription models
+// spec: models_spec.rb:340 .models_dev_model_attributes does not mark multimodal embedding models as transcription models
 #[test]
 fn models_dev_model_attributes_skips_transcription_for_embedding_models() {
     let data = merged_data(json!({
@@ -1592,7 +1592,7 @@ fn models_dev_model_attributes_skips_transcription_for_embedding_models() {
     );
 }
 
-// spec: models_spec.rb:333 .models_dev_model_attributes maps models.dev context tiers into text_tokens.long_context
+// spec: models_spec.rb:350 .models_dev_model_attributes maps models.dev context tiers into text_tokens.long_context
 #[test]
 fn models_dev_model_attributes_maps_context_tiers() {
     let data = merged_data(json!({ "cost": {
@@ -1621,7 +1621,7 @@ fn models_dev_model_attributes_maps_context_tiers() {
     );
 }
 
-// spec: models_spec.rb:373 .models_dev_model_attributes falls back to context_over_200k when models.dev omits structured tiers
+// spec: models_spec.rb:390 .models_dev_model_attributes falls back to context_over_200k when models.dev omits structured tiers
 #[test]
 fn models_dev_model_attributes_falls_back_to_context_over_200k() {
     let data = merged_data(json!({ "cost": {
@@ -1640,7 +1640,7 @@ fn models_dev_model_attributes_falls_back_to_context_over_200k() {
     assert_eq!(text["long_context_threshold"], 200_000);
 }
 
-// spec: models_spec.rb:399 .models_dev_model_attributes keeps models.dev authoritative for the capabilities it reports on when merging provider metadata
+// spec: models_spec.rb:416 .models_dev_model_attributes keeps models.dev authoritative for the capabilities it reports on when merging provider metadata
 #[test]
 fn add_provider_metadata_keeps_models_dev_authoritative_for_reported_capabilities() {
     let models_dev_model = model(
@@ -1670,7 +1670,7 @@ fn add_provider_metadata_keeps_models_dev_authoritative_for_reported_capabilitie
     );
 }
 
-// spec: models_spec.rb:424 .models_dev_model_attributes uses release_date cast to midnight as created_at
+// spec: models_spec.rb:441 .models_dev_model_attributes uses release_date cast to midnight as created_at
 #[test]
 fn models_dev_model_attributes_uses_release_date_as_created_at() {
     let data = merged_data(json!({ "release_date": "2025-03-01" }));
@@ -1680,7 +1680,7 @@ fn models_dev_model_attributes_uses_release_date_as_created_at() {
     );
 }
 
-// spec: models_spec.rb:430 .models_dev_model_attributes normalizes month-only release dates to the first day of the month
+// spec: models_spec.rb:447 .models_dev_model_attributes normalizes month-only release dates to the first day of the month
 #[test]
 fn models_dev_model_attributes_normalizes_month_only_release_dates() {
     let data = merged_data(json!({ "release_date": "2025-09" }));
@@ -1690,7 +1690,7 @@ fn models_dev_model_attributes_normalizes_month_only_release_dates() {
     );
 }
 
-// spec: models_spec.rb:438 .models_dev_model_attributes falls back to last_updated cast to midnight as created_at when release_date is missing
+// spec: models_spec.rb:455 .models_dev_model_attributes falls back to last_updated cast to midnight as created_at when release_date is missing
 #[test]
 fn models_dev_model_attributes_falls_back_to_last_updated() {
     let data = merged_data(json!({ "release_date": null, "last_updated": "2025-03-01" }));
@@ -1700,7 +1700,7 @@ fn models_dev_model_attributes_falls_back_to_last_updated() {
     );
 }
 
-// spec: models_spec.rb:444 .models_dev_model_attributes keeps created_at nil when both release_date and last_updated are missing
+// spec: models_spec.rb:461 .models_dev_model_attributes keeps created_at nil when both release_date and last_updated are missing
 #[test]
 fn models_dev_model_attributes_keeps_created_at_nil_without_dates() {
     let data = merged_data(json!({ "release_date": null, "last_updated": null }));

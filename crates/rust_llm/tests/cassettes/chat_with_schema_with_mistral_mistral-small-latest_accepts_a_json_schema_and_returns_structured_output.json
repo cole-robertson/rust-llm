@@ -5,23 +5,23 @@
     "request_body": "{\"model\":\"mistral-small-latest\",\"messages\":[{\"role\":\"user\",\"content\":\"Generate a person named John who is 30 years old\"}],\"stream\":false,\"response_format\":{\"type\":\"json_schema\",\"json_schema\":{\"name\":\"response\",\"schema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":\"integer\"}},\"required\":[\"name\",\"age\"],\"additionalProperties\":false},\"strict\":true}}}",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:08:05 GMT",
+      "Date": "Wed, 07 Oct 2026 13:00:04 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Mistral-Correlation-Id": "01a0b169-a325-7e07-a875-ff937d549ecb",
-      "X-Kong-Request-Id": "01a0b169-a325-7e07-a875-ff937d549ecb",
+      "Mistral-Correlation-Id": "01a11673-175a-777e-a440-7f30f7c46848",
+      "X-Kong-Request-Id": "01a11673-175a-777e-a440-7f30f7c46848",
       "X-Max-Retry-Attempts-Reached": "false",
       "X-Ratelimit-Limit-Tokens-Minute": "100000",
-      "X-Ratelimit-Remaining-Tokens-Minute": "99059",
+      "X-Ratelimit-Remaining-Tokens-Minute": "80300",
       "X-Ratelimit-Tokens-Query-Cost": "29",
       "X-Ratelimit-Limit-Req-Minute": "100",
       "X-Ratelimit-Remaining-Req-Minute": "99",
-      "X-Envoy-Upstream-Service-Time": "284",
+      "X-Envoy-Upstream-Service-Time": "311",
       "Server": "cloudflare",
       "Access-Control-Allow-Origin": "*",
-      "X-Kong-Upstream-Latency": "284",
-      "X-Kong-Proxy-Latency": "10",
+      "X-Kong-Upstream-Latency": "312",
+      "X-Kong-Proxy-Latency": "19",
       "Cf-Cache-Status": "DYNAMIC",
       "Set-Cookie": "<COOKIE>",
       "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
@@ -29,6 +29,6 @@
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\"id\":\"58dfd03014be450cbe8f44c150e3aeef\",\"created\":1789682885,\"model\":\"mistral-small-latest\",\"usage\":{\"prompt_tokens\":15,\"total_tokens\":29,\"completion_tokens\":14,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":\"{\\\"name\\\": \\\"John\\\", \\\"age\\\": 30}\"}}]}"
+    "response_body": "{\"id\":\"41513482b14b4d7d8217117b4032b1d8\",\"created\":1791378003,\"model\":\"mistral-small-latest\",\"usage\":{\"prompt_tokens\":15,\"total_tokens\":29,\"completion_tokens\":14,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":\"{\\\"name\\\": \\\"John\\\", \\\"age\\\": 30}\"}}]}"
   }
 ]

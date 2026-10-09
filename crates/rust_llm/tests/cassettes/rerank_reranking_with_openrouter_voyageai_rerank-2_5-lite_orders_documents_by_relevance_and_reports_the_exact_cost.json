@@ -5,7 +5,7 @@
     "request_body": "{\"model\":\"voyageai/rerank-2.5-lite\",\"query\":\"what is ruby\",\"documents\":[\"Paris is the capital of France\",\"Ruby is a programming language created by Matz\"]}",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:16:14 GMT",
+      "Date": "Wed, 07 Oct 2026 12:59:42 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
@@ -18,6 +18,6 @@
       "Server": "cloudflare",
       "Cf-Ray": "<CF_RAY>"
     },
-    "response_body": "{\"model\":\"rerank-2.5-lite\",\"results\":[{\"index\":1,\"relevance_score\":0.828125,\"document\":{\"text\":\"Ruby is a programming language created by Matz\"}},{\"index\":0,\"relevance_score\":0.306640625,\"document\":{\"text\":\"Paris is the capital of France\"}}],\"usage\":{\"total_tokens\":17,\"cost\":3.4e-7},\"provider\":\"VoyageAI by MongoDB\",\"id\":\"gen-rerank-1789683373-dcpMnLjry8Z3kmOGNTBS\"}"
+    "response_body": "{\"model\":\"rerank-2.5-lite\",\"results\":[{\"index\":1,\"relevance_score\":0.828125,\"document\":{\"text\":\"Ruby is a programming language created by Matz\"}},{\"index\":0,\"relevance_score\":0.306640625,\"document\":{\"text\":\"Paris is the capital of France\"}}],\"usage\":{\"total_tokens\":17,\"cost\":3.4e-7},\"provider\":\"VoyageAI by MongoDB\",\"id\":\"gen-rerank-1791377982-MKGDVsBUnI4LG5m0FBvT\"}"
   }
 ]

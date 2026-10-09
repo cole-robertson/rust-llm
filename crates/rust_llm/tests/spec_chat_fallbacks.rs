@@ -65,7 +65,7 @@ fn to(model: &str, provider: &str) -> Fallback {
     }
 }
 
-// spec: chat_fallbacks_spec.rb:73 stores ordered fallback models
+// spec: chat_fallbacks_spec.rb:77 stores ordered fallback models
 #[tokio::test]
 async fn stores_ordered_fallback_models() {
     let server = serve(vec![]).await;
@@ -82,7 +82,7 @@ async fn stores_ordered_fallback_models() {
     );
 }
 
-// spec: chat_fallbacks_spec.rb:83 clears fallback models with with_fallbacks(nil)
+// spec: chat_fallbacks_spec.rb:87 clears fallback models with with_fallbacks(nil)
 #[tokio::test]
 async fn with_no_fallbacks_clears_them_and_resets_the_errors() {
     let server = serve(vec![]).await;
@@ -97,7 +97,7 @@ async fn with_no_fallbacks_clears_them_and_resets_the_errors() {
     );
 }
 
-// spec: chat_fallbacks_spec.rb:93 falls back on transient errors and restores the primary model
+// spec: chat_fallbacks_spec.rb:97 falls back on transient errors and restores the primary model
 #[tokio::test]
 async fn falls_back_on_transient_errors_and_restores_the_primary_model() {
     let server = MockServer::start().await;
@@ -117,7 +117,7 @@ async fn falls_back_on_transient_errors_and_restores_the_primary_model() {
     );
 }
 
-// spec: chat_fallbacks_spec.rb:109 links failed fallback attempts to the response they ultimately produce
+// spec: chat_fallbacks_spec.rb:113 links failed fallback attempts to the response they ultimately produce
 #[tokio::test]
 async fn links_failed_attempts_to_the_response_they_produce() {
     let server = MockServer::start().await;
@@ -152,7 +152,7 @@ async fn links_failed_attempts_to_the_response_they_produce() {
     );
 }
 
-// spec: chat_fallbacks_spec.rb:143 tries fallback models in order
+// spec: chat_fallbacks_spec.rb:147 tries fallback models in order
 #[tokio::test]
 async fn tries_fallback_models_in_order() {
     let server = MockServer::start().await;
@@ -182,7 +182,7 @@ async fn tries_fallback_models_in_order() {
     }
 }
 
-// spec: chat_fallbacks_spec.rb:161 does not fallback on non-transient errors
+// spec: chat_fallbacks_spec.rb:165 does not fallback on non-transient errors
 #[tokio::test]
 async fn does_not_fall_back_on_non_transient_errors() {
     let server = MockServer::start().await;
@@ -197,7 +197,7 @@ async fn does_not_fall_back_on_non_transient_errors() {
     assert_eq!(count(&server, "/v1/messages").await, 0);
 }
 
-// spec: chat_fallbacks_spec.rb:173 falls back on configured errors
+// spec: chat_fallbacks_spec.rb:177 falls back on configured errors
 #[tokio::test]
 async fn falls_back_on_configured_errors() {
     let server = MockServer::start().await;
@@ -213,7 +213,7 @@ async fn falls_back_on_configured_errors() {
 
 type Events = Arc<Mutex<Vec<FallbackAttempt>>>;
 
-// spec: chat_fallbacks_spec.rb:188 runs fallback callbacks before retrying
+// spec: chat_fallbacks_spec.rb:192 runs fallback callbacks before retrying
 #[tokio::test]
 async fn runs_fallback_callbacks_before_retrying() {
     let server = MockServer::start().await;
@@ -268,7 +268,7 @@ async fn runs_fallback_callbacks_before_retrying() {
     assert!(after[0].fallback_error.is_none(), "not failed?");
 }
 
-// spec: chat_fallbacks_spec.rb:219 runs fallback callbacks when the attempt fails with a non-fallback error
+// spec: chat_fallbacks_spec.rb:223 runs fallback callbacks when the attempt fails with a non-fallback error
 #[tokio::test]
 async fn runs_fallback_callbacks_when_the_fallback_fails_with_a_non_fallback_error() {
     let server = MockServer::start().await;
@@ -298,7 +298,7 @@ async fn runs_fallback_callbacks_when_the_fallback_fails_with_a_non_fallback_err
     );
 }
 
-// spec: chat_fallbacks_spec.rb:236 drops an explicit protocol override when the fallback changes provider
+// spec: chat_fallbacks_spec.rb:240 drops an explicit protocol override when the fallback changes provider
 #[tokio::test]
 async fn drops_an_explicit_protocol_when_the_fallback_changes_provider() {
     let server = MockServer::start().await;
@@ -322,7 +322,7 @@ async fn drops_an_explicit_protocol_when_the_fallback_changes_provider() {
     );
 }
 
-// spec: chat_fallbacks_spec.rb:253 starts a new streaming message lifecycle when fallback follows yielded chunks
+// spec: chat_fallbacks_spec.rb:257 starts a new streaming message lifecycle when fallback follows yielded chunks
 #[tokio::test]
 async fn a_fallback_after_yielded_chunks_starts_a_new_message_lifecycle() {
     let server = MockServer::start().await;
@@ -821,7 +821,7 @@ async fn a_server_decision_is_recorded_once_without_running_the_local_tool() {
     }
 }
 
-// spec: chat_server_tool_approval_spec.rb:61 runs local calls in a mixed round before parking for the server decision
+// spec: chat_server_tool_approval_spec.rb:69 runs local calls in a mixed round before parking for the server decision
 #[tokio::test]
 async fn local_calls_in_a_mixed_round_run_before_parking() {
     let runs: Runs = Default::default();

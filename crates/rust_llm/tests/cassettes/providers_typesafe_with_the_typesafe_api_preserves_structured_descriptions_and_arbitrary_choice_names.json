@@ -5,13 +5,17 @@
     "request_body": "{\"model\":\"jev-latest\",\"state\":[\"Please refund the duplicate charge today.\"],\"questions\":{\"urgent\":{\"type\":\"noul\",\"instructions\":{\"question\":\"Is action needed today?\"},\"criteria\":{\"true\":{\"deadline\":\"today\"},\"false\":[\"No deadline\",\"Later\"]}},\"department\":{\"type\":\"choice\",\"instructions\":[\"Which team?\",\"Pick the most relevant team\"],\"criteria\":{\"Billing & payments\":{\"handles\":[\"Charges\",\"Refunds\"]},\"Other\":null}},\"frustration\":{\"type\":\"score\",\"instructions\":\"How frustrated is the customer?\",\"criteria\":[{\"description\":\"Calm and polite\"},[\"Frustrated\",\"Still civil\"],\"Angry or hostile\"]}}}",
     "status": 200,
     "response_headers": {
-      "Date": "Mon, 21 Sep 2026 16:06:36 GMT",
-      "Server": "istio-envoy",
-      "Content-Length": "462",
+      "Date": "Wed, 07 Oct 2026 12:57:52 GMT",
       "Content-Type": "application/json",
-      "X-Typesafe-Request-Id": "req_01a0c4b8214c7dfdbf9170041ea80323",
-      "X-Envoy-Upstream-Service-Time": "108"
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Server": "cloudflare",
+      "X-Typesafe-Request-Id": "req_01a1167115de7bf29ab363a15a289adc",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Set-Cookie": "<COOKIE>",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\"model\":\"jev-1.13.0\",\"answers\":{\"urgent\":{\"type\":\"noul\",\"noul\":0.94},\"department\":{\"type\":\"choice\",\"choice\":\"Billing & payments\",\"confidence\":1.0,\"probabilities\":{\"Other\":0.0,\"Billing & payments\":1.0}},\"frustration\":{\"type\":\"score\",\"score\":0.27,\"confidence\":0.6,\"legend\":{\"0\":{\"description\":\"Calm and polite\"},\"1\":[\"Frustrated\",\"Still civil\"],\"2\":\"Angry or hostile\"},\"probabilities\":{\"0\":0.74,\"1\":0.26,\"2\":0.0}}},\"usage\":{\"input_tokens\":439,\"output_tokens\":67}}"
+    "response_body": "{\"model\":\"jev-1.13.0\",\"answers\":{\"urgent\":{\"type\":\"noul\",\"noul\":0.94},\"department\":{\"type\":\"choice\",\"choice\":\"Billing & payments\",\"confidence\":1.0,\"probabilities\":{\"Billing & payments\":1.0,\"Other\":0.0}},\"frustration\":{\"type\":\"score\",\"score\":0.34,\"confidence\":0.49,\"legend\":{\"0\":{\"description\":\"Calm and polite\"},\"1\":[\"Frustrated\",\"Still civil\"],\"2\":\"Angry or hostile\"},\"probabilities\":{\"0\":0.66,\"1\":0.34,\"2\":0.0}}},\"usage\":{\"input_tokens\":439,\"output_tokens\":67}}"
   }
 ]

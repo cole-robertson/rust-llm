@@ -1,0 +1,35 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.openai.com/v1/chat/completions",
+    "request_body": "{\"model\":\"gpt-4.1-nano\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with just the word hello.\"}],\"stream\":false,\"max_completion_tokens\":128}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Wed, 07 Oct 2026 12:59:36 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Cf-Ray": "<CF_RAY>",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Server": "cloudflare",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "Access-Control-Expose-Headers": "CF-Ray",
+      "Openai-Organization": "<OPENAI_ORGANIZATION>",
+      "Openai-Processing-Ms": "416",
+      "Openai-Project": "<OPENAI_PROJECT>",
+      "Openai-Version": "2020-10-01",
+      "X-Openai-Proxy-Wasm": "v0.1",
+      "X-Ratelimit-Limit-Requests": "5000",
+      "X-Ratelimit-Limit-Tokens": "2000000",
+      "X-Ratelimit-Remaining-Requests": "4999",
+      "X-Ratelimit-Remaining-Tokens": "1999990",
+      "X-Ratelimit-Reset-Requests": "12ms",
+      "X-Ratelimit-Reset-Tokens": "0s",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Set-Cookie": "<COOKIE>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\n  \"id\": \"chatcmpl-EWLX6xw7qOHfjgaLNp7VJeCFfaWfp\",\n  \"object\": \"chat.completion\",\n  \"created\": 1791377976,\n  \"model\": \"gpt-4.1-nano-2025-04-14\",\n  \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\": \"assistant\",\n        \"content\": \"hello\",\n        \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 14,\n    \"completion_tokens\": 1,\n    \"total_tokens\": 15,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\": {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\": 0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\": \"default\",\n  \"system_fingerprint\": \"fp_9b878b2ce4\"\n}\n"
+  }
+]

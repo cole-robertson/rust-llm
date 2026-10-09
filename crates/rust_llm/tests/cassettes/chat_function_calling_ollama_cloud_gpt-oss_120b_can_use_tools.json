@@ -6,41 +6,39 @@
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json",
-      "Set-Cookie": "<COOKIE>",
-      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
-      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Build-Commit": "aca5aad1d053bda171888c526b817e0c61227261",
+      "X-Build-Time": "2026-10-06T19:15:30-07:00",
       "X-Frame-Options": "DENY",
       "X-Request-Id": "<X_REQUEST_ID>",
-      "Content-Length": "638",
-      "Date": "Thu, 17 Sep 2026 22:06:35 GMT",
+      "Content-Length": "602",
+      "Date": "Wed, 07 Oct 2026 13:02:40 GMT",
       "Server": "Google Frontend",
-      "X-Cloud-Trace-Context": "174c1c931d79060035b819f35a920c6a/12399824949849154808",
-      "Traceparent": "00-174c1c931d79060035b819f35a920c6a-ac15071844c8e4f8-00",
+      "Traceparent": "00-a636328066fa162052926c723436d30f-a01d5936e2474636-00",
+      "X-Cloud-Trace-Context": "a636328066fa162052926c723436d30f/11537475912652506678",
       "Via": "1.1 google",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
     },
-    "response_body": "{\"id\":\"chatcmpl-183\",\"object\":\"chat.completion\",\"created\":1789682795,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning\":\"The user asks for weather in Berlin with coordinates provided. We can call weather function with latitude and longitude.\",\"tool_calls\":[{\"id\":\"call_9zh73ldv\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":169,\"prompt_tokens_details\":{\"cached_tokens\":64},\"completion_tokens\":61,\"total_tokens\":230}}\n"
+    "response_body": "{\"id\":\"chatcmpl-846\",\"object\":\"chat.completion\",\"created\":1791378160,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning\":\"We need to call functions.weather with latitude and longitude strings. Provide call.\",\"tool_calls\":[{\"id\":\"call_x51o7yyq\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":169,\"completion_tokens\":55,\"total_tokens\":224,\"prompt_tokens_details\":{\"cached_tokens\":64}}}\n"
   },
   {
     "method": "post",
     "uri": "https://ollama.com/v1/chat/completions",
-    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin? (52.5200, 13.4050)\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_9zh73ldv\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}],\"reasoning\":\"The user asks for weather in Berlin with coordinates provided. We can call weather function with latitude and longitude.\",\"reasoning_content\":\"The user asks for weather in Berlin with coordinates provided. We can call weather function with latitude and longitude.\"},{\"role\":\"tool\",\"content\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_9zh73ldv\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin? (52.5200, 13.4050)\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_x51o7yyq\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}],\"reasoning\":\"We need to call functions.weather with latitude and longitude strings. Provide call.\",\"reasoning_content\":\"We need to call functions.weather with latitude and longitude strings. Provide call.\"},{\"role\":\"tool\",\"content\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_x51o7yyq\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}]}",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json",
-      "Set-Cookie": "<COOKIE>",
-      "X-Build-Commit": "06e177d7ef1d1dfcdc87907f62fdef4363abe1ab",
-      "X-Build-Time": "2026-09-17T14:37:26-07:00",
+      "X-Build-Commit": "aca5aad1d053bda171888c526b817e0c61227261",
+      "X-Build-Time": "2026-10-06T19:15:30-07:00",
       "X-Frame-Options": "DENY",
       "X-Request-Id": "<X_REQUEST_ID>",
-      "Content-Length": "448",
-      "Date": "Thu, 17 Sep 2026 22:06:36 GMT",
+      "Content-Length": "434",
+      "Date": "Wed, 07 Oct 2026 13:02:40 GMT",
       "Server": "Google Frontend",
-      "X-Cloud-Trace-Context": "920a7c4dadacd6877ad5be5d2b1e1afe/2222696546422445700",
-      "Traceparent": "00-920a7c4dadacd6877ad5be5d2b1e1afe-1ed89abb8cff5684-00",
+      "Traceparent": "00-2144d19a9bba39eb4505a0ed1237bc34-6018758d702dc6b6-00",
+      "X-Cloud-Trace-Context": "2144d19a9bba39eb4505a0ed1237bc34/6924413677415024310",
       "Via": "1.1 google",
-      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
+      "Alt-Svc": "h3=\":443\"; ma=2592000"
     },
-    "response_body": "{\"id\":\"chatcmpl-90\",\"object\":\"chat.completion\",\"created\":1789682796,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The current weather in Berlin (52.5200 N, 13.4050 E) is **15 °C** with a **wind speed of about 10 km/h**.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":258,\"prompt_tokens_details\":{\"cached_tokens\":176},\"completion_tokens\":45,\"total_tokens\":303}}\n"
+    "response_body": "{\"id\":\"chatcmpl-926\",\"object\":\"chat.completion\",\"created\":1791378160,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The current weather in Berlin (52.5200 N, 13.4050 E) is **15 °C** with a **10 km/h wind**.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":252,\"completion_tokens\":41,\"total_tokens\":293,\"prompt_tokens_details\":{\"cached_tokens\":176}}}\n"
   }
 ]
