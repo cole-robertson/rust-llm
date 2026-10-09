@@ -407,27 +407,19 @@ fn effort_goes_alone_when_the_registry_lists_no_controls() {
 
 // ---- chat_spec.rb: thinking blocks ---------------------------------------------------------------
 
-fn assistant_thinking(text: Option<&str>, signature: Option<&str>) -> Message {
-    let mut m = Message::assistant("hi");
-    m.thinking = Some(Thinking {
-        text: text.map(str::to_string),
-        signature: signature.map(str::to_string),
-    });
+/// `claude_answer`'s usage entry: the answer Anthropic produced, so its signature is Claude's own.
+fn by_claude(mut m: Message) -> Message {
+    m.usage_entries = vec![rust_llm::UsageEntry {
+        id: rust_llm::UsageEntry::next_id(),
+        owner: None,
+        operation: rust_llm::message::Operation::Chat,
+        provider: "anthropic".into(),
+        model: MODEL.into(),
+        status: rust_llm::UsageStatus::Succeeded,
+        tokens: Default::default(),
+        cost: Default::default(),
+    }];
     m
-}
-
-// UPSTREAM-REMOVED in 2.1 (was spec: protocols/anthropic/chat_spec.rb:598) omits a missing signature
-#[tokio::test]
-async fn a_thinking_block_without_a_signature_omits_it() {
-    let server = serve(vec![]).await;
-    let payload = render(
-        &mut chat(&server),
-        vec![Message::user("Hi"), assistant_thinking(Some("why"), None)],
-    );
-    assert_eq!(
-        payload["messages"][1]["content"][0],
-        json!({ "type": "thinking", "thinking": "why" })
-    );
 }
 
 // spec: protocols/anthropic/chat_spec.rb:745 replays a stored thinking block even when the request asks for no thinking
@@ -439,7 +431,10 @@ async fn stored_thinking_replays_on_a_tool_turn_without_thinking_config() {
         text: Some("why".into()),
         signature: Some("sig".into()),
     });
-    let payload = render(&mut chat(&server), vec![Message::user("Weather?"), call]);
+    let payload = render(
+        &mut chat(&server),
+        vec![Message::user("Weather?"), by_claude(call)],
+    );
     let types: Vec<&str> = payload["messages"][1]["content"]
         .as_array()
         .unwrap()
@@ -466,7 +461,10 @@ async fn display_omitted_thinking_stays_thinking() {
     let server = serve(vec![]).await;
     let mut replay = Message::assistant("hi");
     replay.thinking = reply.thinking.clone();
-    let payload = render(&mut chat(&server), vec![Message::user("Hi"), replay]);
+    let payload = render(
+        &mut chat(&server),
+        vec![Message::user("Hi"), by_claude(replay)],
+    );
     assert_eq!(
         payload["messages"][1]["content"][0],
         json!({ "type": "thinking", "thinking": "", "signature": "sig" })
@@ -769,6 +767,7 @@ async fn stream_error(data: &str) -> Error {
 }
 
 // UPSTREAM-REMOVED in 2.1 (was spec: protocols/anthropic/streaming_spec.rb:68) falls back to a 500 for other typed error objects
+// 2.1 maps each documented type to its status (`ERROR_STATUSES`), so a typed invalid request is a 400.
 #[tokio::test]
 async fn other_typed_stream_errors_are_server_errors() {
     let err = stream_error(
@@ -776,7 +775,7 @@ async fn other_typed_stream_errors_are_server_errors() {
     )
     .await;
     assert!(
-        matches!(&err, Error::Server(m, Some(r)) if m == "Bad request" && r.status == 500),
+        matches!(&err, Error::BadRequest(m, Some(r)) if m == "Bad request" && r.status == 400),
         "{err:?}"
     );
 }

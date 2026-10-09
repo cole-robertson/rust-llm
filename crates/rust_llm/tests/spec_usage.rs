@@ -6,13 +6,14 @@
 
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use rust_llm::accounting::Tracker;
+use rust_llm::accounting::{Tracker, UsageResult};
 use rust_llm::error::ErrorResponse;
 use rust_llm::message::Operation;
 use rust_llm::model::{PricingCategory, PricingTier};
 use rust_llm::models::Models;
 use rust_llm::{
-    Chat, Config, Cost, Error, Message, Model, Moderation, Role, Tokens, UsageEntry, UsageStatus,
+    Chat, Config, Cost, Embedding, Error, Image, Message, Model, Moderation, Rerank, Role, Speech,
+    Tokens, Transcription, UsageEntry, UsageStatus, Vectors,
 };
 use serde_json::json;
 
@@ -87,6 +88,7 @@ fn response(status: u16) -> Option<ErrorResponse> {
     Some(ErrorResponse {
         status,
         body: String::new(),
+        ..Default::default()
     })
 }
 
@@ -431,4 +433,180 @@ fn only_the_last_attempt_is_credited() {
     let ids: Vec<u64> = result.usage_entries.iter().map(|e| e.id).collect();
     assert_eq!(ids, [retried, last]);
     assert_eq!(result.usage_entries, tracker.entries());
+}
+
+// spec: accounting/usage_spec.rb:49 keeps the usage a response reported when the attempt then fails
+#[test]
+fn a_failed_attempt_keeps_the_usage_its_response_reported() {
+    let _r = Registry::lock(None);
+    let mut tracker = build_tracker(test_model());
+    let id = tracker.start();
+    tracker.observe_tokens(&Tokens {
+        input: Some(133),
+        output: Some(0),
+        ..Default::default()
+    });
+    assert!(tracker.entry(id).unwrap().is_pending());
+
+    tracker.fail_attempt(
+        Some(id),
+        &Error::ContentFilter("Blocked".into(), response(200)),
+    );
+
+    let entry = tracker.entry(id).unwrap();
+    assert_eq!(entry.status, UsageStatus::Failed);
+    assert_eq!(
+        entry.to_h()["tokens"],
+        json!({ "input_tokens": 133, "output_tokens": 0 })
+    );
+}
+
+/// `describe 'provider-specific operation pricing'`: `priced_model(id, provider, rate)` prices
+/// text, audio, embeddings, and images at `rate` in and `rate * 4` out.
+fn priced_model(id: &str, provider: &str, rate: f64) -> Model {
+    let price = PricingCategory {
+        standard: Some(PricingTier {
+            input_per_million: Some(rate),
+            output_per_million: Some(rate * 4.0),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let mut m = Model::default_for(id, provider);
+    m.pricing.text_tokens = Some(price.clone());
+    m.pricing.audio_tokens = Some(price.clone());
+    m.pricing.embeddings = Some(price.clone());
+    m.pricing.images = Some(price);
+    m
+}
+
+/// `track(operation, result, provider:, other:)`: the registry holds the result's model id at
+/// `other` (rate 0.5, preferred by a providerless lookup) and at `provider` (rate 1.0); the tracker
+/// runs for `provider`. Returns the entry and the `provider` model. The tracker takes a provider
+/// slug, so slugs the port has no provider for (`vertexai`, `azure`, `custom`) work as in Ruby.
+fn track<R: UsageResult>(
+    operation: Operation,
+    result: &mut R,
+    id: &str,
+    provider: &str,
+    other: &str,
+) -> (UsageEntry, Model) {
+    let model = priced_model(id, provider, 1.0);
+    Models::install(vec![priced_model(id, other, 0.5), model.clone()]);
+    let mut tracker = Tracker::new(operation, provider, Some(model.clone()), config(), None);
+    let entry = tracker.start();
+    tracker.succeed(result);
+    (tracker.entry(entry).unwrap().clone(), model)
+}
+
+// spec: accounting/usage_spec.rb:244 provider-specific operation pricing > prices a transcription with the model of the provider that transcribed it
+#[test]
+fn a_transcription_is_priced_with_the_transcribing_providers_model() {
+    let _r = Registry::lock(None);
+    // `model_for(:vertexai, :transcription)`.
+    let id = "gemini-2.5-flash";
+    let mut result =
+        Transcription::new(Some("ok".into()), id).with_token_counts(Some(1000), Some(500));
+
+    let (entry, model) = track(
+        Operation::Transcription,
+        &mut result,
+        id,
+        "vertexai",
+        "gemini",
+    );
+
+    assert_eq!(result.model_info(), Some(model));
+    close(entry.cost.total(), 0.003);
+    assert_eq!(result.cost().total(), entry.cost.total());
+}
+
+// spec: accounting/usage_spec.rb:255 provider-specific operation pricing > prices an embedding with the model of the provider that embedded it
+#[test]
+fn an_embedding_is_priced_with_the_embedding_providers_model() {
+    let _r = Registry::lock(None);
+    // `model_for(:gemini, :embedding)`.
+    let id = "gemini-embedding-001";
+    let mut result = Embedding::new(Vectors::Single(vec![0.1, 0.2]), id.into(), Some(1000));
+
+    let (entry, model) = track(Operation::Embedding, &mut result, id, "vertexai", "gemini");
+
+    assert_eq!(result.model_info(), Some(model));
+    close(entry.cost.total(), 0.001);
+    assert_eq!(result.cost().total(), entry.cost.total());
+}
+
+// spec: accounting/usage_spec.rb:265 provider-specific operation pricing > prices speech with the model of the provider that generated it
+#[test]
+fn speech_is_priced_with_the_generating_providers_model() {
+    let _r = Registry::lock(None);
+    // `model_for(:azure, :azure_speech)`.
+    let id = "gpt-4o-mini-tts";
+    let mut result = Speech::new(b"audio".to_vec(), id, None, None, None)
+        .with_token_counts(Some(1000), Some(500));
+
+    let (entry, model) = track(Operation::Speech, &mut result, id, "azure", "openai");
+
+    assert_eq!(result.model_info(), Some(model));
+    close(entry.cost.total(), 0.003);
+    assert_eq!(result.cost().total(), entry.cost.total());
+}
+
+// spec: accounting/usage_spec.rb:276 provider-specific operation pricing > prices every image with the model of the provider that generated it
+#[test]
+fn every_image_is_priced_with_the_generating_providers_model() {
+    let _r = Registry::lock(None);
+    // `model_for(:vertexai, :image)`.
+    let id = "gemini-3.1-flash-lite-image";
+    let image = |usage| {
+        let mut image = Image::new(id, usage);
+        image.data = Some("aW1hZ2U=".into());
+        image
+    };
+    let mut images = vec![
+        image(json!({ "input_tokens": 1000, "output_tokens": 500 })),
+        image(json!({})),
+    ];
+
+    let (entry, model) = track(Operation::Image, &mut images, id, "vertexai", "gemini");
+
+    let infos: Vec<Option<Model>> = images.iter().map(Image::model_info).collect();
+    assert_eq!(infos, [Some(model.clone()), Some(model)]);
+    close(entry.cost.total(), 0.003);
+    assert_eq!(images[0].cost().total(), entry.cost.total());
+}
+
+// spec: accounting/usage_spec.rb:290 provider-specific operation pricing > prices a rerank with the model of the provider that ranked it
+#[test]
+fn a_rerank_is_priced_with_the_ranking_providers_model() {
+    let _r = Registry::lock(None);
+    // `model_for(:cohere, :rerank)`.
+    let id = "rerank-v3.5";
+    let mut result = Rerank::new(vec![], id, Some(1000));
+
+    let (entry, model) = track(Operation::Rerank, &mut result, id, "custom", "cohere");
+
+    assert_eq!(result.model_info(), Some(model));
+    close(entry.cost.total(), 0.001);
+    assert_eq!(result.cost().total(), entry.cost.total());
+}
+
+// spec: accounting/usage_spec.rb:347 prices a streaming attempt only when its cost is read
+// Ruby spies on `Cost.new` to show `Entry#cost` is built lazily on first read. `UsageEntry.cost` is
+// a plain field here, so `observe` reprices each chunk (an arithmetic-only `Cost::new` with no
+// registry lookup); what the test can observe is the same: the merged tokens and, for the
+// unpriced `test-model`, an unknown total.
+#[test]
+fn a_streaming_attempt_is_unpriced_for_an_unpriced_model() {
+    let _r = Registry::lock(None);
+    let mut tracker = build_tracker(test_model());
+    let id = tracker.start();
+
+    for _ in 0..3 {
+        tracker.observe(&assistant("part", None, None, Some(4)));
+    }
+
+    let entry = tracker.entry(id).unwrap();
+    assert_eq!(entry.cost.total(), None);
+    assert_eq!(entry.to_h()["tokens"], json!({ "output_tokens": 4 }));
 }

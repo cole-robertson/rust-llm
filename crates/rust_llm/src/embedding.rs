@@ -43,7 +43,8 @@ pub struct Embedding {
     pub reported_cost: Option<f64>,
     /// `ruby_llm_usage_entries`: set when a batch prices the embedding at batch rates.
     pub usage_entries: Vec<crate::message::UsageEntry>,
-    model_info: Option<Model>,
+    /// `attr_writer :model_info`: set by `Accounting::Usage::Tracker#succeed`.
+    pub(crate) model_info: Option<Model>,
 }
 
 impl Embedding {
@@ -69,8 +70,13 @@ impl Embedding {
         Cost::new(&self.tokens(), self.model_info.as_ref(), Tier::Standard)
     }
 
+    /// `model_info`: the model `model_info=` set, else the registry model for `model`.
+    pub fn model_info(&self) -> Option<Model> {
+        self.model_info.clone()
+    }
+
     /// `Embedding.new(vectors:, model:, input_tokens:)`, e.g. one Gemini batch embedding result.
-    pub(crate) fn new(vectors: Vectors, model: String, input_tokens: Option<i64>) -> Embedding {
+    pub fn new(vectors: Vectors, model: String, input_tokens: Option<i64>) -> Embedding {
         Embedding {
             model_info: crate::models::models().find(&model, None).ok(),
             vectors,
@@ -160,6 +166,9 @@ pub struct EmbedOptions<'a> {
     pub provider_options: Value,
     /// `metadata:`: added to the `embedding.rust_llm` event payload, never sent to the provider.
     pub metadata: Option<Value>,
+    /// `owner:`: who the usage is attributed to, such as a user; wins over
+    /// [`crate::accounting::with_usage_owner`].
+    pub owner: Option<crate::accounting::UsageOwner>,
 }
 
 fn vectors_from(rows: Vec<Vec<f64>>, single: bool) -> Vectors {
@@ -244,6 +253,7 @@ pub async fn embed(input: impl Into<EmbedInput>, options: EmbedOptions<'_>) -> R
         .to_string();
     let (model, provider) =
         resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let owner = options.owner.clone();
     let mut event = crate::instrumentation::Event::start(&config, "embedding.rust_llm", || {
         let empty = Tokens::default();
         crate::instrumentation::payload([
@@ -274,9 +284,13 @@ pub async fn embed(input: impl Into<EmbedInput>, options: EmbedOptions<'_>) -> R
             ),
         ])
     });
-    let result = tracing::Instrument::instrument(embed_inner(input, options), event.span()).await;
+    let result = tracing::Instrument::instrument(
+        crate::accounting::owned_by(owner, embed_inner(input, options)),
+        event.span(),
+    )
+    .await;
     if let Ok(e) = &result {
-        crate::instrumentation::usages(&config, &e.usage_entries);
+        crate::accounting::report(&config, &e.usage_entries).await;
         event.set("result", || {
             serde_json::json!({ "model": e.model, "vectors": match &e.vectors {
             Vectors::Single(v) => serde_json::json!(v),
@@ -456,9 +470,28 @@ async fn embed_inner(input: EmbedInput, options: EmbedOptions<'_>) -> Result<Emb
             retried.push(crate::chat::failure_tokens(e, None));
         }
     };
-    let raw = connection
-        .post(&path, &payload, &[], &mut on_attempt)
-        .await?;
+    let raw = match connection.post(&path, &payload, &[], &mut on_attempt).await {
+        Ok(raw) => raw,
+        // `track_usage`'s rescue (`fail_pending`): the failed attempts have no result to attach
+        // to, so they are only reported.
+        Err(e) => {
+            let entries: Vec<UsageEntry> = retried
+                .iter()
+                .cloned()
+                .chain([crate::chat::failure_tokens(&e, None)])
+                .map(|tokens| {
+                    let mut entry =
+                        UsageEntry::new(Operation::Embedding, provider.slug(), Some(&model.id));
+                    entry.status = UsageStatus::Failed;
+                    entry.cost = crate::rerank::embeddings_cost(&tokens, Some(&model));
+                    entry.tokens = tokens;
+                    entry
+                })
+                .collect();
+            crate::accounting::report(&config, &entries).await;
+            return Err(e);
+        }
+    };
     let body = raw.body;
     // `ChatCompletions::Embeddings#parse_sparse_vectors`; Gemini, Mistral, and Perplexity override
     // `parse_embedding_response` without it.
@@ -510,6 +543,7 @@ async fn embed_inner(input: EmbedInput, options: EmbedOptions<'_>) -> Result<Emb
     };
     let entry = |status, tokens: Tokens, cost: Option<Cost>| UsageEntry {
         id: UsageEntry::next_id(),
+        owner: crate::accounting::usage_owner(),
         operation: Operation::Embedding,
         provider: provider.slug().into(),
         model: model.id.clone(),

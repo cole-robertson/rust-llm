@@ -54,32 +54,109 @@ fn gemini_refuses_an_attachment_that_is_not_audio() {
     );
 }
 
-// UPSTREAM-REMOVED in 2.1 (was spec: protocols/gemini/transcription_spec.rb:65) #parse_transcription_response > leaves the text nil when the response carries no candidate
+/// `parse(body)`: `parse_transcription_response` on a 200 response with this body.
+fn parse(body: &Value) -> Result<Transcription> {
+    parse_gemini(body, 200, "gemini-2.5-flash")
+}
+
+/// The `usage` the blocked-response examples share.
+fn blocked_usage() -> Value {
+    json!({ "promptTokenCount": 133, "totalTokenCount": 133,
+            "promptTokensDetails": [{ "modality": "TEXT", "tokenCount": 14 },
+                                    { "modality": "AUDIO", "tokenCount": 119 }] })
+}
+
+fn content_filter_message(result: Result<Transcription>) -> (String, Option<ErrorResponse>) {
+    match result {
+        Err(Error::ContentFilter(message, response)) => (message, response),
+        other => panic!("expected ContentFilterError, got {other:?}"),
+    }
+}
+
+// spec: protocols/gemini/transcription_spec.rb:71 #parse_transcription_response > leaves the text nil when the response is not a JSON object
 #[test]
-fn gemini_leaves_the_text_nil_when_the_response_carries_no_candidate() {
-    assert_eq!(parse_gemini(&json!({}), "gemini-2.5-flash").text, None);
-    assert_eq!(
-        parse_gemini(&json!("not a hash"), "gemini-2.5-flash").text,
-        None
-    );
+fn gemini_leaves_the_text_nil_when_the_response_is_not_a_json_object() {
+    assert_eq!(parse(&json!("not a hash")).unwrap().text, None);
 }
 
 // spec: protocols/gemini/transcription_spec.rb:75 #parse_transcription_response > leaves the text nil when the candidate carries no text parts
 #[test]
 fn gemini_leaves_the_text_nil_when_the_candidate_carries_no_text_parts() {
     let inline = json!({ "candidates": [{ "content": { "parts": [{ "inlineData": {} }] } }] });
-    assert_eq!(parse_gemini(&inline, "gemini-2.5-flash").text, None);
+    assert_eq!(parse(&inline).unwrap().text, None);
     let empty = json!({ "candidates": [{ "content": {} }] });
-    assert_eq!(parse_gemini(&empty, "gemini-2.5-flash").text, None);
+    assert_eq!(parse(&empty).unwrap().text, None);
 }
 
 // spec: protocols/gemini/transcription_spec.rb:80 #parse_transcription_response > leaves the token counts nil when the response carries no usage
 #[test]
 fn gemini_leaves_the_token_counts_nil_when_the_response_carries_no_usage() {
     let data = json!({ "candidates": [{ "content": { "parts": [{ "text": "hi" }] } }] });
-    let t = parse_gemini(&data, "gemini-2.5-flash");
+    let t = parse(&data).unwrap();
     assert_eq!(t.tokens().input, None);
     assert_eq!(t.tokens().output, None);
+}
+
+// spec: protocols/gemini/transcription_spec.rb:87 #parse_transcription_response > raises with the block reason when Gemini blocks the audio prompt
+#[test]
+fn gemini_raises_with_the_block_reason_when_gemini_blocks_the_audio_prompt() {
+    let body = json!({ "promptFeedback": { "blockReason": "SAFETY" }, "usageMetadata": blocked_usage(),
+                       "modelVersion": "gemini-3.8-flash", "responseId": "b2WsavzrBt3ZxN8PmJyl6Aw" });
+
+    let (message, response) = content_filter_message(parse(&body));
+
+    assert_eq!(message, "Gemini blocked the transcription: SAFETY");
+    let response = response.expect("the error carries the response");
+    assert_eq!(serde_json::from_str::<Value>(&response.body).unwrap(), body);
+}
+
+// spec: protocols/gemini/transcription_spec.rb:97 #parse_transcription_response > raises with the finish reason when Gemini blocks the transcript
+#[test]
+fn gemini_raises_with_the_finish_reason_when_gemini_blocks_the_transcript() {
+    let body = json!({
+        "candidates": [{
+            "finishReason": "SAFETY", "index": 0,
+            "safetyRatings": [
+                { "category": "HARM_CATEGORY_HATE_SPEECH", "probability": "NEGLIGIBLE" },
+                { "category": "HARM_CATEGORY_HARASSMENT", "probability": "MEDIUM", "blocked": true }
+            ]
+        }],
+        "usageMetadata": blocked_usage(), "modelVersion": "gemini-3.8-flash"
+    });
+
+    let (message, _) = content_filter_message(parse(&body));
+
+    assert_eq!(message, "Gemini blocked the transcription: SAFETY");
+}
+
+// spec: protocols/gemini/transcription_spec.rb:112 #parse_transcription_response > raises when Gemini returns no candidates
+#[test]
+fn gemini_raises_when_gemini_returns_no_candidates() {
+    let body = json!({ "usageMetadata": blocked_usage(), "modelVersion": "gemini-3.8-flash" });
+
+    let (message, _) = content_filter_message(parse(&body));
+
+    assert_eq!(message, "Gemini blocked the transcription");
+}
+
+// spec: protocols/gemini/transcription_spec.rb:117 #parse_transcription_response > returns an empty transcript for silent audio
+#[test]
+fn gemini_returns_an_empty_transcript_for_silent_audio() {
+    let body = json!({ "candidates": [{ "content": { "role": "model", "parts": [{ "text": "" }] },
+                                        "finishReason": "STOP", "index": 0 }],
+                       "usageMetadata": blocked_usage(), "modelVersion": "gemini-3.8-flash" });
+
+    assert_eq!(parse(&body).unwrap().text.as_deref(), Some(""));
+}
+
+// spec: protocols/gemini/transcription_spec.rb:125 #parse_transcription_response > keeps the text a blocked transcript already carries
+#[test]
+fn gemini_keeps_the_text_a_blocked_transcript_already_carries() {
+    let body = json!({ "candidates": [{ "content": { "role": "model", "parts": [{ "text": "Guten Tag" }] },
+                                        "finishReason": "SAFETY", "index": 0 }],
+                       "usageMetadata": blocked_usage(), "modelVersion": "gemini-3.8-flash" });
+
+    assert_eq!(parse(&body).unwrap().text.as_deref(), Some("Guten Tag"));
 }
 
 // ---- protocols/gemini/file_transcription_spec.rb -------------------------------------------
@@ -102,6 +179,27 @@ fn interactions_preserve_speaker_only_annotations_without_fabricating_timing() {
     );
     assert_eq!((t.tokens().input, t.tokens().output), (Some(14), Some(0)));
     assert_eq!(t.duration, None);
+}
+
+// spec: protocols/gemini/file_transcription_spec.rb:109 leaves combining custom vocabulary with diarization to Gemini
+#[test]
+fn interactions_leave_combining_custom_vocabulary_with_diarization_to_gemini() {
+    let options = json!({});
+    let names = vec!["Alice".to_string()];
+    let r = Request {
+        speaker_names: Some(&names),
+        prompt: Some("RubyLLM"),
+        ..request("gemini-3.5-transcribe", &options)
+    };
+
+    let payload = interactions_payload(&ruby_wav(), &r).unwrap();
+
+    let config = &payload["generation_config"]["transcription_config"];
+    assert_eq!(config["custom_vocabulary"], json!(["RubyLLM"]));
+    assert_eq!(
+        config["mode"],
+        json!({ "type": "verbatim", "diarization_mode": "speaker" })
+    );
 }
 
 // spec: protocols/gemini/file_transcription_spec.rb:118 rejects unknown granularities and unsupported reference clips instead of ignoring them

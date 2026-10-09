@@ -30,11 +30,13 @@ use crate::attachment::{Attachment, AttachmentType};
 use crate::chat::resolve_model;
 use crate::config::Config;
 use crate::cost::Cost;
-use crate::error::{Error, Result};
-use crate::message::{Operation, UsageEntry};
+use crate::error::{Error, ErrorResponse, Result};
+use crate::message::{FinishReason, Operation, UsageEntry};
 use crate::model::Model;
 use crate::models;
-use crate::protocols::{anthropic::unsupported, chat_completions, deep_merge, int, str_of};
+use crate::protocols::{
+    anthropic::unsupported, chat_completions, deep_merge, int, normalize_finish_reason, str_of,
+};
 use crate::providers::{ProtocolName, Provider};
 use crate::speech::Tracker;
 use crate::tokens::Tokens;
@@ -62,6 +64,8 @@ pub struct Transcription {
     input_tokens: Option<i64>,
     output_tokens: Option<i64>,
     reported_cost: Option<f64>,
+    /// `attr_writer :model_info`: set by `Accounting::Usage::Tracker#succeed`.
+    pub(crate) model_info: Option<Model>,
 }
 
 /// One event from a streaming transcription (`RubyLLM::TranscriptionChunk`).
@@ -139,10 +143,14 @@ pub struct TranscribeOptions<'a> {
     /// `metadata:`: added to the `transcription.rust_llm` event payload, never sent to the
     /// provider.
     pub metadata: Option<Value>,
+    /// `owner:`: who the usage is attributed to, such as a user; wins over
+    /// [`crate::accounting::with_usage_owner`].
+    pub owner: Option<crate::accounting::UsageOwner>,
 }
 
 impl Transcription {
-    fn new(text: Option<String>, model: &str) -> Transcription {
+    /// `Transcription.new(text:, model:)`.
+    pub fn new(text: Option<String>, model: &str) -> Transcription {
         Transcription {
             text,
             model: model.to_string(),
@@ -154,7 +162,15 @@ impl Transcription {
             input_tokens: None,
             output_tokens: None,
             reported_cost: None,
+            model_info: None,
         }
+    }
+
+    /// The `input_tokens:` and `output_tokens:` of `Transcription.new`.
+    pub fn with_token_counts(mut self, input: Option<i64>, output: Option<i64>) -> Transcription {
+        self.input_tokens = input;
+        self.output_tokens = output;
+        self
     }
 
     /// Usage across every provider attempt, or the usage this transcription reported.
@@ -179,9 +195,12 @@ impl Transcription {
         Cost::audio(&self.tokens(), self.model_info().as_ref())
     }
 
-    /// The registry model for `model`, or `None` when it is not in the registry.
+    /// The model `model_info=` set, else the registry model for `model`, or `None` when it is
+    /// not in the registry.
     pub fn model_info(&self) -> Option<Model> {
-        models::models().find(&self.model, None).ok()
+        self.model_info
+            .clone()
+            .or_else(|| models::models().find(&self.model, None).ok())
     }
 }
 
@@ -316,6 +335,7 @@ async fn run(
         .to_string();
     let (model, provider) =
         resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let owner = options.owner.clone();
     let mut event = crate::instrumentation::Event::start(&config, "transcription.rust_llm", || {
         let empty = Tokens::default();
         crate::instrumentation::payload([
@@ -336,12 +356,15 @@ async fn run(
         ])
     });
     let result = tracing::Instrument::instrument(
-        transcribe_inner(audio, options, on_chunk, config.clone(), model, provider),
+        crate::accounting::owned_by(
+            owner,
+            transcribe_inner(audio, options, on_chunk, config.clone(), model, provider),
+        ),
         event.span(),
     )
     .await;
     if let Ok(t) = &result {
-        crate::instrumentation::usages(&config, &t.usage_entries);
+        crate::accounting::report(&config, &t.usage_entries).await;
         event.set("result", || {
             json!({ "text": t.text, "model": t.model, "language": t.language, "duration": t.duration })
         });
@@ -413,7 +436,22 @@ async fn transcribe_inner(
                     &mut tracker.on_attempt(),
                 )
                 .await?;
-            parse_gemini(&raw.body, &model.id)
+            match parse_gemini(&raw.body, raw.status, &model.id) {
+                Ok(t) => t,
+                // `observe_tokens` before the raise: the blocked attempt keeps what Google billed.
+                Err(e) => {
+                    let (input, output) = gemini_usage(&raw.body);
+                    let tokens = Tokens {
+                        input,
+                        output,
+                        ..Default::default()
+                    };
+                    let entries =
+                        tracker.failed_entries(Operation::Transcription, provider, &model, tokens);
+                    crate::accounting::report(&config, &entries).await;
+                    return Err(e);
+                }
+            }
         }
         Family::Interactions => {
             let payload = interactions_payload(&audio, &request)?;
@@ -898,24 +936,60 @@ fn gemini_payload(audio: &Attachment, r: &Request) -> Result<Value> {
     Ok(payload)
 }
 
-/// `Gemini::Transcription#parse_transcription_response`.
-fn parse_gemini(data: &Value, model: &str) -> Transcription {
-    let texts: Vec<&str> = data
-        .pointer("/candidates/0/content/parts")
+/// `Gemini::Transcription#parse_transcription_response`: the joined text parts and the token
+/// counts, raising `ContentFilterError` when Gemini blocked the transcription.
+fn parse_gemini(data: &Value, status: u16, model: &str) -> Result<Transcription> {
+    let candidate = data.pointer("/candidates/0").filter(|c| !c.is_null());
+    let texts: Vec<&str> = candidate
+        .and_then(|c| c.pointer("/content/parts"))
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
         .filter_map(|part| part.get("text").and_then(Value::as_str))
         .collect();
-    let mut t = Transcription::new((!texts.is_empty()).then(|| texts.concat()), model);
-    if let Some(meta) = data.get("usageMetadata").filter(|m| m.is_object()) {
-        t.input_tokens = int(meta.get("promptTokenCount"));
-        t.output_tokens = Some(
+    let text = (!texts.is_empty()).then(|| texts.concat());
+    let (input_tokens, output_tokens) = gemini_usage(data);
+    // `raise_if_transcription_blocked`: Gemini returns no candidates only for a prompt it blocked.
+    if text.as_deref().unwrap_or_default().is_empty() && data.is_object() {
+        let reason = candidate
+            .and_then(|c| c.get("finishReason"))
+            .or_else(|| data.pointer("/promptFeedback/blockReason"))
+            .and_then(Value::as_str);
+        let filtered = normalize_finish_reason(reason, crate::protocols::gemini::FINISH_REASONS)
+            == Some(FinishReason::ContentFilter);
+        if candidate.is_none() || filtered {
+            let message = match reason {
+                Some(reason) => format!("Gemini blocked the transcription: {reason}"),
+                None => "Gemini blocked the transcription".to_string(),
+            };
+            return Err(Error::ContentFilter(
+                message,
+                Some(ErrorResponse {
+                    status,
+                    body: data.to_string(),
+                    ..Default::default()
+                }),
+            ));
+        }
+    }
+    let mut t = Transcription::new(text, model);
+    t.input_tokens = input_tokens;
+    t.output_tokens = output_tokens;
+    Ok(t)
+}
+
+/// `Gemini::Transcription#extract_usage`: the prompt tokens, and candidates plus thoughts.
+fn gemini_usage(data: &Value) -> (Option<i64>, Option<i64>) {
+    let Some(meta) = data.get("usageMetadata").filter(|m| m.is_object()) else {
+        return (None, None);
+    };
+    (
+        int(meta.get("promptTokenCount")),
+        Some(
             int(meta.get("candidatesTokenCount")).unwrap_or(0)
                 + int(meta.get("thoughtsTokenCount")).unwrap_or(0),
-        );
-    }
-    t
+        ),
+    )
 }
 
 /// `FileTranscription#transcribe` validation plus `Interactions::Transcription#render_transcription_payload`.
@@ -951,21 +1025,6 @@ fn interactions_payload(audio: &Attachment, r: &Request) -> Result<Value> {
         "generation_config": { "transcription_config": config },
     });
     deep_merge(&mut payload, r.provider_options);
-    // `validate_transcription_config`.
-    let config = &payload["generation_config"]["transcription_config"];
-    let mode = config.get("mode").filter(|m| m.is_object());
-    if config
-        .get("custom_vocabulary")
-        .is_some_and(|v| !v.is_null())
-        && mode.is_some_and(|m| {
-            m.get("diarization_mode").is_some() || m.get("timestamp_granularities").is_some()
-        })
-    {
-        return Err(Error::Argument(
-            "Gemini custom vocabulary cannot be combined with diarization or word timestamps"
-                .into(),
-        ));
-    }
     Ok(payload)
 }
 

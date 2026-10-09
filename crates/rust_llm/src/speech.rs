@@ -65,6 +65,8 @@ pub struct Speech {
     pub usage_entries: Vec<UsageEntry>,
     input_tokens: Option<i64>,
     output_tokens: Option<i64>,
+    /// `attr_writer :model_info`: set by `Accounting::Usage::Tracker#succeed`.
+    pub(crate) model_info: Option<Model>,
 }
 
 /// A piece of generated audio, passed to `speak_stream`'s callback as it arrives
@@ -108,6 +110,9 @@ pub struct SpeakOptions<'a> {
     pub config: Option<Arc<Config>>,
     /// `metadata:`: added to the `speech.rust_llm` event payload, never sent to the provider.
     pub metadata: Option<Value>,
+    /// `owner:`: who the usage is attributed to, such as a user; wins over
+    /// [`crate::accounting::with_usage_owner`].
+    pub owner: Option<crate::accounting::UsageOwner>,
 }
 
 impl Speech {
@@ -130,7 +135,15 @@ impl Speech {
             usage_entries: Vec::new(),
             input_tokens: None,
             output_tokens: None,
+            model_info: None,
         }
+    }
+
+    /// The `input_tokens:` and `output_tokens:` of `Speech.new`.
+    pub fn with_token_counts(mut self, input: Option<i64>, output: Option<i64>) -> Speech {
+        self.input_tokens = input;
+        self.output_tokens = output;
+        self
     }
 
     fn with_tokens(mut self, usage: &Value) -> Speech {
@@ -172,9 +185,12 @@ impl Speech {
         Cost::audio(&self.tokens(), self.model_info().as_ref())
     }
 
-    /// The registry model for `model`, or `None` when it is not in the registry.
+    /// The model `model_info=` set, else the registry model for `model`, or `None` when it is
+    /// not in the registry.
     pub fn model_info(&self) -> Option<Model> {
-        models::models().find(&self.model, None).ok()
+        self.model_info
+            .clone()
+            .or_else(|| models::models().find(&self.model, None).ok())
     }
 }
 
@@ -211,6 +227,7 @@ async fn run(
         .to_string();
     let (model, provider) =
         resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let owner = options.owner.clone();
     let mut event = crate::instrumentation::Event::start(&config, "speech.rust_llm", || {
         let empty = Tokens::default();
         crate::instrumentation::payload([
@@ -233,10 +250,13 @@ async fn run(
             ),
         ])
     });
-    let result =
-        tracing::Instrument::instrument(run_inner(input, options, on_chunk), event.span()).await;
+    let result = tracing::Instrument::instrument(
+        crate::accounting::owned_by(owner, run_inner(input, options, on_chunk)),
+        event.span(),
+    )
+    .await;
     if let Ok(speech) = &result {
-        crate::instrumentation::usages(&config, &speech.usage_entries);
+        crate::accounting::report(&config, &speech.usage_entries).await;
         event.set("result", || {
             json!({ "model": speech.model, "voice": speech.voice, "format": speech.format, "mime_type": speech.mime_type })
         });
@@ -335,6 +355,7 @@ impl Tracker {
     ) -> Vec<UsageEntry> {
         let entry = |status, tokens: Tokens, cost: Option<Cost>| UsageEntry {
             id: UsageEntry::next_id(),
+            owner: crate::accounting::usage_owner(),
             operation,
             provider: provider.slug().into(),
             model: model.id.clone(),
@@ -350,6 +371,22 @@ impl Tracker {
             .map(|t| entry(UsageStatus::Failed, t, None))
             .collect();
         entries.push(entry(UsageStatus::Succeeded, tokens, Some(cost)));
+        entries
+    }
+
+    /// `observe_tokens` then `fail_attempt`: the provider answered and billed `tokens`, but the
+    /// attempt failed after it (a blocked Gemini transcription), so it stays failed with them.
+    pub(crate) fn failed_entries(
+        self,
+        operation: Operation,
+        provider: Provider,
+        model: &Model,
+        tokens: Tokens,
+    ) -> Vec<UsageEntry> {
+        let mut entries = self.entries(operation, provider, model, tokens, Cost::default());
+        if let Some(last) = entries.last_mut() {
+            last.status = UsageStatus::Failed;
+        }
         entries
     }
 }
@@ -658,7 +695,11 @@ impl Family {
             }
             return Err(Error::Api(
                 "Expected an audio response from the speech endpoint".into(),
-                Some(ErrorResponse { status, body: text }),
+                Some(ErrorResponse {
+                    status,
+                    body: text,
+                    ..Default::default()
+                }),
             ));
         }
         self.parse(&buffer, model, voice, format)

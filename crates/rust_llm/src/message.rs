@@ -171,12 +171,35 @@ impl Default for ToolArguments {
 }
 
 impl ToolArguments {
+    /// The arguments as a map, keys ordered as [`canonical_arguments`] does. A streamed string is
+    /// parsed the way the finished call Ruby builds from it would be.
     pub fn as_map(&self) -> Map<String, Value> {
-        match self {
+        let map = match self {
             ToolArguments::Parsed(m) => m.clone(),
             ToolArguments::Partial(s) => serde_json::from_str(s).unwrap_or_default(),
-        }
+        };
+        canonical_map(map)
     }
+}
+
+/// `ToolCall#canonical_arguments`: object keys ordered the way PostgreSQL `jsonb` and MySQL
+/// `json` store them (shorter keys first, then bytewise), recursively, so a call reloaded from
+/// the database renders the same request bytes and keeps the provider's prompt cache.
+pub fn canonical_arguments(value: Value) -> Value {
+    match value {
+        Value::Object(map) => Value::Object(canonical_map(map)),
+        Value::Array(items) => Value::Array(items.into_iter().map(canonical_arguments).collect()),
+        other => other,
+    }
+}
+
+fn canonical_map(map: Map<String, Value>) -> Map<String, Value> {
+    let mut entries: Vec<(String, Value)> = map.into_iter().collect();
+    entries.sort_by(|(a, _), (b, _)| (a.len(), a.as_bytes()).cmp(&(b.len(), b.as_bytes())));
+    entries
+        .into_iter()
+        .map(|(k, v)| (k, canonical_arguments(v)))
+        .collect()
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -203,7 +226,7 @@ impl ToolCall {
         ToolCall {
             id: id.into(),
             name: name.into(),
-            arguments: ToolArguments::Parsed(arguments),
+            arguments: ToolArguments::Parsed(canonical_map(arguments)),
             thought_signature: None,
             remote: false,
             starts: true,
@@ -279,12 +302,17 @@ pub struct ServerToolCall {
     pub input: Option<Value>,
     pub result: Option<Value>,
     pub raw: Value,
+    /// `#search_suggestions`: the HTML of the search suggestions the provider requires shown with
+    /// a grounded answer (Google's for Google Search grounding). Only the live response carries
+    /// them: `to_h` leaves them out, so a persisted chat never stores them.
+    #[serde(skip)]
+    pub search_suggestions: Option<String>,
 }
 
-/// The raw HTTP exchange behind a response (`message.raw`). Like Faraday's `env.request_body`,
-/// the request is kept as the exact serialized text that was sent: every message of a long chat
-/// keeps its request, and each request holds the whole conversation so far, so a JSON tree per
-/// message cost ~20x the memory. Parse it on demand with `request_body_json`.
+/// The raw HTTP exchange behind a response (`message.raw`): status, headers, and body. Like
+/// RubyLLM 2.1's `release_request`, provider calls leave `request_body` empty: each request of a
+/// chat holds the whole conversation so far, so keeping one per reply grew a chat's memory
+/// quadratically. Read what a chat sends with `render` or a `before_request` hook instead.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct RawResponse {
     pub status: u16,
@@ -312,6 +340,10 @@ pub enum Operation {
     Ocr,
     Rerank,
     Judgment,
+    /// A finished `VideoJob` (RubyLLM 2.1 `video_job.rb#record_usage`).
+    Video,
+    /// A finished research job (2.1 `Accounting::Usage::OPERATIONS`).
+    Research,
 }
 
 impl Operation {
@@ -326,6 +358,8 @@ impl Operation {
             Operation::Ocr => "ocr",
             Operation::Rerank => "rerank",
             Operation::Judgment => "judgment",
+            Operation::Video => "video",
+            Operation::Research => "research",
         }
     }
 }
@@ -362,6 +396,9 @@ pub struct UsageEntry {
     pub status: UsageStatus,
     pub tokens: Tokens,
     pub cost: Cost,
+    /// `owner`: who the attempt is attributed to, from the operation's `owner:` or the enclosing
+    /// [`crate::accounting::with_usage_owner`] when the attempt started.
+    pub owner: Option<crate::accounting::UsageOwner>,
 }
 
 static NEXT_USAGE_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
@@ -450,7 +487,9 @@ impl Message {
             Value::Null | Value::Bool(false) => return Ok(None),
             Value::Bool(true) => return Ok(Some(None)),
             Value::Object(o) if o.keys().all(|k| k == "ttl") => {
-                return Ok(Some(o.get("ttl").and_then(Value::as_str).map(str::to_string)));
+                return Ok(Some(
+                    o.get("ttl").and_then(Value::as_str).map(str::to_string),
+                ));
             }
             _ => {}
         }
@@ -574,10 +613,10 @@ impl Message {
         }
     }
 
-    /// `Message#without_thinking`: what gets replayed to a provider that did not produce the thinking.
     /// The per-request view of a stored message: everything a protocol renders, without the
-    /// bookkeeping it never reads (the HTTP exchange, usage ledger, registry entry). Cloning
-    /// those for every message on every request made long chats quadratic.
+    /// bookkeeping it never reads (the HTTP exchange, registry entry). Cloning those for every
+    /// message on every request made long chats quadratic. Of the usage ledger only the
+    /// producing entry stays: it is what names the producer (`Protocol#producing_entry`).
     pub(crate) fn for_request(&self) -> Message {
         Message {
             role: self.role,
@@ -596,17 +635,37 @@ impl Message {
             raw: None,
             cache_until_here: self.cache_until_here,
             cache_ttl: self.cache_ttl.clone(),
-            usage_entries: Vec::new(),
+            usage_entries: self.producing_entry().cloned().into_iter().collect(),
             record_id: self.record_id,
             model_info: None,
             supplied_cost: None,
         }
     }
 
-    pub(crate) fn without_thinking(&self) -> Message {
+    /// `Protocol#producing_entry`: the last succeeded usage entry, the one record of which
+    /// provider and model produced this message.
+    pub(crate) fn producing_entry(&self) -> Option<&UsageEntry> {
+        self.usage_entries
+            .iter()
+            .rev()
+            .find(|e| e.status == UsageStatus::Succeeded)
+    }
+
+    /// `Protocol#own_signature`: the thinking signature, only when `provider` produced it. A
+    /// signature can be another provider's opaque blob, and a message without usage could come
+    /// from anyone.
+    pub(crate) fn own_signature(&self, provider: &str) -> Option<&str> {
+        let signature = self.thinking.as_ref()?.signature.as_deref()?;
+        (self.producing_entry()?.provider == provider).then_some(signature)
+    }
+
+    /// `Message#without_native_content(raw_content:)`: what gets replayed to a model that did
+    /// not produce the thinking, raw reasoning, raw content and call signatures.
+    pub(crate) fn without_native_content(&self, raw_content: Option<Value>) -> Message {
         let mut m = self.clone();
         m.thinking = None;
         m.raw_reasoning = None;
+        m.raw_content = raw_content;
         if let Some(calls) = &mut m.tool_calls {
             for (_, call) in calls.0.iter_mut() {
                 call.thought_signature = None;
@@ -708,6 +767,7 @@ impl Message {
                 input: call.get("input").cloned(),
                 result: call.get("result").cloned(),
                 raw: call.get("raw").cloned().unwrap_or(Value::Null),
+                search_suggestions: None,
             });
         }
         for a in h

@@ -70,8 +70,9 @@ async fn gemini_can_animate_videos() {
         .unwrap();
     assert_eq!(
         job.id,
-        "models/veo-3.1-lite-generate-preview/operations/q7m9xli7kryn"
+        "models/veo-3.1-lite-generate-preview/operations/p4gt2i1j6usa"
     );
+    assert_eq!((job.duration, job.resolution.as_deref()), (Some(4.0), None));
     assert!(job.is_pending());
     job.wait(None, None).await.unwrap();
     assert!(job.is_completed());

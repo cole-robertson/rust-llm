@@ -13,8 +13,13 @@ pub fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(CreateRustLlmAttachments),
         Box::new(CreateRustLlmMcpCredentials),
         Box::new(CreateRustLlmBatches),
+        Box::new(CreateRustLlmProviderFiles),
     ]
 }
+
+/// `Accounting::Usage::Entry::OPERATIONS` as the `rust_llm_usages` check constraint
+/// (`usage_operations_sql`).
+pub const USAGE_OPERATIONS_CHECK: &str = "operation IN ('chat','embedding','moderation','image','speech','transcription','ocr','rerank','judgment','video','research')";
 
 /// `create_rust_llm_records_migration.rb.tt`: models, tool calls, usages.
 #[derive(DeriveMigrationName)]
@@ -81,7 +86,8 @@ impl MigrationTrait for CreateRustLlmRecords {
                 .col(string_null("approval"))
                 .col(boolean("remote").default(false))
                 .col(json_null("arguments"))
-                .col(json_null("pending_input"))
+                .col(json_null("mcp_state"))
+                .col(json_null("mcp_result"))
                 .col(timestamp_with_time_zone("created_at").default(Expr::current_timestamp()))
                 .col(timestamp_with_time_zone("updated_at").default(Expr::current_timestamp()))
                 .to_owned(),
@@ -123,66 +129,7 @@ impl MigrationTrait for CreateRustLlmRecords {
         )
         .await?;
 
-        m.create_table(
-            Table::create()
-                .table("rust_llm_usages")
-                .if_not_exists()
-                .col(pk_auto("id"))
-                .col(string("chat_type"))
-                .col(big_integer("chat_id"))
-                .col(string_null("message_type"))
-                .col(big_integer_null("message_id"))
-                .col(string("operation"))
-                .col(string("provider"))
-                .col(string("model"))
-                .col(string("status"))
-                .col(integer_null("input_tokens"))
-                .col(integer_null("output_tokens"))
-                .col(integer_null("cache_read_tokens"))
-                .col(integer_null("cache_write_tokens"))
-                .col(integer_null("thinking_tokens"))
-                .col(double_null("input_cost"))
-                .col(double_null("output_cost"))
-                .col(double_null("cache_read_cost"))
-                .col(double_null("cache_write_cost"))
-                .col(double_null("thinking_cost"))
-                .col(double_null("total_cost"))
-                .col(timestamp_with_time_zone("created_at").default(Expr::current_timestamp()))
-                .col(timestamp_with_time_zone("updated_at").default(Expr::current_timestamp()))
-                .check(Expr::cust(
-                    "operation IN ('chat','embedding','moderation','image','speech','transcription','ocr','rerank','judgment')",
-                ))
-                .check(Expr::cust("status IN ('pending','succeeded','failed','cancelled')"))
-                .to_owned(),
-        )
-        .await?;
-        m.create_index(
-            Index::create()
-                .name("idx-rust_llm_usages-chat")
-                .table("rust_llm_usages")
-                .col("chat_type")
-                .col("chat_id")
-                .to_owned(),
-        )
-        .await?;
-        m.create_index(
-            Index::create()
-                .name("idx-rust_llm_usages-message")
-                .table("rust_llm_usages")
-                .col("message_type")
-                .col("message_id")
-                .to_owned(),
-        )
-        .await?;
-        m.create_index(
-            Index::create()
-                .name("idx-rust_llm_usages-status")
-                .table("rust_llm_usages")
-                .col("status")
-                .to_owned(),
-        )
-        .await?;
-        Ok(())
+        CreateRustLlmUsages.up(m).await
     }
 
     async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
@@ -258,6 +205,7 @@ impl MigrationTrait for CreateMessages {
                 .col(json_null("raw_content"))
                 .col(json_null("raw_reasoning"))
                 .col(string_null("finish_reason"))
+                .col(string_null("cache_ttl"))
                 .col(timestamp_with_time_zone("created_at").default(Expr::current_timestamp()))
                 .col(timestamp_with_time_zone("updated_at").default(Expr::current_timestamp()))
                 .foreign_key(
@@ -307,6 +255,7 @@ impl MigrationTrait for CreateRustLlmAttachments {
                 .col(string("filename"))
                 .col(string("content_type"))
                 .col(big_integer("byte_size"))
+                .col(string_null("blob_key"))
                 .col(json_null("metadata"))
                 .col(blob("data"))
                 .col(timestamp_with_time_zone("created_at").default(Expr::current_timestamp()))
@@ -441,6 +390,154 @@ impl MigrationTrait for CreateRustLlmBatches {
         m.drop_table(
             Table::drop()
                 .table("rust_llm_batches")
+                .if_exists()
+                .to_owned(),
+        )
+        .await
+    }
+}
+
+/// The `ruby_llm_provider_files` table of `create_ruby_llm_records_migration.rb.tt` (and of the
+/// 2.1 upgrade): the provider file each stored attachment was uploaded to, one row per blob key
+/// and provider account (`RubyLLM::ActiveRecord::ProviderFile`, see `rust_llm_loco::ProviderFile`).
+/// Rows name the attachment by its `rust_llm_attachments.blob_key`, never handed out twice.
+#[derive(DeriveMigrationName)]
+pub struct CreateRustLlmProviderFiles;
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateRustLlmProviderFiles {
+    async fn up(&self, m: &SchemaManager) -> Result<(), DbErr> {
+        m.create_table(
+            Table::create()
+                .table("rust_llm_provider_files")
+                .if_not_exists()
+                .col(pk_auto("id"))
+                .col(string("blob_key"))
+                .col(string("provider"))
+                .col(string("account"))
+                .col(text("file_id"))
+                .col(timestamp_with_time_zone_null("expires_at"))
+                .col(timestamp_with_time_zone("created_at").default(Expr::current_timestamp()))
+                .col(timestamp_with_time_zone("updated_at").default(Expr::current_timestamp()))
+                .to_owned(),
+        )
+        .await?;
+        m.create_index(
+            Index::create()
+                .name("index_rust_llm_provider_files_uniqueness")
+                .table("rust_llm_provider_files")
+                .if_not_exists()
+                .col("blob_key")
+                .col("provider")
+                .col("account")
+                .unique()
+                .to_owned(),
+        )
+        .await
+    }
+
+    async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
+        m.drop_table(
+            Table::drop()
+                .table("rust_llm_provider_files")
+                .if_exists()
+                .to_owned(),
+        )
+        .await
+    }
+}
+
+/// The `ruby_llm_usages` table of `create_ruby_llm_records_migration.rb.tt`: one row per billed
+/// attempt, attached to a chat and message when a chat record made it, and to its owner. Part of
+/// [`CreateRustLlmRecords`]; the 2.1 upgrade rebuilds it from here on SQLite.
+#[derive(DeriveMigrationName)]
+pub struct CreateRustLlmUsages;
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateRustLlmUsages {
+    async fn up(&self, m: &SchemaManager) -> Result<(), DbErr> {
+        m.create_table(
+            Table::create()
+                .table("rust_llm_usages")
+                .if_not_exists()
+                .col(pk_auto("id"))
+                .col(string_null("chat_type"))
+                .col(big_integer_null("chat_id"))
+                .col(string_null("message_type"))
+                .col(big_integer_null("message_id"))
+                .col(string_null("owner_type"))
+                .col(big_integer_null("owner_id"))
+                .col(string("operation"))
+                .col(string("provider"))
+                .col(string("model"))
+                .col(string("status"))
+                .col(integer_null("input_tokens"))
+                .col(integer_null("output_tokens"))
+                .col(integer_null("cache_read_tokens"))
+                .col(integer_null("cache_write_tokens"))
+                .col(integer_null("thinking_tokens"))
+                .col(double_null("input_cost"))
+                .col(double_null("output_cost"))
+                .col(double_null("cache_read_cost"))
+                .col(double_null("cache_write_cost"))
+                .col(double_null("thinking_cost"))
+                .col(double_null("total_cost"))
+                .col(json_null("server_tool_use"))
+                .col(timestamp_with_time_zone("created_at").default(Expr::current_timestamp()))
+                .col(timestamp_with_time_zone("updated_at").default(Expr::current_timestamp()))
+                .check(Expr::cust(USAGE_OPERATIONS_CHECK))
+                .check(Expr::cust(
+                    "status IN ('pending','succeeded','failed','cancelled')",
+                ))
+                .to_owned(),
+        )
+        .await?;
+        m.create_index(
+            Index::create()
+                .if_not_exists()
+                .name("idx-rust_llm_usages-chat")
+                .table("rust_llm_usages")
+                .col("chat_type")
+                .col("chat_id")
+                .to_owned(),
+        )
+        .await?;
+        m.create_index(
+            Index::create()
+                .if_not_exists()
+                .name("idx-rust_llm_usages-message")
+                .table("rust_llm_usages")
+                .col("message_type")
+                .col("message_id")
+                .to_owned(),
+        )
+        .await?;
+        m.create_index(
+            Index::create()
+                .if_not_exists()
+                .name("idx-rust_llm_usages-owner")
+                .table("rust_llm_usages")
+                .col("owner_type")
+                .col("owner_id")
+                .to_owned(),
+        )
+        .await?;
+        m.create_index(
+            Index::create()
+                .if_not_exists()
+                .name("idx-rust_llm_usages-status")
+                .table("rust_llm_usages")
+                .col("status")
+                .to_owned(),
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn down(&self, m: &SchemaManager) -> Result<(), DbErr> {
+        m.drop_table(
+            Table::drop()
+                .table("rust_llm_usages")
                 .if_exists()
                 .to_owned(),
         )

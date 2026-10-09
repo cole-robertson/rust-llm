@@ -176,7 +176,11 @@ impl Controls<'_> {
         {
             return Resolved::Options(ThinkingConfig::budget(0));
         }
-        if self.model.reasoning_option("toggle").is_some() || budget.is_some() {
+        // `model.provider_class&.thinking_off_control(model.id)`: Anthropic turns Sonnet 5.5's
+        // thinking off with `{ enabled: false }`, which renders as `between_tools`.
+        let provider_off = self.model.provider == "anthropic"
+            && crate::protocols::anthropic::is_between_tools_off(&self.model.id);
+        if self.model.reasoning_option("toggle").is_some() || budget.is_some() || provider_off {
             return Resolved::Options(ThinkingConfig {
                 enabled: Some(false),
                 ..Default::default()

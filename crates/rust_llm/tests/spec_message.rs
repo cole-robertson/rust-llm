@@ -100,6 +100,7 @@ fn tool_calls_thinking_and_citations_come_back_as_value_objects() {
         input: None,
         result: None,
         raw: json!({ "query": "Berlin" }),
+        search_suggestions: None,
     }];
     original.finish_reason = Some(FinishReason::Stop);
 
@@ -133,7 +134,11 @@ fn attachments_appear_in_to_h_only_when_present() {
         .cloned()
         .unwrap_or_default();
     assert_eq!(listed.len(), 1);
-    assert_eq!(listed[0], json!({ "type": "image", "source": image }));
+    // 2.1 `Attachment#to_h` adds `filename:` (69afb1b6).
+    assert_eq!(
+        listed[0],
+        json!({ "type": "image", "source": image, "filename": "ruby.png" })
+    );
     assert!(without_files.to_h().get("attachments").is_none());
 }
 

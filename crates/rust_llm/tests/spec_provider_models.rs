@@ -1236,3 +1236,16 @@ fn ollama_cloud_leaves_vision_to_models_api_show_reports() {
     assert!(!models[0].supports("vision"));
     assert_eq!(models[0].modalities.input, ["text"]);
 }
+
+// spec: provider_capability_augmenters_spec.rb:44 recognizes only explicit OpenAI Decisions model ids as judgment models
+#[test]
+fn recognizes_only_explicit_openai_decisions_model_ids_as_judgment_models() {
+    assert!(includes(
+        &augment_default("openai", &[], "gpt-6-luna"),
+        "judgment"
+    ));
+    assert!(!includes(
+        &augment_default("openai", &[], "gpt-6-sol"),
+        "judgment"
+    ));
+}

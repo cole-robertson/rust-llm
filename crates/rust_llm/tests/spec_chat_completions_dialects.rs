@@ -454,13 +454,26 @@ async fn openrouter_sends_reasoning_text_with_signature() {
     let server = MockServer::start().await;
     let payload = render(
         openrouter(&server),
-        vec![assistant_thinking(Some("done"), Some("why"), Some("sig"))],
+        vec![openrouter_answer(Some("why"), Some("sig"))],
     )
     .unwrap();
     assert_eq!(
         payload["messages"][0]["reasoning_details"],
         json!([{ "type": "reasoning.text", "text": "why", "signature": "sig" }])
     );
+}
+
+/// The spec's `answer(thinking)`: an assistant answer OpenRouter produced, as its usage records.
+fn openrouter_answer(text: Option<&str>, signature: Option<&str>) -> Message {
+    let mut m = assistant_thinking(Some("done"), text, signature);
+    let mut entry = rust_llm::UsageEntry::new(
+        rust_llm::message::Operation::Chat,
+        "openrouter",
+        Some("claude-haiku-4-5"),
+    );
+    entry.status = rust_llm::UsageStatus::Succeeded;
+    m.usage_entries = vec![entry];
+    m
 }
 
 /// `extract_thinking_text` / `extract_thinking_signature` on a response message, through `ask`.
@@ -790,6 +803,20 @@ async fn mistral_leaves_any_for_a_nameless_single_tool() {
     );
 }
 
+/// `answer(thinking)` in `providers/mistral/chat_spec.rb`: an assistant message Mistral produced
+/// (its succeeded usage entry names the producer, so its signature is Mistral's own).
+fn mistral_answer(content: Option<&str>, text: Option<&str>, signature: Option<&str>) -> Message {
+    let mut m = assistant_thinking(content, text, signature);
+    let mut entry = rust_llm::message::UsageEntry::new(
+        rust_llm::message::Operation::Chat,
+        "mistral",
+        Some("magistral-small-latest"),
+    );
+    entry.status = rust_llm::message::UsageStatus::Succeeded;
+    m.usage_entries = vec![entry];
+    m
+}
+
 fn mistral_content(message: Message) -> Value {
     let mut c = Config::default();
     c.set("mistral_api_base", "http://127.0.0.1:9");
@@ -807,7 +834,7 @@ fn mistral_content(message: Message) -> Value {
 // spec: providers/mistral/chat_spec.rb:203 #build_thinking_blocks wraps thinking text in a text block
 #[test]
 fn mistral_wraps_thinking_text_with_its_signature() {
-    let content = mistral_content(assistant_thinking(Some("Done"), Some("why"), Some("sig")));
+    let content = mistral_content(mistral_answer(Some("Done"), Some("why"), Some("sig")));
     assert_eq!(
         content[0],
         json!({ "type": "thinking", "thinking": [{ "type": "text", "text": "why" }], "signature": "sig" })
@@ -817,7 +844,7 @@ fn mistral_wraps_thinking_text_with_its_signature() {
 // spec: providers/mistral/chat_spec.rb:211 #build_thinking_blocks sends a signature-only block
 #[test]
 fn mistral_sends_a_signature_only_thinking_block() {
-    let content = mistral_content(assistant_thinking(Some("Done"), None, Some("sig")));
+    let content = mistral_content(mistral_answer(Some("Done"), None, Some("sig")));
     assert_eq!(
         content[0],
         json!({ "type": "thinking", "signature": "sig" })
@@ -830,7 +857,7 @@ fn mistral_sends_a_signature_only_thinking_block() {
 #[test]
 fn mistral_concatenates_a_list_of_parts_after_the_thinking_block() {
     let png = Attachment::from_bytes(b"png bytes".to_vec(), "chart.png", None);
-    let message = assistant_thinking(Some("hi"), None, Some("sig")).with_attachments(vec![png]);
+    let message = mistral_answer(Some("hi"), None, Some("sig")).with_attachments(vec![png]);
     let content = mistral_content(message);
     assert_eq!(
         content,
@@ -847,7 +874,7 @@ fn mistral_concatenates_a_list_of_parts_after_the_thinking_block() {
 fn mistral_leaves_thinking_blocks_alone_for_empty_content() {
     for content in [None, Some("")] {
         assert_eq!(
-            mistral_content(assistant_thinking(content, None, Some("sig"))),
+            mistral_content(mistral_answer(content, None, Some("sig"))),
             json!([{ "type": "thinking", "signature": "sig" }])
         );
     }

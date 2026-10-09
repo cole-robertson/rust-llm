@@ -590,6 +590,7 @@ fn message_model_info_does_not_substitute_another_provider() {
     m.model = Some("gpt-5-nano".into());
     m.usage_entries = vec![rust_llm::UsageEntry {
         id: rust_llm::UsageEntry::next_id(),
+        owner: None,
         operation: rust_llm::message::Operation::Chat,
         provider: "custom".into(),
         model: "gpt-5-nano".into(),
@@ -805,6 +806,7 @@ fn errors_keep_the_response_they_came_from() {
     let response = rust_llm::error::ErrorResponse {
         status: 500,
         body: r#"{"error":"server error"}"#.into(),
+        ..Default::default()
     };
     let e = Error::Server("server error".into(), Some(response));
     assert_eq!(e.to_string(), "server error");

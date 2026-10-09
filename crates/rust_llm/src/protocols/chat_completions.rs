@@ -306,15 +306,17 @@ fn format_message(req: &Request, msg: &Message) -> Result<Value> {
         && msg.role == Role::Assistant
         && let Some(thinking) = &msg.thinking
     {
+        // `build_thinking_blocks(msg)`: only a signature Mistral produced (`own_signature`).
+        let signature = msg.own_signature(Provider::Mistral.slug());
         let mut blocks = Vec::new();
         if let Some(text) = &thinking.text {
             let mut block =
                 json!({ "type": "thinking", "thinking": [{ "type": "text", "text": text }] });
-            if let Some(sig) = &thinking.signature {
-                block["signature"] = sig.clone().into();
+            if let Some(sig) = signature {
+                block["signature"] = sig.into();
             }
             blocks.push(block);
-        } else if let Some(sig) = &thinking.signature {
+        } else if let Some(sig) = signature {
             blocks.push(json!({ "type": "thinking", "signature": sig }));
         }
         match content {
@@ -363,7 +365,8 @@ fn format_message(req: &Request, msg: &Message) -> Result<Value> {
                     "type": "function",
                     "function": { "name": tc.name, "arguments": Value::Object(tc.arguments()).to_string() },
                 });
-                if let Some(sig) = &tc.thought_signature {
+                // The Mistral dialect's `format_tool_calls` drops `extra_content`.
+                if let Some(sig) = tc.thought_signature.as_ref().filter(|_| provider != Provider::Mistral) {
                     call["extra_content"] = json!({ "google": { "thought_signature": sig } });
                 }
                 call
@@ -434,7 +437,13 @@ fn format_thinking(provider: Provider, msg: &Message, out: &mut Map<String, Valu
                 out.insert("reasoning_details".into(), details.clone());
                 return;
             }
-            let Some(t) = &msg.thinking else { return };
+            // Rebuilt only for an answer OpenRouter produced (`producer_slug(msg) == @provider.slug`).
+            let Some(t) = msg.thinking.as_ref().filter(|_| {
+                msg.producing_entry()
+                    .is_some_and(|e| e.provider == Provider::OpenRouter.slug())
+            }) else {
+                return;
+            };
             let detail = if let Some(text) = &t.text {
                 let mut d = json!({ "type": "reasoning.text", "text": text });
                 if let Some(sig) = &t.signature {
@@ -531,20 +540,13 @@ pub(crate) fn format_content(
             (Provider::Hetzner, AttachmentType::Image) => {
                 json!({ "type": "image_url", "image_url": { "url": a.for_llm()? } })
             }
-            // `providers/perplexity/media.rb`: images without a detail, supported documents as
-            // `file_url` parts (the URL itself, or bare base64), text files as text, nothing else.
+            // `providers/perplexity/media.rb`: images without a detail, documents as `file_url`
+            // parts (the URL itself, or bare base64), text files as text, nothing else. 2.1 leaves
+            // the document formats to Perplexity.
             (Provider::Perplexity, AttachmentType::Image) => {
                 json!({ "type": "image_url", "image_url": { "url": a.url_or_data_uri()? } })
             }
             (Provider::Perplexity, AttachmentType::Pdf | AttachmentType::Document) => {
-                const SUPPORTED_DOCUMENT_EXTENSIONS: [&str; 5] =
-                    ["pdf", "doc", "docx", "txt", "rtf"];
-                let supported = a.kind() == AttachmentType::Pdf
-                    || a.extension()
-                        .is_some_and(|e| SUPPORTED_DOCUMENT_EXTENSIONS.contains(&e.as_str()));
-                if !supported {
-                    return Err(unsupported(a));
-                }
                 let url = match a.url() {
                     Some(u) => u.to_string(),
                     None => a.encoded()?,
@@ -685,12 +687,23 @@ fn fill_usage(provider: Provider, message: &mut Message, usage: &Value) {
         None
     }; // is_object() checked first
     message.tokens.thinking = thinking_tokens(usage);
-    message.tokens.server_tool_use = usage
+    message.tokens.server_tool_use =
+        crate::tokens::Tokens::positive_counts(&Value::Object(server_tool_use(usage)));
+    message.tokens.reported_cost = reported_cost(provider, usage);
+}
+
+/// `server_tool_use(usage)`: per-tool counters end in `_requests`; OpenRouter's
+/// `tool_calls_requested` and `tool_calls_executed` count every tool at once and are left out.
+pub(crate) fn server_tool_use(usage: &Value) -> Map<String, Value> {
+    usage
         .get("server_tool_use")
         .or_else(|| usage.get("server_tool_use_details"))
         .and_then(Value::as_object)
-        .cloned();
-    message.tokens.reported_cost = reported_cost(provider, usage);
+        .into_iter()
+        .flatten()
+        .filter(|(counter, _)| counter.ends_with("_requests"))
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect()
 }
 
 fn extract_content_and_thinking(content: Option<&Value>) -> (Option<String>, Option<String>) {
@@ -847,8 +860,17 @@ pub fn parse_completion_body(
     data: &Value,
     raw: RawResponse,
 ) -> Result<Message> {
-    if let Some(msg) = data.pointer("/error/message").and_then(Value::as_str) {
-        return Err(Error::Api(msg.into(), None));
+    // `raise_stream_error(JSON.generate(data), data, nil)`: a 200 body that only reports an error
+    // is classified like a stream error event (OpenRouter puts the HTTP status in its code).
+    if data.pointer("/error/message").is_some_and(|m| !m.is_null()) {
+        let body = data.to_string();
+        let status = super::streaming_error_status(super::ProtocolName::ChatCompletions)(&body)
+            .unwrap_or(500);
+        return Err(crate::error::error_for_status_message(
+            status,
+            &body,
+            provider.parse_error(&body),
+        ));
     }
     let Some(message_data) = data.pointer("/choices/0/message") else {
         let mut message = "Provider returned no completion message".to_string();
@@ -862,6 +884,7 @@ pub fn parse_completion_body(
         let response = crate::error::ErrorResponse {
             status: raw.status,
             body: raw.body.to_string(),
+            ..Default::default()
         };
         return Err(Error::Api(message, Some(response)));
     };

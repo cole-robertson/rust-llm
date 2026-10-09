@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use rust_llm::{Attachment, Chat, Config, Error, Message, ProtocolName};
+use rust_llm::{Attachment, Chat, Config, Message, ProtocolName};
 use serde_json::{Value, json};
 use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, MockServer, Request, ResponseTemplate};
@@ -284,24 +284,40 @@ async fn responses_auto_uploads_documents_beyond_pdfs() {
     assert_eq!(responses_file_id(&chat), "file_456");
 }
 
-// UPSTREAM-REMOVED in 2.1 (was spec: protocol_file_preprocessing_spec.rb:168) raises before uploading files above the provider file limit
+// spec: protocol_file_preprocessing_spec.rb:186 leaves the upload size limit to the provider
 #[tokio::test]
-async fn files_above_the_provider_limit_raise_before_uploading() {
+async fn leaves_the_upload_size_limit_to_the_provider() {
     let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/v1/files"))
+        .respond_with(openai_file("file_789", "huge.pdf"))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/api/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "id": "gen_1", "model": "anthropic/claude-haiku-4.5",
+            "choices": [{ "message": { "role": "assistant", "content": "ok" }, "finish_reason": "stop" }],
+            "usage": { "prompt_tokens": 1, "completion_tokens": 1 }
+        })))
+        .mount(&server)
+        .await;
     let config = config(&server, "test");
     let mut chat = chat(&config, "anthropic/claude-haiku-4.5", "openrouter")
         .with_protocol(ProtocolName::ChatCompletions);
-    let err = chat
-        .ask_with("Summarize this", vec![large("huge.pdf", 101 * MB)])
+    chat.ask_with("Summarize this", vec![large("huge.pdf", 101 * MB)])
         .await
-        .unwrap_err();
-    assert!(matches!(err, Error::Api(..)), "{err:?}");
-    assert!(
-        err.to_string()
-            .starts_with("OpenRouter file uploads support files up to"),
-        "{err}"
+        .unwrap();
+    let requests = server.received_requests().await.unwrap();
+    assert_eq!(
+        paths(&requests),
+        ["/api/v1/files", "/api/v1/chat/completions"]
     );
-    assert!(server.received_requests().await.unwrap().is_empty());
+    assert!(
+        body(&requests[1]).to_string().contains("file_789"),
+        "the chat references the upload"
+    );
 }
 
 async fn anthropic(server: &MockServer) {

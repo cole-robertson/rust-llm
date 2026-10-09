@@ -62,6 +62,9 @@ pub mod messages {
         pub raw_content: Option<Json>,
         pub raw_reasoning: Option<Json>,
         pub finish_reason: Option<String>,
+        /// `cache_ttl`: the lifetime of this message's cache boundary (`"1h"`), or `NULL` for the
+        /// chat's.
+        pub cache_ttl: Option<String>,
         pub created_at: DateTimeWithTimeZone,
         pub updated_at: DateTimeWithTimeZone,
     }
@@ -135,7 +138,11 @@ pub mod rust_llm_tool_calls {
         pub approval: Option<String>,
         pub remote: bool,
         pub arguments: Option<Json>,
-        pub pending_input: Option<Json>,
+        /// `mcp_state`: the state of a paused MCP call (its input requests or the task it waits
+        /// on), `NULL` once it resumed. Named `pending_input` before 2.1.
+        pub mcp_state: Option<Json>,
+        /// `mcp_result`: the result an MCP App UI renders for the call.
+        pub mcp_result: Option<Json>,
         pub created_at: DateTimeWithTimeZone,
         pub updated_at: DateTimeWithTimeZone,
     }
@@ -154,10 +161,14 @@ pub mod rust_llm_usages {
     pub struct Model {
         #[sea_orm(primary_key)]
         pub id: i32,
-        pub chat_type: String,
-        pub chat_id: i64,
+        /// `NULL` for an attempt no chat record made (a one-shot operation, a video job).
+        pub chat_type: Option<String>,
+        pub chat_id: Option<i64>,
         pub message_type: Option<String>,
         pub message_id: Option<i64>,
+        /// `owner`: who the attempt is attributed to (`RubyLLM.with_usage_owner`), polymorphic.
+        pub owner_type: Option<String>,
+        pub owner_id: Option<i64>,
         pub operation: String,
         pub provider: String,
         pub model: String,
@@ -173,6 +184,9 @@ pub mod rust_llm_usages {
         pub cache_write_cost: Option<f64>,
         pub thinking_cost: Option<f64>,
         pub total_cost: Option<f64>,
+        /// `Tokens#server_tool_use`: the provider tool uses the attempt billed, such as
+        /// `{"web_search_requests": 2}`.
+        pub server_tool_use: Option<Json>,
         pub created_at: DateTimeWithTimeZone,
         pub updated_at: DateTimeWithTimeZone,
     }
@@ -197,6 +211,9 @@ pub mod rust_llm_attachments {
         pub filename: String,
         pub content_type: String,
         pub byte_size: i64,
+        /// The Active Storage blob key: random, never handed out twice, so the provider uploads
+        /// recorded against it (`rust_llm_provider_files`) never match a later file.
+        pub blob_key: Option<String>,
         /// `{ "resolution": "high" }`, like the blob metadata RubyLLM writes.
         pub metadata: Option<Json>,
         pub data: Vec<u8>,
@@ -256,6 +273,31 @@ pub mod rust_llm_batches {
         pub request_counts: Option<Json>,
         /// `Cost#to_h` of the provider-reported invoice.
         pub reported_cost: Option<Json>,
+        pub created_at: DateTimeWithTimeZone,
+        pub updated_at: DateTimeWithTimeZone,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod rust_llm_provider_files {
+    use sea_orm::entity::prelude::*;
+
+    /// `RubyLLM::ActiveRecord::ProviderFile`: the provider file one stored attachment was uploaded
+    /// to, per provider account, so a chat loaded in another process reuses the upload.
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "rust_llm_provider_files")]
+    pub struct Model {
+        #[sea_orm(primary_key)]
+        pub id: i32,
+        pub blob_key: String,
+        pub provider: String,
+        pub account: String,
+        pub file_id: String,
+        pub expires_at: Option<DateTimeWithTimeZone>,
         pub created_at: DateTimeWithTimeZone,
         pub updated_at: DateTimeWithTimeZone,
     }

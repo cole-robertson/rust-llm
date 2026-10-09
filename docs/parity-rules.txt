@@ -646,7 +646,6 @@ chat_thinking_replay_spec.rb:40	PORTED	tests/thinking_replay.rs::drops_the_signa
 chat_thinking_replay_spec.rb:49	N/A	provider not ported: Vertex AI
 chat_thinking_replay_spec.rb:106	PORTED	tests/thinking_replay.rs::drops_gemini_tool_call_thought_signatures_when_the_chat_moves_to_a_chat_completions_provider
 chat_thinking_replay_spec.rb:176	PORTED	tests/thinking_replay.rs::keeps_thinking_for_the_provider_that_produced_it
-chat_thinking_replay_spec.rb:86	PORTED	tests/thinking_replay.rs::keeps_thinking_whose_producer_is_unknown
 chat_thinking_replay_spec.rb:208	PORTED	tests/thinking_replay.rs::does_not_guess_the_producer_from_a_model_id_several_providers_serve
 chat_thinking_replay_spec.rb:217	PORTED	tests/thinking_replay.rs::leaves_the_transcript_untouched
 chat_thinking_spec.rb:9	PORTED	tests/thinking_replay.rs::uses_the_registered_model_controls_without_options
@@ -860,7 +859,7 @@ protocols/anthropic/chat_spec.rb:636	PORTED	crates/rust_llm/tests/media_replay.r
 protocols/anthropic/chat_spec.rb:695	PORTED	crates/rust_llm/tests/cassette_replay.rs::multi_turn_conversation
 protocols/anthropic/chat_spec.rb:699	PORTED	crates/rust_llm/tests/thinking_replay.rs::keeps_thinking_for_the_provider_that_produced_it
 protocols/anthropic/chat_spec.rb:598	MISSING	no test: thinking block without signature
-protocols/anthropic/chat_spec.rb:707	PORTED	crates/rust_llm/tests/thinking_replay.rs::keeps_thinking_whose_producer_is_unknown
+protocols/anthropic/chat_spec.rb:707	PORTED	crates/rust_llm/tests/thinking_replay.rs::sends_a_signature_only_block_as_redacted_thinking
 protocols/anthropic/chat_spec.rb:725	PORTED	crates/rust_llm/tests/thinking_replay.rs::keeps_thinking_for_the_provider_that_produced_it
 protocols/anthropic/chat_spec.rb:734	PORTED	crates/rust_llm/tests/cassette_replay.rs::multi_turn_conversation
 protocols/anthropic/chat_spec.rb:745	MISSING	no test: stored thinking replayed on tool-call turn without thinking config
@@ -1881,7 +1880,6 @@ websocket_cassette_spec.rb	N/A	Ruby-only: VCR WebSocket cassette test helper (re
 
 # ---- rules_core
 # ---- core chat / value objects (lane A: parity audit) ----
-accounting/usage_spec.rb	MISSING	Tracker unit API not public; per-attempt rules exercised via chat (review_regressions.rs), not each case
 accounting/usage_spec.rb:20	PORTED	src/chat.rs failure_tokens (ConnectionFailed = zero), tests/review_regressions.rs
 accounting/usage_spec.rb:61	PORTED	tests/review_regressions.rs::a_retried_429_keeps_the_cost_known_and_links_to_the_answer
 accounting/usage_spec.rb:73	PORTED	tests/review_regressions.rs::a_retried_429_keeps_the_cost_known_and_links_to_the_answer
@@ -2101,3 +2099,41 @@ providers/mistral/capabilities_spec.rb:21	N/A	Ruby-only: guards against mutating
 providers/xai/capabilities_spec.rb:21	N/A	Ruby-only: guards against mutating a frozen caller Array; Rust augment_capabilities takes the Vec by value, so the caller's list cannot change (ownership)
 models_local_refresh_spec.rb:42	N/A	Rust has no default arguments: fetch_provider_models(config, remote_only) always takes remote_only explicitly (both values tested in tests/spec_models_registry.rs::fetch_provider_models_includes_local_providers_when_asked)
 models/registry_spec.rb:340	N/A	Ruby-only: object identity (equal?) for Model instances mixed into a Hash array; Rust models_from_data takes JSON Value and a Vec<Model> needs no conversion
+configuration_spec.rb:84	N/A	Ruby-only: `ruby -W` method-redefinition warnings on require; Rust rejects duplicate method definitions at compile time
+tool_spec.rb:62	N/A	Ruby-only: memoizes Tool.tool_name derived from a Ruby class name (Utils.underscore called once); Rust derives the name from std::any::type_name in a default trait method, with no per-class cache to observe
+tool_spec.rb:71	N/A	Ruby-only: anonymous classes named later by stub_const; Rust types are named at compile time
+provider_account_identity_spec.rb:31	N/A	provider not ported: Azure
+provider_account_identity_spec.rb:42	N/A	provider not ported: Vertex AI
+provider_account_identity_spec.rb:54	N/A	provider not ported: Bedrock
+chat_provider_tools_spec.rb:296	N/A	provider not ported: Azure
+protocols/anthropic/chat_spec.rb:596	N/A	provider not ported: Bedrock (regional Bedrock Sonnet 5.5 ids)
+protocols/anthropic/chat_spec.rb:605	N/A	provider not ported: Bedrock (Mantle Sonnet 5.5 id)
+transcription_spec.rb:9	N/A	provider not ported: Vertex AI
+chat_bedrock_thinking_spec.rb:6	N/A	provider not ported: Bedrock (regional us.anthropic.claude-sonnet-5-5 between_tools via Converse)
+thinking/controls_spec.rb:26	N/A	provider not ported: Bedrock (regional Bedrock Sonnet 5.5 ids)
+thinking/controls_spec.rb:40	N/A	provider not ported: Vertex AI and Bedrock (Mantle id)
+protocols/gemini/file_transcription_spec.rb:95	N/A	provider not ported: Vertex AI (dedicated transcription)
+# ---- lane AJ (2.1): convert_unsupported_attachments ----
+chat_unsupported_attachments_spec.rb:100	N/A	Rust type system: the converter returns Result<Option<Attachment>>, so a String can never stand in for an attachment
+chat_unsupported_attachments_spec.rb:119	N/A	provider not ported: Cohere (the only protocol that accepts images in user messages but not tool results)
+# ---- lane RT (RubyLLM 2.1 request shapes, tool search) ----
+protocols/chat_completions/request_shapes_spec.rb:29	N/A	provider not ported: Cohere (the example renders a Cohere chat through Protocols::Cohere)
+# ---- lane P (2.1 parity wave): usage ledger, persistence, generators ----
+active_record/usage_ledger_spec.rb:105	N/A	provider not ported: Bedrock (guardrail moderation and its usage row)
+chat/tool_concurrency_rails_spec.rb:35	N/A	Ruby-only mechanism: Rails.error reporting of an error raised in a tool thread; a Rust tool error is returned to the caller (spec_chat_loop.rs), with no global error reporter to keep it out of
+chat/tool_concurrency_rails_spec.rb:57	N/A	Ruby-only mechanism: ActiveSupport::IsolatedExecutionState fiber isolation and Async reactors leasing Active Record connections per fiber; SeaORM pools return connections when the future drops them (spec_chat_methods_21.rs::returns_the_connections_concurrent_tools_lease_while_persisting_results)
+chat/tool_concurrency_rails_spec.rb:64	N/A	Ruby-only mechanism: ActiveSupport::IsolatedExecutionState fiber isolation leasing Active Record connections outside a reactor; SeaORM has no per-fiber connection ownership
+chat/tool_concurrency_rails_spec.rb:71	N/A	Ruby-only mechanism: Rails.error reporting of an error raised in a tool fiber under fiber isolation
+chat/tool_concurrency_rails_spec.rb:115	N/A	Ruby-only mechanism: ActiveSupport::CurrentAttributes carried into tool fibers under thread isolation; Rust passes context explicitly
+# ---- lane X (2.1 wave): transport, streaming, process cache ----
+transport/connection_reuse_spec.rb:81	N/A	Ruby-only mechanism: Faraday builds its middleware stack lazily on the first request (builder.locked?); a reqwest::Client is built whole by ClientBuilder::build before it is cached
+transport/connection_reuse_spec.rb:85	N/A	Ruby-only mechanism: a shared Faraday connection has mutable default headers/options/params (frozen to protect other contexts); a reqwest::Client exposes no setters after build, and per-request headers travel on each RequestBuilder
+transport/connection_reuse_spec.rb:148	N/A	Ruby-only mechanism: fingerprints Faraday middleware instance variables for every Configuration option across OpenAI/Vertex AI/Bedrock; the port's cache key (provider, api base, request_timeout, http_proxy, runtime) is every input of transport::basic, and spec_connection_reuse.rs checks each separates clients
+transport/connection_reuse_spec.rb:273	N/A	provider not ported: Bedrock (mantle and agent connections)
+transport/connection_reuse_spec.rb:282	N/A	provider not ported: Vertex AI (ranking connection)
+transport/connection_reuse_spec.rb:49	N/A	Ruby-only mechanism: Faraday's logger middleware is built with log_bodies when RubyLLM.logger is at debug level, so the logger is part of the cache key; the port logs through tracing, read per event at runtime, never baked into the client
+transport/connection_release_spec.rb:30	N/A	Ruby-only mechanism: Faraday keeps the on_data proc on response.env.request after the call; Connection::stream borrows the handler for the call only (&mut dyn FnMut), so nothing can hold it afterwards
+protocol/streaming_spec.rb:243	PORTED	crates/rust_llm/src/transport/event_stream_parser.rs::tests::rejects_an_oversized_bare_json_body_before_retaining_it (unit test at the stubbed 32-byte limit; stub_const has no Rust counterpart outside the module)
+protocol/streaming_spec.rb:252	PORTED	crates/rust_llm/src/transport/event_stream_parser.rs::tests::limits_the_accumulated_json_bytes_across_network_reads
+protocol/streaming_spec.rb:262	PORTED	crates/rust_llm/src/transport/event_stream_parser.rs::tests::stops_retaining_a_failed_response_body_past_the_limit (+ spec_transport_streaming.rs::a_failed_stream_with_an_oversized_body_raises_from_its_status at the real 1 MiB)
+support/process_cache_spec.rb:105	N/A	Ruby-only mechanism: Process.fork (the child forgets inherited entries); Rust has no fork of a running program. The counterpart, pooled sockets belonging to one tokio runtime, is keyed into the connection cache and tested in spec_connection_reuse.rs::never_sends_another_runtime_through_a_socket_of_the_first

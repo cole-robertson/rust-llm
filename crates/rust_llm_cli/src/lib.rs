@@ -456,7 +456,7 @@ pub const USAGE: &str = "Usage:
   rust-llm generate provider NAME [--dialect chat_completions|responses|anthropic|gemini|ollama]
                                   [--api-base URL] [--models-dev-provider KEY] [--dynamic-models]
                                   [--destination DIR] [--force]
-  rust-llm generate upgrade [--force]
+  rust-llm generate upgrade [message:MODEL] [--force]
 
 Run app generators from the root of a Loco + Inertia + React app.";
 
@@ -509,7 +509,8 @@ pub fn run(args: &[String], cwd: &Path) -> i32 {
     }
     // `parse_provider_options`: `Unexpected arguments: ...` for positionals past the NAME.
     let arity = match generator.copied() {
-        Some("install" | "chat_ui" | "public_chat" | "upgrade") => 2,
+        Some("install" | "chat_ui" | "public_chat") => 2,
+        Some("upgrade") => usize::MAX,
         Some("tool" | "agent" | "schema" | "provider") => 3,
         _ => usize::MAX,
     };
@@ -539,7 +540,10 @@ pub fn run(args: &[String], cwd: &Path) -> i32 {
             };
             provider::generate(&mut generator_run, n, &opts)
         }),
-        Some("upgrade") => upgrade::generate(&mut generator_run),
+        Some("upgrade") => {
+            let mappings: Vec<&str> = positional.iter().skip(2).copied().collect();
+            upgrade::generate_with(&mut generator_run, &mappings)
+        }
         other => Err(format!(
             "Unknown generator: {}\n\n{USAGE}",
             other.unwrap_or("(none)")

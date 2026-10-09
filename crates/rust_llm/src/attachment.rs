@@ -411,6 +411,27 @@ impl Attachment {
         &self.provider_uploads
     }
 
+    /// `Attachment#provider_file_store=`: where uploads of this attachment outlive the process
+    /// (see [`crate::files::ProviderFileStore`]). Shared by clones.
+    pub fn set_provider_file_store(
+        &self,
+        store: Option<Arc<dyn crate::files::ProviderFileStore>>,
+    ) -> &Attachment {
+        self.provider_uploads.set_store(store);
+        self
+    }
+
+    /// `Attachment#provider_file_store`: the store set with
+    /// [`Attachment::set_provider_file_store`], if any.
+    pub fn provider_file_store(&self) -> Option<Arc<dyn crate::files::ProviderFileStore>> {
+        self.provider_uploads.store()
+    }
+
+    /// Ruby's object identity (`compare_by_identity`): the same attachment, or a clone of it.
+    pub(crate) fn same_attachment(&self, other: &Attachment) -> bool {
+        self.provider_uploads.same(&other.provider_uploads)
+    }
+
     /// `Attachment#byte_size`: the provider's size, the file's size on disk, or the loaded bytes.
     pub fn byte_size(&self) -> Option<u64> {
         match &self.source {

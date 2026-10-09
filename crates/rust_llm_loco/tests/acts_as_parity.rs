@@ -604,8 +604,8 @@ async fn usage_row(
     total: Option<f64>,
 ) {
     rust_llm_usages::ActiveModel {
-        chat_type: Set("Chat".into()),
-        chat_id: Set(chat_id as i64),
+        chat_type: Set(Some("Chat".into())),
+        chat_id: Set(Some(chat_id as i64)),
         message_type: Set(message_id.map(|_| "Message".into())),
         message_id: Set(message_id.map(i64::from)),
         operation: Set("chat".into()),
@@ -1163,7 +1163,7 @@ async fn persists_the_input_a_paused_tool_call_waits_on() {
         .with_mcp(files.clone());
     assert!(chat.is_awaiting_input());
     assert_eq!(
-        deploy_call(&db).await.pending_input.unwrap()["request_state"],
+        deploy_call(&db).await.mcp_state.unwrap()["request_state"],
         "environment-state"
     );
     assert_eq!(
@@ -1217,7 +1217,7 @@ async fn resumes_from_another_process_after_the_user_answers() {
         .find(|m| m.role == "tool")
         .unwrap();
     assert_eq!(tool.content.as_deref(), Some("Deployed to staging"));
-    assert_eq!(deploy_call(&db).await.pending_input, None);
+    assert_eq!(deploy_call(&db).await.mcp_state, None);
     assert!(!chat.is_awaiting_input());
     files.close().await;
 }

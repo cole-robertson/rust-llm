@@ -276,6 +276,7 @@ fn anthropic_mcp(options: &Map<String, Value>) -> Result<Entry> {
     let mut toolset = Map::new();
     toolset.insert("type".into(), "mcp_toolset".into());
     toolset.insert("mcp_server_name".into(), name);
+    toolset.extend(anthropic_mcp_tool_filter(options)?);
     toolset.extend(slice(options, &["default_config", "configs"]));
     let mut payload = Map::new();
     payload.insert("mcp_servers".into(), json!([server]));
@@ -284,6 +285,47 @@ fn anthropic_mcp(options: &Map<String, Value>) -> Result<Entry> {
         payload,
         headers: vec![("anthropic-beta".into(), "mcp-client-2025-11-20".into())],
     })
+}
+
+/// `Anthropic.mcp_tool_filter`: Claude runs MCP tools without approval, and filters them only by
+/// name, as a toolset that disables every tool but the named ones.
+fn anthropic_mcp_tool_filter(options: &Map<String, Value>) -> Result<Map<String, Value>> {
+    match options.get("require_approval") {
+        None | Some(Value::Null) => {}
+        Some(Value::String(s)) if s == "never" => {}
+        Some(_) => {
+            return Err(Error::Argument(
+                "Anthropic runs MCP tools without approval; use require_approval: 'never'".into(),
+            ));
+        }
+    }
+    let mut tools = options.get("allowed_tools");
+    if let Some(Value::Object(o)) = tools
+        && o.len() == 1
+        && let Some(names) = o.get("tool_names")
+    {
+        tools = Some(names);
+    }
+    let tools = match tools {
+        None | Some(Value::Null) => return Ok(Map::new()),
+        Some(Value::Array(tools)) => tools,
+        Some(_) => {
+            return Err(Error::Argument(
+                "Anthropic filters MCP tools by name; use allowed_tools: [name]".into(),
+            ));
+        }
+    };
+    let configs: Map<String, Value> = tools
+        .iter()
+        .map(|t| {
+            let name = t.as_str().map_or_else(|| t.to_string(), str::to_string);
+            (name, json!({ "enabled": true }))
+        })
+        .collect();
+    let mut filter = Map::new();
+    filter.insert("default_config".into(), json!({ "enabled": false }));
+    filter.insert("configs".into(), Value::Object(configs));
+    Ok(filter)
 }
 
 /// `Protocols::Responses::SERVER_TOOL_ALIASES`.

@@ -847,6 +847,7 @@ impl Batch {
         let cost = batch_cost(provider, &tokens, &model);
         Ok(UsageEntry {
             id: UsageEntry::next_id(),
+            owner: crate::accounting::usage_owner(),
             operation,
             provider: provider.slug().into(),
             model: result_model

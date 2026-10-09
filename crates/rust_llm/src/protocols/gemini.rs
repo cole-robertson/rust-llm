@@ -11,7 +11,7 @@ use crate::message::{Citation, Message, RawResponse, Role, ServerToolCall, Think
 use crate::model::Model;
 use crate::tool::{Tool, tool_schema};
 
-const FINISH_REASONS: &[(&str, &str)] = &[
+pub(crate) const FINISH_REASONS: &[(&str, &str)] = &[
     ("STOP", "stop"),
     ("MAX_TOKENS", "max_tokens"),
     ("SAFETY", "content_filter"),
@@ -34,8 +34,11 @@ pub fn render_payload(req: &Request) -> Result<Value> {
     let mut payload = Map::new();
     payload.insert(
         "contents".into(),
-        Value::Array(format_messages(req.model, &chat)?),
+        Value::Array(format_messages(req.model, req.provider.slug(), &chat)?),
     );
+    // `{ contents:, generationConfig: {} }` first, then `systemInstruction`: key order matches
+    // the payload RubyLLM sends (and the `payload keys` a RequestShape shows).
+    payload.insert("generationConfig".into(), json!({}));
     let mut generation = Map::new();
 
     let mut system_parts = Vec::new();
@@ -147,8 +150,10 @@ fn function_declaration(tool: &dyn Tool) -> Value {
 
 /// `Gemini::Chat::MessageFormatter`: consecutive tool results collapse into one user turn,
 /// ordered like the calls, and named after the function they answer.
-fn format_messages(model: &Model, messages: &[&Message]) -> Result<Vec<Value>> {
+fn format_messages(model: &Model, provider: &str, messages: &[&Message]) -> Result<Vec<Value>> {
     let mut out = Vec::new();
+    // Gemini checks signatures only in the current turn, which starts at the last user message.
+    let turn_start = messages.iter().rposition(|m| m.role == Role::User);
     let mut call_names: Vec<(String, String)> = Vec::new();
     let mut i = 0;
     while i < messages.len() {
@@ -191,48 +196,78 @@ fn format_messages(model: &Model, messages: &[&Message]) -> Result<Vec<Value>> {
         } else {
             "user"
         };
-        out.push(json!({ "role": role, "parts": format_parts(msg)? }));
+        let mut parts = format_parts(msg, provider)?;
+        if msg.is_tool_call() && turn_start.is_none_or(|start| i > start) {
+            sign_step(&mut parts);
+        }
+        out.push(json!({ "role": role, "parts": parts }));
         i += 1;
     }
     Ok(out)
 }
 
-fn format_parts(msg: &Message) -> Result<Value> {
+/// The signature Google documents for a function call Gemini did not make, such as one from
+/// another provider (`Gemini::Tools::PLACEHOLDER_SIGNATURE`).
+pub(crate) const PLACEHOLDER_SIGNATURE: &str = "skip_thought_signature_validator";
+
+/// `sign_step`: Gemini 3 refuses a step of the current turn whose first function call carries no
+/// signature.
+fn sign_step(parts: &mut Value) {
+    let first = parts
+        .as_array_mut()
+        .and_then(|p| p.iter_mut().find(|p| p.get("functionCall").is_some()));
+    if let Some(first) = first
+        && first.get("thoughtSignature").is_none()
+    {
+        first["thoughtSignature"] = PLACEHOLDER_SIGNATURE.into();
+    }
+}
+
+/// `format_parts`: a recorded answer replays its parts as Gemini returned them; only an Array is
+/// generateContent's own shape (an Interactions answer keeps a whole interaction).
+fn format_parts(msg: &Message, provider: &str) -> Result<Value> {
     if msg.role == Role::Assistant
-        && let Some(raw) = &msg.raw_content
+        && let Some(raw @ Value::Array(_)) = &msg.raw_content
     {
         return Ok(raw.clone());
     }
     if let Some(calls) = msg.tool_calls.as_ref().filter(|c| !c.is_empty()) {
+        // `format_tool_call`: Gemini signs only the first of parallel calls, so each call goes
+        // back with its own signature or none, never one another part carried.
         let mut parts = Vec::new();
         if !msg.content().is_empty() {
             parts.extend(format_content(msg.content.as_deref(), &msg.attachments)?);
         }
-        let mut fallback = msg.thinking.as_ref().and_then(|t| t.signature.clone());
         for call in calls.values() {
             let mut part = json!({ "functionCall": { "name": call.name, "args": Value::Object(call.arguments()) } });
-            let signature = call.thought_signature.clone().or_else(|| fallback.take());
-            if let Some(sig) = signature {
-                part["thoughtSignature"] = sig.into();
+            if let Some(sig) = &call.thought_signature {
+                part["thoughtSignature"] = sig.clone().into();
             }
             parts.push(part);
         }
         return Ok(Value::Array(parts));
     }
-    let mut parts = Vec::new();
-    if msg.role == Role::Assistant
-        && let Some(t) = &msg.thinking
-    {
-        let mut part = json!({ "thought": true });
-        if let Some(text) = &t.text {
-            part["text"] = text.clone().into();
+    // `format_message_parts`: the thought summary in an unsigned part of its own, the signature
+    // on the answer's last part (an empty text part when the answer has none).
+    let mut parts = format_content(msg.content.as_deref(), &msg.attachments)?;
+    let Some(thinking) = msg
+        .thinking
+        .as_ref()
+        .filter(|_| msg.role == Role::Assistant)
+    else {
+        return Ok(Value::Array(parts));
+    };
+    if let Some(signature) = msg.own_signature(provider) {
+        if parts.is_empty() {
+            parts.push(json!({ "text": "" }));
         }
-        if let Some(sig) = &t.signature {
-            part["thoughtSignature"] = sig.clone().into();
+        if let Some(last) = parts.last_mut() {
+            last["thoughtSignature"] = signature.into();
         }
-        parts.push(part);
     }
-    parts.extend(format_content(msg.content.as_deref(), &msg.attachments)?);
+    if let Some(text) = &thinking.text {
+        parts.insert(0, json!({ "thought": true, "text": text }));
+    }
     Ok(Value::Array(parts))
 }
 
@@ -330,7 +365,9 @@ pub(crate) fn format_content(
                 Resolution::Medium => "MEDIUM",
                 Resolution::High => "HIGH",
                 // `:original` asks for the highest level: ultra high on images, high otherwise.
-                Resolution::UltraHigh | Resolution::Original if a.kind() != AttachmentType::Image => {
+                Resolution::UltraHigh | Resolution::Original
+                    if a.kind() != AttachmentType::Image =>
+                {
                     "HIGH"
                 }
                 Resolution::UltraHigh | Resolution::Original => "ULTRA_HIGH",
@@ -362,6 +399,7 @@ fn part_server_calls(parts: &[Value]) -> Vec<ServerToolCall> {
             input: p.get("executableCode").cloned(),
             result: p.get("codeExecutionResult").cloned(),
             raw: p.clone(),
+            search_suggestions: None,
         })
         .collect()
 }
@@ -383,6 +421,9 @@ fn metadata_server_calls(data: &Value) -> Vec<ServerToolCall> {
             input: Some(json!({ "queries": queries })),
             result: None,
             raw: json!({ "webSearchQueries": queries }),
+            search_suggestions: str_of(
+                candidate.pointer("/groundingMetadata/searchEntryPoint/renderedContent"),
+            ),
         });
     }
     if let Some(meta) = candidate.get("urlContextMetadata") {
@@ -393,6 +434,7 @@ fn metadata_server_calls(data: &Value) -> Vec<ServerToolCall> {
             input: None,
             result: Some(meta.clone()),
             raw: meta.clone(),
+            search_suggestions: None,
         });
     }
     calls
@@ -516,6 +558,51 @@ fn usage(message: &mut Message, data: &Value, streaming: bool) {
     };
     message.tokens.cache_read = cached;
     message.tokens.thinking = thought;
+    message.tokens.server_tool_use = parse_server_tool_use(data);
+}
+
+/// `parse_server_tool_use`: Gemini 3 bills each distinct, non-empty query a grounding ran.
+fn parse_server_tool_use(data: &Value) -> Option<Map<String, Value>> {
+    let searches: usize = data
+        .get("candidates")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .map(|candidate| {
+            let mut queries: Vec<&str> = candidate
+                .pointer("/groundingMetadata/webSearchQueries")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .filter(|q| !q.is_empty())
+                .collect();
+            queries.sort_unstable();
+            queries.dedup();
+            queries.len()
+        })
+        .sum();
+    crate::tokens::Tokens::positive_counts(&json!({ "web_search_requests": searches }))
+}
+
+/// `without_search_suggestions`: Google's terms forbid storing search suggestions, and Gemini
+/// takes a replayed search result without them.
+fn without_search_suggestions(parts: &[Value]) -> Value {
+    Value::Array(
+        parts
+            .iter()
+            .map(|part| {
+                let mut part = part.clone();
+                if let Some(response) = part
+                    .pointer_mut("/toolResponse/response")
+                    .and_then(Value::as_object_mut)
+                {
+                    response.remove("search_suggestions");
+                }
+                part
+            })
+            .collect(),
+    )
 }
 
 /// `Gemini#build_response_content` (`protocols/gemini/media.rb`): joined text (`None` when there
@@ -598,7 +685,7 @@ pub fn parse_completion_body(model: &Model, data: &Value, raw: RawResponse) -> R
     m.raw_content = parts
         .iter()
         .any(is_server_tool_part)
-        .then(|| Value::Array(parts.clone()));
+        .then(|| without_search_suggestions(&parts));
     m.server_tool_calls = server_calls;
     usage(&mut m, data, false);
     m.finish_reason = normalize_finish_reason(
@@ -649,7 +736,7 @@ pub fn build_chunk(state: &mut StreamState, data: &Value) -> Message {
                 .gemini_parts
                 .iter()
                 .any(is_server_tool_part)
-                .then(|| Value::Array(state.gemini_parts.clone()));
+                .then(|| without_search_suggestions(&state.gemini_parts));
             m.server_tool_calls = calls;
         }
     }

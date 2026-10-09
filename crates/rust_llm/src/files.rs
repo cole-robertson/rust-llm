@@ -36,18 +36,6 @@ use crate::transport::Connection;
 /// `Anthropic::Files::BETA_HEADER`.
 pub const ANTHROPIC_FILES_BETA: &str = "files-api-2025-04-14";
 
-/// `OpenAI::Files::UPLOAD_PURPOSES`.
-const OPENAI_UPLOAD_PURPOSES: &[&str] = &[
-    "assistants",
-    "batch",
-    "fine-tune",
-    "vision",
-    "user_data",
-    "evals",
-];
-/// `DeepSeek::Files::IMAGE_TYPES` and `MAX_FILE_SIZE`.
-const DEEPSEEK_IMAGE_TYPES: &[&str] = &["image/jpeg", "image/png", "image/gif", "image/webp"];
-const DEEPSEEK_MAX_FILE_SIZE: usize = 64 * 1024 * 1024;
 /// `Gemini::Files::PROCESSING_POLL_INTERVAL` and `PROCESSING_TIMEOUT`, in seconds.
 const GEMINI_POLL_INTERVAL: u64 = 2;
 const GEMINI_PROCESSING_TIMEOUT: i64 = 600;
@@ -299,7 +287,9 @@ fn file_attachment(file: Attachment, filename: Option<&str>) -> Attachment {
     }
 }
 
-/// `Files#file_size`: a path's size on disk, otherwise the length of the loaded content.
+/// `Files#file_size`: a path's size on disk, otherwise the length of the loaded content. 2.1's
+/// upload protocols no longer check sizes, so only its spec exercises it.
+#[cfg_attr(not(test), allow(dead_code))]
 fn file_size(attachment: &Attachment) -> Result<u64> {
     match &attachment.source {
         crate::attachment::Source::Path(path) => Ok(std::fs::metadata(path)?.len()),
@@ -311,7 +301,7 @@ fn file_size(attachment: &Attachment) -> Result<u64> {
 /// (Faraday encodes a nested hash as `key[sub]`).
 fn upload_fields(
     provider: Provider,
-    attachment: &Attachment,
+    _attachment: &Attachment,
     options: &UploadOptions<'_>,
     visibility: Option<String>,
 ) -> Result<Vec<(String, String)>> {
@@ -324,34 +314,14 @@ fn upload_fields(
     let purpose = options.purpose.map(str::to_string);
     match provider {
         Provider::OpenAI | Provider::DeepSeek => {
+            // 2.1 leaves purposes, file types, and sizes to the APIs (`openai/files.rb`,
+            // `deepseek/files.rb`); DeepSeek still defaults the purpose to user_data.
             let purpose = if provider == Provider::DeepSeek {
-                if !DEEPSEEK_IMAGE_TYPES.contains(&attachment.mime_type.as_str()) {
-                    return Err(Error::UnsupportedAttachment(
-                        crate::protocols::anthropic::unsupported(&attachment.mime_type),
-                    ));
-                }
-                if file_size(attachment)? > DEEPSEEK_MAX_FILE_SIZE as u64 {
-                    return Err(Error::Argument(
-                        "DeepSeek image uploads cannot exceed 64 MiB".into(),
-                    ));
-                }
-                if purpose.as_deref().is_some_and(|p| p != "user_data") {
-                    return Err(Error::Argument(
-                        "DeepSeek file uploads require purpose: user_data".into(),
-                    ));
-                }
-                Some("user_data".to_string())
+                purpose.or_else(|| Some("user_data".to_string()))
             } else {
                 purpose
             };
-            let Some(purpose) = purpose else {
-                return Err(Error::Argument(format!(
-                    "{} file uploads require purpose: {}",
-                    provider.display(),
-                    OPENAI_UPLOAD_PURPOSES.join(", ")
-                )));
-            };
-            push("purpose", Some(purpose));
+            push("purpose", purpose);
             if let Some(seconds) = options.expires_in {
                 push("expires_after[anchor]", Some("created_at".into()));
                 push("expires_after[seconds]", Some(seconds.to_string()));
@@ -684,7 +654,205 @@ fn parse_perplexity_file(response_id: &str, data: &Value) -> Result<UploadedFile
 /// Uploads memoized on an attachment, keyed by provider and credentials (`provider_uploads`).
 /// Clones share the memo, so each request's copy of history reuses an earlier upload.
 #[derive(Debug, Clone, Default)]
-pub struct ProviderUploads(Arc<Mutex<HashMap<String, UploadedFile>>>);
+pub struct ProviderUploads(Arc<Mutex<HashMap<String, UploadedFile>>>, StoreSlot);
+
+/// `Attachment#provider_file_store`, kept beside the upload memo so clones share it.
+#[derive(Clone, Default)]
+struct StoreSlot(Arc<Mutex<Option<Arc<dyn ProviderFileStore>>>>);
+
+impl std::fmt::Debug for StoreSlot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ProviderFileStore")
+    }
+}
+
+impl ProviderUploads {
+    /// Whether two attachments share this memo, i.e. one is a clone of the other.
+    pub(crate) fn same(&self, other: &ProviderUploads) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+
+    pub(crate) fn store(&self) -> Option<Arc<dyn ProviderFileStore>> {
+        self.1.0.lock().ok().and_then(|s| s.clone())
+    }
+
+    pub(crate) fn set_store(&self, store: Option<Arc<dyn ProviderFileStore>>) {
+        if let Ok(mut slot) = self.1.0.lock() {
+            *slot = store;
+        }
+    }
+
+    fn get(&self, scope: &str) -> Option<UploadedFile> {
+        self.0.lock().ok().and_then(|m| m.get(scope).cloned())
+    }
+
+    fn insert(&self, scope: String, upload: UploadedFile) {
+        if let Ok(mut m) = self.0.lock() {
+            m.insert(scope, upload);
+        }
+    }
+
+    fn remove(&self, scope: &str) -> Option<UploadedFile> {
+        self.0.lock().ok().and_then(|mut m| m.remove(scope))
+    }
+}
+
+/// `Attachment#provider_file_store`: where uploads of an attachment outlive the process, keyed by
+/// provider slug and [`Provider::account_identity`]. The Rails integration keeps one per file in
+/// Active Storage (`active_record/provider_file.rb`).
+/// Async because a store is usually a database; Ruby's is synchronous Active Record.
+#[async_trait::async_trait]
+pub trait ProviderFileStore: Send + Sync {
+    /// `fetch(provider:, account:)`.
+    async fn fetch(&self, provider: &str, account: &str) -> Option<UploadedFile>;
+    /// `store(upload, provider:, account:)`.
+    async fn store(&self, upload: &UploadedFile, provider: &str, account: &str);
+    /// `forget(id, provider:, account:)`.
+    async fn forget(&self, id: &str, provider: &str, account: &str);
+}
+
+/// `StoredUploads::FILES`: files a provider confirmed (or that this process uploaded), keyed by
+/// provider, account, and id, so each stored upload is asked about once per process. A
+/// `ProcessCache` of 1024 entries, oldest dropped first.
+type ConfirmedFiles = Mutex<Vec<((String, String, String), UploadedFile)>>;
+
+fn confirmed_files() -> &'static ConfirmedFiles {
+    static FILES: std::sync::OnceLock<ConfirmedFiles> = std::sync::OnceLock::new();
+    FILES.get_or_init(Default::default)
+}
+
+const CONFIRMED_FILES_LIMIT: usize = 1024;
+
+/// `StoredUploads.files.fetch(key)`: whether this process already confirmed the file.
+#[doc(hidden)]
+pub fn is_confirmed_upload(provider: &str, account: &str, id: &str) -> bool {
+    let key = (provider.to_string(), account.to_string(), id.to_string());
+    confirmed_files()
+        .lock()
+        .is_ok_and(|f| f.iter().any(|(k, _)| *k == key))
+}
+
+/// `StoredUploads.files.clear`: forgets every confirmation, as a fresh process would.
+#[doc(hidden)]
+pub fn clear_confirmed_uploads() {
+    if let Ok(mut files) = confirmed_files().lock() {
+        files.clear();
+    }
+}
+
+fn confirmed(key: &(String, String, String)) -> Option<UploadedFile> {
+    let mut files = confirmed_files().lock().ok()?;
+    let at = files.iter().position(|(k, _)| k == key)?;
+    // `touch`: the most recently used entry moves to the back.
+    let entry = files.remove(at);
+    let file = entry.1.clone();
+    files.push(entry);
+    Some(file)
+}
+
+fn confirm(key: (String, String, String), file: &UploadedFile) {
+    if let Ok(mut files) = confirmed_files().lock() {
+        if files.iter().any(|(k, _)| *k == key) {
+            return;
+        }
+        files.push((key, file.clone()));
+        while files.len() > CONFIRMED_FILES_LIMIT {
+            files.remove(0);
+        }
+    }
+}
+
+fn unconfirm(key: &(String, String, String)) {
+    if let Ok(mut files) = confirmed_files().lock() {
+        files.retain(|(k, _)| k != key);
+    }
+}
+
+/// `Protocol::StoredUploads` (`protocol/stored_uploads.rb`): reuses the provider file an
+/// attachment's store recorded in an earlier process. Before a process first reuses a file the
+/// provider confirms it still has it; a missing or expired file is uploaded again.
+struct StoredUploads<'a> {
+    provider: Provider,
+    connection: &'a Connection,
+    store: Option<Arc<dyn ProviderFileStore>>,
+    account: Option<String>,
+}
+
+impl<'a> StoredUploads<'a> {
+    fn new(
+        provider: Provider,
+        config: &Config,
+        connection: &'a Connection,
+        store: Option<Arc<dyn ProviderFileStore>>,
+    ) -> StoredUploads<'a> {
+        let account = store
+            .as_ref()
+            .and_then(|_| provider.account_identity(config));
+        StoredUploads {
+            provider,
+            connection,
+            store,
+            account,
+        }
+    }
+
+    fn key(&self, account: &str, id: &str) -> (String, String, String) {
+        (self.provider.slug().into(), account.into(), id.into())
+    }
+
+    /// `fetch { upload }`: the stored file when the provider still has it, else a new upload,
+    /// remembered in the store.
+    async fn fetch(
+        &self,
+        upload: impl std::future::Future<Output = Result<UploadedFile>>,
+    ) -> Result<UploadedFile> {
+        let (Some(store), Some(account)) = (&self.store, &self.account) else {
+            return upload.await;
+        };
+        if let Some(file) = self.stored_file(store.as_ref(), account).await {
+            return Ok(file);
+        }
+        let uploaded = upload.await?;
+        confirm(self.key(account, &uploaded.id), &uploaded);
+        store.store(&uploaded, self.provider.slug(), account).await;
+        Ok(uploaded)
+    }
+
+    async fn stored_file(
+        &self,
+        store: &dyn ProviderFileStore,
+        account: &str,
+    ) -> Option<UploadedFile> {
+        let stored = store.fetch(self.provider.slug(), account).await?;
+        if stored.is_expired() {
+            return None;
+        }
+        let key = self.key(account, &stored.id);
+        let file = match confirmed(&key) {
+            Some(file) => file,
+            // `confirmed_file`: a provider that cannot find it means upload again.
+            None => {
+                let file = find_file(self.connection, self.provider, &stored.id)
+                    .await
+                    .ok()?;
+                confirm(key, &file);
+                file
+            }
+        };
+        (!file.is_expired()).then_some(file)
+    }
+
+    /// `forget(upload)`: drops the process's confirmation and the stored row.
+    async fn forget(&self, upload: &UploadedFile) {
+        let (Some(store), Some(account)) = (&self.store, &self.account) else {
+            return;
+        };
+        unconfirm(&self.key(account, &upload.id));
+        store
+            .forget(&upload.id, self.provider.slug(), account)
+            .await;
+    }
+}
 
 impl PartialEq for ProviderUploads {
     /// A memo of uploads is not part of an attachment's identity.
@@ -696,7 +864,6 @@ impl PartialEq for ProviderUploads {
 /// The per-protocol auto-upload settings from each `chat.rb`.
 struct AutoUpload {
     threshold: u64,
-    limit: u64,
     attachable: fn(&Attachment) -> bool,
     purpose: Option<&'static str>,
 }
@@ -704,21 +871,20 @@ struct AutoUpload {
 const MB: u64 = 1024 * 1024;
 
 /// `supports_provider_file_references?`, `default_large_file_upload_threshold`,
-/// `provider_file_upload_limit`, `provider_file_attachable?`, `provider_file_upload_options`.
+/// `provider_file_attachable?`, `provider_file_upload_options`. 2.1 leaves the upload size limit
+/// to the provider, whose error states it.
 fn auto_upload_rules(protocol: ProtocolName, provider: Provider) -> Option<AutoUpload> {
     use AttachmentType as T;
     match protocol {
         // ANTHROPIC_INLINE_REQUEST_LIMIT, ANTHROPIC_FILE_UPLOAD_LIMIT
         ProtocolName::Anthropic => Some(AutoUpload {
             threshold: 24 * MB,
-            limit: 500 * MB,
             attachable: |a| matches!(a.kind(), T::Image | T::Pdf | T::Text),
             purpose: None,
         }),
         // GEMINI_INLINE_FILE_THRESHOLD, GEMINI_FILE_UPLOAD_LIMIT
         ProtocolName::Gemini => Some(AutoUpload {
             threshold: 20 * MB,
-            limit: 2 * 1024 * MB,
             attachable: |a| matches!(a.kind(), T::Image | T::Video | T::Audio | T::Pdf | T::Text),
             purpose: None,
         }),
@@ -727,20 +893,17 @@ fn auto_upload_rules(protocol: ProtocolName, provider: Provider) -> Option<AutoU
         // OPENAI_INLINE_FILE_LIMIT, OPENAI_FILE_UPLOAD_LIMIT
         ProtocolName::Responses => Some(AutoUpload {
             threshold: 50 * MB,
-            limit: 512 * MB,
             attachable: |a| matches!(a.kind(), T::Pdf | T::Document),
             purpose: Some("user_data"),
         }),
         // OPENROUTER_INLINE_FILE_THRESHOLD, OPENROUTER_FILE_UPLOAD_LIMIT
         ProtocolName::ChatCompletions if provider == Provider::OpenRouter => Some(AutoUpload {
             threshold: 50 * MB,
-            limit: 100 * MB,
             attachable: |a| a.kind() == T::Pdf,
             purpose: None,
         }),
         ProtocolName::ChatCompletions if provider == Provider::OpenAI => Some(AutoUpload {
             threshold: 50 * MB,
-            limit: 512 * MB,
             attachable: |a| a.kind() == T::Pdf,
             purpose: Some("user_data"),
         }),
@@ -759,13 +922,6 @@ fn provider_upload_scope(provider: Provider, config: &Config) -> String {
     provider.api_base(config).ok().hash(&mut hasher);
     provider.headers(config).hash(&mut hasher);
     format!("{}:{:x}", provider.slug(), hasher.finish())
-}
-
-fn format_bytes(bytes: Option<u64>) -> String {
-    match bytes {
-        Some(b) => format!("{:.1} MB", ((b as f64 / MB as f64) * 10.0).round() / 10.0),
-        None => "unknown size".into(),
-    }
 }
 
 /// `Protocol#preprocess_message` (the upload half; foreign thinking is dropped in `Chat`): a user
@@ -793,18 +949,6 @@ pub(crate) async fn preprocess_messages(
             if !size.is_some_and(|s| s > rules.threshold) || !(rules.attachable)(attachment) {
                 continue;
             }
-            if size.is_some_and(|s| s > rules.limit) {
-                return Err(Error::Api(
-                    format!(
-                        "{} file uploads support files up to {}; {} is {}",
-                        provider.display(),
-                        format_bytes(Some(rules.limit)),
-                        attachment.filename.as_deref().unwrap_or(""),
-                        format_bytes(size)
-                    ),
-                    None,
-                ));
-            }
             let uploaded =
                 provider_upload(attachment, &rules, provider, config, connection).await?;
             let resolution = attachment.resolution;
@@ -825,26 +969,68 @@ async fn provider_upload(
     connection: &Connection,
 ) -> Result<UploadedFile> {
     let scope = provider_upload_scope(provider, config);
-    let memo = attachment.provider_uploads().clone();
-    let existing = memo
-        .0
-        .lock()
-        .map_err(|_| Error::Api("provider upload memo poisoned".into(), None))?
-        .get(&scope)
-        .cloned();
-    if let Some(upload) = existing.filter(|u| !u.is_expired()) {
+    let memo = attachment.provider_uploads();
+    if let Some(upload) = memo.get(&scope).filter(|u| !u.is_expired()) {
         return Ok(upload);
     }
     let options = UploadOptions {
         purpose: rules.purpose,
         ..Default::default()
     };
-    let uploaded = upload_file(connection, provider, attachment.clone(), &options).await?;
-    memo.0
-        .lock()
-        .map_err(|_| Error::Api("provider upload memo poisoned".into(), None))?
-        .insert(scope, uploaded.clone());
+    // `StoredUploads.new(@provider, attachment.provider_file_store).fetch { upload_file }`.
+    let uploaded = StoredUploads::new(provider, config, connection, memo.store())
+        .fetch(upload_file(
+            connection,
+            provider,
+            attachment.clone(),
+            &options,
+        ))
+        .await?;
+    memo.insert(scope, uploaded.clone());
     Ok(uploaded)
+}
+
+/// `Protocol#discard_missing_uploads`: a provider can delete a file RubyLLM uploaded for an
+/// attachment. When a request fails naming such a file, or with a 404 that names none, the
+/// attachments forget those uploads (the memo, the stored row, and the process's confirmation)
+/// so the next request uploads them again. Returns the uploads it forgot.
+pub(crate) async fn discard_missing_uploads(
+    messages: &[Message],
+    error: &Error,
+    provider: Provider,
+    config: &Config,
+    connection: &Connection,
+) -> Vec<UploadedFile> {
+    let scope = provider_upload_scope(provider, config);
+    let uploads: Vec<(&Attachment, UploadedFile)> = messages
+        .iter()
+        .flat_map(|m| m.attachments.iter())
+        .filter_map(|a| a.provider_uploads().get(&scope).map(|u| (a, u)))
+        .collect();
+    // `names_file?`: the error message or the response body mentions the file id.
+    let names = |id: &str| {
+        error.to_string().contains(id) || error.response().is_some_and(|r| r.body.contains(id))
+    };
+    let named: Vec<(&Attachment, UploadedFile)> = uploads
+        .iter()
+        .filter(|(_, u)| names(&u.id))
+        .cloned()
+        .collect();
+    let missing = if named.is_empty() && error.response().is_some_and(|r| r.status == 404) {
+        uploads
+    } else {
+        named
+    };
+    let mut forgotten = Vec::with_capacity(missing.len());
+    for (attachment, upload) in missing {
+        let memo = attachment.provider_uploads();
+        memo.remove(&scope);
+        StoredUploads::new(provider, config, connection, memo.store())
+            .forget(&upload)
+            .await;
+        forgotten.push(upload);
+    }
+    forgotten
 }
 
 /// `Anthropic#apply_files_beta`: a request that references an uploaded file (a block whose
@@ -960,12 +1146,10 @@ mod tests {
 
     #[test]
     fn openai_requires_a_purpose_and_nests_expires_after() {
+        // `leaves the purpose requirement to OpenAI`: no purpose field, no local refusal.
         let a = Attachment::from_bytes(b"{}".to_vec(), "batch.jsonl", None);
-        let err = upload_fields(Provider::OpenAI, &a, &UploadOptions::default(), None).unwrap_err();
-        assert_eq!(
-            err.to_string(),
-            "OpenAI file uploads require purpose: assistants, batch, fine-tune, vision, user_data, evals"
-        );
+        let fields = upload_fields(Provider::OpenAI, &a, &UploadOptions::default(), None).unwrap();
+        assert!(fields.iter().all(|(k, _)| k != "purpose"), "{fields:?}");
         let options = UploadOptions {
             purpose: Some("batch"),
             expires_in: Some(86400),
@@ -982,11 +1166,16 @@ mod tests {
 
     #[test]
     fn deepseek_only_uploads_images() {
-        let pdf = Attachment::from_bytes(b"%PDF".to_vec(), "a.pdf", None);
-        assert!(matches!(
-            upload_fields(Provider::DeepSeek, &pdf, &UploadOptions::default(), None),
-            Err(Error::UnsupportedAttachment(_))
-        ));
+        // `leaves file types, sizes, and explicit purposes to DeepSeek`.
+        let text = Attachment::from_bytes(b"Ruby".to_vec(), "ruby.txt", None);
+        let batch = UploadOptions {
+            purpose: Some("batch"),
+            ..Default::default()
+        };
+        assert_eq!(
+            upload_fields(Provider::DeepSeek, &text, &batch, None).unwrap(),
+            vec![("purpose".into(), "batch".into())]
+        );
         let png = Attachment::from_bytes(b"png".to_vec(), "a.png", None);
         let fields =
             upload_fields(Provider::DeepSeek, &png, &UploadOptions::default(), None).unwrap();
@@ -1077,33 +1266,36 @@ mod tests {
         assert_eq!(file_size(&bytes).unwrap(), 5);
     }
 
-    fn ruby_png() -> Attachment {
-        Attachment::new(format!(
-            "{}/tests/fixtures/ruby.png",
-            env!("CARGO_MANIFEST_DIR")
-        ))
-    }
-
-    // UPSTREAM-REMOVED in 2.1 (was spec: protocols/deepseek/files_spec.rb:29) rejects unsupported file purposes
-    #[test]
-    fn deepseek_rejects_unsupported_file_purposes() {
-        let options = UploadOptions {
-            purpose: Some("batch"),
-            ..Default::default()
-        };
-        let err = upload_fields(Provider::DeepSeek, &ruby_png(), &options, None).unwrap_err();
-        assert!(matches!(err, Error::Argument(_)), "{err:?}");
-        assert!(err.to_string().contains("user_data"), "{err}");
-    }
-
-    // UPSTREAM-REMOVED in 2.1 (was spec: protocols/deepseek/files_spec.rb:34) rejects images larger than the upload limit
-    #[test]
-    fn deepseek_rejects_images_larger_than_the_upload_limit() {
-        let image = Attachment::from_bytes(vec![0; DEEPSEEK_MAX_FILE_SIZE + 1], "ruby.png", None);
-        let err =
-            upload_fields(Provider::DeepSeek, &image, &UploadOptions::default(), None).unwrap_err();
-        assert!(matches!(err, Error::Argument(_)), "{err:?}");
-        assert!(err.to_string().contains("64 MiB"), "{err}");
+    // spec: protocol_file_preprocessing_spec.rb:355 with uploads stored for the attachment > keeps uploads in memory when the provider cannot name the account
+    #[tokio::test]
+    async fn keeps_uploads_in_memory_when_the_provider_cannot_name_the_account() {
+        #[derive(Default)]
+        struct Store(Mutex<Vec<String>>);
+        #[async_trait::async_trait]
+        impl ProviderFileStore for Store {
+            async fn fetch(&self, _: &str, _: &str) -> Option<UploadedFile> {
+                panic!("a store without an account is never read")
+            }
+            async fn store(&self, upload: &UploadedFile, _: &str, _: &str) {
+                self.0.lock().unwrap().push(upload.id.clone());
+            }
+            async fn forget(&self, _: &str, _: &str, _: &str) {}
+        }
+        // Mistral's `account_identity` is nil, as the spec stubs Gemini's.
+        let config = Config::default();
+        assert_eq!(Provider::Mistral.account_identity(&config), None);
+        let connection = Connection::new(Provider::Mistral, Arc::new(config.clone())).unwrap();
+        let store = Arc::new(Store::default());
+        let stored = StoredUploads::new(
+            Provider::Mistral,
+            &config,
+            &connection,
+            Some(store.clone() as Arc<dyn ProviderFileStore>),
+        );
+        let file = parse_file_response(Provider::Mistral, &json!({ "id": "files/new" })).unwrap();
+        let uploaded = stored.fetch(async { Ok(file) }).await.unwrap();
+        assert_eq!(uploaded.id, "files/new");
+        assert!(store.0.lock().unwrap().is_empty());
     }
 
     // spec: protocols/deepseek/files_spec.rb:29 reports that stored images cannot be downloaded
@@ -1152,16 +1344,5 @@ mod tests {
             ("resp_1".into(), "f_2".into())
         );
         assert!(split_perplexity_id("f_2").is_err());
-    }
-}
-
-/// `protocol_spec.rb`'s `format_bytes` example; `format_bytes` is private to this module.
-#[cfg(test)]
-mod protocol_spec {
-    // UPSTREAM-REMOVED in 2.1 (was spec: protocol_spec.rb:126) provider file defaults > formats sizes for its error messages
-    #[test]
-    fn formats_sizes_for_its_error_messages() {
-        assert_eq!(super::format_bytes(None), "unknown size");
-        assert_eq!(super::format_bytes(Some(1024 * 1024 * 3)), "3.0 MB");
     }
 }

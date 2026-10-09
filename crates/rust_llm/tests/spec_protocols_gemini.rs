@@ -234,34 +234,144 @@ async fn an_empty_system_message_renders_no_system_instruction() {
     assert!(payload.get("systemInstruction").is_none(), "{payload}");
 }
 
-// UPSTREAM-REMOVED in 2.1 (was spec: protocols/gemini/chat_spec.rb:253) omits the fields the provider did not send
+// ---- chat_spec.rb: replaying an answer -------------------------------------------------------------
+
+/// `answer(content, thinking)`: an answer Gemini produced (its usage names the provider).
+fn gemini_answer(content: Option<&str>, thinking: Option<Thinking>) -> Message {
+    let mut m = Message::new(Role::Assistant, content.map(str::to_string));
+    m.thinking = thinking;
+    m.usage_entries = vec![rust_llm::UsageEntry {
+        id: rust_llm::UsageEntry::next_id(),
+        owner: None,
+        operation: rust_llm::message::Operation::Chat,
+        provider: "gemini".into(),
+        model: GEMINI.into(),
+        status: rust_llm::UsageStatus::Succeeded,
+        tokens: Default::default(),
+        cost: Default::default(),
+    }];
+    m
+}
+
+/// `replay(message)`: `format_parts` of the answer, read from the rendered model turn.
+async fn replayed(message: Message) -> Value {
+    render(GEMINI, vec![Message::user("hi"), message]).await["contents"][1]["parts"].clone()
+}
+
+// spec: protocols/gemini/chat_spec.rb:290 replaying an answer > sends a signature without thinking text back on the answer part
 #[tokio::test]
-async fn a_thought_part_carries_only_the_fields_present() {
-    let thought = |text: Option<&str>, signature: Option<&str>| {
-        let mut m = Message::new(Role::Assistant, None);
-        m.thinking = Some(Thinking {
-            text: text.map(str::to_string),
-            signature: signature.map(str::to_string),
-        });
+async fn sends_a_signature_without_thinking_text_back_on_the_answer_part() {
+    let parts = replayed(gemini_answer(
+        Some("Done."),
+        Thinking::build(None, Some("sig".into())),
+    ))
+    .await;
+    let data_fields = [
+        "text",
+        "inline_data",
+        "file_data",
+        "functionCall",
+        "functionResponse",
+    ];
+    assert!(
+        parts
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|p| data_fields.iter().any(|f| p.get(f).is_some()))
+    );
+    assert_eq!(
+        parts,
+        json!([{ "text": "Done.", "thoughtSignature": "sig" }])
+    );
+}
+
+// spec: protocols/gemini/chat_spec.rb:297 replaying an answer > keeps the thought summary unsigned ahead of the signed answer
+#[tokio::test]
+async fn keeps_the_thought_summary_unsigned_ahead_of_the_signed_answer() {
+    let parts = replayed(gemini_answer(
+        Some("Done."),
+        Thinking::build(Some("Adding.".into()), Some("sig".into())),
+    ))
+    .await;
+    assert_eq!(
+        parts,
+        json!([{ "thought": true, "text": "Adding." }, { "text": "Done.", "thoughtSignature": "sig" }])
+    );
+}
+
+// spec: protocols/gemini/chat_spec.rb:303 replaying an answer > carries the signature of an answer without content in an empty text part
+#[tokio::test]
+async fn carries_the_signature_of_an_answer_without_content_in_an_empty_text_part() {
+    let parts = replayed(gemini_answer(
+        None,
+        Thinking::build(None, Some("sig".into())),
+    ))
+    .await;
+    assert_eq!(parts, json!([{ "text": "", "thoughtSignature": "sig" }]));
+}
+
+// spec: protocols/gemini/chat_spec.rb:309 replaying an answer > sends an answer back with its parts as Gemini returned them
+#[tokio::test]
+async fn sends_an_answer_back_with_its_parts_as_gemini_returned_them() {
+    let parts = json!([{ "text": "Adding.", "thought": true }, { "text": "5 + 3 = 8", "thoughtSignature": "sig" }]);
+    let parsed = parse(parts_body(parts.clone()));
+    let replay = replayed(gemini_answer(parsed.content.as_deref(), parsed.thinking)).await;
+    assert_eq!(replay, parts);
+}
+
+// spec: protocols/gemini/chat_spec.rb:194 #format_messages > signs the first unsigned call of each step in the current turn only
+#[tokio::test]
+async fn signs_the_first_unsigned_call_of_each_step_in_the_current_turn_only() {
+    let step = |ids: &[&str], signature: Option<&str>| {
+        let mut m = Message::new(Role::Assistant, Some(String::new()));
+        let mut calls = rust_llm::message::indexmap_lite::IndexMap::new();
+        for id in ids {
+            let mut call = ToolCall::new(*id, "lookup", Map::new());
+            call.thought_signature = signature.map(str::to_string);
+            calls.insert(id.to_string(), call);
+        }
+        m.tool_calls = Some(calls);
         m
     };
     let payload = render(
         GEMINI,
-        vec![Message::user("hi"), thought(Some("why"), None)],
+        vec![
+            Message::user("Question?"),
+            step(&["a"], None),
+            Message::tool_result("a", "A"),
+            Message::assistant("Answer."),
+            Message::user("Again?"),
+            step(&["b", "c"], None),
+            Message::tool_result("b", "B"),
+            Message::tool_result("c", "C"),
+            step(&["d"], Some("sig")),
+            Message::tool_result("d", "D"),
+        ],
     )
     .await;
+    let signatures: Vec<Vec<Value>> = payload["contents"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c["role"] == "model")
+        .map(|c| {
+            c["parts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|p| p.get("thoughtSignature").cloned().unwrap_or(Value::Null))
+                .collect()
+        })
+        .collect();
     assert_eq!(
-        payload["contents"][1]["parts"],
-        json!([{ "thought": true, "text": "why" }])
-    );
-    let payload = render(
-        GEMINI,
-        vec![Message::user("hi"), thought(None, Some("sig"))],
-    )
-    .await;
-    assert_eq!(
-        payload["contents"][1]["parts"],
-        json!([{ "thought": true, "thoughtSignature": "sig" }])
+        signatures,
+        vec![
+            vec![Value::Null],
+            vec![Value::Null],
+            vec![json!("skip_thought_signature_validator"), Value::Null],
+            vec![json!("sig")],
+        ]
     );
 }
 
@@ -933,4 +1043,187 @@ async fn tool_schemas_keep_unions_references_and_constraints() {
     })
     .await;
     assert_eq!(d["parametersJsonSchema"], schema);
+}
+
+// ---- 2.1: original resolution, grounding usage and search suggestions, parallel signatures -------
+
+// spec: protocols/gemini/media_spec.rb:94 .format_content > maps original resolution to #{level} for #{filename}
+#[tokio::test]
+async fn maps_original_resolution_to_the_highest_level_each_media_takes() {
+    for (filename, level) in [
+        ("page.png", "ULTRA_HIGH"),
+        ("document.pdf", "HIGH"),
+        ("video.mp4", "HIGH"),
+    ] {
+        let parts = user_parts(
+            Some("Read this"),
+            vec![bytes("bytes", filename).with_resolution(Resolution::Original)],
+        )
+        .await;
+        assert_eq!(
+            parts[1]["media_resolution"],
+            json!({ "level": format!("MEDIA_RESOLUTION_{level}") }),
+            "{filename}"
+        );
+    }
+}
+
+fn grounded_body(metadata: Value, usage: Value) -> Value {
+    json!({ "candidates": [{ "content": { "parts": [{ "text": "Ruby 4.0.7" }] },
+                             "groundingMetadata": metadata }],
+            "usageMetadata": usage })
+}
+
+const SUGGESTIONS: &str =
+    r#"<style>.container { display: flex; }</style><div class="container">Ruby 4.0.7</div>"#;
+
+/// The parts of a turn that ran Google Search and code execution, with suggestions on the result.
+fn searched_parts() -> Value {
+    json!([
+        { "thoughtSignature": "sig-1",
+          "toolCall": { "toolType": "GOOGLE_SEARCH_WEB", "id": "call_1",
+                        "args": { "queries": ["latest stable ruby version"] } } },
+        { "thoughtSignature": "sig-2",
+          "toolResponse": { "toolType": "GOOGLE_SEARCH_WEB", "id": "call_1",
+                            "response": { "search_suggestions": "<style></style>" } } },
+        { "executableCode": { "language": "PYTHON", "code": "print(4)" } },
+        { "codeExecutionResult": { "outcome": "OUTCOME_OK", "output": "4\n" } },
+        { "text": "Ruby 4.0.7 is the latest." }
+    ])
+}
+
+// spec: protocols/gemini/chat_spec.rb:410 #parse_completion_response > counts each distinct web search query the grounding ran
+#[test]
+fn counts_each_distinct_web_search_query_the_grounding_ran() {
+    let m = parse(grounded_body(
+        json!({ "webSearchQueries": ["ruby 4.0.7 released", "ruby releases", "", "ruby releases"] }),
+        json!({ "promptTokenCount": 534, "candidatesTokenCount": 313 }),
+    ));
+    assert_eq!(
+        m.tokens.server_tool_use,
+        json!({ "web_search_requests": 2 }).as_object().cloned()
+    );
+}
+
+// spec: protocols/gemini/chat_spec.rb:427 #parse_completion_response > puts the search suggestions on the live search call only
+#[test]
+fn puts_the_search_suggestions_on_the_live_search_call_only() {
+    let m = parse(grounded_body(
+        json!({ "searchEntryPoint": { "renderedContent": SUGGESTIONS },
+                "webSearchQueries": ["ruby 4.0.7 released"] }),
+        json!({}),
+    ));
+    let search = m
+        .server_tool_calls
+        .iter()
+        .find(|c| c.kind == "google_search")
+        .unwrap();
+    assert_eq!(search.search_suggestions.as_deref(), Some(SUGGESTIONS));
+    assert!(
+        !serde_json::to_string(&m.to_h())
+            .unwrap()
+            .contains("container")
+    );
+}
+
+// spec: protocols/gemini/chat_spec.rb:447 #parse_completion_response > drops search suggestions from the parts it keeps for replay
+#[test]
+fn drops_search_suggestions_from_the_parts_it_keeps_for_replay() {
+    let parts = searched_parts();
+    let m = parse(parts_body(parts.clone()));
+    let raw = m.raw_content.unwrap();
+    assert_eq!(
+        raw[1],
+        json!({ "thoughtSignature": "sig-2",
+                "toolResponse": { "toolType": "GOOGLE_SEARCH_WEB", "id": "call_1", "response": {} } })
+    );
+    for i in [0, 2, 3, 4] {
+        assert_eq!(raw[i], parts[i]);
+    }
+}
+
+// spec: protocols/gemini/chat_spec.rb:477 #parse_completion_response > counts no web searches without grounding
+#[test]
+fn counts_no_web_searches_without_grounding() {
+    let m = parse(
+        json!({ "candidates": [{ "content": { "parts": [{ "text": "Hi" }] } }],
+                          "usageMetadata": { "promptTokenCount": 3, "candidatesTokenCount": 1 } }),
+    );
+    assert_eq!(m.tokens.server_tool_use, None);
+}
+
+// spec: protocols/gemini/streaming_spec.rb:40 counts the web searches the final chunk grounds on
+#[test]
+fn counts_the_web_searches_the_final_chunk_grounds_on() {
+    let mut state = StreamState::default();
+    let text = gemini::build_chunk(
+        &mut state,
+        &json!({ "candidates": [{ "content": { "parts": [{ "text": "Ruby" }] } }] }),
+    );
+    let last = gemini::build_chunk(
+        &mut state,
+        &json!({ "candidates": [{ "content": { "parts": [{ "text": " 4.0.7" }] }, "finishReason": "STOP",
+                                  "groundingMetadata": { "webSearchQueries": ["\"Ruby 4.0.7\" released"] } }],
+                 "usageMetadata": { "promptTokenCount": 408, "candidatesTokenCount": 171 } }),
+    );
+    assert_eq!(text.tokens.server_tool_use, None);
+    assert_eq!(
+        last.tokens.server_tool_use,
+        json!({ "web_search_requests": 1 }).as_object().cloned()
+    );
+}
+
+// spec: protocols/gemini/streaming_spec.rb:56 streams the search suggestions on the live search call only
+#[test]
+fn streams_the_search_suggestions_on_the_live_search_call_only() {
+    let chunk = gemini::build_chunk(
+        &mut StreamState::default(),
+        &json!({ "candidates": [{ "content": { "parts": [{ "text": "Ruby 4.0.7" }] }, "finishReason": "STOP",
+                                  "groundingMetadata": { "searchEntryPoint": { "renderedContent": SUGGESTIONS },
+                                                         "webSearchQueries": ["\"Ruby 4.0.7\" released"] } }] }),
+    );
+    let search = chunk
+        .server_tool_calls
+        .iter()
+        .find(|c| c.kind == "google_search")
+        .unwrap();
+    assert_eq!(search.search_suggestions.as_deref(), Some(SUGGESTIONS));
+    assert!(!serde_json::to_string(search).unwrap().contains("container"));
+}
+
+// spec: protocols/gemini/streaming_spec.rb:74 drops search suggestions from the streamed parts it keeps for replay
+#[test]
+fn drops_search_suggestions_from_the_streamed_parts_it_keeps_for_replay() {
+    let parts = searched_parts();
+    let mut state = StreamState::default();
+    gemini::build_chunk(
+        &mut state,
+        &json!({ "candidates": [{ "content": { "parts": [parts[1].clone(), parts[2].clone()] } }] }),
+    );
+    let chunk = gemini::build_chunk(
+        &mut state,
+        &json!({ "candidates": [{ "content": { "parts": [{ "text": "4" }] }, "finishReason": "STOP" }] }),
+    );
+    let raw = chunk.raw_content.unwrap();
+    assert_eq!(raw[0]["toolResponse"]["response"], json!({}));
+    assert_eq!(raw.as_array().unwrap().len(), 3);
+}
+
+// spec: protocols/gemini/tools_spec.rb:52 #format_tool_call > sends parallel calls back in order with only the first one signed, as Gemini returned them
+#[tokio::test]
+async fn sends_parallel_calls_back_in_order_with_only_the_first_one_signed() {
+    let parts = json!([
+        { "functionCall": { "name": "weather", "args": { "city": "Zurich" } }, "thoughtSignature": "sig" },
+        { "functionCall": { "name": "local_time", "args": { "city": "Zurich" } } },
+        { "functionCall": { "name": "weather", "args": { "city": "Paris" } } },
+        { "functionCall": { "name": "local_time", "args": { "city": "Paris" } } }
+    ]);
+    let message = parse(parts_body(parts.clone()));
+    // An earlier turn: the current-turn placeholder never applies, as with `format_tool_call`.
+    let payload = render(
+        GEMINI,
+        vec![Message::user("Weather?"), message, Message::user("Thanks")],
+    )
+    .await;
+    assert_eq!(payload["contents"][1]["parts"], parts);
 }

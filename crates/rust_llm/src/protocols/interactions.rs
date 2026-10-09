@@ -131,7 +131,12 @@ fn format_interaction_input(messages: &[Message]) -> Result<Vec<Value>> {
         .map(|c| (c.id.as_str(), c))
         .collect();
     let mut input = Vec::new();
-    for message in messages.iter().filter(|m| m.role != Role::System) {
+    // Gemini checks signatures only in the current turn, which starts at the last user message.
+    let turn_start = messages.iter().rposition(|m| m.role == Role::User);
+    for (index, message) in messages.iter().enumerate() {
+        if message.role == Role::System {
+            continue;
+        }
         if let Some(raw) = message
             .raw_content
             .as_ref()
@@ -155,21 +160,26 @@ fn format_interaction_input(messages: &[Message]) -> Result<Vec<Value>> {
             )?);
             input.push(result);
         } else {
-            input.extend(render_interaction_message(message)?);
+            let current = turn_start.is_none_or(|start| index > start);
+            input.extend(render_interaction_message(message, current)?);
         }
     }
     Ok(input)
 }
 
-/// `render_interaction_history`: MCP steps replay without their signatures.
+/// `render_interaction_history`: MCP steps, and function steps the provider already answered,
+/// replay without their signatures.
 fn render_interaction_history(steps: Vec<Value>) -> Vec<Value> {
+    let answered = interaction_answered_calls(&steps);
     steps
         .into_iter()
         .map(|mut step| {
-            if step
+            let mcp = step
                 .get("type")
                 .and_then(Value::as_str)
-                .is_some_and(|t| t.starts_with("mcp_server_"))
+                .is_some_and(|t| t.starts_with("mcp_server_"));
+            let id = str_of(step.get("id")).or_else(|| str_of(step.get("call_id")));
+            if (mcp || id.is_some_and(|id| answered.contains(&id)))
                 && let Some(o) = step.as_object_mut()
             {
                 o.remove("signature");
@@ -179,18 +189,33 @@ fn render_interaction_history(steps: Vec<Value>) -> Vec<Value> {
         .collect()
 }
 
-fn render_interaction_message(message: &Message) -> Result<Vec<Value>> {
+/// `render_interaction_message`: the first call of a current-turn step without a signature gets
+/// the placeholder Gemini documents.
+fn render_interaction_message(message: &Message, current: bool) -> Result<Vec<Value>> {
     let mut steps = Vec::new();
-    if message.content.is_some() || !message.attachments.is_empty() {
+    let content = render_interaction_content(message.content.as_deref(), &message.attachments)?;
+    if !content.is_empty() {
         let kind = if message.role == Role::Assistant {
             "model_output"
         } else {
             "user_input"
         };
-        steps.push(json!({ "type": kind, "content": render_interaction_content(message.content.as_deref(), &message.attachments)? }));
+        steps.push(json!({ "type": kind, "content": content }));
     }
-    for call in message.tool_calls.iter().flat_map(|c| c.values()) {
-        steps.push(json!({ "type": "function_call", "id": call.id, "name": call.name, "arguments": Value::Object(call.arguments()) }));
+    for (position, call) in message
+        .tool_calls
+        .iter()
+        .flat_map(|c| c.values())
+        .enumerate()
+    {
+        let mut step = json!({ "type": "function_call", "id": call.id, "name": call.name, "arguments": Value::Object(call.arguments()) });
+        let signature = call.thought_signature.clone().or_else(|| {
+            (current && position == 0).then(|| super::gemini::PLACEHOLDER_SIGNATURE.to_string())
+        });
+        if let Some(signature) = signature {
+            step["signature"] = signature.into();
+        }
+        steps.push(step);
     }
     Ok(steps)
 }
@@ -205,6 +230,7 @@ fn render_interaction_content(
     attachments: &[Attachment],
 ) -> Result<Vec<Value>> {
     let mut parts: Vec<Value> = text
+        .filter(|t| !t.is_empty())
         .map(|t| json!({ "type": "text", "text": t }))
         .into_iter()
         .collect();
@@ -271,6 +297,7 @@ pub fn parse_completion_body(
         .unwrap_or_default();
     let (text, attachments, citations) = parse_interaction_content(&steps);
     let calls = parse_interaction_calls(&steps)?;
+    let status = interaction_status(status, &calls, &steps);
     if status == "requires_action" && calls.is_empty() {
         return Err(Error::Api(
             "Gemini interaction requires an unsupported action".into(),
@@ -283,7 +310,7 @@ pub fn parse_completion_body(
     m.citations = citations;
     m.thinking = parse_interaction_thinking(&steps);
     m.server_tool_calls = parse_interaction_server_calls(&steps);
-    m.raw_content = Some(json!({ "response": data }));
+    m.raw_content = Some(kept_interaction(data, &steps));
     m.model = str_of(data.get("model")).or_else(|| Some(model.id.clone()));
     m.finish_reason = Some(if !calls.is_empty() {
         FinishReason::ToolCalls
@@ -296,8 +323,113 @@ pub fn parse_completion_body(
     });
     m.tool_calls = super::tool_call_map(calls);
     parse_interaction_usage(&mut m, data.get("usage").unwrap_or(&Value::Null));
+    m.tokens.server_tool_use =
+        parse_interaction_server_tool_use(data.get("usage").unwrap_or(&Value::Null));
     m.raw = raw;
     Ok(m.normalized())
+}
+
+/// `interaction_status`: a `requires_action` interaction whose function calls the provider
+/// already answered, and which went on to answer, is complete.
+fn interaction_status<'a>(status: &'a str, calls: &[ToolCall], steps: &[Value]) -> &'a str {
+    if status != "requires_action"
+        || !calls.is_empty()
+        || interaction_answered_calls(steps).is_empty()
+    {
+        return status;
+    }
+    if steps
+        .iter()
+        .any(|s| s.get("type").and_then(Value::as_str) == Some("model_output"))
+    {
+        "completed"
+    } else {
+        status
+    }
+}
+
+/// `parse_interaction_server_tool_use`: `{tool}_requests` per grounding tool, Google Search
+/// counted as `web_search`.
+fn parse_interaction_server_tool_use(usage: &Value) -> Option<Map<String, Value>> {
+    let counts: Map<String, Value> = usage
+        .get("grounding_tool_count")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .map(|g| {
+            let tool = g.get("type").and_then(Value::as_str).unwrap_or("");
+            let tool = if tool == "google_search" {
+                "web_search"
+            } else {
+                tool
+            };
+            (
+                format!("{tool}_requests"),
+                g.get("count").cloned().unwrap_or(Value::Null),
+            )
+        })
+        .collect();
+    crate::tokens::Tokens::positive_counts(&Value::Object(counts))
+}
+
+/// `kept_interaction`: the interaction with its steps' search suggestions left out.
+fn kept_interaction(data: &Value, steps: &[Value]) -> Value {
+    let mut data = data.clone();
+    data["steps"] = Value::Array(steps.iter().map(without_search_suggestions).collect());
+    json!({ "response": data })
+}
+
+/// `without_search_suggestions`: Google's terms forbid storing them, and a replayed
+/// `google_search_result` keeps the shape it needs without them.
+fn without_search_suggestions(step: &Value) -> Value {
+    if step.get("type").and_then(Value::as_str) != Some("google_search_result") {
+        return step.clone();
+    }
+    let mut step = step.clone();
+    let result: Vec<Value> = match step.get("result") {
+        Some(Value::Array(items)) => items.clone(),
+        Some(Value::Null) | None => Vec::new(),
+        Some(other) => vec![other.clone()],
+    };
+    let result: Vec<Value> = result
+        .into_iter()
+        .map(|mut item| {
+            if let Some(o) = item.as_object_mut() {
+                o.remove("search_suggestions");
+            }
+            item
+        })
+        .collect();
+    step["result"] = Value::Array(result);
+    step
+}
+
+/// `search_suggestions(step)`: the suggestions a step's results carry, joined.
+fn search_suggestions(step: &Value) -> Option<String> {
+    let suggestions: Vec<&str> = step
+        .get("result")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|i| i.get("search_suggestions").and_then(Value::as_str))
+        .collect();
+    (!suggestions.is_empty()).then(|| suggestions.concat())
+}
+
+/// `interaction_answered_calls`: function calls whose result the interaction already carries.
+fn interaction_answered_calls(steps: &[Value]) -> Vec<String> {
+    let of = |kind: &str, key: &str| -> Vec<String> {
+        steps
+            .iter()
+            .filter(|s| s.get("type").and_then(Value::as_str) == Some(kind))
+            .filter_map(|s| str_of(s.get(key)))
+            .collect()
+    };
+    let results = of("function_result", "call_id");
+    of("function_call", "id")
+        .into_iter()
+        .filter(|id| results.contains(id))
+        .collect()
 }
 
 /// `parse_interaction_usage`: tool-use tokens count as input; thoughts count as output.
@@ -415,9 +547,11 @@ fn citation_index(text: &str, bytes: Option<i64>) -> Option<i64> {
 
 /// `Interactions::Tools#parse_interaction_calls`.
 pub fn parse_interaction_calls(steps: &[Value]) -> Result<Vec<ToolCall>> {
+    let answered = interaction_answered_calls(steps);
     steps
         .iter()
         .filter(|s| s.get("type").and_then(Value::as_str) == Some("function_call"))
+        .filter(|s| str_of(s.get("id")).is_none_or(|id| !answered.contains(&id)))
         .map(|step| {
             let mut call = ToolCall::new(
                 str_of(step.get("id")).unwrap_or_default(),
@@ -444,22 +578,28 @@ pub fn parse_interaction_arguments(arguments: Option<&Value>) -> Result<Map<Stri
 }
 
 fn parse_interaction_server_calls(steps: &[Value]) -> Vec<ServerToolCall> {
+    let answered = interaction_answered_calls(steps);
     steps
         .iter()
         .filter_map(|step| {
             let kind = step.get("type").and_then(Value::as_str).unwrap_or("");
-            if !(kind.ends_with("_call") || kind.ends_with("_result"))
-                || kind.starts_with("function_")
+            if !(kind.ends_with("_call") || kind.ends_with("_result")) {
+                return None;
+            }
+            let id = str_of(step.get("id")).or_else(|| str_of(step.get("call_id")));
+            if kind.starts_with("function_") && !id.as_ref().is_some_and(|id| answered.contains(id))
             {
                 return None;
             }
+            let kept = without_search_suggestions(step);
             Some(ServerToolCall {
                 kind: kind.into(),
-                id: str_of(step.get("id")).or_else(|| str_of(step.get("call_id"))),
-                name: str_of(step.get("name")),
-                input: step.get("arguments").cloned(),
-                result: step.get("result").cloned(),
-                raw: step.clone(),
+                id,
+                name: str_of(kept.get("name")),
+                input: kept.get("arguments").cloned(),
+                result: kept.get("result").cloned(),
+                raw: kept,
+                search_suggestions: search_suggestions(step),
             })
         })
         .collect()
