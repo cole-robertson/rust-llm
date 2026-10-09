@@ -12,9 +12,6 @@ use crate::config::Config;
 use crate::error::{Error, Result};
 use crate::transport::WebsocketConnection;
 
-/// `SAMPLE_RATES`.
-const SAMPLE_RATES: [u32; 6] = [8000, 16_000, 22_050, 24_000, 44_100, 48_000];
-
 /// `ENCODINGS`: WAVE format tag and bits per sample to xAI's encoding name.
 fn encoding_for(audio: &WavAudio) -> Option<&'static str> {
     match (audio.encoding, audio.bits_per_sample) {
@@ -129,15 +126,10 @@ fn streaming_transcription_url(
     audio: &WavAudio,
     api_base: &str,
 ) -> Result<String> {
-    let encoding = encoding_for(audio);
-    let (Some(encoding), true, true) = (
-        encoding,
-        SAMPLE_RATES.contains(&audio.sample_rate),
-        (1..=8).contains(&audio.channels),
-    ) else {
+    // Sample rates and channel counts are xAI's to enforce (RubyLLM 2.1, 27bb28c0).
+    let Some(encoding) = encoding_for(audio) else {
         return Err(Error::Argument(
-            "xAI streaming requires 16-bit PCM or 8-bit G.711 WAV audio at a supported sample rate"
-                .into(),
+            "xAI streaming requires 16-bit PCM or 8-bit G.711 WAV audio".into(),
         ));
     };
     let mut params = payload.clone();
@@ -433,6 +425,30 @@ mod tests {
             result.words,
             Some(segment_event()["words"].as_array().unwrap().clone())
         );
+    }
+
+    // spec: protocols/xai/streaming_transcription_spec.rb:68 leaves sample rates and channel counts to xAI
+    #[test]
+    fn leaves_sample_rates_and_channel_counts_to_xai() {
+        let audio = WavAudio {
+            encoding: 1,
+            bits_per_sample: 16,
+            sample_rate: 32_000,
+            channels: 10,
+            ..fixture()
+        };
+        let url = streaming_transcription_url(&Map::new(), &audio, "https://api.x.ai/v1").unwrap();
+        let params: Vec<(String, String)> = reqwest::Url::parse(&url)
+            .unwrap()
+            .query_pairs()
+            .into_owned()
+            .collect();
+        for (key, value) in [("sample_rate", "32000"), ("channels", "10")] {
+            assert!(
+                params.contains(&(key.to_string(), value.to_string())),
+                "{key}={value} in {params:?}"
+            );
+        }
     }
 
     // spec: protocols/xai/streaming_transcription_spec.rb:76 rejects unsupported WAV encodings before opening a socket

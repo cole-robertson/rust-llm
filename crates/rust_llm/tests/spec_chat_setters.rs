@@ -249,6 +249,7 @@ fn add_completion_leaves_the_ledger_alone_when_usage_is_already_recorded() {
     response.tokens.output = Some(2);
     response.usage_entries = vec![UsageEntry {
         id: UsageEntry::next_id(),
+        owner: None,
         operation: rust_llm::message::Operation::Chat,
         provider: "anthropic".into(),
         model: MODEL.into(),

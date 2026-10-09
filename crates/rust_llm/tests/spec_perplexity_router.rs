@@ -301,45 +301,36 @@ async fn serializes_documented_wav_audio_input_while_keeping_sonar_audio_unsuppo
     ));
 }
 
-// UPSTREAM-REMOVED in 2.1 (was spec: protocols/perplexity/router_spec.rb:104)
-#[tokio::test]
-async fn rejects_explicitly_unsupported_request_controls_before_making_a_request() {
-    let server = MockServer::start().await;
-    for options in [
-        json!({ "seed": 1 }),
-        json!({ "modalities": ["audio"] }),
-        json!({ "n": 2 }),
-        json!({ "presence_penalty": 1 }),
-        json!({ "stream_options": { "include_obfuscation": true } }),
-    ] {
-        let mut chat = router(config(Some(&server.uri()))).with_provider_options(options.clone());
-        chat.ask_later("Hello").unwrap();
-        let err = chat.render().unwrap_err();
-        assert!(
-            matches!(&err, Error::Argument(m) if m.contains("Perplexity Router does not support")),
-            "{options}: {err:?}"
-        );
-    }
-    assert!(server.received_requests().await.unwrap().is_empty());
+// spec: protocols/perplexity/router_spec.rb:104 leaves request controls and tool descriptions to Router
+#[test]
+fn leaves_request_controls_and_tool_descriptions_to_router() {
+    let mut chat = router(config(None))
+        .with_tool(Undescribed)
+        .with_provider_options(json!({ "seed": 1 }));
+    chat.ask_later("Hello").unwrap();
+    let payload = chat.render().unwrap();
+    assert_eq!(payload["seed"], json!(1));
+    assert_eq!(
+        payload["tools"][0]["function"]["name"],
+        json!("undescribed")
+    );
 }
 
-// UPSTREAM-REMOVED in 2.1 (was spec: protocols/perplexity/router_spec.rb:113)
+// spec: protocols/perplexity/router_spec.rb:112 defaults schemas to strict without overriding an explicit choice
 #[test]
-fn requires_tool_descriptions_and_strict_schemas_without_changing_the_default_protocol() {
-    let mut chat = router(config(None)).with_tool(Undescribed);
-    chat.ask_later("Hello").unwrap();
-    assert!(
-        matches!(chat.render(), Err(Error::Argument(m)) if m.contains("require a description"))
-    );
-    let schema = json!({ "name": "answer", "schema": { "type": "object", "properties": {} }, "strict": false });
-    let err = router(config(None))
-        .with_schema(schema)
-        .render()
-        .unwrap_err();
-    assert!(
-        matches!(&err, Error::Argument(m) if m.contains("strict structured output")),
-        "{err:?}"
-    );
+fn defaults_schemas_to_strict_without_overriding_an_explicit_choice() {
+    let schema = json!({ "name": "answer", "schema": { "type": "object", "properties": {} } });
+    let mut explicit = schema.clone();
+    explicit["strict"] = json!(false);
+    for (given, strict) in [(schema, true), (explicit, false)] {
+        let mut chat = router(config(None)).with_schema(given);
+        chat.ask_later("Hello").unwrap();
+        let payload = chat.render().unwrap();
+        assert_eq!(
+            payload["response_format"]["json_schema"]["strict"],
+            json!(strict)
+        );
+    }
 }
 
 // spec: protocols/perplexity/router_spec.rb:122

@@ -119,8 +119,8 @@ async fn usage_row(
     status: &str,
 ) {
     rust_llm_usages::ActiveModel {
-        chat_type: Set("Chat".into()),
-        chat_id: Set(chat_id as i64),
+        chat_type: Set(Some("Chat".into())),
+        chat_id: Set(Some(chat_id as i64)),
         message_type: Set(Some("Message".into())),
         message_id: Set(Some(message_id as i64)),
         operation: Set("chat".into()),
@@ -558,6 +558,7 @@ async fn drops_a_persisted_gemini_signature_when_the_chat_moves_to_anthropic() {
             .unwrap();
     message.usage_entries = vec![UsageEntry {
         id: UsageEntry::next_id(),
+        owner: None,
         operation: Operation::Chat,
         provider: "gemini".into(),
         model: "gemini-2.5-flash".into(),

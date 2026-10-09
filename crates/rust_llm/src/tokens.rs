@@ -42,7 +42,9 @@ impl Tokens {
             .filter_map(|t| t.reported_cost)
             .fold(None, |acc: Option<f64>, v| Some(acc.unwrap_or(0.0) + v));
         // `aggregate_counts`: sums each key across the attempts that reported any.
-        fn counts<'a>(maps: impl Iterator<Item = &'a Map<String, Value>>) -> Option<Map<String, Value>> {
+        fn counts<'a>(
+            maps: impl Iterator<Item = &'a Map<String, Value>>,
+        ) -> Option<Map<String, Value>> {
             let mut out: Option<Map<String, Value>> = None;
             for counters in maps {
                 let total = out.get_or_insert_with(Map::new);

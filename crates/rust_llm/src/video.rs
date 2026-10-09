@@ -121,9 +121,21 @@ pub struct VideoJob {
     pub error: Option<String>,
     /// The provider's raw response from the last submit or poll.
     pub raw: Value,
+    /// The clip length in seconds the request asked for, or `None` when it left the length to
+    /// the provider's default.
+    pub duration: Option<f64>,
+    /// The resolution the request asked for, as the provider spells it, such as `"720p"` or
+    /// `"1280x720"`, or `None` when it left the resolution to the provider's default.
+    pub resolution: Option<String>,
     family: Family,
     connection: Connection,
     video: Option<Video>,
+    /// `@reported_cost`: what the provider billed, in USD, from the last poll.
+    reported_cost: Option<f64>,
+    /// `@usage_recorded`.
+    usage_recorded: bool,
+    /// `@usage_owner`: the owner at submission, who the finished job's usage is attributed to.
+    usage_owner: Option<crate::accounting::UsageOwner>,
 }
 
 impl VideoJob {
@@ -160,8 +172,42 @@ impl VideoJob {
         let (status, error) = self.family.parse_status(&body)?;
         self.status = status;
         self.error = error;
+        self.reported_cost = self.family.reported_cost(&body);
         self.raw = body;
+        self.record_usage().await;
         Ok(self)
+    }
+
+    /// `cost`: the cost the provider reported for the job. Its total is `None` while the job is
+    /// pending or when the provider reports no price (only xAI and OpenRouter do).
+    pub fn cost(&self) -> crate::cost::Cost {
+        let tokens = crate::tokens::Tokens {
+            reported_cost: self.reported_cost,
+            ..Default::default()
+        };
+        crate::cost::Cost::new(&tokens, None, crate::cost::Tier::Standard)
+    }
+
+    /// `record_usage`: one `usage.rust_llm` entry once the job finishes, priced at the
+    /// provider-reported cost.
+    async fn record_usage(&mut self) {
+        if self.is_pending() || self.usage_recorded {
+            return;
+        }
+        self.usage_recorded = true;
+        let mut entry = crate::message::UsageEntry::new(
+            crate::message::Operation::Video,
+            self.family.provider().slug(),
+            Some(&self.model),
+        );
+        entry.status = if self.is_completed() {
+            crate::message::UsageStatus::Succeeded
+        } else {
+            crate::message::UsageStatus::Failed
+        };
+        entry.cost = self.cost();
+        entry.owner = self.usage_owner.clone();
+        crate::accounting::report(self.connection.config(), &[entry]).await;
     }
 
     /// `wait(timeout:, interval:)`: poll until the job finishes. `None` uses the configured
@@ -277,6 +323,9 @@ pub struct AnimateOptions<'a> {
     /// `metadata:`: added to the `video.rust_llm` and `video_job.rust_llm` event payloads, never
     /// sent to the provider.
     pub metadata: Option<Value>,
+    /// `owner:`: who the job's usage is attributed to once it finishes, such as a user; wins over
+    /// [`crate::accounting::with_usage_owner`].
+    pub owner: Option<crate::accounting::UsageOwner>,
 }
 
 /// `RubyLLM.animate(prompt, ...)`: submit a job and poll until the video is ready, inside a
@@ -334,6 +383,7 @@ pub async fn animate_later(prompt: Option<&str>, options: AnimateOptions<'_>) ->
         .to_string();
     let (model, provider) =
         resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let owner = options.owner.clone();
     let mut event = crate::instrumentation::Event::start(&config, "video_job.rust_llm", || {
         crate::instrumentation::payload([
             ("provider", provider.slug().into()),
@@ -348,7 +398,10 @@ pub async fn animate_later(prompt: Option<&str>, options: AnimateOptions<'_>) ->
         ])
     });
     let result = tracing::Instrument::instrument(
-        submit(prompt, options, config.clone(), model, provider),
+        crate::accounting::owned_by(
+            owner,
+            submit(prompt, options, config.clone(), model, provider),
+        ),
         event.span(),
     )
     .await;
@@ -426,22 +479,30 @@ async fn submit(
         .await?;
     let body = json_response(resp, payload.clone()).await?.body;
     let (id, status, error) = family.parse_job(&body)?;
+    let (duration, resolution) = family.parse_request(&payload);
     let model = match family {
         Family::GPUStack => body.get("model").and_then(Value::as_str),
         _ => None,
     }
     .unwrap_or(&model.id)
     .to_string();
-    Ok(VideoJob {
+    let mut job = VideoJob {
         id,
         status,
         model,
         error,
         raw: body,
+        duration,
+        resolution,
         family,
         connection,
         video: None,
-    })
+        reported_cost: None,
+        usage_recorded: false,
+        usage_owner: crate::accounting::usage_owner(),
+    };
+    job.record_usage().await;
+    Ok(job)
 }
 
 /// Which video seams a provider's protocol includes.
@@ -687,6 +748,53 @@ impl Family {
         }
     }
 
+    /// `parse_video_request`: the duration in seconds and the resolution the rendered request
+    /// asked for, read from each protocol's own fields (`video_request_settings`).
+    fn parse_request(self, payload: &Value) -> (Option<f64>, Option<String>) {
+        let field = |key: &str| payload.get(key).filter(|v| !v.is_null());
+        let (duration, resolution) = match self {
+            Family::XAI => (field("duration"), field("resolution")),
+            Family::OpenRouter => (
+                field("duration"),
+                field("resolution").or_else(|| field("size")),
+            ),
+            Family::Gemini => {
+                let parameters = payload.get("parameters");
+                (
+                    parameters.and_then(|p| p.get("durationSeconds")),
+                    parameters.and_then(|p| p.get("resolution")),
+                )
+            }
+            Family::GPUStack => (field("seconds"), field("size")),
+        };
+        (
+            duration.and_then(video_seconds),
+            resolution.and_then(Value::as_str).map(str::to_string),
+        )
+    }
+
+    /// The provider whose protocol includes these seams.
+    fn provider(self) -> Provider {
+        match self {
+            Family::XAI => Provider::XAI,
+            Family::OpenRouter => Provider::OpenRouter,
+            Family::Gemini => Provider::Gemini,
+            Family::GPUStack => Provider::GPUStack,
+        }
+    }
+
+    /// `parse_video_job_status`'s `reported_cost: reported_cost(body['usage'] || {})`: xAI's USD
+    /// ticks and OpenRouter's dollars, through their chat protocols' helpers.
+    fn reported_cost(self, body: &Value) -> Option<f64> {
+        match self {
+            Family::XAI | Family::OpenRouter => crate::protocols::chat_completions::reported_cost(
+                self.provider(),
+                body.get("usage").unwrap_or(&json!({})),
+            ),
+            Family::Gemini | Family::GPUStack => None,
+        }
+    }
+
     /// `parse_video_job`: the job id, its state, and the provider's failure message.
     fn parse_job(self, body: &Value) -> Result<(String, VideoStatus, Option<String>)> {
         let (key, message) = match self {
@@ -928,6 +1036,20 @@ fn gemini_generated_video(body: &Value) -> Option<&Value> {
         .filter(|v| !v.is_null())
 }
 
+/// `parse_video_seconds`: a number as is; a string like `"8"` or `"8s"` as its number.
+fn video_seconds(value: &Value) -> Option<f64> {
+    match value {
+        // Ruby's `Float()` refuses "inf" and "NaN", which Rust's parser takes.
+        Value::String(s) => s
+            .strip_suffix('s')
+            .unwrap_or(s)
+            .parse::<f64>()
+            .ok()
+            .filter(|n| n.is_finite()),
+        other => other.as_f64(),
+    }
+}
+
 /// Ruby string interpolation of a JSON value: strings bare, everything else as JSON.
 fn display(v: &Value) -> String {
     match v {
@@ -1031,6 +1153,28 @@ mod tests {
                 .unwrap()
                 .0,
             VideoStatus::Pending
+        );
+    }
+
+    // spec: protocols/gemini/videos_spec.rb:43 #parse_video_request > reads the requested duration and resolution from the parameters
+    #[test]
+    fn gemini_reads_the_requested_duration_and_resolution_from_the_parameters() {
+        let (_, payload) = Family::Gemini
+            .render(
+                Some("a hummingbird"),
+                "veo-3.1-fast-generate-preview",
+                &[],
+                &json!({ "parameters": { "durationSeconds": 8, "resolution": "1080p" } }),
+            )
+            .unwrap();
+
+        assert_eq!(
+            Family::Gemini.parse_request(&payload),
+            (Some(8.0), Some("1080p".into()))
+        );
+        assert_eq!(
+            Family::Gemini.parse_request(&json!({ "instances": [{ "prompt": "a hummingbird" }] })),
+            (None, None)
         );
     }
 

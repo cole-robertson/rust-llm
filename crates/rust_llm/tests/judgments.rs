@@ -473,7 +473,7 @@ async fn validates_before_sending_anything() {
     );
     let bad_score = j
         .clone()
-        .score("s", None, json!(["only one"]))
+        .score("s", None, json!([]))
         .unwrap()
         .judge("x")
         .await
@@ -481,7 +481,7 @@ async fn validates_before_sending_anything() {
     assert!(
         bad_score
             .to_string()
-            .contains("at least two non-nil levels")
+            .contains("A score needs a nonempty Array of levels")
     );
     let reserved = j
         .clone()
@@ -499,11 +499,13 @@ async fn validates_before_sending_anything() {
     assert!(seen.lock().unwrap().is_empty(), "nothing was sent");
 }
 
+// 2.1 judges OpenAI models through Decisions, so the unsupported provider is Anthropic
+// (`judge_spec.rb` uses `model_for(:anthropic)`).
 #[tokio::test]
 async fn chat_models_are_rejected_for_judgments_and_jev_for_chat() {
     let err = Judge::new()
         .with_config(config_at("http://127.0.0.1:9", 0))
-        .model("gpt-5-nano")
+        .model("claude-haiku-4-5")
         .probability("urgent", "?")
         .unwrap()
         .judge("x")

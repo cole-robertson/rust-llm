@@ -11,6 +11,7 @@ use crate::message::{
     Citation, Message, RawResponse, Role, ServerToolCall, Thinking, ToolArguments, ToolCall,
 };
 use crate::model::Model;
+use crate::providers::Provider;
 use crate::thinking::ThinkingConfig;
 use crate::tool::{Tool, tool_schema};
 
@@ -293,20 +294,19 @@ fn format_thinking_blocks(msg: &Message) -> Vec<Value> {
     {
         return blocks.clone();
     }
-    let Some(thinking) = &msg.thinking else {
-        return Vec::new();
-    };
-    if let Some(text) = &thinking.text {
-        let mut block = json!({ "type": "thinking", "thinking": text });
-        if let Some(sig) = &thinking.signature {
-            block["signature"] = sig.clone().into();
-        }
-        vec![block]
-    } else if let Some(sig) = &thinking.signature {
-        vec![json!({ "type": "redacted_thinking", "data": sig })]
-    } else {
-        Vec::new()
-    }
+    build_thinking_block(msg).into_iter().collect()
+}
+
+/// `build_thinking_block`: Claude takes a thinking block back only with the signature it issued
+/// (`own_signature`), as `thinking` with its text or as `redacted_thinking` without.
+#[doc(hidden)]
+pub fn build_thinking_block(msg: &Message) -> Option<Value> {
+    let signature = msg.own_signature(Provider::Anthropic.slug())?;
+    let text = msg.thinking.as_ref().and_then(|t| t.text.as_ref());
+    Some(match text {
+        Some(text) => json!({ "type": "thinking", "thinking": text, "signature": signature }),
+        None => json!({ "type": "redacted_thinking", "data": signature }),
+    })
 }
 
 /// `prompt_cache_control(caching, ttl: msg.cache_ttl)` for a boundary message: the message's own
@@ -440,7 +440,8 @@ pub(crate) fn unsupported(mime: &str) -> String {
     )
 }
 
-fn function_for(tool: &dyn Tool) -> Value {
+/// `Tools.function_for` (public for the tool-search specs).
+pub fn function_for(tool: &dyn Tool) -> Value {
     let schema = tool_schema(tool).unwrap_or_else(|| {
         json!({ "type": "object", "properties": {}, "required": [], "additionalProperties": false, "strict": true })
     });
@@ -449,6 +450,9 @@ fn function_for(tool: &dyn Tool) -> Value {
         "description": tool.description(),
         "input_schema": schema,
     });
+    if tool.is_deferred_registration() {
+        declaration["defer_loading"] = true.into();
+    }
     let opts = tool.provider_options();
     if !opts.is_empty() {
         super::deep_merge(&mut declaration, &Value::Object(opts));
@@ -490,7 +494,10 @@ fn add_thinking_fields(
         return;
     };
     if thinking.enabled == Some(false) {
-        payload.insert("thinking".into(), json!({ "type": "disabled" }));
+        payload.insert(
+            "thinking".into(),
+            json!({ "type": thinking_off_type(&model.id) }),
+        );
         return;
     }
     let effort = thinking.effort.clone().filter(|e| !e.is_empty());
@@ -526,6 +533,25 @@ fn add_thinking_fields(
         let output = payload.entry("output_config").or_insert_with(|| json!({}));
         output["effort"] = effort.into();
     }
+}
+
+/// `thinking_off_type`: Claude Sonnet 5.5 turns thinking off with `between_tools`
+/// (`Providers::Anthropic.between_tools_off?`); other models still accept `disabled`.
+fn thinking_off_type(model_id: &str) -> &'static str {
+    if is_between_tools_off(model_id) {
+        "between_tools"
+    } else {
+        "disabled"
+    }
+}
+
+/// `Providers::Anthropic.between_tools_off?`: the exact Sonnet 5.5 ids, no accidental suffixes.
+#[doc(hidden)]
+pub fn is_between_tools_off(model_id: &str) -> bool {
+    matches!(
+        model_id,
+        "claude-sonnet-5-5" | "anthropic.claude-sonnet-5-5"
+    )
 }
 
 fn effort_budget(effort: Option<&str>, model: &Model, max_tokens: i64) -> Option<i64> {
@@ -567,8 +593,39 @@ fn aggregate_usage(usage: Option<&Value>) -> Map<String, Value> {
                 .sum();
             usage.insert(key.into(), sum.into());
         }
+        // `iteration_cache_creation`: the lifetime breakdowns summed key by key.
+        let mut breakdown: Option<Map<String, Value>> = None;
+        for b in iterations
+            .iter()
+            .filter_map(|it| it.get("cache_creation").and_then(Value::as_object))
+        {
+            let total = breakdown.get_or_insert_with(Map::new);
+            for (key, count) in b {
+                let sum = total.get(key).and_then(Value::as_i64).unwrap_or(0)
+                    + count.as_i64().unwrap_or(0);
+                total.insert(key.clone(), sum.into());
+            }
+        }
+        if let Some(breakdown) = breakdown {
+            usage.insert("cache_creation".into(), Value::Object(breakdown));
+        }
     }
     usage
+}
+
+/// `extract_cache_write_by_ttl`: `cache_creation.ephemeral_<ttl>_input_tokens` keyed by ttl.
+fn cache_write_by_ttl(usage: &Map<String, Value>) -> Option<Map<String, Value>> {
+    let breakdown = usage.get("cache_creation")?.as_object()?;
+    let by_ttl: Map<String, Value> = breakdown
+        .iter()
+        .filter_map(|(key, count)| {
+            let ttl = key
+                .strip_prefix("ephemeral_")?
+                .strip_suffix("_input_tokens")?;
+            (!ttl.is_empty()).then(|| (ttl.to_string(), count.clone()))
+        })
+        .collect();
+    crate::tokens::Tokens::positive_counts(&Value::Object(by_ttl))
 }
 
 fn cache_write(usage: &Map<String, Value>) -> Option<i64> {
@@ -621,6 +678,7 @@ fn server_tool_calls(blocks: &[Value]) -> Vec<ServerToolCall> {
             input: b.get("input").cloned(),
             result: b.get("content").cloned(),
             raw: b.clone(),
+            search_suggestions: None,
         })
         .collect()
 }
@@ -720,6 +778,7 @@ pub fn parse_completion_body(data: &Value, raw: RawResponse) -> Result<Message> 
     m.tokens.output = int(usage.get("output_tokens"));
     m.tokens.cache_read = int(usage.get("cache_read_input_tokens"));
     m.tokens.cache_write = cache_write(&usage);
+    m.tokens.cache_write_by_ttl = cache_write_by_ttl(&usage);
     m.tokens.thinking = int(usage
         .get("output_tokens_details")
         .and_then(|d| d.get("thinking_tokens")))
@@ -797,13 +856,14 @@ fn track(state: &mut StreamBlocks, data: &Value, delta_type: Option<&str>) {
             let Some(block) = state.block(index) else {
                 return;
             };
+            // `append_stream_text`: the delta goes onto the block's String in place, so a long
+            // stream does not copy the whole text on every delta.
             let append = |block: &mut Value, key: &str, add: &Value| {
-                let prev = block
-                    .get(key)
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_string();
-                block[key] = format!("{prev}{}", add.as_str().unwrap_or("")).into();
+                let add = add.as_str().unwrap_or("");
+                match block.get_mut(key) {
+                    Some(Value::String(text)) => text.push_str(add),
+                    _ => block[key] = add.into(),
+                }
             };
             match delta_type {
                 Some("text_delta") => append(block, "text", &delta["text"]),
@@ -879,6 +939,11 @@ pub fn build_chunk(state: &mut StreamBlocks, data: &Value) -> Message {
     });
     chunk.tokens.cache_read = usage_int("cache_read_input_tokens");
     chunk.tokens.cache_write = cache_write(&message_usage).or_else(|| cache_write(&delta_usage));
+    chunk.tokens.cache_write_by_ttl = message_usage
+        .get("cache_creation")
+        .map(|_| &message_usage)
+        .or_else(|| delta_usage.get("cache_creation").map(|_| &delta_usage))
+        .and_then(cache_write_by_ttl);
     chunk.tokens.server_tool_use = data
         .pointer("/message/usage/server_tool_use")
         .or_else(|| data.pointer("/usage/server_tool_use"))

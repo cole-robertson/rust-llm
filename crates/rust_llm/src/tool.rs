@@ -155,6 +155,20 @@ pub trait Tool: Send + Sync {
         Map::new()
     }
 
+    /// `Tool.defer` / `Tool.deferred?`: keeps this tool's definition out of the model's context
+    /// until the provider's tool search loads it. Pass `Some(false)` to
+    /// `Chat::add_tool_deferred` to offer it up front in one chat. See `Chat::deferred_tools`.
+    fn is_deferred(&self) -> bool {
+        false
+    }
+
+    /// Whether this is a [`Deferred`] registration, the tool set a chat renders for a request.
+    /// Protocols with native tool search mark these `defer_loading`.
+    #[doc(hidden)]
+    fn is_deferred_registration(&self) -> bool {
+        false
+    }
+
     async fn execute(
         &self,
         arguments: Map<String, Value>,
@@ -354,6 +368,56 @@ pub(crate) fn validate_arguments(
 }
 
 pub type SharedTool = Arc<dyn Tool>;
+
+/// `Tool::Deferred`: a tool the chat registered as deferred, delegating everything to it. Only
+/// protocols with tool search (Anthropic, OpenAI Responses) treat it differently.
+pub struct Deferred(pub SharedTool);
+
+#[async_trait]
+impl Tool for Deferred {
+    fn description(&self) -> String {
+        self.0.description()
+    }
+    fn name(&self) -> String {
+        self.0.name()
+    }
+    fn parameters(&self) -> Vec<Parameter> {
+        self.0.parameters()
+    }
+    fn parameters_schema(&self) -> Option<Value> {
+        self.0.parameters_schema()
+    }
+    fn requires_approval(&self) -> bool {
+        self.0.requires_approval()
+    }
+    fn approval(&self, tool_call: &ToolCall) -> Option<Option<bool>> {
+        self.0.approval(tool_call)
+    }
+    fn provider_options(&self) -> Map<String, Value> {
+        self.0.provider_options()
+    }
+    fn is_deferred(&self) -> bool {
+        self.0.is_deferred()
+    }
+    fn is_deferred_registration(&self) -> bool {
+        true
+    }
+    async fn execute(
+        &self,
+        arguments: Map<String, Value>,
+        tool_call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
+        self.0.execute(arguments, tool_call).await
+    }
+    async fn resume(
+        &self,
+        input: &Value,
+        arguments: Map<String, Value>,
+        tool_call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
+        self.0.resume(input, arguments, tool_call).await
+    }
+}
 
 type ToolFnFuture =
     std::pin::Pin<Box<dyn std::future::Future<Output = Result<ToolResult, ToolError>> + Send>>;

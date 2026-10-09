@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use rust_llm::{Answer, Config, Error, ErrorKind, Judge, list_judgment_models};
+use rust_llm::{Answer, Config, ErrorKind, Judge, list_judgment_models};
 use serde_json::{Value, json};
 use wiremock::{Mock, MockServer, ResponseTemplate, matchers};
 
@@ -64,12 +64,14 @@ fn judge(server: &MockServer) -> Judge {
 }
 
 // UPSTREAM-REMOVED in 2.1 (was spec: protocols/system_one_spec.rb:49) enforces provider limits without putting them in the domain
+// 2.1 trusts System One to enforce its own limits (upstream 1609050b): 256 choices and 11 levels
+// are sent as they are. The stub's canned answers don't match these questions, so only what was
+// sent is checked.
 #[tokio::test]
-async fn enforces_provider_limits_without_putting_them_in_the_domain() {
+async fn forwards_choices_and_levels_beyond_the_old_local_limits() {
     let server = answering(body()).await;
     let options: serde_json::Map<String, Value> =
         (0..256).map(|n| (n.to_string(), Value::Null)).collect();
-    // The questions themselves are valid (the domain has no limit); only rendering refuses them.
     let choice = Judge::new()
         .with_config(config(&server))
         .model(MODEL)
@@ -81,13 +83,31 @@ async fn enforces_provider_limits_without_putting_them_in_the_domain() {
         .score("score", None, json!(vec!["A level"; 11]))
         .unwrap();
 
-    let err = choice.judge("Help").await.unwrap_err();
-    assert!(matches!(err, Error::Argument(_)), "{err:?}");
-    assert!(err.to_string().contains("255"), "{err}");
-    let err = score.judge("Help").await.unwrap_err();
-    assert!(matches!(err, Error::Argument(_)), "{err:?}");
-    assert!(err.to_string().contains("10"), "{err}");
-    assert!(server.received_requests().await.unwrap().is_empty());
+    let _ = choice.judge("Help").await;
+    let _ = score.judge("Help").await;
+
+    let sent: Vec<Value> = server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .map(|r| serde_json::from_slice(&r.body).unwrap())
+        .collect();
+    assert_eq!(sent.len(), 2);
+    assert_eq!(
+        sent[0]["questions"]["team"]["criteria"]
+            .as_object()
+            .unwrap()
+            .len(),
+        256
+    );
+    assert_eq!(
+        sent[1]["questions"]["score"]["criteria"]
+            .as_array()
+            .unwrap()
+            .len(),
+        11
+    );
 }
 
 // spec: protocols/system_one_spec.rb:65 parses all result fields and preserves declared key types

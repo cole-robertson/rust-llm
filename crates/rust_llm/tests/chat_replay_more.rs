@@ -830,6 +830,7 @@ async fn web_search_openrouter_returns_citations_and_counters() {
     cassette.assert_all_matched().await;
 }
 
+// spec: chat_provider_tools_spec.rb:363 web search > with xai/#{model_for(:xai, :provider_tools)} > searches, cites, and counts the sources it used
 #[tokio::test]
 async fn web_search_xai_searches_cites_and_counts() {
     let cassette =
@@ -843,7 +844,7 @@ async fn web_search_xai_searches_cites_and_counts() {
         response
             .tokens()
             .server_tool_use
-            .is_some_and(|u| u.contains_key("num_server_side_tools_used")),
+            .is_some_and(|u| u.get("web_search_requests") == Some(&json!(2))),
         "{:?}",
         response.tokens()
     );

@@ -234,6 +234,7 @@ impl Http {
         let response = Some(ErrorResponse {
             status,
             body: body.to_string(),
+            ..Default::default()
         });
         match status {
             401 => Error::Unauthorized(format!("{} requires authorization", self.host()), response),

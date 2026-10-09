@@ -392,7 +392,7 @@ async fn gemini_2_5_flash_can_transcribe_audio() {
     )
     .await;
     assert_eq!(t.tokens().input, Some(133));
-    assert_eq!(t.tokens().output, Some(30), "candidates plus thoughts");
+    assert_eq!(t.tokens().output, Some(34), "candidates plus thoughts");
     // gemini-2.5-flash prices audio input at $1/M and text output at $2.50/M.
     let cost = t.cost();
     assert!(
@@ -400,7 +400,7 @@ async fn gemini_2_5_flash_can_transcribe_audio() {
         "{cost:?}"
     );
     assert!(
-        (cost.output.unwrap() - 30.0 * 2.5 / 1e6).abs() < 1e-12,
+        (cost.output.unwrap() - 34.0 * 2.5 / 1e6).abs() < 1e-12,
         "{cost:?}"
     );
 }

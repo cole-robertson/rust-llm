@@ -167,6 +167,30 @@ fn deduplicates_citations_repeated_across_chunks() {
     assert_eq!(finish(acc).citations, vec![citation]);
 }
 
+// spec: protocol/stream_accumulator_spec.rb:105 #add > reads each citation of a repeated list once to deduplicate it
+// Ruby spies on `Citation#to_h` to count reads; the port keys each incoming citation by its
+// serialized attributes exactly once (a hash-set insert), which is not observable from outside,
+// so this checks what the keying must preserve: the first occurrences, in order.
+#[test]
+fn reads_each_citation_of_a_repeated_list_once_to_deduplicate_it() {
+    let build = || {
+        (0..5)
+            .map(|index| Citation {
+                url: Some(format!("https://example.com/{index}")),
+                ..Default::default()
+            })
+            .collect::<Vec<_>>()
+    };
+    let first = build();
+    let mut acc = StreamAccumulator::default();
+    for (text, citations) in [("Hello", first.clone()), (" world", build())] {
+        let mut c = chunk(Some(text));
+        c.citations = citations;
+        acc.add(&c);
+    }
+    assert_eq!(finish(acc).citations, first);
+}
+
 // spec: protocol/stream_accumulator_spec.rb:119 #add > retains distinct server events without ids and replaces repeated identified events
 #[test]
 fn retains_distinct_server_events_without_ids_and_replaces_repeated_identified_events() {
@@ -178,6 +202,7 @@ fn retains_distinct_server_events_without_ids_and_replaces_repeated_identified_e
         input: None,
         result: result.map(Value::from),
         raw: json!({}),
+        search_suggestions: None,
     };
     let calls = [
         server_call("tool_result", None, Some("first")),

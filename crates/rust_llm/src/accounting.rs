@@ -13,11 +13,130 @@ use serde_json::{Map, Value};
 use crate::chat::UsageRecorder;
 use crate::config::Config;
 use crate::cost::{Cost, Tier};
+use crate::embedding::Embedding;
 use crate::error::Error;
+use crate::image::Image;
 use crate::message::{Message, Operation, UsageEntry, UsageStatus};
 use crate::model::Model;
 use crate::moderation::Moderation;
+use crate::rerank::Rerank;
+use crate::speech::Speech;
 use crate::tokens::Tokens;
+use crate::transcription::Transcription;
+
+/// Who an attempt's usage is attributed to (`Accounting::Usage::Entry#owner`). Ruby takes any
+/// object and the Rails ledger keeps it only when it is an Active Record; here a [`UsageOwner::Record`]
+/// names a row (`owner_type`/`owner_id`), and [`UsageOwner::Other`] is any other value, reported in
+/// `usage.rust_llm` but never written to a ledger's owner columns.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UsageOwner {
+    /// A database row, like a `User` or an `Account`: `(owner_type, owner_id)`.
+    Record { owner_type: String, owner_id: i64 },
+    /// Anything else, such as `"user-42"`.
+    Other(String),
+}
+
+impl UsageOwner {
+    /// A row of `owner_type` (the class name Rails would store, like `"User"`) with id `owner_id`.
+    pub fn record(owner_type: impl Into<String>, owner_id: i64) -> UsageOwner {
+        UsageOwner::Record {
+            owner_type: owner_type.into(),
+            owner_id,
+        }
+    }
+
+    /// The owner as it appears in a `usage.rust_llm` payload: a record as `{type, id}`, anything
+    /// else as its string.
+    pub fn to_value(&self) -> Value {
+        match self {
+            UsageOwner::Record {
+                owner_type,
+                owner_id,
+            } => serde_json::json!({ "type": owner_type, "id": owner_id }),
+            UsageOwner::Other(s) => Value::String(s.clone()),
+        }
+    }
+}
+
+impl From<&str> for UsageOwner {
+    fn from(s: &str) -> Self {
+        UsageOwner::Other(s.to_string())
+    }
+}
+
+impl From<String> for UsageOwner {
+    fn from(s: String) -> Self {
+        UsageOwner::Other(s)
+    }
+}
+
+tokio::task_local! {
+    static OWNER: Option<UsageOwner>;
+}
+
+/// `Accounting::Usage.owner`: the owner of the running task's `with_usage_owner` block, if any.
+pub fn usage_owner() -> Option<UsageOwner> {
+    OWNER.try_with(Clone::clone).ok().flatten()
+}
+
+/// `RubyLLM.with_usage_owner(owner) { ... }` (`Accounting::Usage.with_owner`): attributes the
+/// usage of every operation `future` runs to `owner`. An operation's own `owner:` option wins.
+/// The outer owner comes back when `future` finishes, fails, or is dropped.
+///
+/// Ruby keeps the owner in fiber storage, which threads started inside the block inherit. A
+/// task-local is not inherited by `tokio::spawn`: wrap the spawned future in [`with_current_owner`].
+pub async fn with_usage_owner<F: std::future::Future>(
+    owner: impl Into<Option<UsageOwner>>,
+    future: F,
+) -> F::Output {
+    OWNER.scope(owner.into(), future).await
+}
+
+/// `future` attributed to the current owner, for a task spawned inside a `with_usage_owner` block
+/// (Ruby's threads inherit fiber storage).
+pub fn with_current_owner<F: std::future::Future>(
+    future: F,
+) -> impl std::future::Future<Output = F::Output> {
+    OWNER.scope(usage_owner(), future)
+}
+
+/// `Accounting::Usage.owned_by(owner) { ... }`: an operation's `owner:` keyword, which wins over
+/// the ambient owner; `None` leaves the ambient owner in place.
+pub(crate) async fn owned_by<F: std::future::Future>(
+    owner: Option<UsageOwner>,
+    future: F,
+) -> F::Output {
+    match owner {
+        Some(owner) => OWNER.scope(Some(owner), future).await,
+        None => future.await,
+    }
+}
+
+/// `Accounting::Usage.ledger`: persists finished entries that no chat records, such as the
+/// attempts of one-shot operations and finished video jobs (`rust_llm_loco::UsageLedger` writes
+/// them to `rust_llm_usages`). Set it on [`Config::usage_ledger`]. A ledger logs its own write
+/// failures and never fails the operation that billed the attempt.
+#[async_trait::async_trait]
+pub trait UsageLedger: Send + Sync {
+    /// `record(entry)`.
+    async fn record(&self, entry: &UsageEntry);
+}
+
+/// `Accounting::Usage.record(entry)`: hands `entry` to the configured ledger, if any.
+pub(crate) async fn record(config: &Config, entry: &UsageEntry) {
+    if let Some(ledger) = &config.usage_ledger {
+        ledger.record(entry).await;
+    }
+}
+
+/// `Accounting::Usage.report(entry, config:)` for each entry: recorded in the ledger, then
+/// published as `usage.rust_llm`.
+pub(crate) async fn report(config: &Arc<Config>, entries: &[UsageEntry]) {
+    for entry in entries {
+        record(config, entry).await;
+        crate::instrumentation::usage(config, entry);
+    }
+}
 
 /// `Accounting::Usage::Entry` readers (`accounting/usage.rb`).
 impl UsageEntry {
@@ -38,6 +157,7 @@ impl UsageEntry {
             status: UsageStatus::Pending,
             cost: Cost::new(&tokens, None, Tier::Standard),
             tokens,
+            owner: usage_owner(),
         }
     }
 
@@ -86,8 +206,7 @@ impl UsageEntry {
 }
 
 /// `Accounting::Usage::Result`: a result object that carries attempt accounting, plus what
-/// `Tracker#succeed` reads from it (`billed.tokens`, `billed.cost`, and for a `Message` its
-/// `model_info=`).
+/// `Tracker#succeed` reads from it (`billed.tokens`, `billed.cost`, and `model_info=`).
 pub trait UsageResult {
     /// `ruby_llm_usage_entries=`.
     fn set_usage_entries(&mut self, entries: Vec<UsageEntry>);
@@ -95,10 +214,15 @@ pub trait UsageResult {
     fn usage_tokens(&self) -> Tokens;
     /// `billed.cost`.
     fn usage_cost(&self) -> Cost;
-    /// `billed.is_a?(Message)`: messages get their `model_info` resolved before pricing.
-    fn as_message_mut(&mut self) -> Option<&mut Message> {
-        None
-    }
+    /// `item.model_info = result_model(item) if item.respond_to?(:model_info=)`: `resolve` maps
+    /// the result's model id (`nil` when absent) to the model it is priced with. Results without
+    /// `model_info=` (such as `Moderation`) keep the default no-op.
+    fn assign_model_info(&mut self, _resolve: &dyn Fn(Option<&str>) -> Option<Model>) {}
+}
+
+/// `result.model` as `Tracker#result_model` reads it: an empty id is `nil`.
+fn model_id(model: &str) -> Option<&str> {
+    (!model.is_empty()).then_some(model)
 }
 
 impl UsageResult for Message {
@@ -111,8 +235,106 @@ impl UsageResult for Message {
     fn usage_cost(&self) -> Cost {
         self.cost(None)
     }
-    fn as_message_mut(&mut self) -> Option<&mut Message> {
-        Some(self)
+    fn assign_model_info(&mut self, resolve: &dyn Fn(Option<&str>) -> Option<Model>) {
+        self.model_info = resolve(self.model.as_deref());
+    }
+}
+
+impl UsageResult for Transcription {
+    fn set_usage_entries(&mut self, entries: Vec<UsageEntry>) {
+        self.usage_entries = entries;
+    }
+    fn usage_tokens(&self) -> Tokens {
+        self.tokens()
+    }
+    fn usage_cost(&self) -> Cost {
+        self.cost()
+    }
+    fn assign_model_info(&mut self, resolve: &dyn Fn(Option<&str>) -> Option<Model>) {
+        self.model_info = resolve(model_id(&self.model));
+    }
+}
+
+impl UsageResult for Embedding {
+    fn set_usage_entries(&mut self, entries: Vec<UsageEntry>) {
+        self.usage_entries = entries;
+    }
+    fn usage_tokens(&self) -> Tokens {
+        self.tokens()
+    }
+    fn usage_cost(&self) -> Cost {
+        self.cost()
+    }
+    fn assign_model_info(&mut self, resolve: &dyn Fn(Option<&str>) -> Option<Model>) {
+        self.model_info = resolve(model_id(&self.model));
+    }
+}
+
+impl UsageResult for Speech {
+    fn set_usage_entries(&mut self, entries: Vec<UsageEntry>) {
+        self.usage_entries = entries;
+    }
+    fn usage_tokens(&self) -> Tokens {
+        self.tokens()
+    }
+    fn usage_cost(&self) -> Cost {
+        self.cost()
+    }
+    fn assign_model_info(&mut self, resolve: &dyn Fn(Option<&str>) -> Option<Model>) {
+        self.model_info = resolve(model_id(&self.model));
+    }
+}
+
+impl UsageResult for Rerank {
+    fn set_usage_entries(&mut self, entries: Vec<UsageEntry>) {
+        self.usage_entries = entries;
+    }
+    fn usage_tokens(&self) -> Tokens {
+        self.tokens()
+    }
+    fn usage_cost(&self) -> Cost {
+        self.cost()
+    }
+    fn assign_model_info(&mut self, resolve: &dyn Fn(Option<&str>) -> Option<Model>) {
+        self.model_info = resolve(model_id(&self.model));
+    }
+}
+
+impl UsageResult for Image {
+    fn set_usage_entries(&mut self, entries: Vec<UsageEntry>) {
+        self.usage_entries = entries;
+    }
+    fn usage_tokens(&self) -> Tokens {
+        self.tokens()
+    }
+    fn usage_cost(&self) -> Cost {
+        self.cost()
+    }
+    fn assign_model_info(&mut self, resolve: &dyn Fn(Option<&str>) -> Option<Model>) {
+        self.model_info = resolve(model_id(&self.model));
+    }
+}
+
+/// A request that produced several images is billed once: the first image carries the call
+/// (`billed = results.first`), and every image gets its `model_info`.
+impl UsageResult for Vec<Image> {
+    fn set_usage_entries(&mut self, entries: Vec<UsageEntry>) {
+        if let Some(first) = self.first_mut() {
+            first.set_usage_entries(entries);
+        }
+    }
+    fn usage_tokens(&self) -> Tokens {
+        self.first().map(Image::tokens).unwrap_or_default()
+    }
+    fn usage_cost(&self) -> Cost {
+        self.first()
+            .map(Image::cost)
+            .unwrap_or_else(|| Cost::new(&Tokens::default(), None, Tier::Standard))
+    }
+    fn assign_model_info(&mut self, resolve: &dyn Fn(Option<&str>) -> Option<Model>) {
+        for image in self {
+            image.assign_model_info(resolve);
+        }
     }
 }
 
@@ -191,14 +413,20 @@ impl Tracker {
     /// `observe(chunk)`: a streamed chunk's token counts update the attempt in flight; a count
     /// the chunk does not report keeps the earlier value (`merge_stream_tokens`).
     pub fn observe(&mut self, chunk: &Message) {
+        self.observe_tokens(&chunk.tokens());
+    }
+
+    /// `observe_tokens(tokens)`: keeps the usage a response reported for the current attempt, so
+    /// an attempt that fails after the provider answered, such as a blocked one, still records
+    /// what it billed. The attempt stays pending.
+    pub fn observe_tokens(&mut self, tokens: &Tokens) {
         let Some(&id) = self.pending.last() else {
             return;
         };
-        let incoming = chunk.tokens();
         let Some(entry) = self.entry_mut(id) else {
             return;
         };
-        entry.tokens.merge_latest(&incoming);
+        entry.tokens.merge_latest(tokens);
         entry.cost = Cost::new(&entry.tokens, None, Tier::Standard);
     }
 
@@ -228,9 +456,7 @@ impl Tracker {
     /// earlier pending attempts succeed with no tokens. The ledger is then attached to the result,
     /// even when no attempt was recorded.
     pub fn succeed<R: UsageResult>(&mut self, result: &mut R) {
-        if let Some(message) = result.as_message_mut() {
-            message.model_info = self.message_model(message);
-        }
+        result.assign_model_info(&|id| self.result_model(id));
         let pending = self.pending.clone();
         let Some((&last, earlier)) = pending.split_last() else {
             result.set_usage_entries(self.entries.clone());
@@ -245,10 +471,10 @@ impl Tracker {
         result.set_usage_entries(self.entries.clone());
     }
 
-    /// `message_model`: the requested model unless the response echoes a different id this
+    /// `result_model`: the requested model unless the response echoes a different id this
     /// provider's registry knows.
-    fn message_model(&self, message: &Message) -> Option<Model> {
-        let Some(id) = message.model.as_deref() else {
+    fn result_model(&self, id: Option<&str>) -> Option<Model> {
+        let Some(id) = id else {
             return self.model_info.clone();
         };
         if self.model_info.as_ref().is_some_and(|m| m.id == id) {
@@ -293,9 +519,12 @@ impl Tracker {
     fn price(&self, tokens: &Tokens) -> Cost {
         let model = self.model_info.as_ref();
         match self.operation {
-            Operation::Chat | Operation::Moderation | Operation::Ocr | Operation::Judgment => {
-                Cost::new(tokens, model, Tier::Standard)
-            }
+            Operation::Chat
+            | Operation::Moderation
+            | Operation::Ocr
+            | Operation::Judgment
+            | Operation::Video
+            | Operation::Research => Cost::new(tokens, model, Tier::Standard),
             Operation::Embedding | Operation::Rerank => {
                 crate::rerank::embeddings_cost(tokens, model)
             }

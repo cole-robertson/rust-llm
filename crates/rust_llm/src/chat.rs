@@ -48,6 +48,9 @@ type ToolCallCallback = Box<dyn FnMut(&ToolCall) + Send + Sync>;
 type ToolResultCallback = Box<dyn FnMut(&ToolResult) + Send + Sync>;
 type FallbackCallback = Box<dyn FnMut(&FallbackAttempt) + Send + Sync>;
 type RequestCallback = Box<dyn FnMut(&mut Value) + Send + Sync>;
+/// A `convert_unsupported_attachments` block: a replacement, `Ok(None)` to keep the error, or
+/// the application's own error.
+type AttachmentConverter = Box<dyn Fn(&Attachment) -> Result<Option<Attachment>> + Send + Sync>;
 /// Called with each persisted-state change; the Loco integration uses these to write rows.
 pub type UsageRecorder = Box<dyn FnMut(&UsageEntry) + Send + Sync>;
 /// An async `usage_recorder` (Ruby's tracker `on_finish`): awaited for each finished attempt
@@ -104,6 +107,12 @@ struct Callbacks {
     after_fallback: Vec<FallbackCallback>,
     /// Behind a lock so `render(&self)` can apply them, as `Chat#render` does.
     before_request: std::sync::Mutex<Vec<RequestCallback>>,
+    /// `@callbacks[:unsupported_attachment]`.
+    unsupported_attachment: Vec<AttachmentConverter>,
+    /// `@attachment_replacements` (`compare_by_identity`): each original's replacement, so a
+    /// converter runs once per attachment and its replacement keeps its upload. Behind a lock so
+    /// `render(&self)` can fill it.
+    attachment_replacements: std::sync::Mutex<Vec<(Attachment, Attachment)>>,
     /// Shared with the running tool's progress listener, which reports while `self` is borrowed.
     after_tool_progress: Arc<std::sync::Mutex<Vec<ToolProgressCallback>>>,
 }
@@ -143,6 +152,8 @@ pub struct Chat {
     usage_recorder: Option<UsageRecorder>,
     async_usage_recorder: Option<AsyncUsageRecorder>,
     tool_call_decisions: HashMap<String, bool>,
+    /// `@tool_deferrals`: per registered tool name, whether it is deferred (`with_tools(defer:)`).
+    tool_deferrals: HashMap<String, bool>,
     cancelled: Arc<AtomicBool>,
     /// `@cancellation_checker`: an outside signal (e.g. a persisted record) consulted with the flag.
     cancellation_checker: Option<CancellationChecker>,
@@ -253,6 +264,7 @@ impl Chat {
             usage_recorder: None,
             async_usage_recorder: None,
             tool_call_decisions: HashMap::new(),
+            tool_deferrals: HashMap::new(),
             cancelled: Arc::new(AtomicBool::new(false)),
             cancellation_checker: None,
             mcp: crate::mcp::Collection::default(),
@@ -357,16 +369,74 @@ impl Chat {
     }
 
     pub fn add_tool(&mut self, tool: SharedTool) -> &mut Self {
+        self.add_tool_deferred(tool, None)
+    }
+
+    /// `with_tools(tool, defer:)`: `Some(true)` keeps the tool's definition out of the model's
+    /// context until the provider's tool search loads it, `Some(false)` offers a tool declared
+    /// deferred (`Tool::is_deferred`) up front, `None` follows the tool. The latest registration
+    /// of a name wins. See [`Chat::deferred_tools`].
+    pub fn add_tool_deferred(&mut self, tool: SharedTool, defer: Option<bool>) -> &mut Self {
         let name = tool.name();
         self.tools.retain(|t| t.name() != name);
+        self.tool_deferrals
+            .insert(name, defer.unwrap_or_else(|| tool.is_deferred()));
         self.tools.push(tool);
         self
     }
 
-    /// `with_tools(nil)`.
+    /// `with_tools(*tools, defer: true)`.
+    pub fn with_deferred_tools(mut self, tools: impl IntoIterator<Item = SharedTool>) -> Self {
+        for t in tools {
+            self.add_tool_deferred(t, Some(true));
+        }
+        self
+    }
+
+    /// `with_tools(nil)`: also forgets which tools were deferred.
     pub fn clear_tools(&mut self) -> &mut Self {
         self.tools.clear();
+        self.tool_deferrals.clear();
         self
+    }
+
+    /// `deferred_tools`: the tools whose definitions stay out of the model's context until the
+    /// provider's tool search loads them, like [`Chat::tools`]. Providers without tool search
+    /// receive them as ordinary tools.
+    pub fn deferred_tools(&self) -> Vec<SharedTool> {
+        let names = self.deferred_tool_names();
+        self.combined_tools()
+            .unwrap_or_else(|_| self.tools.clone())
+            .into_iter()
+            .filter(|t| names.contains(&t.name()))
+            .collect()
+    }
+
+    /// `ToolSearch#deferred_tool_names`. MCP servers' deferral joins here once `with_mcp(defer:)`
+    /// is ported.
+    fn deferred_tool_names(&self) -> Vec<String> {
+        self.tool_deferrals
+            .iter()
+            .filter(|(_, deferred)| **deferred)
+            .map(|(name, _)| name.clone())
+            .collect()
+    }
+
+    /// `ToolSearch#request_tools`: the tool set rendered for a request, deferred tools wrapped
+    /// so protocols with tool search mark them.
+    fn request_tools(&self) -> Result<Vec<SharedTool>> {
+        let deferred = self.deferred_tool_names();
+        Ok(self
+            .combined_tools()?
+            .into_iter()
+            .map(|t| {
+                if deferred.contains(&t.name()) {
+                    Arc::new(crate::tool::Deferred(t)) as SharedTool
+                } else {
+                    t
+                }
+            })
+            .collect())
     }
 
     /// `with_mcp(server)`: gives the model the server's tools. The server is contacted when the
@@ -769,6 +839,20 @@ impl Chat {
         self.callbacks.after_fallback.push(Box::new(f));
         self
     }
+    /// `convert_unsupported_attachments { |attachment| ... }`: replaces an attachment the current
+    /// protocol cannot render. The block returns a replacement, `Ok(None)` to keep the
+    /// `UnsupportedAttachment` error, or an error of its own, which the request raises. Blocks
+    /// run in registration order until one returns a replacement. The transcript keeps the
+    /// original file, even when the model changes; each attachment is converted once and its
+    /// replacement (and that replacement's upload) reused on later requests.
+    pub fn convert_unsupported_attachments(
+        mut self,
+        f: impl Fn(&Attachment) -> Result<Option<Attachment>> + Send + Sync + 'static,
+    ) -> Self {
+        self.callbacks.unsupported_attachment.push(Box::new(f));
+        self
+    }
+
     /// `before_request { |payload| ... }`: last chance to edit the rendered payload.
     pub fn before_request(self, f: impl FnMut(&mut Value) + Send + Sync + 'static) -> Self {
         if let Ok(mut hooks) = self.callbacks.before_request.lock() {
@@ -805,6 +889,7 @@ impl Chat {
         if message.usage_entries.is_empty() {
             let entry = UsageEntry {
                 id: UsageEntry::next_id(),
+                owner: crate::accounting::usage_owner(),
                 operation: Operation::Chat,
                 provider: self.provider.slug().into(),
                 model: message
@@ -985,6 +1070,9 @@ impl Chat {
 
     /// `complete?`: nothing staged, or the model answered without requesting tools.
     pub fn is_complete(&self) -> bool {
+        if self.pending_tool_response().is_some() {
+            return false;
+        }
         match self.last_non_system_message() {
             None => true,
             Some(m) => match m.role {
@@ -1095,8 +1183,11 @@ impl Chat {
         if let Some(r) = &mut self.usage_recorder {
             r(&entry);
         }
-        if let Some(r) = self.async_usage_recorder.clone() {
-            r(entry.clone()).await;
+        // `@usage_recorder ? @usage_recorder.call(entry) : Accounting::Usage.record(entry)`: a
+        // chat a record persists writes its own rows; any other chat goes to the ledger.
+        match self.async_usage_recorder.clone() {
+            Some(r) => r(entry.clone()).await,
+            None => crate::accounting::record(&self.config, &entry).await,
         }
         crate::instrumentation::usage(&self.config, &entry);
         self.usage_entries.push(entry);
@@ -1111,40 +1202,179 @@ impl Chat {
         self.usage_entries.push(entry);
     }
 
-    fn preprocessed_messages(&self) -> Vec<Message> {
-        self.messages
-            .iter()
+    /// `preprocessed_messages`: the request history, each message as the current model may see
+    /// it (`Protocol#preprocess_message`).
+    fn preprocessed_messages(&self) -> Result<Vec<Message>> {
+        let protocol = self
+            .provider
+            .resolve_protocol(self.protocol, &self.model, &self.config)
+            .ok();
+        self.request_history()
+            .into_iter()
             .map(|m| {
-                // A thinking signature is opaque to every provider but the one that issued it.
-                let carries = m.thinking.is_some()
-                    || m.raw_reasoning.is_some()
-                    || m.tool_calls
-                        .iter()
-                        .flat_map(|c| c.values())
-                        .any(|c| c.thought_signature.is_some());
-                let producer = m
-                    .usage_entries
-                    .iter()
-                    .rev()
-                    .find(|e| e.status == UsageStatus::Succeeded)
-                    .map(|e| e.provider.as_str());
-                let lean = m.for_request();
-                if m.role == Role::Assistant
-                    && carries
-                    && producer.is_some_and(|p| p != self.provider.slug())
-                {
-                    lean.without_thinking()
+                let mut m = if self.foreign_native_content(&m) {
+                    // `without_foreign_native_content`: another model of this provider gets the
+                    // raw content any of its models reads, such as a tool search.
+                    let portable = protocol
+                        .filter(|_| {
+                            m.producing_entry()
+                                .is_some_and(|e| e.provider == self.provider.slug())
+                        })
+                        .and_then(|p| crate::tool_search::portable_raw_content(p, &m));
+                    m.for_request().without_native_content(portable)
                 } else {
-                    lean
-                }
+                    m.for_request()
+                };
+                self.replace_unsupported_attachments(&mut m)?;
+                Ok(m)
             })
             .collect()
+    }
+
+    /// `Protocol#replace_unsupported_attachment` with `Chat#unsupported_attachment_handler`:
+    /// swaps each attachment the protocol cannot render for the application's replacement.
+    fn replace_unsupported_attachments(&self, message: &mut Message) -> Result<()> {
+        if self.callbacks.unsupported_attachment.is_empty() || message.attachments.is_empty() {
+            return Ok(());
+        }
+        let protocol = self
+            .provider
+            .resolve_protocol(self.protocol, &self.model, &self.config)?;
+        let supported = |a: &Attachment| {
+            protocols::supported_message_attachment(protocol, self.provider, message.role, a)
+        };
+        let mut prepared = Vec::with_capacity(message.attachments.len());
+        for attachment in &message.attachments {
+            if supported(attachment) {
+                prepared.push(attachment.clone());
+                continue;
+            }
+            let Some(replacement) = self.attachment_replacement(attachment)? else {
+                prepared.push(attachment.clone());
+                continue;
+            };
+            if !supported(&replacement) {
+                return Err(Error::UnsupportedAttachment(
+                    protocols::anthropic::unsupported(&replacement.mime_type),
+                ));
+            }
+            prepared.push(replacement);
+        }
+        message.attachments = prepared;
+        Ok(())
+    }
+
+    /// `@attachment_replacements[attachment] ||= callbacks.lazy.filter_map { ... }.first`.
+    fn attachment_replacement(&self, attachment: &Attachment) -> Result<Option<Attachment>> {
+        let memo = |replacements: &std::sync::Mutex<Vec<(Attachment, Attachment)>>| {
+            replacements.lock().ok().and_then(|r| {
+                r.iter()
+                    .find(|(original, _)| original.same_attachment(attachment))
+                    .map(|(_, replacement)| replacement.clone())
+            })
+        };
+        if let Some(replacement) = memo(&self.callbacks.attachment_replacements) {
+            return Ok(Some(replacement));
+        }
+        for convert in &self.callbacks.unsupported_attachment {
+            if let Some(replacement) = convert(attachment)? {
+                if let Ok(mut r) = self.callbacks.attachment_replacements.lock() {
+                    r.push((attachment.clone(), replacement.clone()));
+                }
+                return Ok(Some(replacement));
+            }
+        }
+        Ok(None)
+    }
+
+    /// `Protocol#foreign_native_content?`: a thinking signature or provider-shaped content belongs
+    /// to the model that produced it; a message with no known producer replays as it is.
+    fn foreign_native_content(&self, m: &Message) -> bool {
+        let carries = m.thinking.is_some()
+            || m.raw_reasoning.is_some()
+            || m.raw_content.is_some()
+            || m.tool_calls
+                .iter()
+                .flat_map(|c| c.values())
+                .any(|c| c.thought_signature.is_some());
+        if m.role != Role::Assistant || !carries {
+            return false;
+        }
+        let Some(producer) = m.producing_entry() else {
+            return false;
+        };
+        producer.provider != self.provider.slug() || !self.is_current_model(&producer.model)
+    }
+
+    /// `Protocol#current_model?`: usage records the resolved id, and a message built by hand may
+    /// name the model by an alias of it.
+    fn is_current_model(&self, model_id: &str) -> bool {
+        model_id == self.model.id
+            || models::models()
+                .find(model_id, Some(self.provider.slug()))
+                .is_ok_and(|m| m.id == self.model.id)
+    }
+
+    /// `request_history`: a process that dies mid-round leaves a blank assistant placeholder, or
+    /// tool calls without results, and providers refuse both. A request leaves blank messages out
+    /// and answers the calls of a round the conversation moved past as unfinished. The latest
+    /// round stays as it is: the loop runs its calls or waits on them.
+    fn request_history(&self) -> Vec<std::borrow::Cow<'_, Message>> {
+        use std::borrow::Cow;
+        let kept: Vec<&Message> = self
+            .messages
+            .iter()
+            .filter(|m| !is_blank_response(m))
+            .collect();
+        let answered: Vec<&str> = kept
+            .iter()
+            .filter(|m| m.is_tool_result())
+            .filter_map(|m| m.tool_call_id.as_deref())
+            .collect();
+        let current = latest_response(kept.iter().copied());
+        let mut out = Vec::with_capacity(kept.len());
+        let mut i = 0;
+        while i < kept.len() {
+            let response = kept[i];
+            out.push(Cow::Borrowed(response));
+            i += 1;
+            while i < kept.len() && kept[i].is_tool_result() {
+                out.push(Cow::Borrowed(kept[i]));
+                i += 1;
+            }
+            if response.is_tool_call() && !current.is_some_and(|c| std::ptr::eq(c, response)) {
+                for call in response.tool_calls.iter().flat_map(|c| c.values()) {
+                    if !answered.contains(&call.id.as_str()) {
+                        out.push(Cow::Owned(self.unfinished_result(call)));
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// `unfinished_result`: a provider-executed call gets the refusal its provider expects
+    /// (`remote_refusal`); any other call the error shape tool results use.
+    fn unfinished_result(&self, call: &ToolCall) -> Message {
+        let responses = self
+            .provider
+            .resolve_protocol(self.protocol, &self.model, &self.config)
+            .is_ok_and(|p| p == ProtocolName::Responses);
+        if call.remote && responses {
+            // `Responses::Approvals#render_tool_approval_response(approved: false)`.
+            let mut m = Message::tool_result(call.id.clone(), "Denied");
+            m.raw_content = Some(serde_json::json!([{
+                "type": "mcp_approval_response", "approval_request_id": call.id, "approve": false
+            }]));
+            return m;
+        }
+        Message::tool_result(call.id.clone(), UNFINISHED_TOOL_RESULT)
     }
 
     /// `Chat#render`: the payload that would be sent, with `before_request` hooks applied,
     /// without sending it.
     pub fn render(&self) -> Result<Value> {
-        self.render_with(&self.preprocessed_messages(), false)
+        self.render_with(&self.preprocessed_messages()?, false)
             .map(|(p, _)| p)
     }
 
@@ -1156,7 +1386,7 @@ impl Chat {
             Some(t) => t.resolve(&self.model)?,
             None => None,
         };
-        let tools = self.combined_tools()?;
+        let tools = self.request_tools()?;
         let request = Request {
             provider: self.provider,
             config: &self.config,
@@ -1185,6 +1415,7 @@ impl Chat {
         {
             crate::provider_tools::apply(&mut payload, &resolution);
         }
+        crate::tool_search::apply(protocol, &mut payload);
         self.apply_before_request_hooks(&mut payload);
         protocols::finish_render(protocol, &mut payload)?;
         Ok((payload, protocol))
@@ -1334,19 +1565,7 @@ impl Chat {
     ) -> Result<Message> {
         self.load_mcp_tools().await?;
         self.load_attachments(&mut []).await?;
-        let mut messages = self.preprocessed_messages();
-        let upload_protocol =
-            self.provider
-                .resolve_protocol(self.protocol, &self.model, &self.config)?;
-        crate::files::preprocess_messages(
-            &mut messages,
-            upload_protocol,
-            self.provider,
-            &self.config,
-            &self.connection,
-        )
-        .await?;
-        self.load_attachments(&mut messages).await?;
+        let mut messages = self.request_messages().await?;
         let streaming = on_chunk.is_some();
         if streaming {
             for cb in &mut self.callbacks.before_message {
@@ -1358,13 +1577,31 @@ impl Chat {
         let mut segments = Vec::new();
         let mut call_entries = Vec::new();
         let mut billed_model = None;
-        for _ in 0..protocols::anthropic::MAX_PAUSE_TURN_CONTINUATIONS {
+        let mut reuploaded = false;
+        let mut continuation = 0;
+        while continuation < protocols::anthropic::MAX_PAUSE_TURN_CONTINUATIONS {
             let chunk_sink = on_chunk
                 .as_mut()
                 .map(|f| &mut **f as &mut (dyn FnMut(&Message) + Send));
-            let (segment, entries, billed, protocol) = self
+            let (segment, entries, billed, protocol) = match self
                 .request_once(&messages, chunk_sink, chunks_yielded)
-                .await?;
+                .await
+            {
+                Ok(answer) => answer,
+                // `replacing_missing_uploads`: a request that failed over a file the provider
+                // deleted, before streaming anything, uploads it again and runs once more.
+                Err(e) => {
+                    if reuploaded || *chunks_yielded || !self.discard_missing_uploads(&e).await {
+                        return Err(e);
+                    }
+                    reuploaded = true;
+                    segments.clear();
+                    messages = self.request_messages().await?;
+                    continuation = 0;
+                    continue;
+                }
+            };
+            continuation += 1;
             call_entries.extend(entries);
             billed_model = Some(billed);
             let paused = protocol == ProtocolName::Anthropic
@@ -1391,6 +1628,38 @@ impl Chat {
             cb(&message);
         }
         Ok(message)
+    }
+
+    /// `preprocessed_messages` plus the request-time uploads, with every attachment read.
+    async fn request_messages(&mut self) -> Result<Vec<Message>> {
+        let mut messages = self.preprocessed_messages()?;
+        let upload_protocol =
+            self.provider
+                .resolve_protocol(self.protocol, &self.model, &self.config)?;
+        crate::files::preprocess_messages(
+            &mut messages,
+            upload_protocol,
+            self.provider,
+            &self.config,
+            &self.connection,
+        )
+        .await?;
+        self.load_attachments(&mut messages).await?;
+        Ok(messages)
+    }
+
+    /// `Chat#discard_missing_uploads`: whether the error named uploads the provider deleted
+    /// (which the attachments now forget).
+    async fn discard_missing_uploads(&self, error: &Error) -> bool {
+        !crate::files::discard_missing_uploads(
+            &self.messages,
+            error,
+            self.provider,
+            &self.config,
+            &self.connection,
+        )
+        .await
+        .is_empty()
     }
 
     /// One completion request (`Protocol#complete`): renders `messages`, sends them, and records
@@ -1517,7 +1786,7 @@ impl Chat {
                     self.record_usage(self.entry(status, failure_tokens(&e, observed), None))
                         .await;
                 }
-                return Err(e);
+                return Err(e.claim(protocol, self.provider.slug(), &self.model.id, &payload));
             }
         };
         let billed_model = message
@@ -1551,7 +1820,7 @@ impl Chat {
         let path =
             crate::tokenization::count_tokens_endpoint(protocol, self.provider, &self.model)?;
         self.load_mcp_tools().await?;
-        let mut messages = self.preprocessed_messages();
+        let mut messages = self.preprocessed_messages()?;
         if let Some(text) = message {
             messages.push(Message::user(text));
         }
@@ -1572,7 +1841,7 @@ impl Chat {
             Some(t) => t.resolve(&self.model)?,
             None => None,
         };
-        let tools = self.combined_tools()?;
+        let tools = self.request_tools()?;
         let request = Request {
             provider: self.provider,
             config: &self.config,
@@ -1588,12 +1857,17 @@ impl Chat {
             caching: self.caching.as_ref(),
             stream: false,
         };
-        let rendered = protocols::render(protocol, &request)?;
+        let mut rendered = protocols::render(protocol, &request)?;
+        // `Anthropic#render_count_tokens_payload`: `.then { Tools.apply_tool_search(payload) }`.
+        if protocol == ProtocolName::Anthropic {
+            crate::tool_search::apply(protocol, &mut rendered);
+        }
         let payload = crate::tokenization::count_tokens_payload(protocol, &self.model, rendered);
         let raw = self
             .connection
             .post(&path, &payload, &[], &mut |_| {})
-            .await?;
+            .await
+            .map_err(|e| e.claim(protocol, self.provider.slug(), &self.model.id, &payload))?;
         crate::tokenization::parse_count_tokens(protocol, &raw.body)
     }
 
@@ -1626,7 +1900,48 @@ impl Chat {
                 None,
             ));
         }
-        let mut messages = self.preprocessed_messages();
+        let mut reuploaded = false;
+        loop {
+            let mut entries = Vec::new();
+            match self.compact_request(protocol, &mut entries).await {
+                // `replacing_missing_uploads`: a file the provider deleted is uploaded again and
+                // the compaction runs once more.
+                Err(e) => {
+                    if reuploaded || !self.discard_missing_uploads(&e).await {
+                        return Err(e);
+                    }
+                    reuploaded = true;
+                    continue;
+                }
+                Ok(mut message) => {
+                    let entry = self.entry(UsageStatus::Succeeded, message.tokens.clone(), None);
+                    self.record_usage(entry.clone()).await;
+                    entries.push(entry);
+                    message.usage_entries = entries;
+                    // `record_generated_message`: a cancel during the request keeps the billed
+                    // usage but adds no message.
+                    self.raise_if_cancelled()?;
+                    for cb in &mut self.callbacks.before_message {
+                        cb();
+                    }
+                    self.messages.push(message.clone());
+                    for cb in &mut self.callbacks.after_message {
+                        cb(&message);
+                    }
+                    return Ok(message);
+                }
+            }
+        }
+    }
+
+    /// One `responses/compact` request: prepares the history, sends it, and records the usage of
+    /// each failed attempt in `entries`.
+    async fn compact_request(
+        &mut self,
+        protocol: ProtocolName,
+        entries: &mut Vec<UsageEntry>,
+    ) -> Result<Message> {
+        let mut messages = self.preprocessed_messages()?;
         crate::files::preprocess_messages(
             &mut messages,
             protocol,
@@ -1667,16 +1982,15 @@ impl Chat {
             Ok(raw) => {
                 protocols::responses::parse_compaction_response(self.provider, &self.model.id, raw)
             }
-            Err(e) => Err(e),
+            Err(e) => Err(e.claim(protocol, self.provider.slug(), &self.model.id, &payload)),
         };
-        let mut entries = Vec::new();
         for tokens in retried {
             let entry = self.entry(UsageStatus::Failed, tokens, None);
             self.record_usage(entry.clone()).await;
             entries.push(entry);
         }
-        let mut message = match result {
-            Ok(m) => m,
+        match result {
+            Ok(m) => Ok(m),
             Err(e) => {
                 if attempts > 0 {
                     self.record_usage(self.entry(
@@ -1686,23 +2000,9 @@ impl Chat {
                     ))
                     .await;
                 }
-                return Err(e);
+                Err(e)
             }
-        };
-        let entry = self.entry(UsageStatus::Succeeded, message.tokens.clone(), None);
-        self.record_usage(entry.clone()).await;
-        entries.push(entry);
-        message.usage_entries = entries;
-        // `record_generated_message`: a cancel during the request keeps the billed usage but adds no message.
-        self.raise_if_cancelled()?;
-        for cb in &mut self.callbacks.before_message {
-            cb();
         }
-        self.messages.push(message.clone());
-        for cb in &mut self.callbacks.after_message {
-            cb(&message);
-        }
-        Ok(message)
     }
 
     fn entry(&self, status: UsageStatus, tokens: Tokens, model: Option<&Model>) -> UsageEntry {
@@ -1710,6 +2010,7 @@ impl Chat {
         let cost = Cost::new(&tokens, Some(model), Tier::Standard);
         UsageEntry {
             id: UsageEntry::next_id(),
+            owner: crate::accounting::usage_owner(),
             operation: Operation::Chat,
             provider: self.provider.slug().into(),
             model: self.model.id.clone(),
@@ -1722,11 +2023,7 @@ impl Chat {
     // ---- tools -----------------------------------------------------------------------------
 
     fn pending_tool_response(&self) -> Option<&Message> {
-        let response = self
-            .messages
-            .iter()
-            .rev()
-            .find(|m| m.role != Role::System && !m.is_tool_result())?;
+        let response = latest_response(self.messages.iter())?;
         (response.is_tool_call() && !self.pending_tool_calls(response).is_empty())
             .then_some(response)
     }
@@ -1785,6 +2082,20 @@ impl Chat {
             if call.remote {
                 // Remote (provider-executed) approvals are answered on the next request.
                 if let Some(&approved) = self.tool_call_decisions.get(&call.id) {
+                    // `Protocol#tool_approval_response`: only the Responses protocol renders one.
+                    let responses = self
+                        .provider
+                        .resolve_protocol(self.protocol, &self.model, &self.config)
+                        .is_ok_and(|p| p == ProtocolName::Responses);
+                    if !responses {
+                        return Err(Error::Api(
+                            format!(
+                                "{} doesn't support remote tool approvals",
+                                self.provider.display()
+                            ),
+                            None,
+                        ));
+                    }
                     let mut m = Message::tool_result(
                         call.id.clone(),
                         if approved { "Approved" } else { "Denied" },
@@ -2042,6 +2353,11 @@ impl Chat {
         self.tool_call_decisions.extend(decisions);
     }
 
+    /// `waiting?`: every pending tool call waits on an approval decision, an input, or an MCP task.
+    pub fn is_waiting(&self) -> bool {
+        self.waiting()
+    }
+
     fn waiting(&self) -> bool {
         let Some(response) = self.pending_tool_response() else {
             return false;
@@ -2050,7 +2366,16 @@ impl Chat {
         !pending.is_empty()
             && pending
                 .iter()
-                .all(|c| self.approval_pending(c) || self.input_pending(c))
+                .all(|c| self.approval_pending(c) || self.is_paused(c))
+    }
+
+    /// `paused?(tool_call)`: the call waits on an unsettled input request or an MCP task.
+    fn is_paused(&self, call: &ToolCall) -> bool {
+        self.input_pending(call)
+            || self
+                .tool_call_inputs
+                .get(&call.id)
+                .is_some_and(|state| state.get("task").is_some())
     }
 
     /// `input_pending?(tool_call)`: the call paused on a request nobody has settled.
@@ -2287,4 +2612,28 @@ fn normalize_schema(raw: Value) -> Option<Schema> {
             .and_then(Value::as_str)
             .map(str::to_string),
     })
+}
+
+/// `UNFINISHED_TOOL_RESULT`: what a request answers a call the conversation moved past with.
+const UNFINISHED_TOOL_RESULT: &str = r#"{"error":"The tool call did not finish."}"#;
+
+/// `latest_response`: a blank response answers nothing, so it never hides the round before it.
+fn latest_response<'a>(
+    messages: impl DoubleEndedIterator<Item = &'a Message>,
+) -> Option<&'a Message> {
+    messages
+        .rev()
+        .find(|m| m.role != Role::System && !m.is_tool_result() && !is_blank_response(m))
+}
+
+/// `blank_response?`: the placeholder a process saves before a response arrives.
+fn is_blank_response(m: &Message) -> bool {
+    m.role == Role::Assistant
+        && !m.is_tool_call()
+        && m.content().trim().is_empty()
+        && m.attachments.is_empty()
+        && m.thinking.is_none()
+        && m.server_tool_calls.is_empty()
+        && m.raw_content.is_none()
+        && m.raw_reasoning.is_none()
 }

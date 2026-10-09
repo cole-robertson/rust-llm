@@ -61,6 +61,10 @@ pub struct Config {
     /// `batch_store`: where submitted chat batches are persisted, so `Batch::find` can hand one
     /// back without contacting the provider. `None` keeps nothing (`crate::batch::BatchStore`).
     pub batch_store: Option<Arc<dyn crate::batch::BatchStore>>,
+    /// `Accounting::Usage.ledger`: where attempts no chat records are persisted (one-shot
+    /// operations, finished video jobs, chats without a record). `None` keeps them in memory
+    /// (`crate::accounting::UsageLedger`).
+    pub usage_ledger: Option<Arc<dyn crate::accounting::UsageLedger>>,
     values: HashMap<String, String>,
 }
 
@@ -158,6 +162,7 @@ impl Default for Config {
             mcp_client_name: "RustLLM".into(),
             mcp_client_id: None,
             batch_store: None,
+            usage_ledger: None,
             values: HashMap::new(),
         }
     }

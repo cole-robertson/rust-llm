@@ -392,6 +392,7 @@ fn produced_by(provider: &str, model: &str, thinking: Option<Thinking>) -> Messa
     message.thinking = thinking;
     message.usage_entries = vec![UsageEntry {
         id: UsageEntry::next_id(),
+        owner: None,
         operation: Operation::Chat,
         provider: provider.into(),
         model: model.into(),
@@ -513,10 +514,16 @@ fn keeps_thinking_for_the_provider_that_produced_it() {
     );
 }
 
+// spec: chat_thinking_replay_spec.rb:188 sends Claude no thinking whose producer is unknown
+// (2.1, b80a5768: Claude takes thinking back only with a signature it issued.)
+// spec: protocols/anthropic/chat_spec.rb:707 sends a signature-only block as redacted thinking
 #[test]
-fn keeps_thinking_whose_producer_is_unknown() {
-    let mut message = Message::assistant("Done.");
-    message.thinking = Thinking::build(None, Some("signature".into()));
+fn sends_a_signature_only_block_as_redacted_thinking() {
+    let message = produced_by(
+        "anthropic",
+        "claude-haiku-4-5",
+        Thinking::build(None, Some("signature".into())),
+    );
     let payload = replay(&mut chat("claude-haiku-4-5", "anthropic"), message);
     assert_eq!(
         payload["messages"][1]["content"][0],
@@ -526,9 +533,11 @@ fn keeps_thinking_whose_producer_is_unknown() {
 
 #[test]
 fn does_not_guess_the_producer_from_a_model_id_several_providers_serve() {
-    let mut message = Message::assistant("Done.");
-    message.model = Some("claude-haiku-4-5".into());
-    message.thinking = Thinking::build(None, Some("signature".into()));
+    let message = produced_by(
+        "openrouter",
+        "claude-haiku-4-5",
+        Thinking::build(None, Some("signature".into())),
+    );
     let payload = replay(&mut chat("claude-haiku-4-5", "openrouter"), message);
     assert_eq!(
         payload["messages"][1]["reasoning_details"],

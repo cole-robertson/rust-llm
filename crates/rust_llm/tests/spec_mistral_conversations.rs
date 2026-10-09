@@ -225,6 +225,10 @@ fn parses_hosted_steps_citation_markers_and_connector_input_tokens_without_infla
         (message.tokens.input, message.tokens.output),
         (Some(120), Some(5))
     );
+    assert_eq!(
+        message.tokens.server_tool_use,
+        json!({ "web_search_requests": 1 }).as_object().cloned()
+    );
     let citation = &message.citations[0];
     assert_eq!(
         (
@@ -491,8 +495,22 @@ async fn rejects_image_controls_that_the_hosted_tool_cannot_honor() {
 // spec: protocols/mistral/conversations/images_spec.rb:57
 #[tokio::test]
 async fn generates_and_downloads_an_image_through_paint() {
-    let cassette = Cassette::start(
+    // RubyLLM 2.1 downloads the image URL the hosted tool returned; the recorded response names
+    // the real blob host, so it is pointed at the replay server, which serves the recorded GET.
+    // Faraday's params encoder re-sorted (and VCR decoded) that GET's query string; the port
+    // fetches the URL exactly as Mistral returned it, so the recorded GET is compared against
+    // that URL instead.
+    let cassette = Cassette::start_edited(
         "protocols_mistral_conversations_images_generates_and_downloads_an_image_through_paint",
+        |here, interactions| {
+            let blob = "https://mistralaiblackforestprod.blob.core.windows.net";
+            interactions[0].response_body = interactions[0].response_body.replace(blob, here);
+            let body: Value = serde_json::from_str(&interactions[0].response_body).unwrap();
+            let result: Value =
+                serde_json::from_str(body["outputs"][0]["info"]["result"].as_str().unwrap())
+                    .unwrap();
+            interactions[1].uri = result["url"].as_str().unwrap().to_string();
+        },
     )
     .await
     .unwrap();
@@ -560,6 +578,10 @@ async fn searches_the_web_with_citations_and_replays_hosted_results_in_a_statele
             .is_some_and(|u| u.contains("ruby-lang.org"))
     }));
     assert!(response.tokens().input.is_some_and(|i| i > 0));
+    assert_eq!(
+        response.tokens().server_tool_use,
+        json!({ "web_search_requests": 1 }).as_object().cloned()
+    );
     assert!(
         chat.ask("What version was that announcement for?")
             .await
@@ -616,11 +638,8 @@ async fn streams_hosted_python_execution_with_complete_tool_history_and_usage() 
     );
     let tokens = response.tokens();
     assert_eq!(
-        tokens
-            .server_tool_use
-            .as_ref()
-            .and_then(|s| s.get("code_interpreter")),
-        Some(&json!(1))
+        tokens.server_tool_use,
+        json!({ "code_execution_requests": 1 }).as_object().cloned()
     );
     assert!(tokens.output.is_some_and(|o| o > 0));
     assert!(
@@ -707,6 +726,14 @@ async fn searches_an_uploaded_document_through_the_file_search_alias() {
             .server_tool_calls
             .iter()
             .any(|c| c.name.as_deref() == Some("document_library"))
+    );
+    assert_eq!(
+        response
+            .tokens()
+            .server_tool_use
+            .as_ref()
+            .and_then(|s| s.get("file_search_requests")),
+        Some(&json!(1))
     );
     // The multipart upload body is not JSON; the replay compares its path and method only.
     cassette.assert_all_matched().await;

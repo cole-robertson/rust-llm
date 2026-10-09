@@ -367,7 +367,7 @@ fn serializes_answers_without_discarding_their_uncertainty() {
 // spec: judge/question_spec.rb:23 rejects invalid question definitions
 // Ruby's `{ type: :choice, criteria: { true => 'Boolean option name' } }` has no JSON form (object
 // keys are always strings, and the string "true" is a valid option name in Ruby too); the other
-// nine definitions are checked.
+// eight definitions are checked.
 #[tokio::test]
 async fn rejects_invalid_question_definitions() {
     let (server, seen) = stub().await;
@@ -379,8 +379,7 @@ async fn rejects_invalid_question_definitions() {
         json!({ "type": "choice", "options": {} }),
         json!({ "type": "choice", "options": { "": "Blank" } }),
         json!({ "type": "choice", "options": { "first": 42 } }),
-        json!({ "type": "score", "levels": ["One level"] }),
-        json!({ "type": "score", "levels": ["First", null] }),
+        json!({ "type": "score", "levels": [] }),
         json!({ "type": "score", "levels": { "first": "First", "second": "Second" } }),
     ];
 

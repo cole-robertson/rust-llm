@@ -837,6 +837,8 @@ const OPENAI_CODEX_MODELS: &[&str] = &[
     "gpt-5.1-codex-mini",
     "gpt-5.2-codex",
 ];
+/// `OpenAI::Capabilities::JUDGMENT_MODELS`.
+const OPENAI_JUDGMENT_MODELS: &[&str] = &["gpt-6-luna"];
 const OPENAI_SEARCH_MODELS: &[&str] = &[
     "gpt-4o-mini-search-preview",
     "gpt-4o-mini-search-preview-2025-03-11",
@@ -876,7 +878,7 @@ pub fn augment_capabilities(
     let tools = ["tool_choice", "parallel_tool_calls"];
     match slug {
         "openai" => {
-            let groups: [(&str, Vec<&[&str]>); 6] = [
+            let groups: [(&str, Vec<&[&str]>); 7] = [
                 (
                     "function_calling",
                     vec![OPENAI_CHAT_MODELS, OPENAI_CODEX_MODELS],
@@ -904,6 +906,8 @@ pub fn augment_capabilities(
                 ),
                 ("transcription", vec![OPENAI_TRANSCRIPTION_MODELS]),
                 ("citations", vec![OPENAI_SEARCH_MODELS]),
+                // `JUDGMENT_MODELS`: the Decisions API models.
+                ("judgment", vec![OPENAI_JUDGMENT_MODELS]),
             ];
             let additions: Vec<&str> = groups
                 .iter()
@@ -1817,6 +1821,13 @@ pub fn parse_ollama_models(
                     input: vec!["text".into()],
                     output: vec!["embeddings".into()],
                 };
+            } else if has("decision") {
+                // A decision model such as Clef answers judgments only.
+                model.modalities = Modalities {
+                    input: vec!["text".into()],
+                    output: vec!["judgment".into()],
+                };
+                model.capabilities = vec!["judgment".into()];
             } else {
                 let mut input = vec!["text".to_string()];
                 if has("vision") {

@@ -227,6 +227,8 @@ async fn install_constrains_usage_operations_and_statuses() {
         Operation::Ocr,
         Operation::Rerank,
         Operation::Judgment,
+        Operation::Video,
+        Operation::Research,
     ];
     let statuses = [
         UsageStatus::Pending,
@@ -289,7 +291,7 @@ async fn install_runs_the_batches_and_mcp_credentials_migrations() {
     );
     assert_eq!(
         column(&db, "rust_llm_batches", "reported_cost").await.0,
-        column(&db, "rust_llm_tool_calls", "pending_input").await.0,
+        column(&db, "rust_llm_tool_calls", "mcp_state").await.0,
         "reported_cost is a json column"
     );
 }
@@ -466,23 +468,33 @@ async fn upgrade_adds_what_2_1_needs_to_a_2_0_schema() {
     upgraded_app();
     let db = installed_db().await;
     query(&db, "DROP TABLE rust_llm_mcp_credentials").await;
-    query(
-        &db,
-        "ALTER TABLE rust_llm_tool_calls DROP COLUMN pending_input",
-    )
-    .await;
+    for (table, column) in [
+        ("rust_llm_tool_calls", "mcp_state"),
+        ("rust_llm_tool_calls", "mcp_result"),
+        ("messages", "cache_ttl"),
+        ("rust_llm_attachments", "blob_key"),
+    ] {
+        query(&db, &format!("ALTER TABLE {table} DROP COLUMN {column}")).await;
+    }
+    query(&db, "DROP TABLE rust_llm_provider_files").await;
+    as_2_0_usages(&db).await;
     let manager = SchemaManager::new(&db);
     assert!(!manager.has_table("rust_llm_mcp_credentials").await.unwrap());
 
     upgrade_migration::Migration.up(&manager).await.unwrap();
 
     assert!(manager.has_table("rust_llm_mcp_credentials").await.unwrap());
-    assert!(
-        manager
-            .has_column("rust_llm_tool_calls", "pending_input")
-            .await
-            .unwrap()
-    );
+    for (table, column) in [
+        ("rust_llm_tool_calls", "mcp_state"),
+        ("rust_llm_tool_calls", "mcp_result"),
+        ("rust_llm_usages", "server_tool_use"),
+        ("messages", "cache_ttl"),
+    ] {
+        assert!(
+            manager.has_column(table, column).await.unwrap(),
+            "{table}.{column}"
+        );
+    }
     // The same shape install creates: a unique key and a polymorphic owner.
     let indexes = index_columns(&db, "rust_llm_mcp_credentials").await;
     assert!(indexes.contains(&vec!["key".to_string()]), "{indexes:?}");
@@ -491,14 +503,185 @@ async fn upgrade_adds_what_2_1_needs_to_a_2_0_schema() {
         "{indexes:?}"
     );
     assert_eq!(
-        column(&db, "rust_llm_tool_calls", "pending_input").await.0,
-        column(
-            &installed_db().await,
-            "rust_llm_tool_calls",
-            "pending_input"
+        column(&db, "rust_llm_tool_calls", "mcp_state").await.0,
+        column(&installed_db().await, "rust_llm_tool_calls", "mcp_state")
+            .await
+            .0
+    );
+    // `index_exists?(:ruby_llm_provider_files, %i[blob_key provider account], unique: true)`.
+    assert!(
+        unique_indexes(&db, "rust_llm_provider_files")
+            .await
+            .contains(&vec![
+                "blob_key".to_string(),
+                "provider".to_string(),
+                "account".to_string()
+            ])
+    );
+}
+
+/// `rust_llm_usages` as 2.0 created it: `chat_type`/`chat_id` required, no owner and no
+/// `server_tool_use`, and an operation constraint without `judgment`, `video`, or `research`.
+async fn as_2_0_usages(db: &DatabaseConnection) {
+    query(db, "DELETE FROM rust_llm_usages").await;
+    query(db, "DROP TABLE rust_llm_usages").await;
+    query(
+        db,
+        "CREATE TABLE rust_llm_usages (id integer NOT NULL PRIMARY KEY AUTOINCREMENT, chat_type varchar NOT NULL, chat_id bigint NOT NULL, message_type varchar NULL, message_id bigint NULL, operation varchar NOT NULL, provider varchar NOT NULL, model varchar NOT NULL, status varchar NOT NULL, input_tokens integer NULL, output_tokens integer NULL, cache_read_tokens integer NULL, cache_write_tokens integer NULL, thinking_tokens integer NULL, input_cost real NULL, output_cost real NULL, cache_read_cost real NULL, cache_write_cost real NULL, thinking_cost real NULL, total_cost real NULL, created_at timestamp_with_timezone_text NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at timestamp_with_timezone_text NOT NULL DEFAULT CURRENT_TIMESTAMP, CHECK (operation IN ('chat', 'embedding', 'moderation', 'image', 'speech', 'transcription', 'ocr', 'rerank')), CHECK (status IN ('pending','succeeded','failed','cancelled')))",
+    )
+    .await;
+    query(
+        db,
+        "CREATE INDEX \"idx-rust_llm_usages-chat\" ON rust_llm_usages (chat_type, chat_id)",
+    )
+    .await;
+}
+
+/// The column lists of a table's unique indexes.
+async fn unique_indexes(db: &DatabaseConnection, table: &str) -> Vec<Vec<String>> {
+    let mut out = Vec::new();
+    for row in query(db, &format!("PRAGMA index_list({table})")).await {
+        if row.try_get::<i32>("", "unique").unwrap() == 1 {
+            let name: String = row.try_get("", "name").unwrap();
+            out.push(strings(db, &format!("PRAGMA index_info('{name}')"), "name").await);
+        }
+    }
+    out
+}
+
+// spec: generators/upgrade_generator_spec.rb:44 renames the pending_input column an earlier 2.1 upgrade added
+#[tokio::test]
+async fn upgrade_renames_the_pending_input_column_an_earlier_2_1_upgrade_added() {
+    upgraded_app();
+    let db = installed_db().await;
+    query(
+        &db,
+        "ALTER TABLE rust_llm_tool_calls RENAME COLUMN mcp_state TO pending_input",
+    )
+    .await;
+    query(
+        &db,
+        "INSERT INTO rust_llm_tool_calls (message_type, message_id, tool_call_id, name, pending_input) VALUES ('Message', 1, 'call_1', 'lookup', '{\"request_state\":\"s\"}')",
+    )
+    .await;
+    let manager = SchemaManager::new(&db);
+
+    upgrade_migration::Migration.up(&manager).await.unwrap();
+
+    assert!(
+        manager
+            .has_column("rust_llm_tool_calls", "mcp_state")
+            .await
+            .unwrap()
+    );
+    assert!(
+        !manager
+            .has_column("rust_llm_tool_calls", "pending_input")
+            .await
+            .unwrap()
+    );
+    // A rename, so a paused call keeps its state.
+    assert_eq!(
+        strings(
+            &db,
+            "SELECT mcp_state FROM rust_llm_tool_calls",
+            "mcp_state"
         )
+        .await,
+        ["{\"request_state\":\"s\"}"]
+    );
+}
+
+// spec: generators/upgrade_generator_spec.rb:58 frees the usage ledger from chats and adds its owner on an app that ran the earlier 2.1 upgrade
+#[tokio::test]
+async fn upgrade_frees_the_usage_ledger_from_chats_and_adds_its_owner() {
+    upgraded_app();
+    let db = installed_db().await;
+    as_2_0_usages(&db).await;
+    query(
+        &db,
+        "INSERT INTO rust_llm_usages (chat_type, chat_id, operation, provider, model, status, input_tokens) VALUES ('Chat', 7, 'chat', 'openai', 'gpt-4.1-nano', 'succeeded', 9)",
+    )
+    .await;
+    assert!(column(&db, "rust_llm_usages", "chat_id").await.1);
+
+    upgrade_migration::Migration
+        .up(&SchemaManager::new(&db))
         .await
-        .0
+        .unwrap();
+
+    assert!(!column(&db, "rust_llm_usages", "chat_type").await.1);
+    assert!(!column(&db, "rust_llm_usages", "chat_id").await.1);
+    column(&db, "rust_llm_usages", "owner_type").await;
+    column(&db, "rust_llm_usages", "owner_id").await;
+    assert!(
+        index_columns(&db, "rust_llm_usages")
+            .await
+            .contains(&vec!["owner_type".to_string(), "owner_id".to_string()])
+    );
+    // Rebuilding the table keeps its rows.
+    assert_eq!(
+        strings(
+            &db,
+            "SELECT chat_id || ':' || input_tokens AS r FROM rust_llm_usages",
+            "r"
+        )
+        .await,
+        ["7:9"]
+    );
+    db.execute_raw(Statement::from_string(
+        DbBackend::Sqlite,
+        format!("INSERT INTO rust_llm_usages (operation, provider, model, status) VALUES ('embedding', 'openai', '{MODEL}', 'succeeded')"),
+    ))
+    .await
+    .unwrap();
+}
+
+// spec: generators/upgrade_generator_spec.rb:77 lets the operation constraint of a 2.0 schema accept every operation
+#[tokio::test]
+async fn upgrade_lets_the_operation_constraint_accept_every_operation() {
+    upgraded_app();
+    let db = installed_db().await;
+    as_2_0_usages(&db).await;
+
+    upgrade_migration::Migration
+        .up(&SchemaManager::new(&db))
+        .await
+        .unwrap();
+
+    let sql = table_sql(&db, "rust_llm_usages").await;
+    let operations: Vec<&str> = sql.matches("operation IN").collect();
+    assert_eq!(operations.len(), 1, "{sql}");
+    use rust_llm::message::Operation;
+    for operation in [
+        Operation::Chat,
+        Operation::Embedding,
+        Operation::Moderation,
+        Operation::Image,
+        Operation::Speech,
+        Operation::Transcription,
+        Operation::Ocr,
+        Operation::Rerank,
+        Operation::Judgment,
+        Operation::Video,
+        Operation::Research,
+    ] {
+        assert!(sql.contains(&format!("'{}'", operation.as_str())), "{sql}");
+    }
+}
+
+// spec: generators/upgrade_generator_spec.rb:95 adds the boundary lifetime to a mapped message table
+#[test]
+fn upgrade_adds_the_boundary_lifetime_to_a_mapped_message_table() {
+    let dir = installed_app();
+    let mut g = Generator::new(dir.path(), false);
+    upgrade::generate_with(&mut g, &["message:ChatMessage"]).unwrap();
+    assert!(g.failures.is_empty(), "{:?}", g.failures);
+    let migration = generated_migration(dir.path(), upgrade::MIGRATION_SUFFIX);
+
+    assert!(migration.contains("const MESSAGES: &str = \"chat_messages\";"));
+    assert!(
+        migration.contains("add_missing(m, MESSAGES, \"cache_ttl\", string_null(\"cache_ttl\"))")
     );
 }
 

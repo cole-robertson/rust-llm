@@ -218,6 +218,83 @@ pub struct Endpoint {
     pub headers: Vec<(String, String)>,
 }
 
+/// `Protocol#supported_attachment?`: whether `protocol`, as `provider` speaks it, can render the
+/// attachment. Mirrors each media module's predicate (`protocols/*/media.rb`, and the provider
+/// dialects in `providers/*/chat.rb` and `media.rb`).
+pub fn supported_attachment(
+    protocol: ProtocolName,
+    provider: Provider,
+    attachment: &crate::attachment::Attachment,
+) -> bool {
+    use crate::attachment::AttachmentType as T;
+    let kind = attachment.kind();
+    let provider_file = attachment.is_provider_file();
+    // `ChatCompletions::Media.supported_attachment?(document_attachments:, audio_attachments:)`.
+    let chat_completions = |documents: Option<bool>, audio: bool| {
+        if provider_file {
+            return documents.is_some();
+        }
+        match kind {
+            T::Image | T::Text => true,
+            T::Audio => audio,
+            T::Pdf => documents.is_some(),
+            T::Document => documents == Some(true),
+            _ => false,
+        }
+    };
+    match protocol {
+        ProtocolName::Anthropic => provider_file || matches!(kind, T::Image | T::Pdf | T::Text),
+        ProtocolName::Gemini => {
+            matches!(kind, T::Image | T::Audio | T::Video | T::Pdf | T::Text)
+        }
+        ProtocolName::Interactions => {
+            matches!(kind, T::Image | T::Audio | T::Video | T::Pdf | T::Text)
+        }
+        // `Perplexity::Agent`: provider files, images, and text.
+        ProtocolName::Responses if provider == Provider::Perplexity => {
+            provider_file || matches!(kind, T::Image | T::Text)
+        }
+        ProtocolName::Responses if provider == Provider::DeepSeek => {
+            if provider_file {
+                kind == T::Image
+            } else {
+                matches!(kind, T::Image | T::Text)
+            }
+        }
+        ProtocolName::Responses => {
+            provider_file || matches!(kind, T::Image | T::Pdf | T::Document | T::Text)
+        }
+        ProtocolName::Conversations => {
+            matches!(kind, T::Image | T::Audio | T::Pdf | T::Document | T::Text)
+        }
+        ProtocolName::RouterChatCompletions => chat_completions(Some(false), true),
+        ProtocolName::ChatCompletions => match provider {
+            Provider::Mistral => {
+                matches!(kind, T::Image | T::Audio | T::Pdf | T::Document | T::Text)
+            }
+            Provider::Ollama | Provider::OllamaCloud => {
+                matches!(kind, T::Image | T::Audio | T::Text)
+            }
+            Provider::GPUStack => matches!(kind, T::Image | T::Audio | T::Video | T::Text),
+            Provider::Perplexity => matches!(kind, T::Image | T::Pdf | T::Document | T::Text),
+            Provider::OpenRouter => kind == T::Video || chat_completions(Some(false), true),
+            Provider::DeepSeek | Provider::XAI | Provider::Hetzner => chat_completions(None, false),
+            _ => chat_completions(Some(false), true),
+        },
+    }
+}
+
+/// `Protocol#supported_message_attachment?`: [`supported_attachment`] for every message role.
+/// (Only Cohere, which this port leaves out, accepts fewer attachments in tool results.)
+pub(crate) fn supported_message_attachment(
+    protocol: ProtocolName,
+    provider: Provider,
+    _role: crate::message::Role,
+    attachment: &crate::attachment::Attachment,
+) -> bool {
+    supported_attachment(protocol, provider, attachment)
+}
+
 pub fn render(protocol: ProtocolName, req: &Request) -> Result<Value> {
     if req.citations && !req.model.supports("citations") {
         warn_unsupported_citations(protocol, req.model);
@@ -234,30 +311,12 @@ pub fn render(protocol: ProtocolName, req: &Request) -> Result<Value> {
 }
 
 /// `Protocols::Perplexity::Router`: the base Chat Completions wire format (not Perplexity's
-/// Sonar dialect), which only accepts strict schemas and MP3 or WAV audio. OpenAI speaks the
-/// base format, so it stands in for the dialect; its one OpenAI-only field is renamed back.
+/// Sonar dialect). Schemas default to strict (`{ strict: true }.merge(schema)`); everything else is
+/// left for Router to judge (cfd85579). OpenAI speaks the base format, so it stands in for the
+/// dialect; its one OpenAI-only field is renamed back.
 fn router_render_payload(req: &Request) -> Result<Value> {
-    if req.schema.is_some_and(|s| s.strict == Some(false)) {
-        return Err(Error::Argument(
-            "Perplexity Router requires strict structured output".into(),
-        ));
-    }
-    for a in req
-        .messages
-        .iter()
-        .filter(|m| !m.is_tool_result())
-        .flat_map(|m| m.attachments.iter())
-    {
-        if a.kind() == crate::attachment::AttachmentType::Audio
-            && !["mp3", "wav"].contains(&a.format().as_str())
-        {
-            return Err(Error::UnsupportedAttachment(anthropic::unsupported(
-                &a.mime_type,
-            )));
-        }
-    }
     let strict = req.schema.map(|s| Schema {
-        strict: Some(true),
+        strict: s.strict.or(Some(true)),
         ..s.clone()
     });
     let base = Request {
@@ -276,87 +335,11 @@ fn router_render_payload(req: &Request) -> Result<Value> {
 
 /// What a protocol's `render` does after `super` (provider options, provider tools, and
 /// `before_request` hooks applied): Mistral Conversations deduplicates its tools and refuses
-/// hosted confirmations; Perplexity Router rejects options and tools it does not accept.
+/// hosted confirmations.
 pub(crate) fn finish_render(protocol: ProtocolName, payload: &mut Value) -> Result<()> {
     match protocol {
         ProtocolName::Conversations => mistral::finish_render(payload),
-        ProtocolName::RouterChatCompletions => validate_router(payload),
         _ => Ok(()),
-    }
-}
-
-/// `Router#validate_router_options` and `#validate_router_tools`.
-fn validate_router(payload: &Value) -> Result<()> {
-    const REJECTED: &[&str] = &[
-        "seed",
-        "logit_bias",
-        "top_logprobs",
-        "functions",
-        "function_call",
-        "modalities",
-        "audio",
-        "prediction",
-        "web_search_options",
-        "moderation",
-        "verbosity",
-    ];
-    let defaults = [
-        ("n", serde_json::json!(1)),
-        ("logprobs", serde_json::json!(false)),
-        ("store", serde_json::json!(false)),
-        ("presence_penalty", serde_json::json!(0)),
-        ("frequency_penalty", serde_json::json!(0)),
-    ];
-    let Some(p) = payload.as_object() else {
-        return Ok(());
-    };
-    let mut unsupported: Vec<&str> = p
-        .keys()
-        .map(String::as_str)
-        .filter(|k| REJECTED.contains(k))
-        .collect();
-    for (key, default) in &defaults {
-        if p.get(*key).is_some_and(|v| !json_eq(v, default)) {
-            unsupported.push(key);
-        }
-    }
-    if p.get("stream_options")
-        .and_then(|o| o.get("include_obfuscation"))
-        .is_some_and(|v| !v.is_null() && *v != Value::Bool(false))
-    {
-        unsupported.push("include_obfuscation");
-    }
-    if !unsupported.is_empty() {
-        return Err(Error::Argument(format!(
-            "Perplexity Router does not support these options: {}",
-            unsupported.join(", ")
-        )));
-    }
-    // A Rust tool always has a description string; an empty one is the absent description here.
-    let described = |t: &Value| {
-        t.pointer("/function/description")
-            .and_then(Value::as_str)
-            .is_some_and(|d| !d.is_empty())
-    };
-    if !p
-        .get("tools")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .all(described)
-    {
-        return Err(Error::Argument(
-            "Perplexity Router function tools require a description".into(),
-        ));
-    }
-    Ok(())
-}
-
-/// Ruby `==` on JSON values: `0 == 0.0`.
-fn json_eq(a: &Value, b: &Value) -> bool {
-    match (a, b) {
-        (Value::Number(x), Value::Number(y)) => x.as_f64() == y.as_f64(),
-        _ => a == b,
     }
 }
 
@@ -563,10 +546,19 @@ pub fn streaming_error_status(protocol: ProtocolName) -> fn(&str) -> Option<u16>
             if v.get("type").and_then(Value::as_str) != Some("error") {
                 return None;
             }
-            match v.pointer("/error/type").and_then(Value::as_str) {
-                Some("overloaded_error") => Some(529),
-                _ => Some(500),
-            }
+            // `Anthropic::Streaming::ERROR_STATUSES`, 500 for any other type.
+            Some(match v.pointer("/error/type").and_then(Value::as_str) {
+                Some("invalid_request_error") => 400,
+                Some("authentication_error") => 401,
+                Some("billing_error") => 402,
+                Some("permission_error") => 403,
+                Some("not_found_error") => 404,
+                Some("request_too_large") => 413,
+                Some("rate_limit_error") => 429,
+                Some("timeout_error") => 504,
+                Some("overloaded_error") => 529,
+                _ => 500,
+            })
         },
         ProtocolName::Gemini => |data| {
             let v: Value = serde_json::from_str(data).ok()?;
@@ -577,14 +569,41 @@ pub fn streaming_error_status(protocol: ProtocolName) -> fn(&str) -> Option<u16>
         ProtocolName::ChatCompletions => |data| {
             let v: Value = serde_json::from_str(data).ok()?;
             let error = v.get("error")?.as_object()?;
+            // A numeric code in the HTTP error range is the status (OpenRouter, 6e99b6cc).
+            if let Some(code) = error
+                .get("code")
+                .and_then(Value::as_u64)
+                .filter(|c| (400..=599).contains(c))
+            {
+                return Some(code as u16);
+            }
             Some(match error.get("type").and_then(Value::as_str) {
                 Some("server_error") => 500,
                 Some("rate_limit_exceeded" | "insufficient_quota") => 429,
                 _ => 400,
             })
         },
-        // `Interactions < Protocol` keeps `Protocol::Streaming#parse_streaming_error`: always 500.
-        ProtocolName::Interactions => |_| Some(500),
+        // `Interactions::Streaming#parse_streaming_error`: the error code's documented status.
+        ProtocolName::Interactions => |data| {
+            let v: Value = serde_json::from_str(data).ok()?;
+            let code = v
+                .get("error")
+                .unwrap_or(&v)
+                .get("code")
+                .and_then(Value::as_str);
+            Some(match code {
+                Some("invalid_request" | "failed_precondition") => 400,
+                Some("authentication") => 401,
+                Some("payment_required") => 402,
+                Some("permission_denied") => 403,
+                Some("not_found") => 404,
+                Some("rate_limit_exceeded" | "quota_exceeded" | "too_many_requests") => 429,
+                Some("service_unavailable") => 503,
+                Some("deadline_exceeded") => 504,
+                _ => 500,
+            })
+        },
+        ProtocolName::Responses => responses::streaming_error_status,
         _ => |data| {
             let v: Value = serde_json::from_str(data).ok()?;
             let kind = v
@@ -607,6 +626,8 @@ pub struct StreamAccumulator {
     content: String,
     model: Option<String>,
     citations: Vec<Citation>,
+    /// `@citation_keys`: each kept citation's attributes, so a repeated list is read once.
+    citation_keys: std::collections::HashSet<String>,
     thinking_text: Option<String>,
     thinking_signature: Option<String>,
     tool_calls: IndexMap<ToolCall>,
@@ -646,8 +667,13 @@ impl StreamAccumulator {
         if let Some(text) = &chunk.content {
             self.content.push_str(text);
         }
+        // `accumulate_citations`: providers like Perplexity repeat the whole list on every chunk,
+        // so each citation is keyed by its attributes once instead of compared with every kept one.
         for c in &chunk.citations {
-            if !self.citations.contains(c) {
+            if self
+                .citation_keys
+                .insert(serde_json::to_string(c).unwrap_or_default())
+            {
                 self.citations.push(c.clone());
             }
         }
@@ -749,6 +775,7 @@ impl StreamAccumulator {
                         let response = crate::error::ErrorResponse {
                             status: raw.status,
                             body: raw.body.to_string(),
+                            ..Default::default()
                         };
                         Error::tool_call_parse_from(finish.as_deref(), response, e)
                     })?,

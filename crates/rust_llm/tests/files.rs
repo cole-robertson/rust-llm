@@ -579,21 +579,33 @@ async fn small_attachments_stay_inline() {
 
 // ---- argument errors, find, and download --------------------------------------------------
 
+/// 2.1 (`Let OpenAI and DeepSeek validate file uploads`): an upload without a purpose goes out as
+/// given, and OpenAI's error states what it needs.
 #[tokio::test]
-async fn openai_uploads_require_a_purpose() {
+async fn openai_uploads_leave_the_purpose_requirement_to_openai() {
+    let server = wiremock::MockServer::start().await;
+    wiremock::Mock::given(wiremock::matchers::path("/v1/files"))
+        .respond_with(
+            wiremock::ResponseTemplate::new(400).set_body_json(serde_json::json!({
+                "error": { "message": "Missing required parameter: 'purpose'." }
+            })),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
     let mut config = Config::default();
     config.set("openai_api_key", "test-key");
+    config.set("openai_api_base", format!("{}/v1", server.uri()));
+    config.max_retries = 0;
     let options = UploadOptions {
         provider: Some("openai"),
         config: Some(Arc::new(config)),
         ..Default::default()
     };
     let err = upload(pdf_path().as_str(), options).await.unwrap_err();
-    assert!(
-        err.to_string()
-            .starts_with("OpenAI file uploads require purpose: assistants, batch"),
-        "{err}"
-    );
+    assert_eq!(err.to_string(), "Missing required parameter: 'purpose'.");
+    let requests = server.received_requests().await.unwrap();
+    assert!(!String::from_utf8_lossy(&requests[0].body).contains("name=\"purpose\""));
 }
 
 #[tokio::test]

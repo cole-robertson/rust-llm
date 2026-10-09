@@ -171,15 +171,14 @@ pub(crate) fn usage(config: &Arc<Config>, entry: &UsageEntry) {
     payload.insert("status".into(), entry.status.as_str().into());
     payload.insert("tokens".into(), tokens_h(&entry.tokens));
     payload.insert("cost".into(), cost_h(&entry.cost));
+    payload.insert(
+        "owner".into(),
+        entry
+            .owner
+            .as_ref()
+            .map_or(Value::Null, crate::accounting::UsageOwner::to_value),
+    );
     instrument_event(config, "usage.rust_llm", payload);
-}
-
-/// `Tracker#finish` -> `Accounting::Usage.instrument` for every attempt of a one-shot operation
-/// (moderation, speech, ...), which records its ledger when it finishes rather than per attempt.
-pub(crate) fn usages(config: &Arc<Config>, entries: &[UsageEntry]) {
-    for entry in entries {
-        usage(config, entry);
-    }
 }
 
 /// `metadata:`: per-call data for the event payload, never sent to the provider.

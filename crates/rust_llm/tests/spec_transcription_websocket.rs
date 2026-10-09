@@ -435,26 +435,3 @@ async fn openrouter_transcribes_a_real_recording_with_speakers_duration_and_cost
     assert!(t.duration.unwrap() > 0.0);
     assert!(t.cost().total().unwrap() > 0.0);
 }
-
-// ---- Gemini dedicated transcription --------------------------------------------------------
-
-// UPSTREAM-REMOVED in 2.1 (was spec: protocols/gemini/file_transcription_spec.rb:95) rejects incompatible custom vocabulary and timestamp options before requesting an interaction
-#[tokio::test]
-async fn gemini_rejects_custom_vocabulary_with_timestamps_before_requesting_an_interaction() {
-    let server = wiremock::MockServer::start().await;
-    let opts = TranscribeOptions {
-        timestamps: Some(vec!["word"]),
-        prompt: Some("RubyLLM"),
-        ..options(
-            "gemini-3.5-transcribe",
-            "gemini",
-            config_at("gemini", format!("{}/v1beta", server.uri())),
-        )
-    };
-    let result = transcribe(ruby_wav().as_str(), opts).await;
-    assert!(
-        matches!(&result, Err(Error::Argument(m)) if m.contains("custom vocabulary cannot be combined")),
-        "{result:?}"
-    );
-    assert!(server.received_requests().await.unwrap().is_empty());
-}
