@@ -54,7 +54,7 @@ fn gemini_refuses_an_attachment_that_is_not_audio() {
     );
 }
 
-// spec: protocols/gemini/transcription_spec.rb:65 #parse_transcription_response > leaves the text nil when the response carries no candidate
+// UPSTREAM-REMOVED in 2.1 (was spec: protocols/gemini/transcription_spec.rb:65) #parse_transcription_response > leaves the text nil when the response carries no candidate
 #[test]
 fn gemini_leaves_the_text_nil_when_the_response_carries_no_candidate() {
     assert_eq!(parse_gemini(&json!({}), "gemini-2.5-flash").text, None);
@@ -64,7 +64,7 @@ fn gemini_leaves_the_text_nil_when_the_response_carries_no_candidate() {
     );
 }
 
-// spec: protocols/gemini/transcription_spec.rb:70 #parse_transcription_response > leaves the text nil when the candidate carries no text parts
+// spec: protocols/gemini/transcription_spec.rb:75 #parse_transcription_response > leaves the text nil when the candidate carries no text parts
 #[test]
 fn gemini_leaves_the_text_nil_when_the_candidate_carries_no_text_parts() {
     let inline = json!({ "candidates": [{ "content": { "parts": [{ "inlineData": {} }] } }] });
@@ -73,7 +73,7 @@ fn gemini_leaves_the_text_nil_when_the_candidate_carries_no_text_parts() {
     assert_eq!(parse_gemini(&empty, "gemini-2.5-flash").text, None);
 }
 
-// spec: protocols/gemini/transcription_spec.rb:75 #parse_transcription_response > leaves the token counts nil when the response carries no usage
+// spec: protocols/gemini/transcription_spec.rb:80 #parse_transcription_response > leaves the token counts nil when the response carries no usage
 #[test]
 fn gemini_leaves_the_token_counts_nil_when_the_response_carries_no_usage() {
     let data = json!({ "candidates": [{ "content": { "parts": [{ "text": "hi" }] } }] });
@@ -104,7 +104,7 @@ fn interactions_preserve_speaker_only_annotations_without_fabricating_timing() {
     assert_eq!(t.duration, None);
 }
 
-// spec: protocols/gemini/file_transcription_spec.rb:102 rejects unknown granularities and unsupported reference clips instead of ignoring them
+// spec: protocols/gemini/file_transcription_spec.rb:118 rejects unknown granularities and unsupported reference clips instead of ignoring them
 // (The reference-clip half transcribes through Vertex AI, a provider this port leaves out.)
 #[test]
 fn interactions_reject_unknown_granularities() {

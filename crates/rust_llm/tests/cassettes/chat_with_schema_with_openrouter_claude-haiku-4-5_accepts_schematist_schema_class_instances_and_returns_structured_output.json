@@ -5,12 +5,12 @@
     "request_body": "{\"model\":\"anthropic/claude-haiku-4.5\",\"messages\":[{\"role\":\"user\",\"content\":\"Generate a person named Alice who is 28 years old\"}],\"stream\":false,\"response_format\":{\"type\":\"json_schema\",\"json_schema\":{\"name\":\"PersonSchemaClass\",\"schema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":\"number\"}},\"required\":[\"name\",\"age\"],\"additionalProperties\":false},\"strict\":true}}}",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:08:45 GMT",
+      "Date": "Wed, 07 Oct 2026 13:00:50 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
       "Access-Control-Allow-Origin": "*",
-      "X-Generation-Id": "gen-1789682923-z0i5qAd9HBEGYfN8qrw1",
+      "X-Generation-Id": "gen-1791378048-tKC99n0s5jsTOeXGokvi",
       "Access-Control-Expose-Headers": "X-Generation-Id,X-Provider-Name,request-id,cf-ray",
       "Set-Cookie": "<COOKIE>",
       "Permissions-Policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
@@ -19,6 +19,6 @@
       "Server": "cloudflare",
       "Cf-Ray": "<CF_RAY>"
     },
-    "response_body": "\n         \n{\"id\":\"gen-1789682923-z0i5qAd9HBEGYfN8qrw1\",\"object\":\"chat.completion\",\"created\":1789682923,\"model\":\"anthropic/claude-haiku-4.5\",\"provider\":\"Amazon Bedrock\",\"system_fingerprint\":null,\"service_tier\":null,\"choices\":[{\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"end_turn\",\"message\":{\"role\":\"assistant\",\"content\":\"{\\\"name\\\":\\\"Alice\\\",\\\"age\\\":28}\",\"refusal\":null,\"reasoning\":null}}],\"usage\":{\"prompt_tokens\":181,\"completion_tokens\":12,\"total_tokens\":193,\"cost\":0.000241,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000241,\"upstream_inference_prompt_cost\":0.000181,\"upstream_inference_completions_cost\":0.00006},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}"
+    "response_body": "\n         \n{\"id\":\"gen-1791378048-tKC99n0s5jsTOeXGokvi\",\"object\":\"chat.completion\",\"created\":1791378048,\"model\":\"anthropic/claude-haiku-4.5\",\"provider\":\"Amazon Bedrock\",\"system_fingerprint\":null,\"service_tier\":null,\"choices\":[{\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"native_finish_reason\":\"end_turn\",\"message\":{\"role\":\"assistant\",\"content\":\"{\\\"name\\\":\\\"Alice\\\",\\\"age\\\":28}\",\"refusal\":null,\"reasoning\":null}}],\"usage\":{\"prompt_tokens\":181,\"completion_tokens\":12,\"total_tokens\":193,\"cost\":0.000241,\"is_byok\":false,\"prompt_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0,\"audio_tokens\":0,\"video_tokens\":0},\"cost_details\":{\"upstream_inference_cost\":0.000241,\"upstream_inference_prompt_cost\":0.000181,\"upstream_inference_completions_cost\":0.00006},\"completion_tokens_details\":{\"reasoning_tokens\":0,\"image_tokens\":0,\"audio_tokens\":0}}}"
   }
 ]

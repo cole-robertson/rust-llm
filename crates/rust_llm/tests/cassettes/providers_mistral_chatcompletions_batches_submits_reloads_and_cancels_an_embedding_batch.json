@@ -5,17 +5,17 @@
     "request_body": "{\"endpoint\":\"/v1/embeddings\",\"model\":\"mistral-embed\",\"requests\":[{\"custom_id\":\"0\",\"body\":{\"input\":\"Ruby\"}},{\"custom_id\":\"1:array\",\"body\":{\"input\":[\"Rails\"]}}]}",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:16:25 GMT",
+      "Date": "Wed, 07 Oct 2026 12:59:07 GMT",
       "Content-Type": "application/json; charset=utf-8",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Mistral-Correlation-Id": "01a0b171-41c5-7880-a32d-a626a4e0cefa",
-      "X-Kong-Request-Id": "01a0b171-41c5-7880-a32d-a626a4e0cefa",
+      "Mistral-Correlation-Id": "01a11672-37f1-73a8-bb52-4096e580c382",
+      "X-Kong-Request-Id": "01a11672-37f1-73a8-bb52-4096e580c382",
       "Server": "cloudflare",
-      "X-Envoy-Upstream-Service-Time": "561",
+      "X-Envoy-Upstream-Service-Time": "1354",
       "Access-Control-Allow-Origin": "*",
-      "X-Kong-Upstream-Latency": "563",
-      "X-Kong-Proxy-Latency": "22",
+      "X-Kong-Upstream-Latency": "1357",
+      "X-Kong-Proxy-Latency": "9",
       "Cf-Cache-Status": "DYNAMIC",
       "Set-Cookie": "<COOKIE>",
       "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
@@ -23,25 +23,25 @@
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\"id\": \"a036608b-ebde-4715-9431-45981360ef2c\", \"object\": \"batch\", \"input_files\": [\"f8473673-2f53-4cd0-ada5-b6681ee78028\"], \"metadata\": null, \"endpoint\": \"/v1/embeddings\", \"model\": \"mistral-embed\", \"agent_id\": null, \"output_file\": null, \"error_file\": null, \"errors\": [], \"outputs\": null, \"status\": \"QUEUED\", \"created_at\": 1789683385, \"total_requests\": 0, \"completed_requests\": 0, \"succeeded_requests\": 0, \"failed_requests\": 0, \"started_at\": null, \"completed_at\": null}"
+    "response_body": "{\"id\": \"9eb63e8f-7554-40ed-856e-88914a7cdb4b\", \"object\": \"batch\", \"input_files\": [\"7de82725-10b6-454b-84d7-dcfdd18d6456\"], \"metadata\": null, \"endpoint\": \"/v1/embeddings\", \"model\": \"mistral-embed\", \"agent_id\": null, \"output_file\": null, \"error_file\": null, \"errors\": [], \"outputs\": null, \"status\": \"QUEUED\", \"created_at\": 1791377947, \"total_requests\": 0, \"completed_requests\": 0, \"succeeded_requests\": 0, \"failed_requests\": 0, \"started_at\": null, \"completed_at\": null}"
   },
   {
     "method": "get",
-    "uri": "https://api.mistral.ai/v1/batch/jobs/a036608b-ebde-4715-9431-45981360ef2c",
+    "uri": "https://api.mistral.ai/v1/batch/jobs/9eb63e8f-7554-40ed-856e-88914a7cdb4b",
     "request_body": "",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:16:25 GMT",
+      "Date": "Wed, 07 Oct 2026 12:59:08 GMT",
       "Content-Type": "application/json; charset=utf-8",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Mistral-Correlation-Id": "01a0b171-4450-7896-8403-5bf06fa5e15b",
-      "X-Kong-Request-Id": "01a0b171-4450-7896-8403-5bf06fa5e15b",
+      "Mistral-Correlation-Id": "01a11672-3da1-7c96-b63d-ad3f195a81f9",
+      "X-Kong-Request-Id": "01a11672-3da1-7c96-b63d-ad3f195a81f9",
       "Server": "cloudflare",
-      "X-Envoy-Upstream-Service-Time": "52",
+      "X-Envoy-Upstream-Service-Time": "66",
       "Access-Control-Allow-Origin": "*",
-      "X-Kong-Upstream-Latency": "54",
-      "X-Kong-Proxy-Latency": "10",
+      "X-Kong-Upstream-Latency": "67",
+      "X-Kong-Proxy-Latency": "13",
       "Cf-Cache-Status": "DYNAMIC",
       "Set-Cookie": "<COOKIE>",
       "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
@@ -49,25 +49,25 @@
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\"id\": \"a036608b-ebde-4715-9431-45981360ef2c\", \"object\": \"batch\", \"input_files\": [\"f8473673-2f53-4cd0-ada5-b6681ee78028\"], \"metadata\": null, \"endpoint\": \"/v1/embeddings\", \"model\": \"mistral-embed\", \"agent_id\": null, \"output_file\": null, \"error_file\": null, \"errors\": [], \"outputs\": null, \"status\": \"QUEUED\", \"created_at\": 1789683385, \"total_requests\": 2, \"completed_requests\": 0, \"succeeded_requests\": 0, \"failed_requests\": 0, \"started_at\": 1789683385, \"completed_at\": null}"
+    "response_body": "{\"id\": \"9eb63e8f-7554-40ed-856e-88914a7cdb4b\", \"object\": \"batch\", \"input_files\": [\"7de82725-10b6-454b-84d7-dcfdd18d6456\"], \"metadata\": null, \"endpoint\": \"/v1/embeddings\", \"model\": \"mistral-embed\", \"agent_id\": null, \"output_file\": null, \"error_file\": null, \"errors\": [], \"outputs\": null, \"status\": \"RUNNING\", \"created_at\": 1791377947, \"total_requests\": 2, \"completed_requests\": 0, \"succeeded_requests\": 0, \"failed_requests\": 0, \"started_at\": 1791377948, \"completed_at\": null}"
   },
   {
     "method": "post",
-    "uri": "https://api.mistral.ai/v1/batch/jobs/a036608b-ebde-4715-9431-45981360ef2c/cancel",
+    "uri": "https://api.mistral.ai/v1/batch/jobs/9eb63e8f-7554-40ed-856e-88914a7cdb4b/cancel",
     "request_body": "{}",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:16:25 GMT",
+      "Date": "Wed, 07 Oct 2026 12:59:08 GMT",
       "Content-Type": "application/json; charset=utf-8",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Mistral-Correlation-Id": "01a0b171-44c8-71b8-b059-d4f10626bcb6",
-      "X-Kong-Request-Id": "01a0b171-44c8-71b8-b059-d4f10626bcb6",
+      "Mistral-Correlation-Id": "01a11672-3e3b-7fa3-8f64-fd8863dee083",
+      "X-Kong-Request-Id": "01a11672-3e3b-7fa3-8f64-fd8863dee083",
       "Server": "cloudflare",
-      "X-Envoy-Upstream-Service-Time": "147",
+      "X-Envoy-Upstream-Service-Time": "144",
       "Access-Control-Allow-Origin": "*",
-      "X-Kong-Upstream-Latency": "149",
-      "X-Kong-Proxy-Latency": "25",
+      "X-Kong-Upstream-Latency": "146",
+      "X-Kong-Proxy-Latency": "15",
       "Cf-Cache-Status": "DYNAMIC",
       "Set-Cookie": "<COOKIE>",
       "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
@@ -75,6 +75,6 @@
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\"id\": \"a036608b-ebde-4715-9431-45981360ef2c\", \"object\": \"batch\", \"input_files\": [\"f8473673-2f53-4cd0-ada5-b6681ee78028\"], \"metadata\": null, \"endpoint\": \"/v1/embeddings\", \"model\": \"mistral-embed\", \"agent_id\": null, \"output_file\": null, \"error_file\": null, \"errors\": [], \"outputs\": null, \"status\": \"CANCELLED\", \"created_at\": 1789683385, \"total_requests\": 2, \"completed_requests\": 0, \"succeeded_requests\": 0, \"failed_requests\": 0, \"started_at\": 1789683385, \"completed_at\": null}"
+    "response_body": "{\"id\": \"9eb63e8f-7554-40ed-856e-88914a7cdb4b\", \"object\": \"batch\", \"input_files\": [\"7de82725-10b6-454b-84d7-dcfdd18d6456\"], \"metadata\": null, \"endpoint\": \"/v1/embeddings\", \"model\": \"mistral-embed\", \"agent_id\": null, \"output_file\": null, \"error_file\": null, \"errors\": [], \"outputs\": null, \"status\": \"CANCELLATION_REQUESTED\", \"created_at\": 1791377947, \"total_requests\": 2, \"completed_requests\": 0, \"succeeded_requests\": 0, \"failed_requests\": 0, \"started_at\": 1791377948, \"completed_at\": null}"
   }
 ]

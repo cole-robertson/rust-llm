@@ -302,7 +302,7 @@ fn openai_delay(pairs: &[(&str, &str)]) -> Option<f64> {
     Provider::OpenAI.retry_delay(&headers(pairs))
 }
 
-// spec: providers/openai_spec.rb:48 #retry_delay > parses duration-formatted reset headers
+// spec: providers/openai_spec.rb:49 #retry_delay > parses duration-formatted reset headers
 #[test]
 fn openai_retry_delay_parses_duration_formatted_reset_headers() {
     assert_eq!(
@@ -311,7 +311,7 @@ fn openai_retry_delay_parses_duration_formatted_reset_headers() {
     );
 }
 
-// spec: providers/openai_spec.rb:54 #retry_delay > parses fractional seconds
+// spec: providers/openai_spec.rb:55 #retry_delay > parses fractional seconds
 #[test]
 fn openai_retry_delay_parses_fractional_seconds() {
     assert_eq!(
@@ -320,7 +320,7 @@ fn openai_retry_delay_parses_fractional_seconds() {
     );
 }
 
-// spec: providers/openai_spec.rb:60 #retry_delay > parses milliseconds
+// spec: providers/openai_spec.rb:61 #retry_delay > parses milliseconds
 #[test]
 fn openai_retry_delay_parses_milliseconds() {
     assert_eq!(
@@ -329,7 +329,7 @@ fn openai_retry_delay_parses_milliseconds() {
     );
 }
 
-// spec: providers/openai_spec.rb:66 #retry_delay > parses hours
+// spec: providers/openai_spec.rb:67 #retry_delay > parses hours
 #[test]
 fn openai_retry_delay_parses_hours() {
     assert_eq!(
@@ -338,7 +338,7 @@ fn openai_retry_delay_parses_hours() {
     );
 }
 
-// spec: providers/openai_spec.rb:72 #retry_delay > returns the longer wait when both limits are hit
+// spec: providers/openai_spec.rb:73 #retry_delay > returns the longer wait when both limits are hit
 #[test]
 fn openai_retry_delay_returns_the_longer_wait() {
     assert_eq!(
@@ -350,13 +350,13 @@ fn openai_retry_delay_returns_the_longer_wait() {
     );
 }
 
-// spec: providers/openai_spec.rb:81 #retry_delay > returns nil without rate limit headers
+// spec: providers/openai_spec.rb:82 #retry_delay > returns nil without rate limit headers
 #[test]
 fn openai_retry_delay_is_none_without_rate_limit_headers() {
     assert_eq!(openai_delay(&[("content-type", "application/json")]), None);
 }
 
-// spec: providers/openai_spec.rb:85 #retry_delay > returns nil for unparseable values
+// spec: providers/openai_spec.rb:86 #retry_delay > returns nil for unparseable values
 #[test]
 fn openai_retry_delay_is_none_for_unparseable_values() {
     assert_eq!(
@@ -365,7 +365,7 @@ fn openai_retry_delay_is_none_for_unparseable_values() {
     );
 }
 
-// spec: providers/openai_spec.rb:91 #retry_delay > returns nil when a duration contains trailing text
+// spec: providers/openai_spec.rb:92 #retry_delay > returns nil when a duration contains trailing text
 #[test]
 fn openai_retry_delay_is_none_with_trailing_text() {
     assert_eq!(
@@ -374,7 +374,7 @@ fn openai_retry_delay_is_none_with_trailing_text() {
     );
 }
 
-// spec: providers/openai_spec.rb:97 #retry_delay > returns nil when the response has no headers
+// spec: providers/openai_spec.rb:98 #retry_delay > returns nil when the response has no headers
 #[test]
 fn openai_retry_delay_is_none_without_headers() {
     assert_eq!(Provider::OpenAI.retry_delay(&[]), None);
@@ -609,7 +609,7 @@ async fn a_chat_completion_is_retried_after_a_server_error() {
     assert_eq!(requests(&server).await, 2);
 }
 
-// spec: transport/connection_retry_spec.rb:133 rate limit retry timing > honors millisecond retry delays for HTTP #{status}
+// spec: transport/connection_retry_spec.rb:144 rate limit retry timing > honors millisecond retry delays for HTTP #{status}
 #[tokio::test]
 async fn millisecond_retry_delays_are_honored() {
     for status in [429, 500, 503, 529] {
@@ -634,7 +634,7 @@ async fn millisecond_retry_delays_are_honored() {
     }
 }
 
-// spec: transport/connection_retry_spec.rb:146 rate limit retry timing > does not retry before an excessive millisecond delay has elapsed
+// spec: transport/connection_retry_spec.rb:157 rate limit retry timing > does not retry before an excessive millisecond delay has elapsed
 #[tokio::test]
 async fn an_excessive_millisecond_delay_is_not_retried() {
     let failed = ResponseTemplate::new(529)
@@ -672,7 +672,7 @@ async fn submit_one(config: Arc<Config>) -> rust_llm::Result<rust_llm::Batch> {
     rust_llm::batch(vec![chat]).await
 }
 
-// spec: transport/connection_retry_spec.rb:175 job-creating requests > submits a batch once when the first attempt fails with a server error
+// spec: transport/connection_retry_spec.rb:186 job-creating requests > submits a batch once when the first attempt fails with a server error
 #[tokio::test]
 async fn a_batch_is_submitted_once_after_a_server_error() {
     let failed = ResponseTemplate::new(500)
@@ -687,7 +687,7 @@ async fn a_batch_is_submitted_once_after_a_server_error() {
     assert_eq!(requests(&server).await, 1);
 }
 
-// spec: transport/connection_retry_spec.rb:183 job-creating requests > submits a batch once when the first attempt times out
+// spec: transport/connection_retry_spec.rb:194 job-creating requests > submits a batch once when the first attempt times out
 #[tokio::test]
 async fn a_batch_is_submitted_once_after_a_timeout() {
     let server = serve_in_order(vec![
@@ -721,7 +721,7 @@ fn retry_after(provider: Option<Provider>, status: u16, pairs: &[(&str, &str)]) 
 /// way to make a provider report a delay (`"12.5s"` => 12.5, `"2m"` => 120.0).
 const RESET: &str = "x-ratelimit-reset-requests";
 
-// spec: transport/error_middleware_spec.rb:84 retry delay normalization > copies the provider retry delay into Retry-After for the retry middleware
+// spec: transport/error_middleware_spec.rb:96 retry delay normalization > copies the provider retry delay into Retry-After for the retry middleware
 #[test]
 fn the_provider_retry_delay_becomes_retry_after() {
     assert_eq!(
@@ -730,7 +730,7 @@ fn the_provider_retry_delay_becomes_retry_after() {
     );
 }
 
-// spec: transport/error_middleware_spec.rb:92 retry delay normalization > keeps a Retry-After already sent by the provider
+// spec: transport/error_middleware_spec.rb:104 retry delay normalization > keeps a Retry-After already sent by the provider
 #[test]
 fn a_retry_after_sent_by_the_provider_is_kept() {
     let date = "Wed, 21 Oct 2099 07:28:00 GMT";
@@ -745,7 +745,7 @@ fn a_retry_after_sent_by_the_provider_is_kept() {
     );
 }
 
-// spec: transport/error_middleware_spec.rb:101 retry delay normalization > normalizes millisecond retry delays for HTTP #{status} without a provider
+// spec: transport/error_middleware_spec.rb:113 retry delay normalization > normalizes millisecond retry delays for HTTP #{status} without a provider
 #[test]
 fn millisecond_retry_delays_are_normalized_without_a_provider() {
     for status in [429, 500, 503, 529] {
@@ -757,7 +757,7 @@ fn millisecond_retry_delays_are_normalized_without_a_provider() {
     }
 }
 
-// spec: transport/error_middleware_spec.rb:110 retry delay normalization > preserves a zero millisecond delay ahead of provider reset hints
+// spec: transport/error_middleware_spec.rb:122 retry delay normalization > preserves a zero millisecond delay ahead of provider reset hints
 #[test]
 fn a_zero_millisecond_delay_wins_over_provider_reset_hints() {
     assert_eq!(
@@ -771,7 +771,7 @@ fn a_zero_millisecond_delay_wins_over_provider_reset_hints() {
     );
 }
 
-// spec: transport/error_middleware_spec.rb:119 retry delay normalization > falls back to provider timing when retry-after-ms is #{value}
+// spec: transport/error_middleware_spec.rb:131 retry delay normalization > falls back to provider timing when retry-after-ms is #{value}
 #[test]
 fn invalid_millisecond_delays_fall_back_to_provider_timing() {
     for value in ["invalid", "-1000", "NaN", "Infinity", "1e999"] {
@@ -797,7 +797,7 @@ async fn failure(status: u16, message: &str) -> Error {
     post(config).await.unwrap_err()
 }
 
-// spec: transport/error_middleware_spec.rb:171 .parse_error > maps context-length-like 429 errors to ContextLengthExceededError
+// spec: transport/error_middleware_spec.rb:183 .parse_error > maps context-length-like 429 errors to ContextLengthExceededError
 #[tokio::test]
 async fn a_request_too_large_429_is_context_length_exceeded() {
     assert_eq!(
@@ -806,14 +806,14 @@ async fn a_request_too_large_429_is_context_length_exceeded() {
     );
 }
 
-// spec: transport/error_middleware_spec.rb:189 .parse_error > maps context-length-like 400 errors to ContextLengthExceededError
+// spec: transport/error_middleware_spec.rb:255 .parse_error > maps context-length-like 400 errors to ContextLengthExceededError
 #[tokio::test]
 async fn a_maximum_context_length_400_is_context_length_exceeded() {
     let error = failure(400, "This model's maximum context length is 8192 tokens.").await;
     assert_eq!(error.kind(), ErrorKind::ContextLengthExceeded);
 }
 
-// spec: transport/error_middleware_spec.rb:209 .parse_error > keeps an invalid context-size setting as BadRequestError
+// spec: transport/error_middleware_spec.rb:275 .parse_error > keeps an invalid context-size setting as BadRequestError
 #[tokio::test]
 async fn an_invalid_context_size_setting_stays_a_bad_request() {
     let msg = "Invalid context size: must be a positive integer";
@@ -822,7 +822,7 @@ async fn an_invalid_context_size_setting_stays_a_bad_request() {
     assert_eq!(error.to_string(), msg);
 }
 
-// spec: transport/error_middleware_spec.rb:229 .parse_error > maps Anthropic's 'input length and max_tokens exceed context limit' 400 error to ContextLengthExceededError
+// spec: transport/error_middleware_spec.rb:295 .parse_error > maps Anthropic's 'input length and max_tokens exceed context limit' 400 error to ContextLengthExceededError
 #[tokio::test]
 async fn an_exceeded_context_limit_400_is_context_length_exceeded() {
     let error = failure(
@@ -833,7 +833,7 @@ async fn an_exceeded_context_limit_400_is_context_length_exceeded() {
     assert_eq!(error.kind(), ErrorKind::ContextLengthExceeded);
 }
 
-// spec: transport/error_middleware_spec.rb:239 .parse_error > maps a currently overloaded 400 to OverloadedError
+// spec: transport/error_middleware_spec.rb:305 .parse_error > maps a currently overloaded 400 to OverloadedError
 #[tokio::test]
 async fn a_currently_overloaded_400_is_overloaded() {
     let msg = "Our servers are currently overloaded. Please try again later.";
@@ -842,7 +842,7 @@ async fn a_currently_overloaded_400_is_overloaded() {
     assert_eq!(error.to_string(), msg);
 }
 
-// spec: transport/error_middleware_spec.rb:249 .parse_error > maps 'the engine is currently overloaded' 400 errors to OverloadedError
+// spec: transport/error_middleware_spec.rb:315 .parse_error > maps 'the engine is currently overloaded' 400 errors to OverloadedError
 #[tokio::test]
 async fn an_engine_overloaded_400_is_overloaded() {
     let msg = "The engine is currently overloaded, please try again later.";
@@ -851,7 +851,7 @@ async fn an_engine_overloaded_400_is_overloaded() {
     assert_eq!(error.to_string(), msg);
 }
 
-// spec: transport/error_middleware_spec.rb:259 .parse_error > keeps a 400 that only mentions overloaded as BadRequestError
+// spec: transport/error_middleware_spec.rb:336 .parse_error > keeps a 400 that only mentions overloaded as BadRequestError
 #[tokio::test]
 async fn a_400_that_only_mentions_overloaded_stays_a_bad_request() {
     let msg = "Unknown parameter: overloaded";
@@ -1031,7 +1031,7 @@ fn openai_error(body: Value) -> Option<String> {
     Provider::OpenAI.parse_error(&body.to_string())
 }
 
-// spec: provider_spec.rb:723 #parse_error body shapes > joins a list of errors
+// spec: provider_spec.rb:735 #parse_error body shapes > joins a list of errors
 #[test]
 fn a_list_of_errors_is_joined() {
     assert_eq!(
@@ -1041,7 +1041,7 @@ fn a_list_of_errors_is_joined() {
     );
 }
 
-// spec: provider_spec.rb:729 #parse_error body shapes > ignores empty error shapes and stringifies scalar list entries
+// spec: provider_spec.rb:741 #parse_error body shapes > ignores empty error shapes and stringifies scalar list entries
 #[test]
 fn empty_error_shapes_are_ignored_and_scalar_entries_stringified() {
     let body = json!([null, "", { "error": [] }, "second", { "message": "third" }]);
@@ -1049,13 +1049,13 @@ fn empty_error_shapes_are_ignored_and_scalar_entries_stringified() {
     assert_eq!(openai_error(json!({ "error": [] })), None);
 }
 
-// spec: provider_spec.rb:736 #parse_error body shapes > passes a body it cannot interpret through
+// spec: provider_spec.rb:748 #parse_error body shapes > passes a body it cannot interpret through
 #[test]
 fn an_uninterpretable_body_is_passed_through() {
     assert_eq!(openai_error(json!(42)).as_deref(), Some("42"));
 }
 
-// spec: provider_spec.rb:744 #parse_error body shapes > keeps an unparseable string body as text
+// spec: provider_spec.rb:756 #parse_error body shapes > keeps an unparseable string body as text
 #[test]
 fn an_unparseable_string_body_is_kept_as_text() {
     assert_eq!(
@@ -1066,7 +1066,7 @@ fn an_unparseable_string_body_is_kept_as_text() {
     );
 }
 
-// spec: provider_spec.rb:750 provider registry partitions > splits providers into local and remote
+// spec: provider_spec.rb:762 provider registry partitions > splits providers into local and remote
 #[test]
 fn providers_split_into_local_and_remote() {
     let local = providers::local_providers();
@@ -1080,7 +1080,7 @@ fn providers_split_into_local_and_remote() {
     assert_eq!(all, expected);
 }
 
-// spec: provider_spec.rb:758 provider registry partitions > lists only providers the configuration can reach
+// spec: provider_spec.rb:770 provider registry partitions > lists only providers the configuration can reach
 #[test]
 fn only_reachable_providers_are_listed_as_configured() {
     let config = config_for(Provider::OpenAI);
@@ -1101,7 +1101,7 @@ fn bearer(key: &str) -> Vec<(String, String)> {
     vec![("Authorization".to_string(), format!("Bearer {key}"))]
 }
 
-// spec: providers/anthropic_spec.rb:28 #api_base > when anthropic_api_base is not set > returns the default Anthropic API URL
+// spec: providers/anthropic_spec.rb:29 #api_base > when anthropic_api_base is not set > returns the default Anthropic API URL
 #[test]
 fn anthropic_defaults_to_its_api_url() {
     assert_eq!(

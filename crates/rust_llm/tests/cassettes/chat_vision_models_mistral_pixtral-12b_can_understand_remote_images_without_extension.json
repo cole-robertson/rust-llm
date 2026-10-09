@@ -5,7 +5,7 @@
     "request_body": "",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:09:18 GMT",
+      "Date": "Wed, 07 Oct 2026 13:17:07 GMT",
       "Content-Type": "image/jpeg",
       "Content-Length": "35588",
       "Connection": "keep-alive",
@@ -22,23 +22,23 @@
     "request_body": "{\"model\":\"pixtral-12b\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What do you see in this image?\"},{\"type\":\"image_url\",\"image_url\":\"https://httpbin.org/image/jpeg\"}]}],\"stream\":false}",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:09:20 GMT",
+      "Date": "Wed, 07 Oct 2026 13:17:12 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Mistral-Correlation-Id": "01a0b16a-c263-77f2-b310-be9881487672",
-      "X-Kong-Request-Id": "01a0b16a-c263-77f2-b310-be9881487672",
+      "Mistral-Correlation-Id": "01a11682-b887-71cd-b8f4-0d8c787d933d",
+      "X-Kong-Request-Id": "01a11682-b887-71cd-b8f4-0d8c787d933d",
       "X-Max-Retry-Attempts-Reached": "false",
       "X-Ratelimit-Limit-Tokens-Minute": "1500000",
-      "X-Ratelimit-Remaining-Tokens-Minute": "1499779",
-      "X-Ratelimit-Tokens-Query-Cost": "141",
+      "X-Ratelimit-Remaining-Tokens-Minute": "1499781",
+      "X-Ratelimit-Tokens-Query-Cost": "140",
       "X-Ratelimit-Limit-Req-Minute": "120",
       "X-Ratelimit-Remaining-Req-Minute": "118",
-      "X-Envoy-Upstream-Service-Time": "1663",
+      "X-Envoy-Upstream-Service-Time": "4845",
       "Server": "cloudflare",
       "Access-Control-Allow-Origin": "*",
-      "X-Kong-Upstream-Latency": "1664",
-      "X-Kong-Proxy-Latency": "14",
+      "X-Kong-Upstream-Latency": "4846",
+      "X-Kong-Proxy-Latency": "10",
       "Cf-Cache-Status": "DYNAMIC",
       "Set-Cookie": "<COOKIE>",
       "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
@@ -46,6 +46,6 @@
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\"id\":\"5b428a6db14f439f828ee478d3429a4b\",\"created\":1789682959,\"model\":\"ministral-14b-latest\",\"usage\":{\"prompt_tokens\":81,\"total_tokens\":141,\"completion_tokens\":60,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":\"The image depicts a coyote, a wild canine, walking on a ground that appears to be a dry, open area with sparse vegetation. The coyote has a slender body, pointed ears, and a bushy tail. Its fur is a mix of browns and grays.\"}}]}"
+    "response_body": "{\"id\":\"c2702a01ee90431eb0a5a5366e7ebaa8\",\"created\":1791379028,\"model\":\"ministral-14b-latest\",\"usage\":{\"prompt_tokens\":81,\"total_tokens\":140,\"completion_tokens\":59,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":\"The image depicts a coyote, a wild canid, walking in what appears to be a natural, possibly arid environment. The coyote has a slender body, pointed ears, and a bushy tail. Its fur is a mix of brown, gray, and white.\"}}]}"
   }
 ]

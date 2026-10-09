@@ -1,0 +1,28 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.openai.com/v1/responses",
+    "request_body": "{\"model\":\"gpt-4.1-nano\",\"input\":[{\"role\":\"user\",\"content\":\"hello\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"max_output_tokens\":-1}",
+    "status": 400,
+    "response_headers": {
+      "Date": "Wed, 07 Oct 2026 12:59:42 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "249",
+      "Connection": "keep-alive",
+      "Cf-Ray": "<CF_RAY>",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Server": "cloudflare",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "Access-Control-Expose-Headers": "CF-Ray",
+      "Openai-Organization": "<OPENAI_ORGANIZATION>",
+      "Openai-Processing-Ms": "22",
+      "Openai-Project": "<OPENAI_PROJECT>",
+      "Openai-Version": "2020-10-01",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "Set-Cookie": "<COOKIE>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\n  \"error\": {\n    \"message\": \"Invalid 'max_output_tokens': integer below minimum value. Expected a value >= 16, but got -1 instead.\",\n    \"type\": \"invalid_request_error\",\n    \"param\": \"max_output_tokens\",\n    \"code\": \"integer_below_min_value\"\n  }\n}"
+  }
+]

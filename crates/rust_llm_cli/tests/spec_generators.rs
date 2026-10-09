@@ -303,7 +303,7 @@ async fn chat_round_trip(db: &DatabaseConnection) -> (i32, messages::Model) {
     (chat.id(), message)
 }
 
-// spec: generators/install_generator_spec.rb:183 chat functionality works correctly
+// spec: generators/install_generator_spec.rb:184 chat functionality works correctly
 #[tokio::test]
 async fn installed_chat_and_message_models_work() {
     installed_app();
@@ -502,7 +502,7 @@ async fn upgrade_adds_what_2_1_needs_to_a_2_0_schema() {
     );
 }
 
-// spec: generators/upgrade_generator_spec.rb:35 leaves an up-to-date schema alone
+// spec: generators/upgrade_generator_spec.rb:103 leaves an up-to-date schema alone
 #[tokio::test]
 async fn upgrade_leaves_an_up_to_date_schema_alone() {
     upgraded_app();

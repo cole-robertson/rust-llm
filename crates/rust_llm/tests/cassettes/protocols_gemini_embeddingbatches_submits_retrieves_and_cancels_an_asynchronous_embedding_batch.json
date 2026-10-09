@@ -2,55 +2,55 @@
   {
     "method": "post",
     "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:asyncBatchEmbedContent",
-    "request_body": "{\"batch\":{\"displayName\":\"ruby_llm_6bf18295447f2780\",\"inputConfig\":{\"requests\":{\"requests\":[{\"request\":{\"model\":\"models/gemini-embedding-001\",\"content\":{\"parts\":[{\"text\":\"Ruby\"}]},\"outputDimensionality\":64},\"metadata\":{\"custom_id\":\"0\",\"model\":\"gemini-embedding-001\",\"array_input\":false,\"embedding_index\":0,\"embedding_count\":1}}]}}}}",
+    "request_body": "{\"batch\":{\"displayName\":\"ruby_llm_552c5c479df446bf\",\"inputConfig\":{\"requests\":{\"requests\":[{\"request\":{\"model\":\"models/gemini-embedding-001\",\"content\":{\"parts\":[{\"text\":\"Ruby\"}]},\"outputDimensionality\":64},\"metadata\":{\"custom_id\":\"0\",\"model\":\"gemini-embedding-001\",\"array_input\":false,\"embedding_index\":0,\"embedding_count\":1}}]}}}}",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Thu, 17 Sep 2026 22:15:10 GMT",
+      "Date": "Wed, 07 Oct 2026 12:59:06 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=4224",
+      "Server-Timing": "gfet4t7; dur=4628",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"name\": \"batches/yyn3anyz3fgvnndyurauw5bqhh19v1s7nfpg\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.EmbedContentBatch\",\n    \"model\": \"models/gemini-embedding-001\",\n    \"displayName\": \"ruby_llm_6bf18295447f2780\",\n    \"createTime\": \"2026-09-17T22:15:07.287598565Z\",\n    \"updateTime\": \"2026-09-17T22:15:07.287598565Z\",\n    \"batchStats\": {\n      \"requestCount\": \"1\",\n      \"pendingRequestCount\": \"1\"\n    },\n    \"state\": \"BATCH_STATE_PENDING\",\n    \"name\": \"batches/yyn3anyz3fgvnndyurauw5bqhh19v1s7nfpg\"\n  }\n}\n"
+    "response_body": "{\n  \"name\": \"batches/4qacsfai4w6rb6ayyrp7lwwa3qr1ctspk4fu\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.EmbedContentBatch\",\n    \"model\": \"models/gemini-embedding-001\",\n    \"displayName\": \"ruby_llm_552c5c479df446bf\",\n    \"createTime\": \"2026-10-07T12:59:02.585947608Z\",\n    \"updateTime\": \"2026-10-07T12:59:02.585947608Z\",\n    \"batchStats\": {\n      \"requestCount\": \"1\",\n      \"pendingRequestCount\": \"1\"\n    },\n    \"state\": \"BATCH_STATE_PENDING\",\n    \"name\": \"batches/4qacsfai4w6rb6ayyrp7lwwa3qr1ctspk4fu\"\n  }\n}\n"
   },
   {
     "method": "get",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/yyn3anyz3fgvnndyurauw5bqhh19v1s7nfpg",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/4qacsfai4w6rb6ayyrp7lwwa3qr1ctspk4fu",
     "request_body": "",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Thu, 17 Sep 2026 22:15:11 GMT",
+      "Date": "Wed, 07 Oct 2026 12:59:07 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=272",
+      "Server-Timing": "gfet4t7; dur=286",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"name\": \"batches/yyn3anyz3fgvnndyurauw5bqhh19v1s7nfpg\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.EmbedContentBatch\",\n    \"model\": \"models/gemini-embedding-001\",\n    \"displayName\": \"ruby_llm_6bf18295447f2780\",\n    \"createTime\": \"2026-09-17T22:15:07.287598565Z\",\n    \"updateTime\": \"2026-09-17T22:15:07.287598565Z\",\n    \"batchStats\": {\n      \"requestCount\": \"1\",\n      \"pendingRequestCount\": \"1\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/yyn3anyz3fgvnndyurauw5bqhh19v1s7nfpg\"\n  }\n}\n"
+    "response_body": "{\n  \"name\": \"batches/4qacsfai4w6rb6ayyrp7lwwa3qr1ctspk4fu\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.EmbedContentBatch\",\n    \"model\": \"models/gemini-embedding-001\",\n    \"displayName\": \"ruby_llm_552c5c479df446bf\",\n    \"createTime\": \"2026-10-07T12:59:02.585947608Z\",\n    \"updateTime\": \"2026-10-07T12:59:02.585947608Z\",\n    \"batchStats\": {\n      \"requestCount\": \"1\",\n      \"pendingRequestCount\": \"1\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/4qacsfai4w6rb6ayyrp7lwwa3qr1ctspk4fu\"\n  }\n}\n"
   },
   {
     "method": "post",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/yyn3anyz3fgvnndyurauw5bqhh19v1s7nfpg:cancel",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/4qacsfai4w6rb6ayyrp7lwwa3qr1ctspk4fu:cancel",
     "request_body": "{}",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Thu, 17 Sep 2026 22:15:12 GMT",
+      "Date": "Wed, 07 Oct 2026 12:59:08 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=1329",
+      "Server-Timing": "gfet4t7; dur=1422",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
@@ -58,21 +58,21 @@
   },
   {
     "method": "get",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/yyn3anyz3fgvnndyurauw5bqhh19v1s7nfpg",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/4qacsfai4w6rb6ayyrp7lwwa3qr1ctspk4fu",
     "request_body": "",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Thu, 17 Sep 2026 22:15:12 GMT",
+      "Date": "Wed, 07 Oct 2026 12:59:08 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=292",
+      "Server-Timing": "gfet4t7; dur=298",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"name\": \"batches/yyn3anyz3fgvnndyurauw5bqhh19v1s7nfpg\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.EmbedContentBatch\",\n    \"model\": \"models/gemini-embedding-001\",\n    \"displayName\": \"ruby_llm_6bf18295447f2780\",\n    \"createTime\": \"2026-09-17T22:15:07.287598565Z\",\n    \"endTime\": \"2026-09-17T22:15:11.801196Z\",\n    \"updateTime\": \"2026-09-17T22:15:11.801196Z\",\n    \"batchStats\": {\n      \"requestCount\": \"1\",\n      \"pendingRequestCount\": \"1\"\n    },\n    \"state\": \"BATCH_STATE_CANCELLED\",\n    \"name\": \"batches/yyn3anyz3fgvnndyurauw5bqhh19v1s7nfpg\"\n  },\n  \"done\": true,\n  \"error\": {\n    \"code\": 13,\n    \"message\": \"Batch yyn3anyz3fgvnndyurauw5bqhh19v1s7nfpg failed without error.\"\n  }\n}\n"
+    "response_body": "{\n  \"name\": \"batches/4qacsfai4w6rb6ayyrp7lwwa3qr1ctspk4fu\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.EmbedContentBatch\",\n    \"model\": \"models/gemini-embedding-001\",\n    \"displayName\": \"ruby_llm_552c5c479df446bf\",\n    \"createTime\": \"2026-10-07T12:59:02.585947608Z\",\n    \"endTime\": \"2026-10-07T12:59:07.701513Z\",\n    \"updateTime\": \"2026-10-07T12:59:07.701513Z\",\n    \"batchStats\": {\n      \"requestCount\": \"1\",\n      \"pendingRequestCount\": \"1\"\n    },\n    \"state\": \"BATCH_STATE_CANCELLED\",\n    \"name\": \"batches/4qacsfai4w6rb6ayyrp7lwwa3qr1ctspk4fu\"\n  },\n  \"done\": true,\n  \"error\": {\n    \"code\": 13,\n    \"message\": \"Batch 4qacsfai4w6rb6ayyrp7lwwa3qr1ctspk4fu failed without error.\"\n  }\n}\n"
   }
 ]

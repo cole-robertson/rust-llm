@@ -586,7 +586,7 @@ async fn still_resolves_the_chat_that_points_at_it() {
 
 // ---- chat_methods_spec.rb: model assignment ------------------------------------------------------
 
-// spec: active_record/chat_methods_spec.rb:95 fills an empty model store with the registry before adding the first chat
+// spec: active_record/chat_methods_spec.rb:97 fills an empty model store with the registry before adding the first chat
 #[tokio::test]
 async fn fills_an_empty_model_store_with_the_registry_before_adding_the_first_chat() {
     let _lock = GLOBAL.lock().await;
@@ -627,7 +627,7 @@ async fn fills_an_empty_model_store_with_the_registry_before_adding_the_first_ch
     );
 }
 
-// spec: active_record/chat_methods_spec.rb:161 reuses a model row another process inserted after the lookup missed
+// spec: active_record/chat_methods_spec.rb:163 reuses a model row another process inserted after the lookup missed
 #[tokio::test]
 async fn reuses_a_model_row_another_process_inserted_after_the_lookup_missed() {
     let _lock = GLOBAL.lock().await;

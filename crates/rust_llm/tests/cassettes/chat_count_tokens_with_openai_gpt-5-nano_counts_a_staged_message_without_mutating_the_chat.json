@@ -5,7 +5,7 @@
     "request_body": "{\"model\":\"gpt-5-nano\",\"input\":[{\"role\":\"user\",\"content\":\"What is the capital of France?\"}]}",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:15:01 GMT",
+      "Date": "Wed, 07 Oct 2026 12:59:27 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
@@ -16,7 +16,7 @@
       "X-Content-Type-Options": "nosniff",
       "Access-Control-Expose-Headers": "CF-Ray",
       "Openai-Organization": "<OPENAI_ORGANIZATION>",
-      "Openai-Processing-Ms": "103",
+      "Openai-Processing-Ms": "406",
       "Openai-Project": "<OPENAI_PROJECT>",
       "Openai-Version": "2020-10-01",
       "X-Request-Id": "<X_REQUEST_ID>",

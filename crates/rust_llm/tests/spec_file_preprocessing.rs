@@ -111,7 +111,7 @@ fn responses_file_id(request: &Request) -> Value {
     body(request)["input"][0]["content"][1]["file_id"].clone()
 }
 
-// spec: protocol_file_preprocessing_spec.rb:54 replaces an upload past its retention window
+// spec: protocol_file_preprocessing_spec.rb:72 replaces an upload past its retention window
 #[tokio::test]
 async fn an_upload_past_its_retention_window_is_replaced() {
     let server = MockServer::start().await;
@@ -154,7 +154,7 @@ async fn an_upload_past_its_retention_window_is_replaced() {
     assert_eq!(starts, 2, "uploaded twice");
 }
 
-// spec: protocol_file_preprocessing_spec.rb:72 uploads separately for each provider
+// spec: protocol_file_preprocessing_spec.rb:90 uploads separately for each provider
 #[tokio::test]
 async fn each_provider_gets_its_own_upload() {
     let server = MockServer::start().await;
@@ -213,7 +213,7 @@ async fn each_provider_gets_its_own_upload() {
     assert_eq!(uploads, ["/upload/v1beta/files", "/v1/files"]);
 }
 
-// spec: protocol_file_preprocessing_spec.rb:96 uploads again for the same provider under different credentials
+// spec: protocol_file_preprocessing_spec.rb:114 uploads again for the same provider under different credentials
 #[tokio::test]
 async fn the_same_provider_under_other_credentials_uploads_again() {
     let server = MockServer::start().await;
@@ -268,7 +268,7 @@ async fn responses_auto_upload(filename: &str, id: &str) -> (Request, Request) {
     (requests[0].clone(), requests[1].clone())
 }
 
-// spec: protocol_file_preprocessing_spec.rb:130 uses OpenAI user_data purpose for automatic Responses uploads
+// spec: protocol_file_preprocessing_spec.rb:148 uses OpenAI user_data purpose for automatic Responses uploads
 #[tokio::test]
 async fn responses_auto_uploads_use_the_user_data_purpose() {
     let (upload, chat) = responses_auto_upload("large.pdf", "file_123").await;
@@ -276,7 +276,7 @@ async fn responses_auto_uploads_use_the_user_data_purpose() {
     assert_eq!(responses_file_id(&chat), "file_123");
 }
 
-// spec: protocol_file_preprocessing_spec.rb:150 uploads oversized Responses documents beyond PDFs
+// spec: protocol_file_preprocessing_spec.rb:168 uploads oversized Responses documents beyond PDFs
 #[tokio::test]
 async fn responses_auto_uploads_documents_beyond_pdfs() {
     let (upload, chat) = responses_auto_upload("large.docx", "file_456").await;
@@ -284,7 +284,7 @@ async fn responses_auto_uploads_documents_beyond_pdfs() {
     assert_eq!(responses_file_id(&chat), "file_456");
 }
 
-// spec: protocol_file_preprocessing_spec.rb:168 raises before uploading files above the provider file limit
+// UPSTREAM-REMOVED in 2.1 (was spec: protocol_file_preprocessing_spec.rb:168) raises before uploading files above the provider file limit
 #[tokio::test]
 async fn files_above_the_provider_limit_raise_before_uploading() {
     let server = MockServer::start().await;
@@ -329,7 +329,7 @@ async fn anthropic(server: &MockServer) {
         .await;
 }
 
-// spec: protocol_file_preprocessing_spec.rb:182 preprocesses at request time rather than when messages are added
+// spec: protocol_file_preprocessing_spec.rb:200 preprocesses at request time rather than when messages are added
 #[tokio::test]
 async fn preprocessing_happens_at_request_time_not_when_adding_messages() {
     let server = MockServer::start().await;
@@ -352,7 +352,7 @@ async fn preprocessing_happens_at_request_time_not_when_adding_messages() {
     );
 }
 
-// spec: protocol_file_preprocessing_spec.rb:193 preprocesses the messages it counts tokens for
+// spec: protocol_file_preprocessing_spec.rb:211 preprocesses the messages it counts tokens for
 #[tokio::test]
 async fn count_tokens_preprocesses_the_messages_it_counts() {
     let server = MockServer::start().await;

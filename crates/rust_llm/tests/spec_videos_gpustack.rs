@@ -162,7 +162,7 @@ async fn serializes_image_and_audio_input_and_nested_options_as_json_fields() {
     );
 }
 
-// spec: protocols/gpustack/videos_spec.rb:57 preserves ordered multiple references and sends remote references inline
+// spec: protocols/gpustack/videos_spec.rb:63 preserves ordered multiple references and sends remote references inline
 #[tokio::test]
 async fn preserves_ordered_multiple_references_and_sends_remote_references_inline() {
     let server = MockServer::start().await;
@@ -204,7 +204,7 @@ async fn preserves_ordered_multiple_references_and_sends_remote_references_inlin
     );
 }
 
-// spec: protocols/gpustack/videos_spec.rb:78 accepts a local video through the public attachment API and sends a JSON reference field
+// spec: protocols/gpustack/videos_spec.rb:84 accepts a local video through the public attachment API and sends a JSON reference field
 #[tokio::test]
 async fn accepts_a_local_video_and_sends_a_json_reference_field() {
     let server = MockServer::start().await;
@@ -230,7 +230,7 @@ async fn accepts_a_local_video_and_sends_a_json_reference_field() {
     server.verify().await;
 }
 
-// spec: protocols/gpustack/videos_spec.rb:91 preserves provider failure and rejects unknown job states rather than polling forever
+// spec: protocols/gpustack/videos_spec.rb:97 preserves provider failure and rejects unknown job states rather than polling forever
 #[tokio::test]
 async fn preserves_provider_failure_and_rejects_unknown_job_states() {
     let server = MockServer::start().await;
@@ -274,7 +274,7 @@ async fn preserves_provider_failure_and_rejects_unknown_job_states() {
     );
 }
 
-// spec: protocols/gpustack/videos_spec.rb:104 does not repeat a video submission after an uncertain transport failure
+// spec: protocols/gpustack/videos_spec.rb:110 does not repeat a video submission after an uncertain transport failure
 #[tokio::test]
 async fn does_not_repeat_a_video_submission_after_an_uncertain_transport_failure() {
     let server = MockServer::start().await;
@@ -298,7 +298,7 @@ async fn does_not_repeat_a_video_submission_after_an_uncertain_transport_failure
     assert_eq!(posts(&server).await.len(), 1);
 }
 
-// spec: protocols/gpustack/videos_spec.rb:112 rejects unsupported gateway routes, references, multi-output requests, and extension before HTTP
+// spec: protocols/gpustack/videos_spec.rb:118 rejects unsupported gateway routes, references, multi-output requests, and extension before HTTP
 #[tokio::test]
 async fn rejects_unsupported_inputs_before_http() {
     let server = MockServer::start().await;

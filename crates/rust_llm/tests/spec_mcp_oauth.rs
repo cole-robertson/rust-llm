@@ -216,7 +216,7 @@ fn mcp_error(error: Error) -> String {
     }
 }
 
-// spec: mcp/oauth_spec.rb:63 starts an authorization with PKCE, the resource, and the challenged scope
+// spec: mcp/oauth_spec.rb:103 starts an authorization with PKCE, the resource, and the challenged scope
 #[tokio::test]
 async fn starts_an_authorization_with_pkce_the_resource_and_the_challenged_scope() {
     let w = world().await;
@@ -252,7 +252,7 @@ async fn starts_an_authorization_with_pkce_the_resource_and_the_challenged_scope
     );
 }
 
-// spec: mcp/oauth_spec.rb:76 exchanges the code and uses the token
+// spec: mcp/oauth_spec.rb:135 exchanges the code and uses the token
 #[tokio::test]
 async fn exchanges_the_code_and_uses_the_token() {
     let w = world().await;
@@ -271,7 +271,7 @@ async fn exchanges_the_code_and_uses_the_token() {
     assert!(exchange.get("code_verifier").is_some_and(|v| !v.is_empty()));
 }
 
-// spec: mcp/oauth_spec.rb:88 sends the server and OAuth requests through the connection of its context
+// spec: mcp/oauth_spec.rb:155 sends the server and OAuth requests through the connection of its context
 // Ruby proves it with a recording Faraday adapter; reqwest has no adapter hook, so this checks
 // the same requests are made and that they read the context's configuration (its client name and
 // credential store) rather than the global one.
@@ -320,7 +320,7 @@ async fn sends_the_server_and_oauth_requests_with_the_configuration_of_its_conte
     );
 }
 
-// spec: mcp/oauth_spec.rb:106 keeps credentials per owner
+// spec: mcp/oauth_spec.rb:173 keeps credentials per owner
 #[tokio::test]
 async fn keeps_credentials_per_owner() {
     let w = world().await;
@@ -329,7 +329,7 @@ async fn keeps_credentials_per_owner() {
     assert!(!w.linear("grace").is_authorized().await.unwrap());
 }
 
-// spec: mcp/oauth_spec.rb:112 refreshes an expired token when the server rejects it
+// spec: mcp/oauth_spec.rb:179 refreshes an expired token when the server rejects it
 #[tokio::test]
 async fn refreshes_an_expired_token_when_the_server_rejects_it() {
     let w = world().await;
@@ -346,7 +346,7 @@ async fn refreshes_an_expired_token_when_the_server_rejects_it() {
     );
 }
 
-// spec: mcp/oauth_spec.rb:122 refuses a callback with the wrong state
+// spec: mcp/oauth_spec.rb:232 refuses a callback with the wrong state
 #[tokio::test]
 async fn refuses_a_callback_with_the_wrong_state() {
     let w = world().await;
@@ -361,7 +361,7 @@ async fn refuses_a_callback_with_the_wrong_state() {
     assert_eq!(mcp_error(error), "The authorization state does not match");
 }
 
-// spec: mcp/oauth_spec.rb:129 refuses a callback from another issuer, or none when one is required
+// spec: mcp/oauth_spec.rb:239 refuses a callback from another issuer, or none when one is required
 #[tokio::test]
 async fn refuses_a_callback_from_another_issuer_or_none_when_one_is_required() {
     let w = world().await;
@@ -382,7 +382,7 @@ async fn refuses_a_callback_from_another_issuer_or_none_when_one_is_required() {
     assert!(mcp_error(error).contains("did not identify"));
 }
 
-// spec: mcp/oauth_spec.rb:137 uses a pre-registered client with its secret
+// spec: mcp/oauth_spec.rb:306 uses a pre-registered client with its secret
 #[tokio::test]
 async fn uses_a_pre_registered_client_with_its_secret() {
     let w = world().await;
@@ -406,7 +406,7 @@ async fn uses_a_pre_registered_client_with_its_secret() {
     ));
 }
 
-// spec: mcp/oauth_spec.rb:151 refuses authorization servers without PKCE
+// spec: mcp/oauth_spec.rb:350 refuses authorization servers without PKCE
 #[tokio::test]
 async fn refuses_authorization_servers_without_pkce() {
     let w = world().await;
@@ -432,7 +432,7 @@ async fn refuses_authorization_servers_without_pkce() {
     assert!(mcp_error(error).contains("PKCE"));
 }
 
-// spec: mcp/oauth_spec.rb:158 refuses metadata for another resource
+// spec: mcp/oauth_spec.rb:357 refuses metadata for another resource
 #[tokio::test]
 async fn refuses_metadata_for_another_resource() {
     let w = world().await;
@@ -483,7 +483,7 @@ async fn impostor_error(w: &World, impostor_server: &MockServer, impostor: &str)
     mcp_error(mcp.authorization_url(REDIRECT_URI).await.err().unwrap())
 }
 
-// spec: mcp/oauth_spec.rb:167 refuses a server at #{impostor} claiming another server's resource
+// spec: mcp/oauth_spec.rb:366 refuses a server at #{impostor} claiming another server's resource
 // Both impostors: another host on the same port (`localhost` against `127.0.0.1`, standing in for
 // `mcp.example.com.attacker.io`), and the same host on another port (`:8443`).
 #[tokio::test]
@@ -505,7 +505,7 @@ async fn refuses_a_server_at_another_host_or_port_claiming_another_servers_resou
     );
 }
 
-// spec: mcp/oauth_spec.rb:187 refuses an authorization endpoint that is not HTTPS
+// spec: mcp/oauth_spec.rb:394 refuses an authorization endpoint that is not HTTPS
 #[tokio::test]
 async fn refuses_an_authorization_endpoint_that_is_not_https() {
     let w = world().await;
@@ -528,7 +528,7 @@ async fn refuses_an_authorization_endpoint_that_is_not_https() {
     assert!(mcp_error(error).contains("HTTPS"));
 }
 
-// spec: mcp/oauth_spec.rb:194 needs the declared owner
+// spec: mcp/oauth_spec.rb:401 needs the declared owner
 #[tokio::test]
 async fn needs_the_declared_owner() {
     let w = world().await;
@@ -541,7 +541,7 @@ async fn needs_the_declared_owner() {
     );
 }
 
-// spec: mcp/oauth_spec.rb:198 keeps refreshing with the token endpoint that issued the token
+// spec: mcp/oauth_spec.rb:405 keeps refreshing with the token endpoint that issued the token
 #[tokio::test]
 async fn keeps_refreshing_with_the_token_endpoint_that_issued_the_token() {
     let w = world().await;
@@ -569,7 +569,7 @@ async fn keeps_refreshing_with_the_token_endpoint_that_issued_the_token() {
     );
 }
 
-// spec: mcp/oauth_spec.rb:209 ignores metadata URLs on other hosts
+// spec: mcp/oauth_spec.rb:416 ignores metadata URLs on other hosts
 #[tokio::test]
 async fn ignores_metadata_urls_on_other_hosts() {
     let w = world().await;
@@ -623,7 +623,7 @@ async fn insufficient_scope(w: &World) {
     .await;
 }
 
-// spec: mcp/oauth_spec.rb:220 asks for challenged scopes along with the ones already granted
+// spec: mcp/oauth_spec.rb:427 asks for challenged scopes along with the ones already granted
 #[tokio::test]
 async fn asks_for_challenged_scopes_along_with_the_ones_already_granted() {
     let w = world().await;
@@ -638,7 +638,7 @@ async fn asks_for_challenged_scopes_along_with_the_ones_already_granted() {
     );
 }
 
-// spec: mcp/oauth_spec.rb:232 uses the server origin for servers without protected resource metadata
+// spec: mcp/oauth_spec.rb:439 uses the server origin for servers without protected resource metadata
 #[tokio::test]
 async fn uses_the_server_origin_for_servers_without_protected_resource_metadata() {
     let w = world().await;
@@ -675,7 +675,7 @@ async fn uses_the_server_origin_for_servers_without_protected_resource_metadata(
     );
 }
 
-// spec: mcp/oauth_spec.rb:245 adds challenged scopes to configured ones
+// spec: mcp/oauth_spec.rb:452 adds challenged scopes to configured ones
 #[tokio::test]
 async fn adds_challenged_scopes_to_configured_ones() {
     let w = world().await;
@@ -690,7 +690,7 @@ async fn adds_challenged_scopes_to_configured_ones() {
     );
 }
 
-// spec: mcp/oauth_spec.rb:262 refuses a legacy authorization server without PKCE
+// spec: mcp/oauth_spec.rb:469 refuses a legacy authorization server without PKCE
 #[tokio::test]
 async fn refuses_a_legacy_authorization_server_without_pkce() {
     let w = world().await;
@@ -721,7 +721,7 @@ async fn refuses_a_legacy_authorization_server_without_pkce() {
     assert!(mcp_error(error).contains("PKCE"));
 }
 
-// spec: mcp/oauth_spec.rb:273 refreshes once when the server keeps rejecting the token
+// spec: mcp/oauth_spec.rb:480 refreshes once when the server keeps rejecting the token
 #[tokio::test]
 async fn refreshes_once_when_the_server_keeps_rejecting_the_token() {
     let w = world().await;
@@ -741,7 +741,7 @@ async fn refreshes_once_when_the_server_keeps_rejecting_the_token() {
     assert_eq!(refreshes, 1);
 }
 
-// spec: mcp/oauth_spec.rb:282 forgets credentials
+// spec: mcp/oauth_spec.rb:556 forgets credentials
 #[tokio::test]
 async fn forgets_credentials() {
     let w = world().await;
@@ -759,7 +759,7 @@ async fn forgets_credentials() {
     );
 }
 
-// spec: mcp_spec.rb:518 accepts a prefix and OAuth settings
+// spec: mcp_spec.rb:1210 accepts a prefix and OAuth settings
 #[tokio::test]
 async fn accepts_a_prefix_and_oauth_settings() {
     let linear = Mcp::url("https://mcp.linear.app/mcp")

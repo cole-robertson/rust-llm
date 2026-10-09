@@ -163,7 +163,7 @@ fn a_model_free_operation_keeps_no_model_and_unknown_tokens() {
     );
 }
 
-// spec: accounting/usage_spec.rb:80 prices against the requested model when the provider echoes an unregistered id
+// spec: accounting/usage_spec.rb:92 prices against the requested model when the provider echoes an unregistered id
 #[test]
 fn an_unregistered_echoed_id_is_priced_against_the_requested_model() {
     let _r = Registry::lock(None);
@@ -178,7 +178,7 @@ fn an_unregistered_echoed_id_is_priced_against_the_requested_model() {
     assert_eq!(result.cost(None).total(), entry_total);
 }
 
-// spec: accounting/usage_spec.rb:97 keeps tokens unknown for attempts that may have been billed
+// spec: accounting/usage_spec.rb:109 keeps tokens unknown for attempts that may have been billed
 #[test]
 fn a_possibly_billed_failure_keeps_tokens_unknown() {
     let _r = Registry::lock(None);
@@ -193,7 +193,7 @@ fn a_possibly_billed_failure_keeps_tokens_unknown() {
     assert!(!entry.usage_available());
 }
 
-// spec: accounting/usage_spec.rb:129 provider-specific message pricing > replaces a providerless lookup before recording the cost
+// spec: accounting/usage_spec.rb:141 provider-specific message pricing > replaces a providerless lookup before recording the cost
 #[test]
 fn a_providerless_lookup_is_replaced_before_pricing() {
     let _r = Registry::lock(Some(vec![other_model(), custom_model()]));
@@ -211,7 +211,7 @@ fn a_providerless_lookup_is_replaced_before_pricing() {
     assert_eq!(result.cost(None).total(), entry.cost.total());
 }
 
-// spec: accounting/usage_spec.rb:142 provider-specific message pricing > falls back to the requested model when only another provider knows the echoed id
+// spec: accounting/usage_spec.rb:154 provider-specific message pricing > falls back to the requested model when only another provider knows the echoed id
 #[test]
 fn an_echoed_id_known_only_to_another_provider_falls_back_to_the_requested_model() {
     let mut elsewhere = other_model();
@@ -228,7 +228,7 @@ fn an_echoed_id_known_only_to_another_provider_falls_back_to_the_requested_model
     close(tracker.entry(id).unwrap().cost.total(), 0.0000123);
 }
 
-// spec: accounting/usage_spec.rb:156 provider-specific message pricing > uses a different echoed model when it belongs to the same provider
+// spec: accounting/usage_spec.rb:168 provider-specific message pricing > uses a different echoed model when it belongs to the same provider
 #[test]
 fn an_echoed_model_of_the_same_provider_prices_the_call() {
     let mut echoed = other_model();
@@ -247,7 +247,7 @@ fn an_echoed_model_of_the_same_provider_prices_the_call() {
     assert_eq!(tracker.entry(id).unwrap().cost.total(), expected);
 }
 
-// spec: accounting/usage_spec.rb:171 provider-specific message pricing > preserves a provider-reported cost of #{amount}
+// spec: accounting/usage_spec.rb:183 provider-specific message pricing > preserves a provider-reported cost of #{amount}
 #[test]
 fn a_provider_reported_cost_is_preserved() {
     let _r = Registry::lock(Some(vec![other_model(), custom_model()]));
@@ -265,7 +265,7 @@ fn a_provider_reported_cost_is_preserved() {
     }
 }
 
-// spec: accounting/usage_spec.rb:185 provider-specific message pricing > preserves an explicitly supplied cost
+// spec: accounting/usage_spec.rb:197 provider-specific message pricing > preserves an explicitly supplied cost
 #[test]
 fn an_explicitly_supplied_cost_is_preserved() {
     let _r = Registry::lock(Some(vec![other_model(), custom_model()]));
@@ -279,7 +279,7 @@ fn an_explicitly_supplied_cost_is_preserved() {
     assert_eq!(result.cost(None).total(), Some(0.003));
 }
 
-// spec: accounting/usage_spec.rb:197 provider-specific message pricing > leaves missing provider pricing unknown
+// spec: accounting/usage_spec.rb:209 provider-specific message pricing > leaves missing provider pricing unknown
 #[test]
 fn missing_provider_pricing_stays_unknown() {
     let mut unpriced = custom_model();
@@ -305,7 +305,7 @@ fn recorded_entry(status: UsageStatus, cost: Option<Cost>) -> UsageEntry {
     entry
 }
 
-// spec: accounting/usage_spec.rb:213 recognizes an exact cost even when token counts are unavailable
+// spec: accounting/usage_spec.rb:301 recognizes an exact cost even when token counts are unavailable
 #[test]
 fn an_exact_cost_counts_without_token_counts() {
     let _r = Registry::lock(None);
@@ -325,7 +325,7 @@ fn an_exact_cost_counts_without_token_counts() {
     assert_eq!(chat.cost().total(), Some(0.0042));
 }
 
-// spec: accounting/usage_spec.rb:230 keeps aggregate cost unknown when any potentially billed attempt is unknown
+// spec: accounting/usage_spec.rb:318 keeps aggregate cost unknown when any potentially billed attempt is unknown
 #[test]
 fn one_unknown_attempt_keeps_the_aggregate_unknown() {
     let _r = Registry::lock(None);
@@ -341,7 +341,7 @@ fn one_unknown_attempt_keeps_the_aggregate_unknown() {
     assert_eq!(chat.cost().total(), None);
 }
 
-// spec: accounting/usage_spec.rb:287 ignores a second failure for an attempt that already finished
+// spec: accounting/usage_spec.rb:387 ignores a second failure for an attempt that already finished
 #[test]
 fn a_second_failure_is_ignored() {
     let _r = Registry::lock(None);
@@ -360,7 +360,7 @@ fn a_second_failure_is_ignored() {
     tracker.fail_attempt(None, &Error::Timeout("late".into()));
 }
 
-// spec: accounting/usage_spec.rb:296 fails every attempt still in flight
+// spec: accounting/usage_spec.rb:396 fails every attempt still in flight
 #[test]
 fn every_attempt_in_flight_fails() {
     let _r = Registry::lock(None);
@@ -374,7 +374,7 @@ fn every_attempt_in_flight_fails() {
     assert!(tracker.entry(second).unwrap().is_failed());
 }
 
-// spec: accounting/usage_spec.rb:306 ignores a chunk when nothing is in flight
+// spec: accounting/usage_spec.rb:406 ignores a chunk when nothing is in flight
 #[test]
 fn a_chunk_with_nothing_in_flight_is_ignored() {
     let _r = Registry::lock(None);
@@ -387,7 +387,7 @@ fn a_chunk_with_nothing_in_flight_is_ignored() {
     assert!(tracker.entries().is_empty());
 }
 
-// spec: accounting/usage_spec.rb:312 ignores an observation that carries no tokens
+// spec: accounting/usage_spec.rb:412 ignores an observation that carries no tokens
 // Ruby observes `Object.new` (no `tokens` method); the Rust counterpart is a chunk reporting none.
 #[test]
 fn an_observation_without_tokens_leaves_the_attempt_unknown() {
@@ -401,7 +401,7 @@ fn an_observation_without_tokens_leaves_the_attempt_unknown() {
     assert!(tracker.entry(id).unwrap().is_pending());
 }
 
-// spec: accounting/usage_spec.rb:321 attaches the ledger to a result even when no attempt was recorded
+// spec: accounting/usage_spec.rb:421 attaches the ledger to a result even when no attempt was recorded
 #[test]
 fn the_ledger_is_attached_without_attempts() {
     let _r = Registry::lock(None);
@@ -415,7 +415,7 @@ fn the_ledger_is_attached_without_attempts() {
     assert_eq!(result.content(), "hi");
 }
 
-// spec: accounting/usage_spec.rb:329 credits only the last attempt with the tokens the call used
+// spec: accounting/usage_spec.rb:429 credits only the last attempt with the tokens the call used
 #[test]
 fn only_the_last_attempt_is_credited() {
     let _r = Registry::lock(None);

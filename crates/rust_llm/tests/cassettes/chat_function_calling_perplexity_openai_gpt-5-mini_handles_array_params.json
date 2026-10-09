@@ -5,23 +5,23 @@
     "request_body": "{\"model\":\"openai/gpt-5-mini\",\"input\":[{\"role\":\"user\",\"content\":\"Call the array params tool with tags [\\\"red\\\",\\\"blue\\\"] and tell me the combined tags.\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"tools\":[{\"type\":\"function\",\"name\":\"array_params\",\"description\":\"Uses params DSL array support\",\"parameters\":{\"type\":\"object\",\"properties\":{\"tags\":{\"type\":\"array\",\"description\":\"List of tags to combine\",\"items\":{\"type\":\"string\"}}},\"required\":[\"tags\"],\"additionalProperties\":false},\"strict\":false}]}",
     "status": 200,
     "response_headers": {
-      "Date": "Fri, 25 Sep 2026 08:38:55 GMT",
+      "Date": "Wed, 07 Oct 2026 13:43:38 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
+      "Set-Cookie": "<COOKIE>",
       "Server": "cloudflare",
       "X-Ratelimit-Limit": "1",
       "X-Ratelimit-Remaining": "0",
-      "X-Ratelimit-Reset": "1790325536",
+      "X-Ratelimit-Reset": "1791380619",
       "X-Ratelimit-Used": "1",
       "X-Request-Id": "<X_REQUEST_ID>",
       "Access-Control-Allow-Origin": "*",
-      "Cf-Cache-Status": "DYNAMIC",
-      "Set-Cookie": "<COOKIE>",
       "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
+      "Cf-Cache-Status": "DYNAMIC",
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\"background\":false,\"completed_at\":1790325534,\"created_at\":1790325534,\"error\":null,\"frequency_penalty\":0,\"id\":\"resp_3af9a45d-741f-4673-88cd-fa736e6afb50\",\"incomplete_details\":null,\"instructions\":null,\"max_output_tokens\":null,\"max_tool_calls\":null,\"metadata\":{},\"model\":\"openai/gpt-5-mini\",\"object\":\"response\",\"output\":[{\"arguments\":\"{\\\"tags\\\":[\\\"red\\\",\\\"blue\\\"]}\",\"call_id\":\"call_FFVXuODu9NwlLAJwlNt9d8Ps\",\"id\":\"fc_d9e1a2e4-d2b8-4f7a-b6f6-e54c9af2faf4\",\"name\":\"array_params\",\"status\":\"completed\",\"type\":\"function_call\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"reasoning\":null,\"safety_identifier\":null,\"service_tier\":\"default\",\"status\":\"completed\",\"store\":false,\"temperature\":1,\"text\":{\"format\":{\"type\":\"text\"}},\"tool_choice\":\"auto\",\"tools\":[{\"type\":\"function\",\"name\":\"array_params\",\"description\":\"Uses params DSL array support\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"tags\":{\"description\":\"List of tags to combine\",\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"strict\":false}],\"top_logprobs\":0,\"top_p\":1,\"truncation\":\"\",\"usage\":{\"cost\":{\"currency\":\"USD\",\"input_cost\":0.00002,\"output_cost\":0.00014,\"total_cost\":0.00016},\"input_tokens\":95,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":71,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":166},\"user\":null}\n"
+    "response_body": "{\"background\":false,\"completed_at\":1791380616,\"created_at\":1791380616,\"error\":null,\"frequency_penalty\":0,\"id\":\"resp_ac69bb9d-dfac-4417-bc1f-b259c4721c93\",\"incomplete_details\":null,\"instructions\":null,\"max_output_tokens\":null,\"max_tool_calls\":null,\"metadata\":{},\"model\":\"openai/gpt-5-mini\",\"object\":\"response\",\"output\":[{\"arguments\":\"{\\\"tags\\\":[\\\"red\\\",\\\"blue\\\"]}\",\"call_id\":\"call_IIRSMwSS61fNe7B3g2GRZNw7\",\"id\":\"fc_b9b74415-420b-4935-87da-7a6a63a9e3bb\",\"name\":\"array_params\",\"status\":\"completed\",\"type\":\"function_call\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"reasoning\":null,\"safety_identifier\":null,\"service_tier\":\"default\",\"status\":\"completed\",\"store\":false,\"temperature\":1,\"text\":{\"format\":{\"type\":\"text\"}},\"tool_choice\":\"auto\",\"tools\":[{\"type\":\"function\",\"name\":\"array_params\",\"description\":\"Uses params DSL array support\",\"parameters\":{\"additionalProperties\":false,\"properties\":{\"tags\":{\"description\":\"List of tags to combine\",\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"tags\"],\"type\":\"object\"},\"strict\":false}],\"top_logprobs\":0,\"top_p\":1,\"truncation\":\"\",\"usage\":{\"cost\":{\"currency\":\"USD\",\"input_cost\":0.00002,\"output_cost\":0.00025,\"total_cost\":0.00027},\"input_tokens\":95,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":126,\"output_tokens_details\":{\"reasoning_tokens\":64},\"total_tokens\":221},\"user\":null}\n"
   }
 ]

@@ -7,50 +7,50 @@
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Thu, 17 Sep 2026 22:15:27 GMT",
+      "Date": "Wed, 07 Oct 2026 12:59:19 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=1021",
+      "Server-Timing": "gfet4t7; dur=1239",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"name\": \"cachedContents/s3sqqmpxqgk6kjzdw5b4g47h6sd2d6hk0lv4xy5o\",\n  \"model\": \"models/gemini-2.5-flash\",\n  \"createTime\": \"2026-09-17T22:15:27.697246Z\",\n  \"updateTime\": \"2026-09-17T22:15:27.697246Z\",\n  \"expireTime\": \"2026-09-17T22:20:26.897552689Z\",\n  \"displayName\": \"\",\n  \"usageMetadata\": {\n    \"totalTokenCount\": 9602\n  }\n}\n"
+    "response_body": "{\n  \"name\": \"cachedContents/51h7pwlon6m8f0rnl6o9sm6wcahqi5vzpmh2uws2\",\n  \"model\": \"models/gemini-2.5-flash\",\n  \"createTime\": \"2026-10-07T12:59:19.328454Z\",\n  \"updateTime\": \"2026-10-07T12:59:19.328454Z\",\n  \"expireTime\": \"2026-10-07T13:04:18.361687354Z\",\n  \"displayName\": \"\",\n  \"usageMetadata\": {\n    \"totalTokenCount\": 9602\n  }\n}\n"
   },
   {
     "method": "get",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/cachedContents/s3sqqmpxqgk6kjzdw5b4g47h6sd2d6hk0lv4xy5o",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/cachedContents/51h7pwlon6m8f0rnl6o9sm6wcahqi5vzpmh2uws2",
     "request_body": "",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Thu, 17 Sep 2026 22:15:27 GMT",
+      "Date": "Wed, 07 Oct 2026 12:59:19 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=151",
+      "Server-Timing": "gfet4t7; dur=187",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"name\": \"cachedContents/s3sqqmpxqgk6kjzdw5b4g47h6sd2d6hk0lv4xy5o\",\n  \"model\": \"models/gemini-2.5-flash\",\n  \"createTime\": \"2026-09-17T22:15:27.697246Z\",\n  \"updateTime\": \"2026-09-17T22:15:27.697246Z\",\n  \"expireTime\": \"2026-09-17T22:20:26.897552689Z\",\n  \"displayName\": \"\",\n  \"usageMetadata\": {\n    \"totalTokenCount\": 9602\n  }\n}\n"
+    "response_body": "{\n  \"name\": \"cachedContents/51h7pwlon6m8f0rnl6o9sm6wcahqi5vzpmh2uws2\",\n  \"model\": \"models/gemini-2.5-flash\",\n  \"createTime\": \"2026-10-07T12:59:19.328454Z\",\n  \"updateTime\": \"2026-10-07T12:59:19.328454Z\",\n  \"expireTime\": \"2026-10-07T13:04:18.361687354Z\",\n  \"displayName\": \"\",\n  \"usageMetadata\": {\n    \"totalTokenCount\": 9602\n  }\n}\n"
   },
   {
     "method": "delete",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/cachedContents/s3sqqmpxqgk6kjzdw5b4g47h6sd2d6hk0lv4xy5o",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/cachedContents/51h7pwlon6m8f0rnl6o9sm6wcahqi5vzpmh2uws2",
     "request_body": "",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Thu, 17 Sep 2026 22:15:28 GMT",
+      "Date": "Wed, 07 Oct 2026 12:59:20 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=654",
+      "Server-Timing": "gfet4t7; dur=632",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },

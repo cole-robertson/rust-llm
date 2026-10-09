@@ -5,7 +5,7 @@
     "request_body": "{\"model\":\"anthropic/claude-haiku-4.5\",\"messages\":[{\"role\":\"user\",\"content\":\"Hello\"}],\"stream\":false}",
     "status": 401,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:06:31 GMT",
+      "Date": "Wed, 07 Oct 2026 12:59:14 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",

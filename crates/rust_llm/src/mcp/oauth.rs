@@ -1009,7 +1009,7 @@ impl Authorization for Authorizer {
 mod tests {
     use super::*;
 
-    // spec: mcp/oauth_spec.rb:182 reads WWW-Authenticate challenges
+    // spec: mcp/oauth_spec.rb:381 reads WWW-Authenticate challenges
     #[test]
     fn reads_www_authenticate_challenges() {
         let challenge = OAuth::challenge(Some(

@@ -1021,7 +1021,7 @@ mod tests {
         format!("{}/tests/fixtures/ruby.txt", env!("CARGO_MANIFEST_DIR"))
     }
 
-    // spec: protocols/files_spec.rb:110 passes expires_in as expires_after seconds
+    // spec: protocols/files_spec.rb:108 passes expires_in as expires_after seconds
     #[test]
     fn xai_passes_expires_in_as_expires_after_seconds() {
         let options = UploadOptions {
@@ -1033,7 +1033,7 @@ mod tests {
         assert_eq!(fields, vec![("expires_after".into(), "3600".into())]);
     }
 
-    // spec: protocols/files_spec.rb:125 normalizes file metadata
+    // spec: protocols/files_spec.rb:123 normalizes file metadata
     #[test]
     fn openrouter_normalizes_file_metadata() {
         let file = parse_file_response(
@@ -1052,14 +1052,14 @@ mod tests {
         assert_eq!(file.downloadable, Some(false));
     }
 
-    // spec: protocols/files_spec.rb:213 prefixes a bare file id with the collection name
+    // spec: protocols/files_spec.rb:211 prefixes a bare file id with the collection name
     #[test]
     fn gemini_prefixes_a_bare_file_id_with_the_collection_name() {
         assert_eq!(gemini_file_name("abc"), "files/abc");
         assert_eq!(gemini_file_name("files/abc"), "files/abc");
     }
 
-    // spec: protocols/files_spec.rb:411 rewraps an attachment when a new filename is given
+    // spec: protocols/files_spec.rb:409 rewraps an attachment when a new filename is given
     #[test]
     fn file_attachment_rewraps_only_for_a_new_filename() {
         let attachment = Attachment::new(ruby_txt());
@@ -1068,7 +1068,7 @@ mod tests {
         assert_eq!(renamed.filename.as_deref(), Some("renamed.txt"));
     }
 
-    // spec: protocols/files_spec.rb:425 sizes a file from disk or from its content
+    // spec: protocols/files_spec.rb:423 sizes a file from disk or from its content
     #[test]
     fn file_size_reads_disk_or_content() {
         let on_disk = std::fs::metadata(ruby_txt()).unwrap().len();
@@ -1084,7 +1084,7 @@ mod tests {
         ))
     }
 
-    // spec: protocols/deepseek/files_spec.rb:29 rejects unsupported file purposes
+    // UPSTREAM-REMOVED in 2.1 (was spec: protocols/deepseek/files_spec.rb:29) rejects unsupported file purposes
     #[test]
     fn deepseek_rejects_unsupported_file_purposes() {
         let options = UploadOptions {
@@ -1096,7 +1096,7 @@ mod tests {
         assert!(err.to_string().contains("user_data"), "{err}");
     }
 
-    // spec: protocols/deepseek/files_spec.rb:34 rejects images larger than the upload limit
+    // UPSTREAM-REMOVED in 2.1 (was spec: protocols/deepseek/files_spec.rb:34) rejects images larger than the upload limit
     #[test]
     fn deepseek_rejects_images_larger_than_the_upload_limit() {
         let image = Attachment::from_bytes(vec![0; DEEPSEEK_MAX_FILE_SIZE + 1], "ruby.png", None);
@@ -1106,7 +1106,7 @@ mod tests {
         assert!(err.to_string().contains("64 MiB"), "{err}");
     }
 
-    // spec: protocols/deepseek/files_spec.rb:40 reports that stored images cannot be downloaded
+    // spec: protocols/deepseek/files_spec.rb:29 reports that stored images cannot be downloaded
     #[tokio::test]
     async fn deepseek_reports_that_stored_images_cannot_be_downloaded() {
         let file = parse_file_response(
@@ -1158,7 +1158,7 @@ mod tests {
 /// `protocol_spec.rb`'s `format_bytes` example; `format_bytes` is private to this module.
 #[cfg(test)]
 mod protocol_spec {
-    // spec: protocol_spec.rb:126 provider file defaults > formats sizes for its error messages
+    // UPSTREAM-REMOVED in 2.1 (was spec: protocol_spec.rb:126) provider file defaults > formats sizes for its error messages
     #[test]
     fn formats_sizes_for_its_error_messages() {
         assert_eq!(super::format_bytes(None), "unknown size");

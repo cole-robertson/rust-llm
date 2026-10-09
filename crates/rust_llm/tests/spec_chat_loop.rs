@@ -819,7 +819,7 @@ impl Tool for BlowsUp {
     }
 }
 
-// spec: chat/tool_concurrency_spec.rb:130 raises the first error a threaded tool call produced
+// spec: chat/tool_concurrency_spec.rb:173 raises the first error a threaded tool call produced
 #[tokio::test]
 async fn concurrent_tool_errors_escape_after_every_call_ends() {
     let server = serve(vec![]).await;

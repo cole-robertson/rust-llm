@@ -8,18 +8,18 @@
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Date": "Thu, 24 Sep 2026 21:39:39 GMT",
+      "Date": "Wed, 07 Oct 2026 13:07:22 GMT",
       "Server": "elb",
       "Vary": "origin, access-control-request-method, access-control-request-headers",
       "Access-Control-Allow-Credentials": "true",
-      "X-Ds-Trace-Id": "c3c4975c51b0927cbd7d65558a2ba85c",
+      "X-Ds-Trace-Id": "8f65bbdb6f1c9619cc2cffb689ab10e3",
       "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
       "X-Content-Type-Options": "nosniff",
       "X-Cache": "Miss from cloudfront",
-      "Via": "1.1 090ef954bc87b6fef8e23db76d6f3804.cloudfront.net (CloudFront)",
-      "X-Amz-Cf-Pop": "GRU1-P4",
-      "X-Amz-Cf-Id": "vL3RQmFOWl5wrnWykw5dHRmDoHH1Nr-tBVCTOCc_1k8bpd-rPHePSA=="
+      "Via": "1.1 309f16a82e9f6132954a6c8e7d8ac26e.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL52-P2",
+      "X-Amz-Cf-Id": "DNZ1nRAQthw1bTe7ap3jMjaKDI7tgr9NEI-xhAY52oU5H7UemMbJXg=="
     },
-    "response_body": "{\"id\":\"a8573071-d266-4f3f-bfe0-57b9851cc3ec\",\"object\":\"chat.completion\",\"created\":1790285979,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"I see the logo for the Ruby programming language. It's a red, faceted gemstone shape with the word \\\"Ruby\\\" typically associated with it. This logo is commonly used to represent the dynamic, open-source programming language known for its simplicity and productivity.\",\"reasoning_content\":\"Oh, I need to extract the text from the image.\\nThe user's question is simple: \\\"What do you see in this image?\\\" The image shows a red gemstone with a faceted surface, and the text \\\"Ruby\\\" is clearly visible below it. I recognize this as the Ruby programming language logo. The text is well-defined, no rotation or blur issues. I will describe the visual elements and identify the logo directly in my response.\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":222,\"completion_tokens\":143,\"total_tokens\":365,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":90},\"prompt_cache_hit_tokens\":0,\"prompt_cache_miss_tokens\":222},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+    "response_body": "{\"id\":\"6dbf0ccf-3c13-4ed3-91ca-dd6d4f1b291c\",\"object\":\"chat.completion\",\"created\":1791378442,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Based on the image provided, I see the iconic logo for the Ruby programming language. It's a stylized, deep red gemstone with a faceted, almost 3D appearance. The gem has a smooth, rounded cut on the left side and sharp, angular facets on the right, with a bright white highlight along the top edge that gives it a shiny, polished look. The background is plain white, making the vibrant red gem stand out prominently.\",\"reasoning_content\":\"Oh, I need to extract the text from the image.\\nThe user's question is simple: \\\"What do you see in this image?\\\" The image shows a red gemstone, clearly a Ruby logo. I recognize it as the iconic Ruby programming language logo—a faceted, deep red gem with a smooth, rounded cut on the left and sharp geometric facets on the right, with a bright white highlight along the top edge. The background is plain white, making the gem stand out. Since there's no text or complex content, I just need to describe the visual accurately. I'll state it's the Ruby logo, describe its shape, color, and the highlight, and confirm the background. The response should be direct and match the user's request for a description.\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":222,\"completion_tokens\":248,\"total_tokens\":470,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":155},\"prompt_cache_hit_tokens\":0,\"prompt_cache_miss_tokens\":222},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
   }
 ]

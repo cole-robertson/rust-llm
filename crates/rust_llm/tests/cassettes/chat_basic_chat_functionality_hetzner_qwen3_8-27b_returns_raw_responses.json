@@ -5,15 +5,15 @@
     "request_body": "{\"model\":\"Qwen3.8-27B\",\"messages\":[{\"role\":\"user\",\"content\":\"What is the capital of France?\"}],\"stream\":false}",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 24 Sep 2026 18:33:21 GMT",
+      "Date": "Wed, 07 Oct 2026 13:07:06 GMT",
       "Content-Type": "application/json",
-      "Content-Length": "825",
+      "Content-Length": "877",
       "Connection": "keep-alive",
       "Vary": "Origin",
       "X-Request-Id": "<X_REQUEST_ID>",
       "X-Went-Into-Resp-Headers": "true",
       "Server": "HeRay"
     },
-    "response_body": "{\"model\":\"Qwen3.8-27B\",\"usage\":{\"prompt_tokens\":59,\"completion_tokens\":20,\"total_tokens\":79,\"completion_tokens_details\":{\"reasoning_tokens\":10},\"prompt_tokens_details\":{\"cached_tokens\":0,\"created_cache_tokens\":0,\"multimodal_tokens\":null}},\"choices\":[{\"message\":{\"content\":\"\\n\\nThe capital of France is Paris.\",\"role\":\"assistant\",\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"reasoning\":\"We need answer simple. No need elaborate.\\n\"},\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"stop_reason\":null,\"token_ids\":null,\"routed_experts\":null}],\"id\":\"chatcmpl-47e388eb-ae03-4879-9634-0fbdd0d737a2\",\"object\":\"chat.completion\",\"created\":1790274799,\"system_fingerprint\":null,\"prompt_logprobs\":null,\"prompt_token_ids\":null,\"prompt_text\":null,\"kv_transfer_params\":null,\"ec_transfer_params\":null,\"metrics\":null}"
+    "response_body": "{\"model\":\"Qwen3.8-27B\",\"usage\":{\"prompt_tokens\":59,\"completion_tokens\":32,\"total_tokens\":91,\"completion_tokens_details\":{\"reasoning_tokens\":22},\"prompt_tokens_details\":{\"cached_tokens\":0,\"created_cache_tokens\":0,\"multimodal_tokens\":null}},\"choices\":[{\"message\":{\"content\":\"\\n\\nThe capital of France is Paris.\",\"role\":\"assistant\",\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"reasoning\":\"We need to answer user: \\\"What is the capital of France?\\\" Simple. Need final answer concise.\\n\"},\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"stop_reason\":null,\"token_ids\":null,\"routed_experts\":null}],\"id\":\"chatcmpl-094d7dc6-537d-4c01-9f66-4adc421302b5\",\"object\":\"chat.completion\",\"created\":1791378200,\"system_fingerprint\":null,\"prompt_logprobs\":null,\"prompt_token_ids\":null,\"prompt_text\":null,\"kv_transfer_params\":null,\"ec_transfer_params\":null,\"metrics\":null}"
   }
 ]

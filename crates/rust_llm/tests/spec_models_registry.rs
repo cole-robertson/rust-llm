@@ -803,7 +803,7 @@ async fn refresh_from_providers_replaces_previous_lookups() {
 
 // ---- models_spec.rb -------------------------------------------------------------------------------
 
-// spec: models_spec.rb:71 filtering and chaining > filters by vision support
+// spec: models_spec.rb:88 filtering and chaining > filters by vision support
 #[tokio::test]
 async fn filters_by_vision_support() {
     let _lock = LOCK.lock().await;
@@ -817,7 +817,7 @@ async fn filters_by_vision_support() {
     assert!(vision.iter().all(|m| m.supports("vision")));
 }
 
-// spec: models_spec.rb:77 filtering and chaining > filters by video support
+// spec: models_spec.rb:94 filtering and chaining > filters by video support
 #[tokio::test]
 async fn filters_by_video_support() {
     let _lock = LOCK.lock().await;
@@ -831,7 +831,7 @@ async fn filters_by_video_support() {
     assert!(video.iter().all(|m| m.supports("video")));
 }
 
-// spec: models_spec.rb:82 filtering and chaining > finds transcription support in the bundled registry
+// spec: models_spec.rb:99 filtering and chaining > finds transcription support in the bundled registry
 #[tokio::test]
 async fn finds_transcription_support_in_the_bundled_registry() {
     let _lock = LOCK.lock().await;
@@ -850,7 +850,7 @@ async fn finds_transcription_support_in_the_bundled_registry() {
     );
 }
 
-// spec: models_spec.rb:187 #refresh > updates models and returns a chainable Models instance
+// spec: models_spec.rb:204 #refresh > updates models and returns a chainable Models instance
 #[tokio::test]
 async fn refresh_returns_a_registry_to_chain_on() {
     let _lock = LOCK.lock().await;
@@ -880,7 +880,7 @@ async fn refresh_returns_a_registry_to_chain_on() {
     assert!(providers.contains(&"openai") && providers.contains(&"anthropic"));
 }
 
-// spec: models_spec.rb:200 #refresh > works as a class method too
+// spec: models_spec.rb:217 #refresh > works as a class method too
 #[tokio::test]
 async fn refresh_works_through_the_global_registry() {
     let _lock = LOCK.lock().await;
@@ -899,7 +899,7 @@ async fn refresh_works_through_the_global_registry() {
     assert!(!rust_llm::models().all().is_empty());
 }
 
-// spec: models_spec.rb:481 #audio_models > filters to models that are audio-capable
+// spec: models_spec.rb:498 #audio_models > filters to models that are audio-capable
 #[tokio::test]
 async fn audio_models_have_audio_output() {
     let _lock = LOCK.lock().await;
@@ -912,7 +912,7 @@ async fn audio_models_have_audio_output() {
     }));
 }
 
-// spec: models_spec.rb:496 #image_models > filters to models that are image-capable
+// spec: models_spec.rb:513 #image_models > filters to models that are image-capable
 #[tokio::test]
 async fn image_models_have_image_output() {
     let _lock = LOCK.lock().await;
@@ -925,7 +925,7 @@ async fn image_models_have_image_output() {
     }));
 }
 
-// spec: models_spec.rb:511 #by_family > filters models by family
+// spec: models_spec.rb:528 #by_family > filters models by family
 #[tokio::test]
 async fn by_family_filters_models_by_family() {
     let _lock = LOCK.lock().await;
@@ -940,7 +940,7 @@ async fn by_family_filters_models_by_family() {
     );
 }
 
-// spec: models_spec.rb:595 #resolve > uses registry metadata before dynamic-provider fallback models
+// spec: models_spec.rb:612 #resolve > uses registry metadata before dynamic-provider fallback models
 // Ollama Cloud is a provider whose models are assumed to exist, like the spec's dynamic provider.
 #[tokio::test]
 async fn assumed_providers_use_registry_metadata_first() {
@@ -975,7 +975,7 @@ async fn assumed_providers_use_registry_metadata_first() {
     assert_eq!(chat.provider(), Provider::OllamaCloud);
 }
 
-// spec: models_spec.rb:636 #save_to_json > saves models to the models.json file
+// spec: models_spec.rb:653 #save_to_json > saves models to the models.json file
 #[tokio::test]
 async fn save_to_json_saves_every_listed_model() {
     let _lock = LOCK.lock().await;
@@ -989,7 +989,7 @@ async fn save_to_json_saves_every_listed_model() {
     assert_eq!(saved.as_array().unwrap().len(), registry.all().len());
 }
 
-// spec: models_spec.rb:654 #save_to_json > saves and loads from a custom file path
+// spec: models_spec.rb:671 #save_to_json > saves and loads from a custom file path
 #[tokio::test]
 async fn save_to_json_round_trips_through_a_custom_path() {
     let _lock = LOCK.lock().await;
@@ -1470,7 +1470,7 @@ fn priced_model() -> Model {
     }))
 }
 
-// spec: cost_spec.rb:283 provider-reported cost > round-trips the reported total through to_h
+// spec: cost_spec.rb:320 provider-reported cost > round-trips the reported total through to_h
 #[test]
 fn round_trips_the_reported_total_through_to_h() {
     let tokens = Tokens {
@@ -1483,7 +1483,7 @@ fn round_trips_the_reported_total_through_to_h() {
     assert_eq!(restored.total(), Some(0.0042));
 }
 
-// spec: cost_spec.rb:348 .from_h > round-trips a live cost through to_h
+// spec: cost_spec.rb:385 .from_h > round-trips a live cost through to_h
 #[test]
 fn round_trips_a_live_cost_through_to_h() {
     let tokens = Tokens {
@@ -1501,7 +1501,7 @@ fn round_trips_a_live_cost_through_to_h() {
     );
 }
 
-// spec: cost_spec.rb:449 #to_h > omits the components that were never priced
+// spec: cost_spec.rb:486 #to_h > omits the components that were never priced
 #[test]
 fn to_h_omits_components_that_were_never_priced() {
     let tokens = Tokens {

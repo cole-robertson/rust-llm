@@ -5,7 +5,7 @@
     "request_body": "{\"model\":\"grok-4.3\",\"text\":\"Ruby makes AI useful.\"}",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:16:22 GMT",
+      "Date": "Wed, 07 Oct 2026 12:59:06 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
@@ -16,7 +16,7 @@
       "X-Request-Id": "<X_REQUEST_ID>",
       "X-Zero-Data-Retention": "false",
       "X-Data-Retention": "general",
-      "Traceparent": "00-7178709052537765034fb21d4b5b9517-4b2be2170004c5f6-01",
+      "Traceparent": "00-3103f44eef5b23b0e4f4287e6399a479-58e5a18700031da9-01",
       "Set-Cookie": "<COOKIE>",
       "Vary": "origin, access-control-request-method, access-control-request-headers",
       "Access-Control-Allow-Origin": "*",

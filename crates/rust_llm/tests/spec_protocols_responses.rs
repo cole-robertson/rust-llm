@@ -85,7 +85,7 @@ impl Tool for StrictWeather {
     }
 }
 
-// spec: protocols/responses/chat_spec.rb:90 #render_payload > lets tools opt into strict mode via provider_options
+// spec: protocols/responses/chat_spec.rb:107 #render_payload > lets tools opt into strict mode via provider_options
 #[tokio::test]
 async fn tools_opt_into_strict_mode_via_provider_options() {
     let server = serve(vec![]).await;
@@ -94,7 +94,7 @@ async fn tools_opt_into_strict_mode_via_provider_options() {
     assert_eq!(chat.render().unwrap()["tools"][0]["strict"], json!(true));
 }
 
-// spec: protocols/responses/chat_spec.rb:123 #render_payload > asks for a reasoning summary when display is summarized
+// spec: protocols/responses/chat_spec.rb:140 #render_payload > asks for a reasoning summary when display is summarized
 #[tokio::test]
 async fn asks_for_a_reasoning_summary_when_display_is_summarized() {
     let server = serve(vec![]).await;
@@ -107,7 +107,7 @@ async fn asks_for_a_reasoning_summary_when_display_is_summarized() {
     );
 }
 
-// spec: protocols/responses/chat_spec.rb:153 #render_payload > marks cache boundaries without disabling implicit caching
+// spec: protocols/responses/chat_spec.rb:170 #render_payload > marks cache boundaries without disabling implicit caching
 #[tokio::test]
 async fn marks_cache_boundaries_without_disabling_implicit_caching() {
     let server = serve(vec![]).await;
@@ -127,7 +127,7 @@ async fn marks_cache_boundaries_without_disabling_implicit_caching() {
     assert!(payload.get("prompt_cache_options").is_none());
 }
 
-// spec: protocols/responses/chat_spec.rb:168 #render_payload > preserves cache options alongside explicit boundaries
+// spec: protocols/responses/chat_spec.rb:185 #render_payload > preserves cache options alongside explicit boundaries
 #[tokio::test]
 async fn preserves_cache_options_alongside_explicit_boundaries() {
     let server = serve(vec![]).await;
@@ -145,7 +145,7 @@ async fn preserves_cache_options_alongside_explicit_boundaries() {
     );
 }
 
-// spec: protocols/responses/chat_spec.rb:177 #render_payload > sends cache-bounded system messages as input items
+// spec: protocols/responses/chat_spec.rb:194 #render_payload > sends cache-bounded system messages as input items
 #[tokio::test]
 async fn sends_cache_bounded_system_messages_as_input_items() {
     let server = serve(vec![]).await;
@@ -162,7 +162,7 @@ async fn sends_cache_bounded_system_messages_as_input_items() {
 
 // ---- responses/chat_spec.rb #parse_completion_response -----------------------------------------
 
-// spec: protocols/responses/chat_spec.rb:214 #parse_completion_response > preserves web, file-search and container-file citations
+// spec: protocols/responses/chat_spec.rb:276 #parse_completion_response > preserves web, file-search and container-file citations
 #[tokio::test]
 async fn preserves_web_file_search_and_container_file_citations() {
     let message = parse(response_with(
@@ -206,7 +206,7 @@ async fn preserves_web_file_search_and_container_file_citations() {
     );
 }
 
-// spec: protocols/responses/chat_spec.rb:240 #parse_completion_response > places citation spans against all preceding response text
+// spec: protocols/responses/chat_spec.rb:302 #parse_completion_response > places citation spans against all preceding response text
 #[tokio::test]
 async fn places_citation_spans_against_all_preceding_response_text() {
     let message = parse(response_with(
@@ -236,7 +236,7 @@ async fn places_citation_spans_against_all_preceding_response_text() {
     assert_eq!(Some(span.as_str()), citation.text.as_deref());
 }
 
-// spec: protocols/responses/chat_spec.rb:260 #parse_completion_response > surfaces refusal parts as content
+// spec: protocols/responses/chat_spec.rb:322 #parse_completion_response > surfaces refusal parts as content
 #[tokio::test]
 async fn surfaces_refusal_parts_as_content() {
     let message = parse(response_with(
@@ -250,7 +250,7 @@ async fn surfaces_refusal_parts_as_content() {
 
 /// Ruby also asserts `error.response == response` and a `JSON::ParserError` cause; the port's
 /// `ToolCallParse` carries neither (no response field on the variant).
-// spec: protocols/responses/chat_spec.rb:284 #parse_completion_response > wraps malformed function-call arguments in a RubyLLM error
+// spec: protocols/responses/chat_spec.rb:346 #parse_completion_response > wraps malformed function-call arguments in a RubyLLM error
 #[tokio::test]
 async fn wraps_malformed_function_call_arguments_in_a_rust_llm_error() {
     let body = json!({
@@ -267,7 +267,7 @@ async fn wraps_malformed_function_call_arguments_in_a_rust_llm_error() {
     }
 }
 
-// spec: protocols/responses/chat_spec.rb:326 #parse_completion_response > maps usage with cached and reasoning tokens
+// spec: protocols/responses/chat_spec.rb:388 #parse_completion_response > maps usage with cached and reasoning tokens
 #[tokio::test]
 async fn maps_usage_with_cached_and_reasoning_tokens() {
     let message = parse(response_with(
@@ -283,7 +283,7 @@ async fn maps_usage_with_cached_and_reasoning_tokens() {
     assert_eq!(message.tokens.thinking, Some(3));
 }
 
-// spec: protocols/responses/chat_spec.rb:342 #parse_completion_response > maps cache write tokens for models that bill cache writes
+// spec: protocols/responses/chat_spec.rb:419 #parse_completion_response > maps cache write tokens for models that bill cache writes
 #[tokio::test]
 async fn maps_cache_write_tokens_for_models_that_bill_cache_writes() {
     let message = parse(response_with(
@@ -297,7 +297,7 @@ async fn maps_cache_write_tokens_for_models_that_bill_cache_writes() {
     assert_eq!(message.tokens.cache_write, Some(100));
 }
 
-// spec: protocols/responses/chat_spec.rb:356 #parse_completion_response > reports the completed status as finish_reason for function calls
+// spec: protocols/responses/chat_spec.rb:433 #parse_completion_response > reports the completed status as finish_reason for function calls
 #[tokio::test]
 async fn reports_the_completed_status_as_finish_reason_for_function_calls() {
     let message = parse(response_with(
@@ -311,7 +311,7 @@ async fn reports_the_completed_status_as_finish_reason_for_function_calls() {
     assert!(!message.is_stopped());
 }
 
-// spec: protocols/responses/chat_spec.rb:369 #parse_completion_response > preserves incomplete_details reason as finish_reason when present
+// spec: protocols/responses/chat_spec.rb:446 #parse_completion_response > preserves incomplete_details reason as finish_reason when present
 #[tokio::test]
 async fn preserves_incomplete_details_reason_as_finish_reason() {
     let message = parse(json!({
@@ -350,7 +350,7 @@ async fn still_rejects_attachments_the_api_cannot_take() {
 }
 
 // spec: protocols/responses/media_spec.rb:55 .format_content > maps low resolution to low image detail
-// spec: protocols/responses/media_spec.rb:63 .format_content > maps higher resolutions to high image detail
+// UPSTREAM-REMOVED in 2.1 (was spec: protocols/responses/media_spec.rb:63) .format_content > maps higher resolutions to high image detail
 #[tokio::test]
 async fn maps_image_resolution_to_detail() {
     let server = serve(vec![]).await;
@@ -427,7 +427,7 @@ async fn preserves_a_streamed_approval_exactly_once_across_repeated_final_events
 
 // ---- responses/streaming_spec.rb ---------------------------------------------------------------
 
-// spec: protocols/responses/streaming_spec.rb:18 streams refusal deltas as content
+// spec: protocols/responses/streaming_spec.rb:27 streams refusal deltas as content
 #[tokio::test]
 async fn streams_refusal_deltas_as_content() {
     let (result, chunks) =
@@ -436,7 +436,7 @@ async fn streams_refusal_deltas_as_content() {
     assert_eq!(result.unwrap().content(), "I cannot help");
 }
 
-// spec: protocols/responses/streaming_spec.rb:24 streams file citations with their source identities
+// spec: protocols/responses/streaming_spec.rb:33 streams file citations with their source identities
 #[tokio::test]
 async fn streams_file_citations_with_their_source_identities() {
     let (result, chunks) = stream(&[json!({
@@ -452,7 +452,7 @@ async fn streams_file_citations_with_their_source_identities() {
     );
 }
 
-// spec: protocols/responses/streaming_spec.rb:34 keeps streamed citation positions across output parts without duplicating final annotations
+// spec: protocols/responses/streaming_spec.rb:43 keeps streamed citation positions across output parts without duplicating final annotations
 #[tokio::test]
 async fn keeps_streamed_citation_positions_without_duplicating_final_annotations() {
     let annotation = json!({ "type": "container_file_citation", "container_id": "container_1", "file_id": "file_report",
@@ -485,7 +485,7 @@ async fn keeps_streamed_citation_positions_without_duplicating_final_annotations
     );
 }
 
-// spec: protocols/responses/streaming_spec.rb:74 resets citation positions when the protocol starts another stream
+// spec: protocols/responses/streaming_spec.rb:83 resets citation positions when the protocol starts another stream
 #[tokio::test]
 async fn resets_citation_positions_when_another_stream_starts() {
     let body = events(&[
@@ -506,7 +506,7 @@ async fn resets_citation_positions_when_another_stream_starts() {
     }
 }
 
-// spec: protocols/responses/streaming_spec.rb:91 streams reasoning summary deltas as thinking
+// spec: protocols/responses/streaming_spec.rb:100 streams reasoning summary deltas as thinking
 #[tokio::test]
 async fn streams_reasoning_summary_deltas_as_thinking() {
     let (result, chunks) =
@@ -518,7 +518,7 @@ async fn streams_reasoning_summary_deltas_as_thinking() {
     );
 }
 
-// spec: protocols/responses/streaming_spec.rb:97 separates reasoning summary parts
+// spec: protocols/responses/streaming_spec.rb:106 separates reasoning summary parts
 #[tokio::test]
 async fn separates_reasoning_summary_parts() {
     let (result, _) = stream(&[
@@ -535,7 +535,7 @@ async fn separates_reasoning_summary_parts() {
     );
 }
 
-// spec: protocols/responses/streaming_spec.rb:146 reads usage and model from the completed event
+// spec: protocols/responses/streaming_spec.rb:155 reads usage and model from the completed event
 #[tokio::test]
 async fn reads_usage_and_model_from_the_completed_event() {
     let (result, chunks) = stream(&[json!({ "type": "response.completed", "response": {
@@ -554,7 +554,7 @@ async fn reads_usage_and_model_from_the_completed_event() {
     assert_eq!(chunk.finish_reason, Some(rust_llm::FinishReason::Stop));
 }
 
-// spec: protocols/responses/streaming_spec.rb:169 reports the completed status as finish_reason for function-call responses
+// spec: protocols/responses/streaming_spec.rb:207 reports the completed status as finish_reason for function-call responses
 #[tokio::test]
 async fn reports_the_completed_status_as_finish_reason_for_streamed_function_calls() {
     let (result, chunks) = stream(&[json!({ "type": "response.completed", "response": {
@@ -566,7 +566,7 @@ async fn reports_the_completed_status_as_finish_reason_for_streamed_function_cal
     assert_eq!(chunks[0].finish_reason, Some(rust_llm::FinishReason::Stop));
 }
 
-// spec: protocols/responses/streaming_spec.rb:220 preserves incomplete_details reason on completed events
+// spec: protocols/responses/streaming_spec.rb:324 preserves incomplete_details reason on completed events
 #[tokio::test]
 async fn preserves_incomplete_details_reason_on_completed_events() {
     let (result, chunks) = stream(&[json!({ "type": "response.completed", "response": {
@@ -587,7 +587,7 @@ async fn stream_error(frame: Value) -> Error {
     result.unwrap_err()
 }
 
-// spec: protocols/responses/streaming_spec.rb:190 #parse_streaming_error > classifies a rate limit reported by a flat error event
+// spec: protocols/responses/streaming_spec.rb:228 #parse_streaming_error > classifies a rate limit reported by a flat error event
 #[tokio::test]
 async fn classifies_a_rate_limit_reported_by_a_flat_error_event() {
     let error = stream_error(json!({ "type": "error", "code": "rate_limit_exceeded", "message": "Slow down", "param": null, "sequence_number": 3 })).await;
@@ -597,7 +597,7 @@ async fn classifies_a_rate_limit_reported_by_a_flat_error_event() {
     );
 }
 
-// spec: protocols/responses/streaming_spec.rb:199 #parse_streaming_error > classifies a server error reported by a flat error event
+// spec: protocols/responses/streaming_spec.rb:237 #parse_streaming_error > classifies a server error reported by a flat error event
 #[tokio::test]
 async fn classifies_a_server_error_reported_by_a_flat_error_event() {
     let error = stream_error(
@@ -610,7 +610,7 @@ async fn classifies_a_server_error_reported_by_a_flat_error_event() {
     );
 }
 
-// spec: protocols/responses/streaming_spec.rb:205 #parse_streaming_error > falls back to a 400 for other flat error codes
+// spec: protocols/responses/streaming_spec.rb:243 #parse_streaming_error > falls back to a 400 for other flat error codes
 #[tokio::test]
 async fn falls_back_to_a_400_for_other_flat_error_codes() {
     let error =
@@ -622,7 +622,7 @@ async fn falls_back_to_a_400_for_other_flat_error_codes() {
     );
 }
 
-// spec: protocols/responses/streaming_spec.rb:212 #parse_streaming_error > still classifies nested error objects
+// spec: protocols/responses/streaming_spec.rb:250 #parse_streaming_error > still classifies nested error objects
 #[tokio::test]
 async fn still_classifies_nested_error_objects() {
     let error =

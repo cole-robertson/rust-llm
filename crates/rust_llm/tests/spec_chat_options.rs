@@ -241,7 +241,7 @@ async fn chats_resolve_provider_aliases() {
 
 // ---- chat_spec.rb (unit parts) ----------------------------------------------------------------
 
-// spec: chat_spec.rb:119 keeps manually added messages out of the conversation totals
+// spec: chat_spec.rb:121 keeps manually added messages out of the conversation totals
 #[tokio::test]
 async fn manually_added_messages_stay_out_of_chat_totals() {
     let server = serve(vec![]).await;
@@ -259,7 +259,7 @@ async fn manually_added_messages_stay_out_of_chat_totals() {
     assert_eq!(chat.cost().total(), None);
 }
 
-// spec: chat_spec.rb:134 returns empty value objects before the chat has usage
+// spec: chat_spec.rb:136 returns empty value objects before the chat has usage
 #[tokio::test]
 async fn a_new_chat_has_empty_tokens_and_no_cost() {
     let server = serve(vec![]).await;
@@ -268,7 +268,7 @@ async fn a_new_chat_has_empty_tokens_and_no_cost() {
     assert_eq!(chat.cost().total(), None);
 }
 
-// spec: chat_spec.rb:143 prices a response against a given model when its own model id cannot be resolved
+// spec: chat_spec.rb:145 prices a response against a given model when its own model id cannot be resolved
 #[tokio::test]
 async fn a_response_prices_against_a_given_model() {
     let server = serve(vec![]).await;

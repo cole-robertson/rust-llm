@@ -1372,7 +1372,7 @@ async fn renders_the_payload_with_before_request_hooks_applied() {
     );
 }
 
-// spec: active_record/acts_as_spec.rb:95 persists each attempt before publishing its usage event
+// spec: active_record/acts_as_spec.rb:103 persists each attempt before publishing its usage event
 #[tokio::test]
 async fn persists_each_attempt_before_publishing_its_usage_event() {
     // A file-backed database, so the probe below can read on its own connection while the chat

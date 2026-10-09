@@ -61,7 +61,7 @@ fn raises_when_the_protocol_finds_no_completion_message_in_the_body() {
     assert_eq!(err.response().unwrap().body, r#"{"choices":[]}"#);
 }
 
-// spec: protocol_spec.rb:112 provider file defaults > keeps the resolution when it uploads a large attachment
+// spec: protocol_spec.rb:111 provider file defaults > keeps the resolution when it uploads a large attachment
 #[tokio::test]
 async fn keeps_the_resolution_when_it_uploads_a_large_attachment() {
     let server = MockServer::start().await;
@@ -124,7 +124,7 @@ async fn keeps_the_resolution_when_it_uploads_a_large_attachment() {
     );
 }
 
-// spec: protocol_spec.rb:142 #validate_paint_inputs! > refuses image references the protocol cannot send
+// spec: protocol_spec.rb:130 #validate_paint_inputs! > refuses image references the protocol cannot send
 #[tokio::test]
 async fn refuses_image_references_the_protocol_cannot_send() {
     // Gemini's Imagen models keep the base `Protocol#validate_paint_inputs!`.

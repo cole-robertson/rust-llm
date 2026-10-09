@@ -168,7 +168,7 @@ async fn an_isolated_context_uses_its_own_key_and_forwards_provider_options() {
     assert_eq!(seen[0].0["extension"], json!({ "enabled": true }));
 }
 
-// spec: judge_spec.rb:166 rejects missing or unknown runtime inputs
+// spec: judge_spec.rb:175 rejects missing or unknown runtime inputs
 #[tokio::test]
 async fn rejects_missing_or_unknown_runtime_inputs() {
     let (server, seen) = stub().await;
@@ -200,7 +200,7 @@ async fn rejects_missing_or_unknown_runtime_inputs() {
     assert!(bodies(&seen).is_empty());
 }
 
-// spec: judge_spec.rb:223 with a default judgment model > resolves the global default at each call, including inherited judges
+// spec: judge_spec.rb:232 with a default judgment model > resolves the global default at each call, including inherited judges
 #[tokio::test]
 async fn resolves_the_global_default_at_each_call_including_derived_judges() {
     let _lock = GLOBAL.lock().await;
@@ -222,7 +222,7 @@ async fn resolves_the_global_default_at_each_call_including_derived_judges() {
     );
 }
 
-// spec: judge_spec.rb:241 with a default judgment model > uses an isolated context default for classes and one-off questions
+// spec: judge_spec.rb:250 with a default judgment model > uses an isolated context default for classes and one-off questions
 #[tokio::test]
 async fn uses_an_isolated_context_default_for_judges_and_one_off_questions() {
     let _lock = GLOBAL.lock().await;
@@ -255,7 +255,7 @@ async fn uses_an_isolated_context_default_for_judges_and_one_off_questions() {
     assert_eq!(global_default, MODEL);
 }
 
-// spec: judge_spec.rb:252 with a default judgment model > prefers a class model over the default and a call model over both
+// spec: judge_spec.rb:261 with a default judgment model > prefers a class model over the default and a call model over both
 #[tokio::test]
 async fn prefers_a_judge_model_over_the_default_and_a_call_model_over_both() {
     let (server, seen) = stub().await;
@@ -280,7 +280,7 @@ async fn prefers_a_judge_model_over_the_default_and_a_call_model_over_both() {
     );
 }
 
-// spec: judge_spec.rb:261 with a default judgment model > uses the default when a call explicitly resets the model to nil
+// spec: judge_spec.rb:270 with a default judgment model > uses the default when a call explicitly resets the model to nil
 #[tokio::test]
 async fn uses_the_default_when_a_call_explicitly_resets_the_model() {
     let (server, seen) = stub().await;
@@ -301,7 +301,7 @@ async fn uses_the_default_when_a_call_explicitly_resets_the_model() {
     assert_eq!(field(&seen, &["model"]), [json!("jev-preview")]);
 }
 
-// spec: judge_spec.rb:269 with a default judgment model > requires a model when the default is unset
+// spec: judge_spec.rb:278 with a default judgment model > requires a model when the default is unset
 #[tokio::test]
 async fn requires_a_model_when_the_default_is_unset() {
     let (server, seen) = stub().await;
@@ -395,7 +395,7 @@ async fn rejects_invalid_question_definitions() {
     assert!(bodies(&seen).is_empty());
 }
 
-// spec: judge/question_spec.rb:48 rejects unknown types and misspelled Hash fields
+// spec: judge/question_spec.rb:53 rejects unknown types and misspelled Hash fields
 #[test]
 fn rejects_unknown_types_and_misspelled_hash_fields() {
     for (definition, inspected) in [

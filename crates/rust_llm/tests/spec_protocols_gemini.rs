@@ -215,7 +215,7 @@ async fn out_of_order_results_are_put_back_in_call_order() {
 
 // ---- chat_spec.rb: build_thinking_config, format_system_instruction, build_thought_part ----------
 
-// spec: protocols/gemini/chat_spec.rb:226 sends a numeric budget when one is set
+// spec: protocols/gemini/chat_spec.rb:250 sends a numeric budget when one is set
 #[tokio::test]
 async fn a_numeric_budget_is_sent_as_thinking_budget() {
     let server = serve(vec![]).await;
@@ -227,14 +227,14 @@ async fn a_numeric_budget_is_sent_as_thinking_budget() {
     );
 }
 
-// spec: protocols/gemini/chat_spec.rb:245 skips empty system messages
+// spec: protocols/gemini/chat_spec.rb:269 skips empty system messages
 #[tokio::test]
 async fn an_empty_system_message_renders_no_system_instruction() {
     let payload = render(GEMINI, vec![Message::system(""), Message::user("hi")]).await;
     assert!(payload.get("systemInstruction").is_none(), "{payload}");
 }
 
-// spec: protocols/gemini/chat_spec.rb:253 omits the fields the provider did not send
+// UPSTREAM-REMOVED in 2.1 (was spec: protocols/gemini/chat_spec.rb:253) omits the fields the provider did not send
 #[tokio::test]
 async fn a_thought_part_carries_only_the_fields_present() {
     let thought = |text: Option<&str>, signature: Option<&str>| {
@@ -271,7 +271,7 @@ fn grounded(text: &str, metadata: Value) -> Value {
     json!({ "candidates": [{ "content": { "parts": [{ "text": text }] }, "groundingMetadata": metadata }], "usageMetadata": {} })
 }
 
-// spec: protocols/gemini/chat_spec.rb:264 returns nothing without grounding metadata
+// spec: protocols/gemini/chat_spec.rb:321 returns nothing without grounding metadata
 #[test]
 fn no_grounding_metadata_means_no_citations() {
     assert!(
@@ -281,7 +281,7 @@ fn no_grounding_metadata_means_no_citations() {
     );
 }
 
-// spec: protocols/gemini/chat_spec.rb:268 cites every grounding chunk when there are no supports
+// spec: protocols/gemini/chat_spec.rb:325 cites every grounding chunk when there are no supports
 #[test]
 fn every_grounding_chunk_is_cited_without_supports() {
     let citations = parse(grounded(
@@ -307,7 +307,7 @@ fn every_grounding_chunk_is_cited_without_supports() {
     );
 }
 
-// spec: protocols/gemini/chat_spec.rb:290 anchors supports to character offsets in the response text
+// spec: protocols/gemini/chat_spec.rb:347 anchors supports to character offsets in the response text
 #[test]
 fn supports_are_anchored_to_character_offsets() {
     let citations = parse(grounded(
@@ -323,7 +323,7 @@ fn supports_are_anchored_to_character_offsets() {
     assert_eq!(citations[0].end_index, Some(4));
 }
 
-// spec: protocols/gemini/chat_spec.rb:311 leaves offsets nil when the support carries no segment
+// spec: protocols/gemini/chat_spec.rb:368 leaves offsets nil when the support carries no segment
 #[test]
 fn a_support_without_a_segment_has_no_offsets() {
     let citations = parse(grounded(
@@ -340,21 +340,21 @@ fn a_support_without_a_segment_has_no_offsets() {
 
 // ---- chat_spec.rb: parse_content, extract_thought_signature, parse_completion_response -----------
 
-// spec: protocols/gemini/chat_spec.rb:331 returns empty content for a response with no candidate
+// spec: protocols/gemini/chat_spec.rb:388 returns empty content for a response with no candidate
 #[test]
 fn no_candidate_is_empty_content() {
     let m = parse(json!({}));
     assert_eq!((m.content.as_deref(), m.attachments.len()), (Some(""), 0));
 }
 
-// spec: protocols/gemini/chat_spec.rb:335 returns empty content for a candidate with no parts
+// spec: protocols/gemini/chat_spec.rb:392 returns empty content for a candidate with no parts
 #[test]
 fn a_candidate_without_parts_is_empty_content() {
     let m = parse(json!({ "candidates": [{ "content": {} }] }));
     assert_eq!((m.content.as_deref(), m.attachments.len()), (Some(""), 0));
 }
 
-// spec: protocols/gemini/chat_spec.rb:341 reads the signature off a function call part
+// spec: protocols/gemini/chat_spec.rb:398 reads the signature off a function call part
 #[test]
 fn the_signature_is_read_off_a_function_call_part() {
     let m = parse(parts_body(
@@ -363,14 +363,14 @@ fn the_signature_is_read_off_a_function_call_part() {
     assert_eq!(m.thinking.and_then(|t| t.signature).as_deref(), Some("sig"));
 }
 
-// spec: protocols/gemini/chat_spec.rb:347 returns nil when no part carries one
+// spec: protocols/gemini/chat_spec.rb:404 returns nil when no part carries one
 #[test]
 fn no_part_carries_a_signature() {
     let m = parse(parts_body(json!([{ "text": "hi" }])));
     assert_eq!(m.thinking.and_then(|t| t.signature), None);
 }
 
-// spec: protocols/gemini/chat_spec.rb:353 normalizes finishReason
+// spec: protocols/gemini/chat_spec.rb:488 normalizes finishReason
 #[test]
 fn safety_normalizes_to_content_filter() {
     let m = parse(
@@ -379,7 +379,7 @@ fn safety_normalizes_to_content_filter() {
     assert_eq!(m.finish_reason, Some(FinishReason::ContentFilter));
 }
 
-// spec: protocols/gemini/chat_spec.rb:372 keeps thought-only parts out of assistant content
+// spec: protocols/gemini/chat_spec.rb:507 keeps thought-only parts out of assistant content
 #[test]
 fn thought_only_parts_stay_out_of_content() {
     let m = parse(parts_body(
@@ -392,7 +392,7 @@ fn thought_only_parts_stay_out_of_content() {
     );
 }
 
-// spec: protocols/gemini/chat_spec.rb:396 keeps non-thought text in content when mixed with thought parts
+// spec: protocols/gemini/chat_spec.rb:531 keeps non-thought text in content when mixed with thought parts
 #[test]
 fn mixed_thought_and_text_parts_split() {
     let m = parse(parts_body(
@@ -405,7 +405,7 @@ fn mixed_thought_and_text_parts_split() {
     );
 }
 
-// spec: protocols/gemini/chat_spec.rb:421 captures cached token usage when present
+// spec: protocols/gemini/chat_spec.rb:556 captures cached token usage when present
 #[test]
 fn cached_token_usage_is_captured() {
     let m = parse(json!({
@@ -494,7 +494,7 @@ async fn ultra_high_on_a_video_sends_high() {
     );
 }
 
-// spec: protocols/gemini/media_spec.rb:93 omits media_resolution on audio
+// spec: protocols/gemini/media_spec.rb:103 omits media_resolution on audio
 #[tokio::test]
 async fn audio_carries_no_media_resolution() {
     let parts = user_parts(
@@ -506,7 +506,7 @@ async fn audio_carries_no_media_resolution() {
     assert!(parts[1].get("media_resolution").is_none(), "{}", parts[1]);
 }
 
-// spec: protocols/gemini/media_spec.rb:101 omits media_resolution from standalone parts such as tool results
+// spec: protocols/gemini/media_spec.rb:111 omits media_resolution from standalone parts such as tool results
 #[tokio::test]
 async fn a_tool_result_attachment_carries_no_media_resolution() {
     let pdf = bytes("pdf bytes", "page.pdf").with_resolution(Resolution::High);
@@ -516,7 +516,7 @@ async fn a_tool_result_attachment_carries_no_media_resolution() {
     assert!(sibling.get("media_resolution").is_none(), "{sibling}");
 }
 
-// spec: protocols/gemini/media_spec.rb:201 sends attachments without any text
+// spec: protocols/gemini/media_spec.rb:211 sends attachments without any text
 #[tokio::test]
 async fn attachments_are_sent_without_text() {
     let parts = user_parts(None, vec![bytes("pdf bytes", "proposal.pdf")]).await;
@@ -526,7 +526,7 @@ async fn attachments_are_sent_without_text() {
 
 // ---- media_spec.rb: build_response_content, attachment_filename -----------------------------------
 
-// spec: protocols/gemini/media_spec.rb:117 parses inline image responses as a text and attachments pair
+// spec: protocols/gemini/media_spec.rb:127 parses inline image responses as a text and attachments pair
 #[tokio::test]
 async fn an_inline_image_response_is_an_attachment_without_text() {
     let image = b"\x89PNG\r\n\x1a\n".to_vec();
@@ -544,7 +544,7 @@ async fn an_inline_image_response_is_an_attachment_without_text() {
     assert_eq!(attachment.content().await.unwrap(), image);
 }
 
-// spec: protocols/gemini/media_spec.rb:149 joins text parts and reports no attachments
+// spec: protocols/gemini/media_spec.rb:159 joins text parts and reports no attachments
 #[test]
 fn text_parts_are_joined() {
     let m = parse(parts_body(json!([{ "text": "one " }, { "text": "two" }])));
@@ -552,7 +552,7 @@ fn text_parts_are_joined() {
     assert!(m.attachments.is_empty());
 }
 
-// spec: protocols/gemini/media_spec.rb:156 ignores parts it does not recognize
+// spec: protocols/gemini/media_spec.rb:166 ignores parts it does not recognize
 // (A lone functionCall part still yields a tool call, and `Message` makes a tool call's missing
 // content `''` in Ruby too; beside text, the part adds nothing to content or attachments.)
 #[test]
@@ -565,7 +565,7 @@ fn unrecognized_parts_add_no_content_or_attachments() {
     assert_eq!((m.content.as_deref(), m.attachments.len()), (Some("hi"), 0));
 }
 
-// spec: protocols/gemini/media_spec.rb:160 builds an attachment from a fileData part
+// spec: protocols/gemini/media_spec.rb:170 builds an attachment from a fileData part
 #[test]
 fn a_file_data_part_is_an_attachment() {
     let m = parse(parts_body(
@@ -579,7 +579,7 @@ fn a_file_data_part_is_an_attachment() {
     assert_eq!(m.attachments[0].url(), Some("https://files.example/report"));
 }
 
-// spec: protocols/gemini/media_spec.rb:169 prefers the filename the response carries
+// spec: protocols/gemini/media_spec.rb:179 prefers the filename the response carries
 #[test]
 fn a_file_data_filename_wins() {
     let m = parse(parts_body(
@@ -588,14 +588,14 @@ fn a_file_data_filename_wins() {
     assert_eq!(m.attachments[0].filename.as_deref(), Some("report.pdf"));
 }
 
-// spec: protocols/gemini/media_spec.rb:177 skips a fileData part with no URI
+// spec: protocols/gemini/media_spec.rb:187 skips a fileData part with no URI
 #[test]
 fn a_file_data_part_without_a_uri_is_skipped() {
     let m = parse(parts_body(json!([{ "fileData": {} }])));
     assert_eq!((m.content, m.attachments.len()), (None, 0));
 }
 
-// spec: protocols/gemini/media_spec.rb:181 skips an inlineData part with no data
+// spec: protocols/gemini/media_spec.rb:191 skips an inlineData part with no data
 #[test]
 fn an_inline_data_part_without_data_is_skipped() {
     let m = parse(parts_body(
@@ -604,7 +604,7 @@ fn an_inline_data_part_without_data_is_skipped() {
     assert_eq!((m.content, m.attachments.len()), (None, 0));
 }
 
-// spec: protocols/gemini/media_spec.rb:189 falls back to an extensionless name without a mime type
+// spec: protocols/gemini/media_spec.rb:199 falls back to an extensionless name without a mime type
 #[test]
 fn an_attachment_without_a_mime_type_has_no_extension() {
     let m = parse(parts_body(
@@ -616,7 +616,7 @@ fn an_attachment_without_a_mime_type_has_no_extension() {
     );
 }
 
-// spec: protocols/gemini/media_spec.rb:193 normalizes the extensions Gemini reports
+// spec: protocols/gemini/media_spec.rb:203 normalizes the extensions Gemini reports
 #[test]
 fn reported_extensions_are_normalized() {
     let m = parse(parts_body(json!([
@@ -662,7 +662,7 @@ fn a_chunk_captures_cached_token_usage() {
     );
 }
 
-// spec: protocols/gemini/streaming_spec.rb:40 preserves raw finishReason on chunks
+// spec: protocols/gemini/streaming_spec.rb:92 preserves raw finishReason on chunks
 #[test]
 fn a_chunk_normalizes_finish_reason() {
     let chunk = gemini::build_chunk(
@@ -680,7 +680,7 @@ async fn stream_error(data: &str) -> Error {
         .unwrap_err()
 }
 
-// spec: protocols/gemini/streaming_spec.rb:56 parses error objects
+// spec: protocols/gemini/streaming_spec.rb:108 parses error objects
 #[tokio::test]
 async fn an_error_object_raises_its_code() {
     let data = r#"{"error":{"code":429,"message":"Quota exceeded"}}"#;
@@ -695,7 +695,7 @@ async fn an_error_object_raises_its_code() {
     );
 }
 
-// spec: protocols/gemini/streaming_spec.rb:66 handles a body that parses to a bare JSON string
+// spec: protocols/gemini/streaming_spec.rb:118 handles a body that parses to a bare JSON string
 // (`parse_streaming_error` gives no status; the error is raised as the stream's default 500.)
 #[tokio::test]
 async fn a_bare_json_string_error_has_no_status() {
@@ -711,7 +711,7 @@ async fn a_bare_json_string_error_has_no_status() {
     );
 }
 
-// spec: protocols/gemini/streaming_spec.rb:73 handles a string error value
+// spec: protocols/gemini/streaming_spec.rb:125 handles a string error value
 #[tokio::test]
 async fn a_string_error_value_has_no_status() {
     let data = r#"{"error":"model unavailable"}"#;
@@ -750,7 +750,7 @@ async fn function_call_parts_follow_the_assistant_text() {
     );
 }
 
-// spec: protocols/gemini/tools_spec.rb:54 uses the tool call id for Gemini function responses
+// spec: protocols/gemini/tools_spec.rb:68 uses the tool call id for Gemini function responses
 #[tokio::test]
 async fn an_unmatched_result_is_named_by_its_tool_call_id() {
     let parts = tool_result_parts(GEMINI, tool_result("uuid-123", "Result payload", vec![])).await;
@@ -762,7 +762,7 @@ async fn an_unmatched_result_is_named_by_its_tool_call_id() {
     );
 }
 
-// spec: protocols/gemini/tools_spec.rb:76 uses a placeholder when the tool returns no content
+// spec: protocols/gemini/tools_spec.rb:90 uses a placeholder when the tool returns no content
 #[tokio::test]
 async fn an_empty_result_renders_a_placeholder() {
     let parts = tool_result_parts(GEMINI, tool_result("uuid-123", "", vec![])).await;
@@ -774,8 +774,8 @@ async fn an_empty_result_renders_a_placeholder() {
     );
 }
 
-// spec: protocols/gemini/tools_spec.rb:123 nests media for the latest aliases, which track the newest release
-// spec: protocols/gemini/tools_spec.rb:205 treats the latest aliases as the newest generation
+// spec: protocols/gemini/tools_spec.rb:137 nests media for the latest aliases, which track the newest release
+// spec: protocols/gemini/tools_spec.rb:219 treats the latest aliases as the newest generation
 #[tokio::test]
 async fn latest_aliases_nest_media_in_the_function_response() {
     for id in [
@@ -796,7 +796,7 @@ async fn latest_aliases_nest_media_in_the_function_response() {
     }
 }
 
-// spec: protocols/gemini/tools_spec.rb:132 keeps text files as sibling text parts on Gemini 3 models
+// spec: protocols/gemini/tools_spec.rb:146 keeps text files as sibling text parts on Gemini 3 models
 #[tokio::test]
 async fn text_files_stay_sibling_parts_on_gemini_3() {
     let parts = tool_result_parts(
@@ -808,7 +808,7 @@ async fn text_files_stay_sibling_parts_on_gemini_3() {
     assert!(parts.last().unwrap().get("text").is_some());
 }
 
-// spec: protocols/gemini/tools_spec.rb:139 keeps provider-managed files as sibling parts on Gemini 3 models
+// spec: protocols/gemini/tools_spec.rb:153 keeps provider-managed files as sibling parts on Gemini 3 models
 #[tokio::test]
 async fn provider_files_stay_sibling_parts_on_gemini_3() {
     let mut file = uploaded("files/abc123", "ruby.png", "image/png");
@@ -826,7 +826,7 @@ async fn provider_files_stay_sibling_parts_on_gemini_3() {
     assert!(parts.last().unwrap().get("file_data").is_some());
 }
 
-// spec: protocols/gemini/tools_spec.rb:211 reads no generation out of an id that names none
+// spec: protocols/gemini/tools_spec.rb:225 reads no generation out of an id that names none
 // (Ruby's `supported?(nil)` has no counterpart: a Rust model always has an id.)
 #[tokio::test]
 async fn ids_naming_no_generation_keep_media_as_siblings() {
@@ -887,7 +887,7 @@ async fn declaration(tool: Declared) -> Value {
     chat.render().unwrap()["tools"][0]["functionDeclarations"][0].clone()
 }
 
-// spec: protocols/gemini/tools_spec.rb:172 merges provider options into the declaration
+// spec: protocols/gemini/tools_spec.rb:186 merges provider options into the declaration
 #[tokio::test]
 async fn provider_options_merge_into_the_declaration() {
     let d = declaration(Declared {
@@ -902,7 +902,7 @@ async fn provider_options_merge_into_the_declaration() {
     );
 }
 
-// spec: protocols/gemini/tools_spec.rb:185 is nil for a response Gemini did not send
+// spec: protocols/gemini/tools_spec.rb:199 is nil for a response Gemini did not send
 #[test]
 fn malformed_responses_have_no_tool_calls() {
     for data in [
@@ -915,7 +915,7 @@ fn malformed_responses_have_no_tool_calls() {
     }
 }
 
-// spec: protocols/gemini/tools_spec.rb:245 keeps type unions, references, and constraints the converter dropped
+// spec: protocols/gemini/tools_spec.rb:259 keeps type unions, references, and constraints the converter dropped
 #[tokio::test]
 async fn tool_schemas_keep_unions_references_and_constraints() {
     let schema = json!({

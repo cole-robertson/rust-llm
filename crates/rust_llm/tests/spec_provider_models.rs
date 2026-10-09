@@ -157,7 +157,7 @@ fn recognizes_only_explicit_openai_search_model_ids_as_citable() {
     ));
 }
 
-// spec: provider_capability_augmenters_spec.rb:44 restores documented capabilities for exact OpenAI Chat and Codex model ids
+// spec: provider_capability_augmenters_spec.rb:49 restores documented capabilities for exact OpenAI Chat and Codex model ids
 #[test]
 fn restores_documented_capabilities_for_openai_chat_and_codex_ids() {
     assert_contain_exactly(
@@ -181,7 +181,7 @@ fn restores_documented_capabilities_for_openai_chat_and_codex_ids() {
     }
 }
 
-// spec: provider_capability_augmenters_spec.rb:53 restores documented capabilities for exact OpenAI research and moderation model ids
+// spec: provider_capability_augmenters_spec.rb:58 restores documented capabilities for exact OpenAI research and moderation model ids
 #[test]
 fn restores_documented_capabilities_for_openai_research_and_moderation_ids() {
     assert_contain_exactly(
@@ -194,7 +194,7 @@ fn restores_documented_capabilities_for_openai_research_and_moderation_ids() {
     );
 }
 
-// spec: provider_capability_augmenters_spec.rb:62 adds streaming to xAI models with text output
+// spec: provider_capability_augmenters_spec.rb:67 adds streaming to xAI models with text output
 #[test]
 fn adds_streaming_to_xai_models_with_text_output() {
     assert!(includes(&augment_default("xai", &[], "test"), "streaming"));
@@ -204,7 +204,7 @@ fn adds_streaming_to_xai_models_with_text_output() {
     ));
 }
 
-// spec: provider_capability_augmenters_spec.rb:69 uses Google modality facts without classifying embedding operations as transcription
+// spec: provider_capability_augmenters_spec.rb:74 uses Google modality facts without classifying embedding operations as transcription
 #[test]
 fn uses_google_modality_facts_without_classifying_embeddings_as_transcription() {
     assert!(includes(
@@ -1171,7 +1171,7 @@ async fn ollama_server(show: ResponseTemplate) -> (MockServer, Vec<Model>) {
     (server, models)
 }
 
-// spec: providers/ollama_spec.rb:61 model listing asks /api/show about every listed model
+// spec: providers/ollama_spec.rb:70 model listing asks /api/show about every listed model
 #[tokio::test]
 async fn ollama_asks_api_show_about_every_listed_model() {
     let (_server, models) = ollama_server(
@@ -1182,7 +1182,7 @@ async fn ollama_asks_api_show_about_every_listed_model() {
     assert!(models[0].supports("vision"));
 }
 
-// spec: providers/ollama_spec.rb:73 model listing survives a server that does not answer /api/show
+// spec: providers/ollama_spec.rb:82 model listing survives a server that does not answer /api/show
 #[tokio::test]
 async fn ollama_survives_a_server_that_does_not_answer_api_show() {
     let (_server, models) =

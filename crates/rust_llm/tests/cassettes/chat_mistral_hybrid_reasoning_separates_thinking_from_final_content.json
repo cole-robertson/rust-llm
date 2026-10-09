@@ -5,23 +5,23 @@
     "request_body": "{\"model\":\"mistral-small-latest\",\"messages\":[{\"role\":\"user\",\"content\":\"What is 12 * 12? Answer with just the number.\"}],\"stream\":false,\"reasoning_effort\":\"high\"}",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:13:44 GMT",
+      "Date": "Wed, 07 Oct 2026 13:04:46 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Mistral-Correlation-Id": "01a0b16e-cc6b-7bcb-a037-257c1152b2d4",
-      "X-Kong-Request-Id": "01a0b16e-cc6b-7bcb-a037-257c1152b2d4",
+      "Mistral-Correlation-Id": "01a11677-64f5-7a50-9fc7-8750a2395054",
+      "X-Kong-Request-Id": "01a11677-64f5-7a50-9fc7-8750a2395054",
       "X-Max-Retry-Attempts-Reached": "false",
       "X-Ratelimit-Limit-Tokens-Minute": "100000",
-      "X-Ratelimit-Remaining-Tokens-Minute": "99903",
-      "X-Ratelimit-Tokens-Query-Cost": "97",
+      "X-Ratelimit-Remaining-Tokens-Minute": "98865",
+      "X-Ratelimit-Tokens-Query-Cost": "70",
       "X-Ratelimit-Limit-Req-Minute": "100",
-      "X-Ratelimit-Remaining-Req-Minute": "99",
-      "X-Envoy-Upstream-Service-Time": "525",
+      "X-Ratelimit-Remaining-Req-Minute": "98",
+      "X-Envoy-Upstream-Service-Time": "433",
       "Server": "cloudflare",
       "Access-Control-Allow-Origin": "*",
-      "X-Kong-Upstream-Latency": "526",
-      "X-Kong-Proxy-Latency": "13",
+      "X-Kong-Upstream-Latency": "435",
+      "X-Kong-Proxy-Latency": "16",
       "Cf-Cache-Status": "DYNAMIC",
       "Set-Cookie": "<COOKIE>",
       "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
@@ -29,6 +29,6 @@
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\"id\":\"92caac568cd84f1cb3c2a88c9970c694\",\"created\":1789683223,\"model\":\"mistral-small-latest\",\"usage\":{\"prompt_tokens\":31,\"total_tokens\":97,\"completion_tokens\":66,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":[{\"type\":\"thinking\",\"thinking\":[{\"type\":\"text\",\"text\":\"The user is asking for the product of 12 multiplied by 12. I know that 12 times 12 is a basic multiplication fact. Let me calculate it:\\n\\n12 * 12 = 144\\n\\nSo, the answer is 144.\"}],\"closed\":true},{\"type\":\"text\",\"text\":\"144\"}]}}]}"
+    "response_body": "{\"id\":\"feaf03c9a7f94264888c1ecf76368702\",\"created\":1791378285,\"model\":\"mistral-small-latest\",\"usage\":{\"prompt_tokens\":31,\"total_tokens\":70,\"completion_tokens\":39,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":[{\"type\":\"thinking\",\"thinking\":[{\"type\":\"text\",\"text\":\"The user is asking for the product of 12 multiplied by 12. I know that 12 times 12 is 144.\"}],\"closed\":true},{\"type\":\"text\",\"text\":\"144\"}]}}]}"
   }
 ]

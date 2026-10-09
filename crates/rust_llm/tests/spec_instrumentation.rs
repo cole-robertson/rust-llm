@@ -603,7 +603,7 @@ async fn video_events_wrap_the_job_event() {
 
 // ---- tool_spec.rb ------------------------------------------------------------------------------
 
-// spec: tool_spec.rb:327 .split_result > returns a lone attachment with empty text
+// spec: tool_spec.rb:345 .split_result > returns a lone attachment with empty text
 #[test]
 fn a_lone_attachment_result_has_empty_text() {
     let attachment = Attachment::from_bytes(b"bytes".to_vec(), "a.txt", Some("text/plain"));
@@ -633,7 +633,7 @@ impl rust_llm::Tool for Guarded {
     }
 }
 
-// spec: tool_spec.rb:207 #call > with a tool_call keyword > rejects tool_call as a model-provided argument
+// spec: tool_spec.rb:225 #call > with a tool_call keyword > rejects tool_call as a model-provided argument
 #[tokio::test]
 async fn a_model_provided_tool_call_argument_is_rejected() {
     let server = MockServer::start().await;

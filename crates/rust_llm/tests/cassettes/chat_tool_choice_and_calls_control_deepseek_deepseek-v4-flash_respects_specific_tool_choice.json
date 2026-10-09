@@ -8,41 +8,41 @@
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Date": "Thu, 17 Sep 2026 22:27:23 GMT",
+      "Date": "Wed, 07 Oct 2026 13:57:08 GMT",
       "Server": "elb",
       "Vary": "origin, access-control-request-method, access-control-request-headers",
       "Access-Control-Allow-Credentials": "true",
-      "X-Ds-Trace-Id": "94ce49194e7fd08c9b3e4db1bb797251",
+      "X-Ds-Trace-Id": "2817e327659294388b366934af5462a7",
       "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
       "X-Content-Type-Options": "nosniff",
       "X-Cache": "Miss from cloudfront",
-      "Via": "1.1 0996579236e052d74cb05219740670d6.cloudfront.net (CloudFront)",
-      "X-Amz-Cf-Pop": "TXL52-P3",
-      "X-Amz-Cf-Id": "oSub9PfgyQi3789hiYtzFZkebiY-BteoYAIzQdJQRTIMYRDmJpOq8A=="
+      "Via": "1.1 0a6ac8acf76b8beb94cbdf4e77bda682.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL50-P6",
+      "X-Amz-Cf-Id": "Zl1kLG4IIH-l1GRTWY-kvhxvEH3g3Xrv7WUMRmensqxQF1hZjYziOw=="
     },
-    "response_body": "{\"id\":\"e148ce8c-9061-4059-8ab2-a2c001791d0f\",\"object\":\"chat.completion\",\"created\":1789684043,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"index\":0,\"id\":\"call_00_VcniVptMIrASXBxxJt0f6557\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\": \\\"41.9028\\\", \\\"longitude\\\": \\\"12.4964\\\"}\"}}]},\"logprobs\":null,\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":333,\"completion_tokens\":54,\"total_tokens\":387,\"prompt_tokens_details\":{\"cached_tokens\":128},\"prompt_cache_hit_tokens\":128,\"prompt_cache_miss_tokens\":205},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+    "response_body": "{\"id\":\"82301c4e-e045-4faf-bee9-52650e12f151\",\"object\":\"chat.completion\",\"created\":1791381428,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"index\":0,\"id\":\"call_00_1YBpEDgc5RxOxfiZ7Wme9444\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\": \\\"41.9028\\\", \\\"longitude\\\": \\\"12.4964\\\"}\"}}]},\"logprobs\":null,\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":333,\"completion_tokens\":54,\"total_tokens\":387,\"prompt_tokens_details\":{\"cached_tokens\":0},\"prompt_cache_hit_tokens\":0,\"prompt_cache_miss_tokens\":333},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
   },
   {
     "method": "post",
     "uri": "https://api.deepseek.com/chat/completions",
-    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the fall of Rome?\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_00_VcniVptMIrASXBxxJt0f6557\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"41.9028\\\",\\\"longitude\\\":\\\"12.4964\\\"}\"}}],\"reasoning_content\":\"\"},{\"role\":\"tool\",\"content\":\"Current weather at 41.9028, 12.4964: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_00_VcniVptMIrASXBxxJt0f6557\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}],\"thinking\":{\"type\":\"disabled\"}}",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the fall of Rome?\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_00_1YBpEDgc5RxOxfiZ7Wme9444\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"41.9028\\\",\\\"longitude\\\":\\\"12.4964\\\"}\"}}],\"reasoning_content\":\"\"},{\"role\":\"tool\",\"content\":\"Current weather at 41.9028, 12.4964: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_00_1YBpEDgc5RxOxfiZ7Wme9444\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}],\"thinking\":{\"type\":\"disabled\"}}",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Date": "Thu, 17 Sep 2026 22:27:24 GMT",
+      "Date": "Wed, 07 Oct 2026 13:57:09 GMT",
       "Server": "elb",
       "Vary": "origin, access-control-request-method, access-control-request-headers",
       "Access-Control-Allow-Credentials": "true",
-      "X-Ds-Trace-Id": "3f636fda39f403a2e5ad1e0798689850",
+      "X-Ds-Trace-Id": "7a5861331cd903656d8a61d11994b09b",
       "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
       "X-Content-Type-Options": "nosniff",
       "X-Cache": "Miss from cloudfront",
-      "Via": "1.1 9ee1074b6d71798355c695fb26c21452.cloudfront.net (CloudFront)",
-      "X-Amz-Cf-Pop": "TXL50-P2",
-      "X-Amz-Cf-Id": "jMBmKLD9sHNU4I6XRf-KmC9y1cqfQhJPKoIysON17EfHB_FrI0I_jg=="
+      "Via": "1.1 638b173cd330df78700f2706cc7e6c8a.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL52-P1",
+      "X-Amz-Cf-Id": "Bp-Rvt--oJ-2l6nr07afQl7A95SkhWIKB-Z_VD7mT3UILulIWLSrmw=="
     },
-    "response_body": "{\"id\":\"480ba133-a1a1-4851-8181-a8e526fcc66b\",\"object\":\"chat.completion\",\"created\":1789684044,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The \\\"fall of Rome\\\" usually refers to the collapse of the Western Roman Empire, traditionally dated to **476 AD**, when the Germanic chieftain Odoacer deposed Romulus Augustulus, the last Western emperor. But it's better understood as a long decline than a single event. Key factors:\\n\\n- **Political instability** — the 3rd century \\\"Crisis of the Third Century\\\" saw dozens of emperors, most dying violently; the empire was later split into East and West (AD 285).\\n- **Economic troubles** — debased currency, inflation, heavy taxation, and reliance on slave labor that stagnated innovation.\\n- **Military pressures** — \\\"barbarian\\\" invasions and migrations: Visigoths sacked Rome in 410, Vandals in 455. Rome's legions increasingly relied on Germanic troops.\\n- **Loss of provinces** — North Africa, Gaul, Hispania, and Britain slipped away during the 5th century.\\n- **The Eastern half survived** — the Byzantine Empire continued for nearly another thousand years, until 1453.\\n\\nHistorians like Edward Gibbon blamed Christianity and moral decay; modern scholars emphasize structural, fiscal, and environmental factors (plagues, climate shifts). Many also argue for \\\"transformation\\\" rather than \\\"fall\\\" — Roman institutions, law, and language persisted and shaped medieval Europe.\\n\\n(Note: I checked the weather in Rome anyway — currently 15°C with light wind — but that's unrelated to your question.)\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":425,\"completion_tokens\":306,\"total_tokens\":731,\"prompt_tokens_details\":{\"cached_tokens\":256},\"prompt_cache_hit_tokens\":256,\"prompt_cache_miss_tokens\":169},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+    "response_body": "{\"id\":\"489a6952-5031-4e96-8d69-d340c90dcdbc\",\"object\":\"chat.completion\",\"created\":1791381429,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The \\\"fall of Rome\\\" refers to the end of the Western Roman Empire — a long, gradual process rather than a single event. Most historians date it to **476 AD**, when the Germanic chieftain Odoacer deposed Romulus Augustulus, the last Western emperor.\\n\\nKey context:\\n\\n- **Crisis of the Third Century (235–284 AD):** Nearly 50 years of military anarchy, rapid emperor turnover, plague, and economic collapse nearly tore the empire apart.\\n- **Reforms and division:** Diocletian and Constantine stabilized things temporarily, but the empire was permanently split into Western and Eastern halves (the East, based at Constantinople, survived as the Byzantine Empire for another thousand years).\\n- **Invasions and migrations:** Pressure from the Huns pushed Gothic, Vandal, and other groups across Roman borders. Rome itself was sacked by the Visigoths in **410** and the Vandals in **455** — shocking but not fatal blows.\\n- **Internal decay:** Political instability, over-reliance on foreign troops, tax burdens, and loss of loyalty among provincial elites eroded the state from within.\\n- **A more common framing:** Rather than a \\\"fall,\\\" many historians describe a **transformation** — Roman institutions, law, language, and the Church persisted and shaped medieval Europe.\\n\\nIf you were asking about something else by \\\"fall of Rome\\\" — like a specific book (e.g., Edward Gibbon's *The History of the Decline and Fall of the Roman Empire*) or a modern metaphor — let me know and I'll dig into that instead.\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":425,\"completion_tokens\":325,\"total_tokens\":750,\"prompt_tokens_details\":{\"cached_tokens\":256},\"prompt_cache_hit_tokens\":256,\"prompt_cache_miss_tokens\":169},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
   }
 ]

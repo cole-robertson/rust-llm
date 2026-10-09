@@ -5,14 +5,14 @@
     "request_body": "{\"model\":\"openai/gpt-5-mini\",\"input\":[{\"role\":\"user\",\"content\":\"Tell me about the weather.\"}],\"instructions\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\",\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"]}",
     "status": 200,
     "response_headers": {
-      "Date": "Fri, 25 Sep 2026 08:37:12 GMT",
+      "Date": "Wed, 07 Oct 2026 13:10:27 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
       "Server": "cloudflare",
       "X-Ratelimit-Limit": "1",
       "X-Ratelimit-Remaining": "0",
-      "X-Ratelimit-Reset": "1790325433",
+      "X-Ratelimit-Reset": "1791378628",
       "X-Ratelimit-Used": "1",
       "X-Request-Id": "<X_REQUEST_ID>",
       "Access-Control-Allow-Origin": "*",
@@ -22,6 +22,6 @@
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\"background\":false,\"completed_at\":1790325425,\"created_at\":1790325425,\"error\":null,\"frequency_penalty\":0,\"id\":\"resp_eedfdf10-04fe-45ea-9a74-4de94df97b40\",\"incomplete_details\":null,\"instructions\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\",\"max_output_tokens\":null,\"max_tool_calls\":null,\"metadata\":{},\"model\":\"openai/gpt-5-mini\",\"object\":\"response\",\"output\":[{\"content\":[{\"annotations\":[],\"text\":\"I don’t have a location—where do you want the weather for (city, ZIP/postal code, or coordinates)? Also tell me the timeframe you want: now/today, next 48 hours, next 7 days, or a specific date/time.\\n\\nWhat I can provide once you give a location:\\n- Current conditions (temperature, feels-like, wind, humidity, precipitation now)\\n- Hourly forecast (rain/snow probability, temps, wind) for 24–48 hours\\n- Daily forecast (high/low, precip chance) for up to 7–10 days\\n- Severe weather alerts and watches/warnings\\n- Radar/precipitation map summary\\n- Air quality, pollen, or marine/aviation forecasts if you need them\\n\\nIf you’d rather not share a location, I can:\\n- Explain how to read forecasts and radar\\n- Give typical climate/seasonal averages for a city or region\\n- Suggest sources/apps for live weather\\n\\nReply with a location and timeframe (for example: “London, UK — next 3 days”) and I’ll fetch a detailed forecast. XKCD7392\",\"type\":\"output_text\"}],\"id\":\"msg_3801c3ba-d580-4882-8184-4b3da2818bf6\",\"role\":\"assistant\",\"status\":\"completed\",\"type\":\"message\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"reasoning\":null,\"safety_identifier\":null,\"service_tier\":\"default\",\"status\":\"completed\",\"store\":false,\"temperature\":1,\"text\":{\"format\":{\"type\":\"text\"}},\"tool_choice\":\"auto\",\"tools\":[],\"top_logprobs\":0,\"top_p\":1,\"truncation\":\"\",\"usage\":{\"cost\":{\"currency\":\"USD\",\"input_cost\":0.00001,\"output_cost\":0.00115,\"total_cost\":0.00116},\"input_tokens\":53,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":573,\"output_tokens_details\":{\"reasoning_tokens\":320},\"total_tokens\":626},\"user\":null}\n"
+    "response_body": "{\"background\":false,\"completed_at\":1791378620,\"created_at\":1791378620,\"error\":null,\"frequency_penalty\":0,\"id\":\"resp_16e281f1-9ceb-40f1-987f-edaf469fd6e3\",\"incomplete_details\":null,\"instructions\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\",\"max_output_tokens\":null,\"max_tool_calls\":null,\"metadata\":{},\"model\":\"openai/gpt-5-mini\",\"object\":\"response\",\"output\":[{\"content\":[{\"annotations\":[],\"text\":\"I can — but I need a location. What city, ZIP/postal code, or airport code do you want the weather for (or allow location sharing)? Also tell me which details you want: current conditions, hourly or 7–10 day forecast, radar/precip map, severe-weather alerts, air quality/pollen, or something else. Preferred units: °C or °F? XKCD7392\",\"type\":\"output_text\"}],\"id\":\"msg_b188bb27-9a45-40d6-8394-14a91bec90b7\",\"role\":\"assistant\",\"status\":\"completed\",\"type\":\"message\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"reasoning\":null,\"safety_identifier\":null,\"service_tier\":\"default\",\"status\":\"completed\",\"store\":false,\"temperature\":1,\"text\":{\"format\":{\"type\":\"text\"}},\"tool_choice\":\"auto\",\"tools\":[],\"top_logprobs\":0,\"top_p\":1,\"truncation\":\"\",\"usage\":{\"cost\":{\"currency\":\"USD\",\"input_cost\":0.00001,\"output_cost\":0.00128,\"total_cost\":0.00129},\"input_tokens\":53,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":638,\"output_tokens_details\":{\"reasoning_tokens\":512},\"total_tokens\":691},\"user\":null}\n"
   }
 ]

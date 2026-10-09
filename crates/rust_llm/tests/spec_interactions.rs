@@ -240,7 +240,7 @@ fn includes_the_function_name_with_a_local_result() {
     );
 }
 
-// spec: protocols/interactions_spec.rb:82
+// spec: protocols/interactions_spec.rb:104
 #[test]
 fn replays_edited_history_and_signed_results_after_serialization_without_a_remote_cursor() {
     let mut chat = chat();
@@ -268,7 +268,7 @@ fn replays_edited_history_and_signed_results_after_serialization_without_a_remot
     );
 }
 
-// spec: protocols/interactions_spec.rb:98
+// spec: protocols/interactions_spec.rb:120
 #[tokio::test]
 async fn replays_a_local_function_call_and_its_named_result_without_provider_storage() {
     let mut data = body();
@@ -289,7 +289,7 @@ async fn replays_a_local_function_call_and_its_named_result_without_provider_sto
     );
 }
 
-// spec: protocols/interactions_spec.rb:114
+// spec: protocols/interactions_spec.rb:136
 #[test]
 fn renders_json_schema_and_specific_tool_choice_in_the_documented_fields() {
     let schema = json!({ "type": "object", "properties": { "answer": { "type": "integer" } }, "required": ["answer"] });
@@ -315,7 +315,7 @@ fn renders_json_schema_and_specific_tool_choice_in_the_documented_fields() {
     );
 }
 
-// spec: protocols/interactions_spec.rb:123
+// spec: protocols/interactions_spec.rb:145
 #[test]
 fn converts_citation_byte_offsets_to_characters_across_multiple_output_parts() {
     let mut data = body();
@@ -345,7 +345,7 @@ fn converts_citation_byte_offsets_to_characters_across_multiple_output_parts() {
     );
 }
 
-// spec: protocols/interactions_spec.rb:139
+// spec: protocols/interactions_spec.rb:161
 #[test]
 fn separates_thinking_effort_from_summary_display_and_rejects_an_unsupported_off_control() {
     for effort in ["minimal", "low", "medium", "high"] {
@@ -399,7 +399,7 @@ fn separates_thinking_effort_from_summary_display_and_rejects_an_unsupported_off
     );
 }
 
-// spec: protocols/interactions_spec.rb:155
+// spec: protocols/interactions_spec.rb:177
 #[tokio::test]
 async fn renders_image_and_pdf_attachments_as_content() {
     let fixtures = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
@@ -445,7 +445,7 @@ async fn stream(events: Vec<Value>) -> (rust_llm::Result<Message>, Vec<Message>)
     (result, chunks)
 }
 
-// spec: protocols/interactions_spec.rb:162
+// spec: protocols/interactions_spec.rb:184
 #[tokio::test]
 async fn accumulates_streamed_mcp_steps_and_never_yields_remote_result_text_as_assistant_text() {
     let body = body();
@@ -493,7 +493,7 @@ async fn accumulates_streamed_mcp_steps_and_never_yields_remote_result_text_as_a
     assert_eq!((last.input, last.output), (Some(46), Some(15)));
 }
 
-// spec: protocols/interactions_spec.rb:182
+// spec: protocols/interactions_spec.rb:241
 #[tokio::test]
 async fn rejects_failed_or_truncated_streams_and_unsupported_required_actions() {
     let (truncated, _) = stream(vec![
@@ -519,7 +519,7 @@ async fn rejects_failed_or_truncated_streams_and_unsupported_required_actions() 
     assert!(matches!(parse(&data), Err(Error::Api(m, _)) if m.contains("unsupported action")));
 }
 
-// spec: protocols/interactions_spec.rb:191
+// spec: protocols/interactions_spec.rb:324
 #[tokio::test]
 async fn accumulates_local_function_argument_deltas_after_an_empty_object_in_the_initial_step() {
     let mut completed = body();
@@ -577,7 +577,7 @@ fn microsoft_learn() -> ProviderTool {
     )
 }
 
-// spec: protocols/interactions_spec.rb:222
+// spec: protocols/interactions_spec.rb:355
 #[tokio::test]
 async fn executes_a_remote_mcp_tool_and_replays_its_signed_results_through_stateless_chat() {
     let (cassette, chat) =
@@ -618,7 +618,7 @@ async fn executes_a_remote_mcp_tool_and_replays_its_signed_results_through_state
     cassette.assert_all_matched().await;
 }
 
-// spec: protocols/interactions_spec.rb:233
+// spec: protocols/interactions_spec.rb:367
 #[tokio::test]
 async fn streams_remote_mcp_results_and_preserves_the_complete_signed_history() {
     let (cassette, chat) =
@@ -650,7 +650,7 @@ async fn streams_remote_mcp_results_and_preserves_the_complete_signed_history() 
     cassette.assert_all_matched().await;
 }
 
-// spec: protocols/interactions_spec.rb:246
+// spec: protocols/interactions_spec.rb:394
 #[tokio::test]
 async fn executes_local_tools_and_returns_json_schema_output_through_interactions() {
     let (cassette, chat) =
@@ -671,7 +671,7 @@ async fn executes_local_tools_and_returns_json_schema_output_through_interaction
     cassette.assert_all_matched().await;
 }
 
-// spec: protocols/interactions_spec.rb:254
+// spec: protocols/interactions_spec.rb:402
 #[tokio::test]
 async fn streams_local_function_arguments_and_continues_with_the_actual_tool_result() {
     let (cassette, chat) =

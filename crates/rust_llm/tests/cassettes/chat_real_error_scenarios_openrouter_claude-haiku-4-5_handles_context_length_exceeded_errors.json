@@ -2,16 +2,16 @@
   {
     "method": "post",
     "uri": "https://openrouter.ai/api/v1/chat/completions",
-    "request_body": "{\"model\":\"anthropic/claude-haiku-4.5\",\"messages\":[{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"user\",\"content\":\"Hi\"}],\"stream\":false}",
+    "request_body": "{\"model\":\"anthropic/claude-haiku-4.5\",\"messages\":[{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"user\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"assistant\",\"content\":\"<MASSIVE_TEXT>\"},{\"role\":\"user\",\"content\":\"Hi\"}],\"stream\":false}",
     "status": 400,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:08:13 GMT",
+      "Date": "Wed, 07 Oct 2026 13:24:44 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Expose-Headers": "X-Generation-Id,X-Provider-Name,request-id,cf-ray",
-      "X-Generation-Id": "gen-1789682893-P061DgRv6HeByIiVojM7",
+      "X-Generation-Id": "gen-1791379484-13zqcqDSX4ItLKmU47sZ",
       "Set-Cookie": "<COOKIE>",
       "Permissions-Policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
       "Referrer-Policy": "no-referrer, strict-origin-when-cross-origin",
@@ -19,6 +19,6 @@
       "Server": "cloudflare",
       "Cf-Ray": "<CF_RAY>"
     },
-    "response_body": "{\"error\":{\"message\":\"This endpoint's maximum context length is 200000 tokens. However, you requested about 2500011 tokens (2500011 of text input). Please reduce the length of either one, or use the context-compression plugin to compress your prompt automatically.\",\"code\":400,\"metadata\":{\"provider_name\":null}}}"
+    "response_body": "{\"error\":{\"message\":\"This endpoint's maximum context length is 200000 tokens. However, you requested about 1500007 tokens (1500007 of text input). Please reduce the length of either one, or use the context-compression plugin to compress your prompt automatically.\",\"code\":400,\"metadata\":{\"provider_name\":null}}}"
   }
 ]

@@ -1,0 +1,35 @@
+[
+  {
+    "method": "post",
+    "uri": "https://api.openai.com/v1/decisions",
+    "request_body": "{\"model\":\"gpt-6-luna\",\"input\":\"{\\\"message\\\":\\\"I was charged twice. Please refund the duplicate charge today.\\\"}\",\"questions\":[{\"type\":\"predicate\",\"name\":\"urgent\",\"instructions\":\"Does the customer explicitly need action today?\\nYes: Explicitly asks for action today\\nNo: No deadline or a later deadline\"},{\"type\":\"choice\",\"name\":\"department\",\"instructions\":\"Which team should handle this message?\",\"choices\":[{\"value\":\"billing\",\"description\":\"Payments and refunds\"},{\"value\":\"technical\",\"description\":\"Bugs and integrations\"},{\"value\":\"other\"}]},{\"type\":\"score\",\"name\":\"frustration\",\"instructions\":\"How frustrated is the customer?\",\"levels\":[{\"label\":\"0\",\"description\":\"Calm and polite\"},{\"label\":\"1\",\"description\":\"Expresses frustration\"},{\"label\":\"2\",\"description\":\"Angry or hostile\"}]}]}",
+    "status": 200,
+    "response_headers": {
+      "Date": "Wed, 07 Oct 2026 13:24:38 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "X-Ratelimit-Limit-Requests": "5000",
+      "X-Ratelimit-Limit-Tokens": "2000000",
+      "X-Ratelimit-Remaining-Requests": "4999",
+      "X-Ratelimit-Remaining-Tokens": "1999571",
+      "X-Ratelimit-Reset-Requests": "12ms",
+      "X-Ratelimit-Reset-Tokens": "12ms",
+      "Vary": "origin, access-control-request-method, access-control-request-headers",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Expose-Headers": "CF-Ray",
+      "Server-Timing-Total": "712.830",
+      "Openai-Processing-Ms": "712",
+      "X-Request-Id": "<X_REQUEST_ID>",
+      "X-Openai-Proxy-Wasm": "v0.1",
+      "Server": "cloudflare",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Set-Cookie": "<COOKIE>",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+      "X-Content-Type-Options": "nosniff",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
+    },
+    "response_body": "{\"model\":\"gpt-6-luna\",\"answers\":[{\"type\":\"predicate\",\"name\":\"urgent\",\"probability\":1.0},{\"type\":\"choice\",\"name\":\"department\",\"choice\":\"billing\",\"probabilities\":[{\"value\":\"billing\",\"probability\":1.0},{\"value\":\"technical\",\"probability\":0.0},{\"value\":\"other\",\"probability\":0.0}],\"confidence\":1.0},{\"type\":\"score\",\"name\":\"frustration\",\"score\":0.68,\"probabilities\":[{\"value\":0,\"label\":\"0\",\"probability\":0.32},{\"value\":1,\"label\":\"1\",\"probability\":0.68},{\"value\":2,\"label\":\"2\",\"probability\":0.0}],\"confidence\":0.52}],\"usage\":{\"input_tokens\":428,\"input_tokens_details\":{\"cached_tokens\":0,\"cache_write_tokens\":0},\"output_tokens\":0,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":428}}"
+  }
+]
