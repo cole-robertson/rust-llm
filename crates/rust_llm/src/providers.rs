@@ -152,6 +152,12 @@ impl Provider {
         }
     }
 
+    /// `Provider#original_image_detail?`: OpenAI sends `detail: "original"` for
+    /// `resolution: :original`; the rest map it to high detail.
+    pub fn is_original_image_detail(&self) -> bool {
+        *self == Provider::OpenAI
+    }
+
     /// `Provider.local?`: local providers skip the registry (models are assumed to exist).
     pub fn is_local(&self) -> bool {
         matches!(self, Provider::Ollama | Provider::GPUStack)

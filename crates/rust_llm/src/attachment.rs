@@ -19,12 +19,52 @@ pub enum AttachmentType {
     Unknown,
 }
 
+/// `Attachment::RESOLUTIONS`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Resolution {
     Low,
     Medium,
     High,
     UltraHigh,
+    /// `:original`: original image detail where supported, or the highest available resolution.
+    Original,
+}
+
+impl Resolution {
+    /// The Symbol name RubyLLM serializes (`:ultra_high` -> `"ultra_high"`).
+    pub fn name(&self) -> &'static str {
+        match self {
+            Resolution::Low => "low",
+            Resolution::Medium => "medium",
+            Resolution::High => "high",
+            Resolution::UltraHigh => "ultra_high",
+            Resolution::Original => "original",
+        }
+    }
+
+    /// `resolution must be one of ...` for any other name.
+    pub fn parse(name: &str) -> Result<Resolution> {
+        match name {
+            "low" => Ok(Resolution::Low),
+            "medium" => Ok(Resolution::Medium),
+            "high" => Ok(Resolution::High),
+            "ultra_high" => Ok(Resolution::UltraHigh),
+            "original" => Ok(Resolution::Original),
+            other => Err(Error::Argument(format!(
+                "resolution must be one of :low, :medium, :high, :ultra_high, :original, got {other:?}"
+            ))),
+        }
+    }
+
+    /// `ChatCompletions::Media.image_detail(resolution, original_detail:)`: the OpenAI-style
+    /// image `detail` (`original` only where the provider answers `original_image_detail?`).
+    pub(crate) fn image_detail(&self, original_detail: bool) -> &'static str {
+        match self {
+            Resolution::Low => "low",
+            Resolution::Original if original_detail => "original",
+            _ => "high",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -248,6 +288,61 @@ impl Attachment {
 
     pub fn is_url(&self) -> bool {
         matches!(self.source, Source::Url(_))
+    }
+
+    /// `Attachment#to_h`: `{ type:, source:, filename:, resolution: }` without nil values. Inline
+    /// bytes have no source to serialize.
+    pub fn to_h(&self) -> serde_json::Value {
+        let kind = match self.kind() {
+            AttachmentType::Image => "image",
+            AttachmentType::Video => "video",
+            AttachmentType::Audio => "audio",
+            AttachmentType::Pdf => "pdf",
+            AttachmentType::Text => "text",
+            AttachmentType::Document => "document",
+            AttachmentType::Unknown => "unknown",
+        };
+        let mut h = serde_json::Map::new();
+        h.insert("type".into(), kind.into());
+        match &self.source {
+            Source::Path(p) => {
+                h.insert("source".into(), p.to_string_lossy().into_owned().into());
+            }
+            Source::Url(u) => {
+                h.insert("source".into(), u.clone().into());
+            }
+            Source::ProviderFile(f) => {
+                h.insert("source".into(), f.id.clone().into());
+            }
+            Source::Bytes(_) => {}
+        }
+        if let Some(f) = &self.filename {
+            h.insert("filename".into(), f.clone().into());
+        }
+        if let Some(r) = self.resolution {
+            h.insert("resolution".into(), r.name().into());
+        }
+        h.into()
+    }
+
+    /// `Attachment.from_h`: rebuilds an attachment from [`Attachment::to_h`] (or its JSON),
+    /// taking the `source`, `filename`, and `resolution`. A bare string is a source.
+    pub fn from_h(data: &serde_json::Value) -> Result<Attachment> {
+        if let Some(source) = data.as_str() {
+            return Ok(Attachment::new(source));
+        }
+        let source = data
+            .get("source")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| Error::Argument(format!("Cannot rebuild an attachment from {data}")))?;
+        let mut attachment = Attachment::new(source);
+        if let Some(filename) = data.get("filename").and_then(serde_json::Value::as_str) {
+            attachment = attachment.with_filename(filename);
+        }
+        if let Some(r) = data.get("resolution").and_then(serde_json::Value::as_str) {
+            attachment = attachment.with_resolution(Resolution::parse(r)?);
+        }
+        Ok(attachment)
     }
 
     pub fn url(&self) -> Option<&str> {

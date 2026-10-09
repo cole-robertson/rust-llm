@@ -329,8 +329,11 @@ pub(crate) fn format_content(
                 Resolution::Low => "LOW",
                 Resolution::Medium => "MEDIUM",
                 Resolution::High => "HIGH",
-                Resolution::UltraHigh if a.kind() != AttachmentType::Image => "HIGH",
-                Resolution::UltraHigh => "ULTRA_HIGH",
+                // `:original` asks for the highest level: ultra high on images, high otherwise.
+                Resolution::UltraHigh | Resolution::Original if a.kind() != AttachmentType::Image => {
+                    "HIGH"
+                }
+                Resolution::UltraHigh | Resolution::Original => "ULTRA_HIGH",
             };
             part["media_resolution"] = json!({ "level": format!("MEDIA_RESOLUTION_{level}") });
         }

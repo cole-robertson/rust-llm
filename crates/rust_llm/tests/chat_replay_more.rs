@@ -318,7 +318,9 @@ async fn real_errors_context_length_exceeded() {
             } else {
                 // RubyLLM sends 'a' * 1_000_000 and VCR records it as `<MASSIVE_TEXT>` (the spec's
                 // `filter_sensitive_data`), so the placeholder is what reproduces the recorded body.
-                for _ in 0..5 {
+                // 2.1 sends three turns to OpenRouter and five elsewhere.
+                let turns = if provider == "openrouter" { 3 } else { 5 };
+                for _ in 0..turns {
                     chat.add_message(Message::user("<MASSIVE_TEXT>"));
                     chat.add_message(Message::assistant("<MASSIVE_TEXT>"));
                 }

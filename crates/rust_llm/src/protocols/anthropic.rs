@@ -94,8 +94,8 @@ pub fn render_payload(req: &Request) -> Result<Value> {
     let mut system_content = Vec::new();
     for msg in &system {
         let mut blocks = format_content(msg.content.as_deref(), &msg.attachments)?;
-        if let Some(control) = cache.filter(|_| msg.cache_until_here) {
-            inject_cache_control(&mut blocks, control);
+        if let Some(control) = boundary_control(cache, msg) {
+            inject_cache_control(&mut blocks, &control);
         }
         system_content.extend(blocks);
     }
@@ -213,15 +213,15 @@ fn format_messages(
     for msg in messages {
         if msg.is_tool_result() {
             tool_results.push(format_tool_result_block(msg)?);
-            if let Some(control) = cache.filter(|_| msg.cache_until_here) {
-                inject_cache_control(&mut tool_results, control);
+            if let Some(control) = boundary_control(cache, msg) {
+                inject_cache_control(&mut tool_results, &control);
             }
             continue;
         }
         if !tool_results.is_empty() {
             rendered.push(json!({ "role": "user", "content": std::mem::take(&mut tool_results) }));
         }
-        let formatted = format_message(msg, citations, cache.filter(|_| msg.cache_until_here))?;
+        let formatted = format_message(msg, citations, boundary_control(cache, msg).as_ref())?;
         if formatted["content"]
             .as_array()
             .is_some_and(|c| !c.is_empty())
@@ -307,6 +307,16 @@ fn format_thinking_blocks(msg: &Message) -> Vec<Value> {
     } else {
         Vec::new()
     }
+}
+
+/// `prompt_cache_control(caching, ttl: msg.cache_ttl)` for a boundary message: the message's own
+/// lifetime wins over the chat's.
+fn boundary_control(cache: Option<&Value>, msg: &Message) -> Option<Value> {
+    let mut control = cache.filter(|_| msg.cache_until_here)?.clone();
+    if let Some(ttl) = &msg.cache_ttl {
+        control["ttl"] = ttl.clone().into();
+    }
+    Some(control)
 }
 
 fn inject_cache_control(blocks: &mut [Value], control: &Value) {

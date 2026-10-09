@@ -317,15 +317,30 @@ impl Chat {
         append: bool,
         cache_until_here: bool,
     ) -> &mut Self {
+        self.set_instructions_with(instructions, append, &Value::Bool(cache_until_here))
+            .expect("a Boolean is a valid cache boundary")
+    }
+
+    /// `with_instructions(text, append:, cache_until_here: true | false | { ttl: "1h" })`: the
+    /// instruction becomes a cache boundary, with its own lifetime when `ttl` is given.
+    pub fn set_instructions_with(
+        &mut self,
+        instructions: Option<String>,
+        append: bool,
+        cache_until_here: &Value,
+    ) -> Result<&mut Self> {
+        let boundary = Message::cache_boundary_options(cache_until_here)?;
         if !append {
             self.messages.retain(|m| m.role != Role::System);
         }
         if let Some(text) = instructions {
             let mut m = Message::system(text);
-            m.cache_until_here = cache_until_here;
+            if let Some(ttl) = &boundary {
+                m = m.with_cache_until_here(ttl.as_deref());
+            }
             self.messages.push(m);
         }
-        self
+        Ok(self)
     }
 
     /// `with_tools(Weather)`.
@@ -829,11 +844,18 @@ impl Chat {
 
     /// `cache_until_here`: mark the last message as a prompt-cache boundary.
     pub fn cache_until_here(&mut self) -> Result<&mut Self> {
+        self.cache_until_here_with(None)
+    }
+
+    /// `cache_until_here(ttl:)`: the boundary gets its own cache lifetime (`"1h"`), rendered ahead
+    /// of the `with_caching(ttl:)` lifetime on providers that set one per boundary.
+    pub fn cache_until_here_with(&mut self, ttl: Option<&str>) -> Result<&mut Self> {
         let last = self
             .messages
             .last_mut()
             .ok_or_else(|| Error::Argument("No messages to cache".into()))?;
         last.cache_until_here = true;
+        last.cache_ttl = ttl.map(str::to_string);
         Ok(self)
     }
 

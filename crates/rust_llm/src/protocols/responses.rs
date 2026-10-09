@@ -398,12 +398,7 @@ fn format_content(
             AttachmentType::Image => {
                 let mut part = json!({ "type": "input_image", "image_url": a.url_or_data_uri()? });
                 if let Some(res) = a.resolution {
-                    part["detail"] = if res == crate::attachment::Resolution::Low {
-                        "low"
-                    } else {
-                        "high"
-                    }
-                    .into();
+                    part["detail"] = res.image_detail(provider.is_original_image_detail()).into();
                 }
                 part
             }
