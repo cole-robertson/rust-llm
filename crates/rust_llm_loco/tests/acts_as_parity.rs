@@ -213,7 +213,7 @@ async fn handles_multiple_attachments() {
         upload("ruby.png", "ruby.png", "image/png"),
         upload(
             "sample.pdf",
-            "sample20260918-2161701-9wz8c4.pdf",
+            "sample20261007-681054-dscbr5.pdf",
             "application/pdf",
         ),
     ];
@@ -244,7 +244,7 @@ async fn handles_multiple_attachments() {
     );
     assert_eq!(
         restored[1].filename.as_deref(),
-        Some("sample20260918-2161701-9wz8c4.pdf")
+        Some("sample20261007-681054-dscbr5.pdf")
     );
     let mut first = restored[0].clone();
     assert_eq!(

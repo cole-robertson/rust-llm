@@ -261,7 +261,7 @@ async fn openai_gpt_4o_transcribe_diarize_can_transcribe_audio() {
     assert_eq!(t.duration, Some(3.7));
     let segments = t.segments.as_ref().expect("diarized_json returns segments");
     assert_eq!(segments[0]["speaker"], "A");
-    assert_eq!((t.tokens().input, t.tokens().output), (Some(37), Some(144)));
+    assert_eq!((t.tokens().input, t.tokens().output), (Some(37), Some(145)));
     billed_once_as_transcription(&t, "openai", model);
 }
 

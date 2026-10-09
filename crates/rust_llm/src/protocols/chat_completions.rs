@@ -326,7 +326,7 @@ fn format_message(req: &Request, msg: &Message) -> Result<Value> {
     }
     let boundary = msg.cache_until_here && Caching::boundaries(req.caching);
     if boundary && provider == Provider::OpenRouter {
-        content = inject_cache_control(content, req.caching)?;
+        content = inject_boundary_cache_control(content, req.caching, msg.cache_ttl.as_deref())?;
     } else if boundary && provider != Provider::Mistral {
         // `inject_cache_breakpoint` runs wherever `openai_prompt_caching?` holds: every Chat
         // Completions provider but Mistral and OpenRouter (`protocols/chat_completions/chat.rb`).
@@ -385,6 +385,16 @@ fn format_message(req: &Request, msg: &Message) -> Result<Value> {
 /// An empty list, a trailing non-object, or a block already carrying `cache_control` is left alone.
 #[doc(hidden)]
 pub fn inject_cache_control(content: Value, caching: Option<&Caching>) -> Result<Value> {
+    inject_boundary_cache_control(content, caching, None)
+}
+
+/// `inject_cache_control(content, caching:, ttl: msg.cache_ttl)`: the boundary's own lifetime
+/// wins over the chat's.
+fn inject_boundary_cache_control(
+    content: Value,
+    caching: Option<&Caching>,
+    ttl: Option<&str>,
+) -> Result<Value> {
     let mut blocks = match content {
         Value::Array(parts) => parts,
         other => vec![json!({ "type": "text", "text": other })],
@@ -392,7 +402,11 @@ pub fn inject_cache_control(content: Value, caching: Option<&Caching>) -> Result
     if let Some(Value::Object(last)) = blocks.last_mut()
         && last.get("cache_control").is_none_or(Value::is_null)
     {
-        let control = openrouter_cache_control(Caching::checked(caching, &["ttl"], "OpenRouter")?);
+        let mut control =
+            openrouter_cache_control(Caching::checked(caching, &["ttl"], "OpenRouter")?);
+        if let Some(ttl) = ttl {
+            control["ttl"] = ttl.into();
+        }
         last.insert("cache_control".into(), control);
     }
     Ok(Value::Array(blocks))
@@ -554,12 +568,8 @@ pub(crate) fn format_content(
                 let mut part =
                     json!({ "type": "image_url", "image_url": { "url": a.url_or_data_uri()? } });
                 if let Some(res) = a.resolution {
-                    part["image_url"]["detail"] = if res == crate::attachment::Resolution::Low {
-                        "low"
-                    } else {
-                        "high"
-                    }
-                    .into();
+                    part["image_url"]["detail"] =
+                        res.image_detail(provider.is_original_image_detail()).into();
                 }
                 part
             }

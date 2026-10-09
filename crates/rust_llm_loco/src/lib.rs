@@ -1813,12 +1813,7 @@ fn apply_tool_call_state(chat: &mut Chat, calls: &[rust_llm_tool_calls::Model]) 
 }
 
 fn resolution_name(resolution: Resolution) -> &'static str {
-    match resolution {
-        Resolution::Low => "low",
-        Resolution::Medium => "medium",
-        Resolution::High => "high",
-        Resolution::UltraHigh => "ultra_high",
-    }
+    resolution.name()
 }
 
 /// An attachment row as the `RubyLLM::Attachment` `extract_attachments` builds from a blob.
@@ -1833,13 +1828,7 @@ fn attachment(row: &rust_llm_attachments::Model) -> Attachment {
         .as_ref()
         .and_then(|m| m.get("resolution"))
         .and_then(Value::as_str)
-        .and_then(|r| match r {
-            "low" => Some(Resolution::Low),
-            "medium" => Some(Resolution::Medium),
-            "high" => Some(Resolution::High),
-            "ultra_high" => Some(Resolution::UltraHigh),
-            _ => None,
-        });
+        .and_then(|r| Resolution::parse(r).ok());
     match resolution {
         Some(r) => a.with_resolution(r),
         None => a,

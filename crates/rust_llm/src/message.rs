@@ -396,6 +396,8 @@ pub struct Message {
     pub finish_reason: Option<FinishReason>,
     pub raw: Option<RawResponse>,
     pub cache_until_here: bool,
+    /// `#cache_ttl`: this boundary's own cache lifetime (`"1h"`), or `None` for the chat's.
+    pub cache_ttl: Option<String>,
     pub usage_entries: Vec<UsageEntry>,
     /// Primary key of the row this message is stored as, set by a persistence layer
     /// (`rust_llm_loco`). `None` means not yet persisted.
@@ -425,11 +427,36 @@ impl Message {
             finish_reason: None,
             raw: None,
             cache_until_here: false,
+            cache_ttl: None,
             usage_entries: Vec::new(),
             record_id: None,
             model_info: None,
             supplied_cost: None,
         }
+    }
+
+    /// `Message#cache_until_here(ttl:)`: marks this message as a prompt cache boundary, with its
+    /// own lifetime when `ttl` is given.
+    pub fn with_cache_until_here(mut self, ttl: Option<&str>) -> Message {
+        self.cache_until_here = true;
+        self.cache_ttl = ttl.map(str::to_string);
+        self
+    }
+
+    /// `Message.cache_boundary_options`: `true` (no lifetime) or `{ ttl: }`; `false`/`nil` is
+    /// no boundary. Anything else is an `ArgumentError`.
+    pub fn cache_boundary_options(value: &Value) -> Result<Option<Option<String>>> {
+        match value {
+            Value::Null | Value::Bool(false) => return Ok(None),
+            Value::Bool(true) => return Ok(Some(None)),
+            Value::Object(o) if o.keys().all(|k| k == "ttl") => {
+                return Ok(Some(o.get("ttl").and_then(Value::as_str).map(str::to_string)));
+            }
+            _ => {}
+        }
+        Err(Error::Argument(format!(
+            "cache_until_here accepts true, false, or ttl:, got {value}"
+        )))
     }
 
     pub fn system(content: impl Into<String>) -> Message {
@@ -568,6 +595,7 @@ impl Message {
             finish_reason: self.finish_reason.clone(),
             raw: None,
             cache_until_here: self.cache_until_here,
+            cache_ttl: self.cache_ttl.clone(),
             usage_entries: Vec::new(),
             record_id: self.record_id,
             model_info: None,
@@ -657,7 +685,8 @@ impl Message {
             Some(Value::String(text)) => {
                 Thinking::build(Some(text.clone()), str_of("thinking_signature"))
             }
-            _ => None,
+            // `coerce_thinking`: no thinking text still keeps a signature-only thinking.
+            _ => Thinking::build(None, str_of("thinking_signature")),
         };
         if let Some(citations) = h.get("citations") {
             m.citations = serde_json::from_value(citations.clone())?;
@@ -687,12 +716,7 @@ impl Message {
             .into_iter()
             .flatten()
         {
-            let source = a
-                .as_str()
-                .or_else(|| a.get("source").and_then(Value::as_str));
-            let source = source
-                .ok_or_else(|| Error::Argument(format!("Cannot rebuild an attachment from {a}")))?;
-            m.attachments.push(Attachment::new(source));
+            m.attachments.push(Attachment::from_h(a)?);
         }
         m.raw_content = h.get("raw_content").cloned();
         m.raw_reasoning = h.get("raw_reasoning").cloned();
@@ -704,6 +728,12 @@ impl Message {
             .get("cache_until_here")
             .and_then(Value::as_bool)
             .unwrap_or(false);
+        if m.cache_until_here {
+            m.cache_ttl = h
+                .get("cache_ttl")
+                .and_then(Value::as_str)
+                .map(str::to_string);
+        }
         m.supplied_cost = h.get("cost").map(|c| Cost::from_h(c, None));
         m.tokens = Tokens {
             input: int_of("input_tokens"),
@@ -711,7 +741,10 @@ impl Message {
             cache_read: int_of("cache_read_tokens"),
             cache_write: int_of("cache_write_tokens"),
             thinking: int_of("thinking_tokens"),
-            server_tool_use: h.get("server_tool_use").and_then(Value::as_object).cloned(),
+            cache_write_by_ttl: h
+                .get("cache_write_tokens_by_ttl")
+                .and_then(Tokens::positive_counts),
+            server_tool_use: h.get("server_tool_use").and_then(Tokens::positive_counts),
             reported_cost: h.get("reported_cost").and_then(Value::as_f64),
         };
         Ok(m.normalized())
@@ -739,6 +772,10 @@ impl Message {
                 "cost".into(),
                 crate::instrumentation::cost_h(&self.cost(None)),
             );
+        }
+        // `reported_cost: tokens.reported_cost`: the provider's own price, summed over attempts.
+        if let Some(reported) = self.tokens().reported_cost {
+            h.insert("reported_cost".into(), reported.into());
         }
         if let Some(calls) = &self.tool_calls {
             let calls: Map<String, Value> = calls
@@ -785,6 +822,9 @@ impl Message {
         if self.cache_until_here {
             h.insert("cache_until_here".into(), true.into());
         }
+        if let Some(ttl) = &self.cache_ttl {
+            h.insert("cache_ttl".into(), ttl.clone().into());
+        }
         let t = self.tokens();
         for (k, v) in [
             ("input_tokens", t.input),
@@ -796,6 +836,12 @@ impl Message {
             if let Some(v) = v {
                 h.insert(k.into(), v.into());
             }
+        }
+        if let Some(by_ttl) = &t.cache_write_by_ttl {
+            h.insert(
+                "cache_write_tokens_by_ttl".into(),
+                Value::Object(by_ttl.clone()),
+            );
         }
         if let Some(s) = &t.server_tool_use {
             h.insert("server_tool_use".into(), Value::Object(s.clone()));
@@ -839,21 +885,5 @@ fn server_tool_call_h(call: &ServerToolCall) -> Value {
 
 /// `Attachment#to_h`: `{ type:, source: }`. In-memory bytes have no source to record (`null`).
 fn attachment_h(a: &Attachment) -> Value {
-    use crate::attachment::{AttachmentType, Source};
-    let kind = match a.kind() {
-        AttachmentType::Image => "image",
-        AttachmentType::Video => "video",
-        AttachmentType::Audio => "audio",
-        AttachmentType::Pdf => "pdf",
-        AttachmentType::Text => "text",
-        AttachmentType::Document => "document",
-        AttachmentType::Unknown => "unknown",
-    };
-    let source = match &a.source {
-        Source::Path(p) => Value::from(p.to_string_lossy().into_owned()),
-        Source::Url(u) => Value::from(u.clone()),
-        Source::ProviderFile(f) => Value::from(f.id.clone()),
-        Source::Bytes(_) => Value::Null,
-    };
-    serde_json::json!({ "type": kind, "source": source })
+    a.to_h()
 }
