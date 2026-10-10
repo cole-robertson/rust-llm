@@ -4,7 +4,7 @@ Each guide covers one feature in depth. Every Rust sample compiles: `docs/check`
 guide as a doctest (`cargo test -p rust_llm_docs --doc`). Samples are `no_run`, so nothing calls a
 provider.
 
-RustLLM is a port of [RubyLLM](https://github.com/crmne/ruby_llm) 2.0, and the guides follow the
+RustLLM is a port of [RubyLLM](https://github.com/crmne/ruby_llm) 2.1, and the guides follow the
 structure of RubyLLM's own, with the Ruby original shown next to the Rust.
 [RubyLLM vs RustLLM](rubyllm.md) maps the whole API and lists what is left out.
 

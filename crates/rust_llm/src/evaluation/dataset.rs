@@ -78,7 +78,11 @@ impl From<Value> for Dataset {
 }
 
 /// `Dataset.load(source, name:)`.
-pub(crate) fn load(source: Option<&Dataset>, name: Option<&str>, config: &Config) -> Result<Vec<Case>> {
+pub(crate) fn load(
+    source: Option<&Dataset>,
+    name: Option<&str>,
+    config: &Config,
+) -> Result<Vec<Case>> {
     let cases = rows(source.cloned(), name, config)?;
     if cases.is_empty() {
         return Err(Error::Argument("A dataset cannot be empty".into()));
@@ -140,8 +144,10 @@ fn cases_from_hash(source: serde_json::Map<String, Value>) -> Result<Value> {
         .ok_or_else(|| Error::Argument("key not found: \"cases\"".into()))
 }
 
-static ACRONYM: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([A-Z]+)([A-Z][a-z])").expect("valid regex"));
-static CAMEL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([a-z\d])([A-Z])").expect("valid regex"));
+static ACRONYM: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"([A-Z]+)([A-Z][a-z])").expect("valid regex"));
+static CAMEL: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"([a-z\d])([A-Z])").expect("valid regex"));
 
 /// `Dataset.discover(name)`: `app/evals/<name underscored>.{yml,yaml,json,jsonl}` beside the
 /// prompt root (`Prompt.root.parent.join("evals")`).
@@ -225,11 +231,15 @@ fn yaml_to_json(value: serde_yaml::Value) -> Result<Value> {
                 let f = n.as_f64().unwrap_or(f64::NAN);
                 serde_json::Number::from_f64(f)
                     .map(Value::Number)
-                    .ok_or_else(|| Error::Argument("Judgment data must contain finite numbers".into()))?
+                    .ok_or_else(|| {
+                        Error::Argument("Judgment data must contain finite numbers".into())
+                    })?
             }
         }
         Y::String(s) => Value::String(s),
-        Y::Sequence(items) => Value::Array(items.into_iter().map(yaml_to_json).collect::<Result<_>>()?),
+        Y::Sequence(items) => {
+            Value::Array(items.into_iter().map(yaml_to_json).collect::<Result<_>>()?)
+        }
         Y::Mapping(map) => {
             let mut out = serde_json::Map::new();
             for (k, v) in map {
@@ -238,7 +248,9 @@ fn yaml_to_json(value: serde_yaml::Value) -> Result<Value> {
                     Y::Bool(b) => b.to_string(),
                     Y::Number(n) => n.to_string(),
                     Y::Null => String::new(),
-                    other => return Err(Error::Argument(format!("Unsupported YAML key: {other:?}"))),
+                    other => {
+                        return Err(Error::Argument(format!("Unsupported YAML key: {other:?}")));
+                    }
                 };
                 out.insert(key, yaml_to_json(v)?);
             }

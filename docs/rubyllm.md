@@ -1,7 +1,7 @@
 # RubyLLM vs RustLLM
 
-RustLLM is a port of [RubyLLM](https://github.com/crmne/ruby_llm) **2.0.0** (upstream
-`1e91b30`) by Carmine Paolino, plus `rust_llm_loco`, a port of its Rails `acts_as_chat` layer to
+RustLLM is a port of [RubyLLM](https://github.com/crmne/ruby_llm) **2.1.0** (upstream
+tag `v2.1.0`) by Carmine Paolino, plus `rust_llm_loco`, a port of its Rails `acts_as_chat` layer to
 SeaORM, Loco's default ORM. It keeps RubyLLM's names, behavior, and wire format, so this page is
 mostly spelling: how a Ruby idiom turns into Rust.
 
@@ -10,9 +10,9 @@ mostly spelling: how a Ruby idiom turns into Rust.
 - **Cassette replay:** the tests replay RubyLLM's own recorded VCR cassettes (HTTP and WebSocket),
   and every request RustLLM sends must be JSON-equal to the one RubyLLM recorded.
   `bin/convert-cassettes` turns upstream cassettes into fixtures.
-- **Spec parity:** [`PARITY.md`](PARITY.md) classifies all 3,747 examples in RubyLLM 2.0's spec
-  suite: 2,157 ported as Rust tests that cite them (`// spec: file:line`), 177 replayed from their
-  own cassettes, 1,413 not applicable (each with its reason), and 0 missing. `bin/parity`
+- **Spec parity:** [`PARITY.md`](PARITY.md) classifies all 4,658 examples in RubyLLM 2.1's spec
+  suite: 2,966 ported as Rust tests that cite them (`// spec: file:line`), 176 replayed from their
+  own cassettes, 1,516 not applicable (each with its reason), and 0 missing. `bin/parity`
   regenerates it.
 - **Live:** `examples/readme.rs` runs RubyLLM's README against a real provider, and
   `examples/judge.rs` runs a Jev judgment.
@@ -324,3 +324,9 @@ async fn main() -> rust_llm::Result<()> {
 - `rust_llm_loco::McpCredentialStore` uses Active Record encryption's message layout, but its key
   is not derived the Rails way, so a Rails app and a Loco app cannot share the credentials table.
 - Tables use the `rust_llm_` prefix, and Loco message attachments live in `rust_llm_attachments`.
+- OpenTelemetry is an optional cargo feature (`opentelemetry`) instead of an optional gem.
+- Evaluations integrate with `cargo test` instead of RSpec and Minitest.
+- An MCP tool call that starts a task returns it as `Err(Error::McpTask(task))`, and `after_change`
+  takes an async closure.
+- MCP OAuth refuses P-521 DPoP keys (`ring` cannot sign with them); generated keys are P-256, as in
+  RubyLLM.

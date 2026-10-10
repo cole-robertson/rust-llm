@@ -4,7 +4,7 @@ One Rust API for chat, tools, agents, structured output, streaming, embeddings, 
 batches, MCP, and judgments across OpenAI, Anthropic, Gemini, and ten more providers. Includes
 persistence for [Loco](https://loco.rs) apps and generators for a full chat UI.
 
-The API follows [RubyLLM](https://github.com/crmne/ruby_llm) 2.0: if you know RubyLLM, you already
+The API follows [RubyLLM](https://github.com/crmne/ruby_llm) 2.1: if you know RubyLLM, you already
 know RustLLM. Same method names, same behavior, Rust types.
 [RubyLLM vs RustLLM](docs/rubyllm.md) maps one to the other.
 
@@ -406,7 +406,7 @@ GPUStack, Hetzner, TypeSafe, and any OpenAI-compatible API.
 - [Guides](docs/README.md): every feature in depth, with samples that are compiled in CI
 - [API reference](https://docs.rs/rust_llm)
 - [RubyLLM vs RustLLM](docs/rubyllm.md): RustLLM is a port of
-  [RubyLLM](https://github.com/crmne/ruby_llm) 2.0; this page maps one to the other and explains
+  [RubyLLM](https://github.com/crmne/ruby_llm) 2.1; this page maps one to the other and explains
   how the port is verified
 - [Benchmarks](docs/BENCHMARK.md)
 - [Contributing](CONTRIBUTING.md)

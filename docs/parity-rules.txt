@@ -2142,3 +2142,7 @@ support/process_cache_spec.rb:105	N/A	Ruby-only mechanism: Process.fork (the chi
 mcp_spec.rb:647	N/A	Ruby-only: Process.fork of a process whose listener thread a child does not inherit; a tokio runtime does not survive fork, so the port has no forked-child listener
 mcp_spec.rb:782	N/A	Ruby-only: class inheritance of MCP settings (extensions copied to subclasses); McpBuilder is a value you clone
 mcp/listener_spec.rb:130	N/A	Rails-only: callbacks wrapped in Rails.application.executor; there is no Rails executor in Rust
+
+# ---- lane EO: evaluations (wave 2) ----
+evaluation/assertions_spec.rb:31	N/A	Ruby-only: assertions come from the optional minitest gem (LoadError when absent); the port's Assertions are built into rust_llm, so there is no optional dependency to be missing
+evaluation/assertions_spec.rb:38	N/A	Ruby-only: respond_to?/method_missing delegation of assert_* to Minitest::Assertions; Rust assertions are statically typed methods on evaluation::Assertions, so an unknown assertion is a compile error, not a runtime respond_to? answer
