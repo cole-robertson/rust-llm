@@ -18,21 +18,52 @@
 //! `owner_type`/`owner_id` of a record: pass an owner such as `gid://app/Chat/1` (a GlobalID, as
 //! Ruby's `owner.to_gid`), or [`McpCredentialStore::owner_key`]; other owners (plain strings)
 //! leave the columns empty, like Ruby's `owner.is_a?(ActiveRecord::Base) ? owner : nil`.
+//!
+//! `synchronize(key)` touches the row in a transaction, which locks it on every database (SQLite
+//! takes its write lock), so one process refreshes a grant while the others wait for its token.
+//! The store's own reads and writes inside the block run in that transaction, as Active Record's
+//! do on the transaction's connection.
+
+use std::sync::Arc;
 
 use aes_gcm::aead::{Aead, AeadCore, KeyInit, OsRng};
 use aes_gcm::{Aes256Gcm, Key, Nonce};
 use async_trait::async_trait;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-use rust_llm::mcp::{CredentialStore, McpError};
+use rust_llm::mcp::{CredentialStore, McpError, Synchronized};
+use sea_orm::sea_query::Expr;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DatabaseTransaction,
+    EntityTrait, QueryFilter, TransactionTrait,
 };
 use serde_json::{Value, json};
 
 use crate::entities::rust_llm_mcp_credentials;
 
 const TAG_LENGTH: usize = 16;
+
+tokio::task_local! {
+    /// The transaction `synchronize` holds while its block runs.
+    static TRANSACTION: Arc<DatabaseTransaction>;
+}
+
+/// Runs `$body` with `$conn` bound to the transaction of a running `synchronize`, or the store's
+/// connection.
+macro_rules! on_connection {
+    ($self:ident, |$conn:ident| $body:expr) => {
+        match TRANSACTION.try_with(Arc::clone) {
+            Ok(transaction) => {
+                let $conn = transaction.as_ref();
+                $body
+            }
+            Err(_) => {
+                let $conn = &$self.db;
+                $body
+            }
+        }
+    };
+}
 
 /// `RubyLLM::ActiveRecord::MCPCredential` as a [`CredentialStore`].
 #[derive(Clone)]
@@ -71,10 +102,9 @@ impl McpCredentialStore {
         &self,
         key: &str,
     ) -> Result<Option<rust_llm_mcp_credentials::Model>, sea_orm::DbErr> {
-        rust_llm_mcp_credentials::Entity::find()
-            .filter(rust_llm_mcp_credentials::Column::Key.eq(key))
-            .one(&self.db)
-            .await
+        let query = rust_llm_mcp_credentials::Entity::find()
+            .filter(rust_llm_mcp_credentials::Column::Key.eq(key));
+        on_connection!(self, |conn| query.one(conn).await)
     }
 
     /// `count`.
@@ -154,31 +184,67 @@ impl CredentialStore for McpCredentialStore {
                 record.owner_type = Set(owner_type);
                 record.owner_id = Set(owner_id);
                 record.updated_at = Set(now);
-                record.update(&self.db).await.map(|_| ())
+                on_connection!(self, |conn| record.update(conn).await.map(|_| ()))
             }
-            None => rust_llm_mcp_credentials::ActiveModel {
-                key: Set(key.to_string()),
-                data: Set(Some(encrypted)),
-                owner_type: Set(owner_type),
-                owner_id: Set(owner_id),
-                created_at: Set(now),
-                updated_at: Set(now),
-                ..Default::default()
+            None => {
+                let record = rust_llm_mcp_credentials::ActiveModel {
+                    key: Set(key.to_string()),
+                    data: Set(Some(encrypted)),
+                    owner_type: Set(owner_type),
+                    owner_id: Set(owner_id),
+                    created_at: Set(now),
+                    updated_at: Set(now),
+                    ..Default::default()
+                };
+                on_connection!(self, |conn| record.insert(conn).await.map(|_| ()))
             }
-            .insert(&self.db)
-            .await
-            .map(|_| ()),
         };
         result.map_err(failure)
     }
 
     /// `where(key:).delete_all`.
     async fn delete(&self, key: &str) -> rust_llm::Result<()> {
-        rust_llm_mcp_credentials::Entity::delete_many()
-            .filter(rust_llm_mcp_credentials::Column::Key.eq(key))
-            .exec(&self.db)
-            .await
+        let query = rust_llm_mcp_credentials::Entity::delete_many()
+            .filter(rust_llm_mcp_credentials::Column::Key.eq(key));
+        on_connection!(self, |conn| query.exec(conn).await)
             .map(|_| ())
             .map_err(failure)
+    }
+
+    /// `synchronize(key)`: `transaction { where(key:).touch_all; yield }`. Updating the row locks
+    /// it on every database; SQLite ignores `FOR UPDATE`. The block's error rolls it back.
+    async fn synchronize<'a>(
+        &'a self,
+        key: &'a str,
+        block: Synchronized<'a>,
+    ) -> rust_llm::Result<bool> {
+        if TRANSACTION.try_with(|_| ()).is_ok() {
+            return block.await;
+        }
+        let transaction = self.db.begin().await.map_err(failure)?;
+        let now: sea_orm::prelude::DateTimeWithTimeZone = chrono::Utc::now().into();
+        rust_llm_mcp_credentials::Entity::update_many()
+            .col_expr(
+                rust_llm_mcp_credentials::Column::UpdatedAt,
+                Expr::value(now),
+            )
+            .filter(rust_llm_mcp_credentials::Column::Key.eq(key))
+            .exec(&transaction)
+            .await
+            .map_err(failure)?;
+        let transaction = Arc::new(transaction);
+        let result = TRANSACTION.scope(transaction.clone(), block).await;
+        let transaction = Arc::into_inner(transaction)
+            .ok_or_else(|| failure("the transaction outlived its block"))?;
+        match result {
+            Ok(value) => {
+                transaction.commit().await.map_err(failure)?;
+                Ok(value)
+            }
+            Err(e) => {
+                let _ = transaction.rollback().await;
+                Err(e)
+            }
+        }
     }
 }

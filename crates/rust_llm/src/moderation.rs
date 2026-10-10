@@ -33,6 +33,19 @@ pub struct ModerationResult {
 }
 
 impl ModerationResult {
+    /// `Moderation::Result.new(flagged:, categories:, category_scores:)`.
+    pub fn new(
+        flagged: bool,
+        categories: Vec<String>,
+        category_scores: Map<String, Value>,
+    ) -> ModerationResult {
+        ModerationResult {
+            flagged,
+            categories,
+            category_scores,
+        }
+    }
+
     /// `Result.from_h`.
     fn from_h(data: &Value) -> ModerationResult {
         let categories: Vec<String> = data
@@ -225,14 +238,12 @@ pub async fn moderate(
             ),
         ])
     });
-    let result = tracing::Instrument::instrument(
-        crate::accounting::owned_by(
+    let result = event
+        .instrument(crate::accounting::owned_by(
             owner,
             moderate_inner(input, options, config.clone(), model, provider),
-        ),
-        event.span(),
-    )
-    .await;
+        ))
+        .await;
     if let Ok(m) = &result {
         crate::accounting::report(&config, &m.usage_entries).await;
         event.set(

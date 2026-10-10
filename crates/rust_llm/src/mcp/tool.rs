@@ -10,8 +10,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::{Map, Value, json};
 
-use super::{InputState, Mcp, McpResult};
-use crate::error::Result;
+use super::{InputState, Mcp, McpResult, Task, apps};
+use crate::error::{Error, Result};
 use crate::message::ToolCall;
 use crate::tool::{Tool, ToolError, ToolResult};
 
@@ -99,6 +99,16 @@ pub struct McpTool {
     pub server_name: String,
     /// The JSON Schema for the arguments the model provides.
     pub parameters_schema: Value,
+    /// The tool's `_meta` as the server sent it, empty when there is none. Extensions keep
+    /// their own vocabulary there.
+    pub meta: Map<String, Value>,
+    /// The URI of the tool's UI, the `ui://` resource an MCP App renders next to the tool's
+    /// results, or `None` for a tool without one. Read it with `Mcp::resource`.
+    pub ui_uri: Option<String>,
+    /// Who may call the tool: `"model"` when chats offer it to the model, `"app"` when a UI
+    /// from the same server may call it. Tools say nothing about it unless they belong to an MCP
+    /// App, which makes them `["model", "app"]`.
+    pub visibility: Vec<String>,
     pub(crate) fixed_arguments: Vec<(String, FixedArgument)>,
     pub(crate) wrap: Option<Wrap>,
     annotations: Value,
@@ -120,12 +130,8 @@ impl std::fmt::Debug for McpTool {
 }
 
 impl McpTool {
-    pub(crate) fn new(
-        mcp: Mcp,
-        definition: &Value,
-        prefix: Option<&str>,
-        shape: ToolShape,
-    ) -> McpTool {
+    /// `MCP::Tool.new(mcp, definition, prefix:, **shape)`.
+    pub fn new(mcp: Mcp, definition: &Value, prefix: Option<&str>, shape: ToolShape) -> McpTool {
         let server_name = definition
             .get("name")
             .and_then(Value::as_str)
@@ -146,12 +152,20 @@ impl McpTool {
             .cloned()
             .unwrap_or_else(|| json!({}));
         let parameters_schema = model_schema(schema, &shape.fixed_arguments);
+        let meta = definition
+            .get("_meta")
+            .and_then(Value::as_object)
+            .cloned()
+            .unwrap_or_default();
         McpTool {
             mcp,
             name,
             description,
             server_name,
             parameters_schema,
+            ui_uri: apps::uri(&meta),
+            visibility: apps::visibility(&meta),
+            meta,
             fixed_arguments: shape.fixed_arguments,
             wrap: shape.wrap,
             annotations: definition
@@ -186,14 +200,22 @@ impl McpTool {
         self.hint("openWorldHint") != Some(false)
     }
 
-    /// `call(**arguments)`: calls the tool on the server and returns what the model sees. Fails
-    /// with `Error::McpInputRequired` when the server needs input no callback gave.
+    /// `call(**arguments)`: calls the tool on the server and returns what the model sees: the
+    /// result's content (with the result kept as `ToolResult::mcp_result`), what the `wrap`
+    /// made of it, or `{ error: }` when the tool failed. When the server runs the call as a
+    /// task, fails with `Error::McpTask` carrying the task, without waiting. Fails with
+    /// `Error::McpInputRequired` when the server needs input no callback gave.
     pub async fn call(&self, arguments: Value) -> Result<ToolResult> {
         let arguments = match arguments {
             Value::Object(map) => map,
             _ => Map::new(),
         };
         self.mcp.run(self, arguments, None).await
+    }
+
+    /// `task(state, tool_call:)`: the task a call paused on, from its saved state.
+    pub fn task(&self, state: &Value, tool_call: Option<ToolCall>) -> Task {
+        Task::load(Some(self.mcp.clone()), state, tool_call)
     }
 }
 
@@ -222,7 +244,7 @@ fn model_schema(mut schema: Value, fixed: &[(String, FixedArgument)]) -> Value {
     schema
 }
 
-fn boxed(error: crate::Error) -> ToolError {
+fn boxed(error: Error) -> ToolError {
     Box::new(error)
 }
 
@@ -245,6 +267,14 @@ impl Tool for McpTool {
         self.mcp.requires_approval(self)
     }
 
+    fn is_model_visible(&self) -> bool {
+        self.visibility.iter().any(|v| v == "model")
+    }
+
+    fn mcp_task(&self, state: &Value, tool_call: &ToolCall) -> Option<Task> {
+        Some(self.task(state, Some(tool_call.clone())))
+    }
+
     async fn execute(
         &self,
         arguments: Map<String, Value>,
@@ -253,7 +283,8 @@ impl Tool for McpTool {
         self.mcp.run(self, arguments, None).await.map_err(boxed)
     }
 
-    /// `resume(input, arguments)`: resumes a call that paused on input requests, now answered.
+    /// `resume(input, arguments)`: resumes a call that paused on input requests, now answered,
+    /// or on a task, which it checks on once.
     async fn resume(
         &self,
         input: &Value,

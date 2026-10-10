@@ -953,9 +953,10 @@ impl ChatRecord {
         chat: &mut Chat,
         pending_usages: &UsageRows,
     ) -> Result<()> {
+        self.check_on_tasks(db, chat, pending_usages).await?;
         loop {
             self.refresh_tool_call_state(db, chat).await?;
-            if chat.is_complete() || chat.is_awaiting_approval() || chat.is_awaiting_input() {
+            if chat.is_complete() || chat.is_waiting() {
                 return Ok(());
             }
             let inputs_before = chat.tool_call_inputs().clone();
@@ -972,6 +973,28 @@ impl ChatRecord {
         }
     }
 
+    /// `run_tools if awaiting_tasks?`: `complete` checks on the MCP tasks pending calls wait on
+    /// once, persisting the results of those that finished and the state of the rest. A chat
+    /// another process cancelled cancels the tasks instead.
+    async fn check_on_tasks(
+        &self,
+        db: &DatabaseConnection,
+        chat: &mut Chat,
+        pending_usages: &UsageRows,
+    ) -> Result<()> {
+        self.refresh_tool_call_state(db, chat).await?;
+        if !chat.is_awaiting_tasks() {
+            return Ok(());
+        }
+        let inputs_before = chat.tool_call_inputs().clone();
+        let outcome = chat.run_tools().await.map(|_| ());
+        self.persist_unsaved(db, chat, Usages::Written(pending_usages))
+            .await?;
+        self.persist_tool_call_inputs(db, chat, &inputs_before)
+            .await?;
+        Ok(outcome?)
+    }
+
     /// [`ChatRecord::run_loop`] for [`ChatRecord::complete_stream`]: a response gets its row
     /// before the request (`persist_new_message`) and is written into it afterwards; tool results
     /// are written as they finish.
@@ -982,9 +1005,10 @@ impl ChatRecord {
         pending_usages: &UsageRows,
         on_event: &mut (dyn FnMut(StreamEvent<'_>) + Send),
     ) -> Result<()> {
+        self.check_on_tasks(db, chat, pending_usages).await?;
         loop {
             self.refresh_tool_call_state(db, chat).await?;
-            if chat.is_complete() || chat.is_awaiting_approval() || chat.is_awaiting_input() {
+            if chat.is_complete() || chat.is_waiting() {
                 return Ok(());
             }
             let inputs_before = chat.tool_call_inputs().clone();
@@ -1191,6 +1215,8 @@ impl ChatRecord {
             let mut call: rust_llm_tool_calls::ActiveModel = call.into();
             call.result_type = Set(Some(MESSAGE_TYPE.into()));
             call.result_id = Set(Some(row.id as i64));
+            // `tool_result_attributes`: the result an MCP App UI renders stays on the call.
+            call.mcp_result = Set(m.mcp_result.as_ref().map(|r| r.dump()));
             call.updated_at = Set(now());
             call.update(&txn).await?;
         }
@@ -1855,6 +1881,11 @@ fn restore_message(
     m.raw_reasoning = row.raw_reasoning.clone();
     m.finish_reason = row.finish_reason.as_deref().map(FinishReason::from_symbol);
     m.tool_call_id = parent.map(|p| p.tool_call_id.clone());
+    // `mcp_result`: kept on the parent tool call, so the UI renders again after a reload.
+    m.mcp_result = parent
+        .and_then(|p| p.mcp_result.as_ref())
+        .filter(|r| r.is_object())
+        .map(|r| Box::new(rust_llm::mcp::McpResult::load(r)));
     m.attachments = files
         .iter()
         .filter(|f| f.message_id == row.id as i64)
@@ -2153,5 +2184,15 @@ fn usage_entry(u: &rust_llm_usages::Model) -> UsageEntry {
         status,
         cost,
         tokens,
+    }
+}
+
+/// `tool_error_message` (`PayloadHelpers#payload_error_message`): the `error` of a JSON object
+/// payload, such as a failed tool result's content or a tool call's arguments, or `None`.
+pub fn tool_error_message(payload: Option<&str>) -> Option<String> {
+    let parsed: Value = serde_json::from_str(payload?).ok()?;
+    match parsed.get("error")? {
+        Value::String(text) => Some(text.clone()),
+        other => Some(other.to_string()),
     }
 }

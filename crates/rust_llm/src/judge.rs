@@ -48,6 +48,15 @@ pub enum QuestionType {
 }
 
 impl QuestionType {
+    /// The declared type name (`:probability`, `:choice`, `:score`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            QuestionType::Probability => "probability",
+            QuestionType::Choice => "choice",
+            QuestionType::Score => "score",
+        }
+    }
+
     /// `Judgments::TYPES`.
     fn wire(&self) -> &'static str {
         match self {
@@ -195,6 +204,15 @@ impl Question {
             instructions,
             criteria,
         })
+    }
+
+    /// `question.instructions` when it is a plain value; `None` when absent or resolved per
+    /// judgment (a proc in RubyLLM).
+    pub fn instructions(&self) -> Option<&Value> {
+        match &self.instructions {
+            Some(Dynamic::Value(v)) => Some(v),
+            _ => None,
+        }
     }
 
     /// `Question.from_h`: one entry of `RubyLLM.judge(questions: { ... })`.
@@ -406,6 +424,11 @@ impl Judge {
         }
         self.questions.push(question);
         Ok(self)
+    }
+
+    /// `question_definitions`: the declared questions, in order.
+    pub fn questions(&self) -> &[Question] {
+        &self.questions
     }
 
     /// Replaces an inherited question of the same name (a subclass redeclaring it).
@@ -644,7 +667,7 @@ async fn judge_request(
         config.clone(),
         with,
     );
-    let result = tracing::Instrument::instrument(request, event.span()).await;
+    let result = event.instrument(request).await;
     if let Ok(j) = &result {
         crate::accounting::report(&config, &j.usage_entries).await;
         event.set("result", || {

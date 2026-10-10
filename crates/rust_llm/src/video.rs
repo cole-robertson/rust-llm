@@ -355,7 +355,7 @@ pub async fn animate(prompt: Option<&str>, options: AnimateOptions<'_>) -> Resul
         .await;
         Ok::<_, Error>((model, id, video))
     };
-    let (job, result) = match tracing::Instrument::instrument(run, event.span()).await {
+    let (job, result) = match event.instrument(run).await {
         Ok((model, id, video)) => (Some((model, id)), video),
         Err(e) => (None, Err(e)),
     };
@@ -397,14 +397,12 @@ pub async fn animate_later(prompt: Option<&str>, options: AnimateOptions<'_>) ->
             ),
         ])
     });
-    let result = tracing::Instrument::instrument(
-        crate::accounting::owned_by(
+    let result = event
+        .instrument(crate::accounting::owned_by(
             owner,
             submit(prompt, options, config.clone(), model, provider),
-        ),
-        event.span(),
-    )
-    .await;
+        ))
+        .await;
     if let Ok(job) = &result {
         event.set("job_id", || job.id.clone().into());
     }

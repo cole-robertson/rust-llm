@@ -93,6 +93,10 @@ pub enum Error {
     /// `MCP::InputRequiredError`: a server needs input from the user that no callback gave.
     #[error(transparent)]
     McpInputRequired(Box<crate::mcp::InputRequiredError>),
+    /// A tool call an MCP server runs in the background (`MCP::Task`): a chat pauses the call
+    /// until the task is done, and `McpTool::call` hands the task back this way.
+    #[error("{} runs the call as task {}", .0.server_name(), .0.id)]
+    McpTask(Box<crate::mcp::Task>),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error(transparent)]
@@ -153,6 +157,17 @@ impl Error {
             Error::Overloaded(_, r) => Error::Overloaded(message, r),
             other => other,
         }
+    }
+
+    /// `error.class.name`, spelled for Rust: `rust_llm::Error::<Variant>` (`rust_llm::Error::Api`,
+    /// `rust_llm::Error::Cancelled`). Never includes the message, so it is safe to export.
+    pub fn class_name(&self) -> String {
+        let debug = format!("{self:?}");
+        let variant: String = debug
+            .chars()
+            .take_while(char::is_ascii_alphanumeric)
+            .collect();
+        format!("rust_llm::Error::{variant}")
     }
 
     pub fn response(&self) -> Option<&ErrorResponse> {

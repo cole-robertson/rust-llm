@@ -1706,6 +1706,7 @@ mcp/http_spec.rb:227	PORTED	crates/rust_llm/tests/mcp.rs::http_closes_a_modern_s
 mcp/http_spec.rb:818	PORTED	crates/rust_llm/tests/mcp.rs::http_uses_a_result_sent_with_an_error_status_and_maps_401
 mcp/http_spec.rb:825	PORTED	crates/rust_llm/tests/mcp.rs::http_uses_a_result_sent_with_an_error_status_and_maps_401
 mcp/http_spec.rb:831	PORTED	crates/rust_llm/tests/mcp.rs::http_resolves_headers_on_every_request_and_mcp_inputs_reach_them
+mcp/http_spec.rb:316	N/A	Ruby-only: Faraday 1 adapters call on_data without the response env (31a5ce6e); reqwest always reads the response headers before the body, so the session id is always seen
 # 2.1: file-wide PORTED removed (upstream added examples); each example is cited by line instead: mcp/oauth_spec.rb	PORTED	crates/rust_llm/tests/spec_mcp_oauth.rs (each example cites its line)
 mcp/param_headers_spec.rb:16	PORTED	crates/rust_llm/src/mcp/param_headers.rs::tests::mirrors_marked_arguments_that_have_values
 mcp/param_headers_spec.rb:26	PORTED	crates/rust_llm/src/mcp/param_headers.rs::tests::rejects_tools_with_invalid_declarations
@@ -2137,3 +2138,7 @@ protocol/streaming_spec.rb:243	PORTED	crates/rust_llm/src/transport/event_stream
 protocol/streaming_spec.rb:252	PORTED	crates/rust_llm/src/transport/event_stream_parser.rs::tests::limits_the_accumulated_json_bytes_across_network_reads
 protocol/streaming_spec.rb:262	PORTED	crates/rust_llm/src/transport/event_stream_parser.rs::tests::stops_retaining_a_failed_response_body_past_the_limit (+ spec_transport_streaming.rs::a_failed_stream_with_an_oversized_body_raises_from_its_status at the real 1 MiB)
 support/process_cache_spec.rb:105	N/A	Ruby-only mechanism: Process.fork (the child forgets inherited entries); Rust has no fork of a running program. The counterpart, pooled sockets belonging to one tokio runtime, is keyed into the connection cache and tested in spec_connection_reuse.rs::never_sends_another_runtime_through_a_socket_of_the_first
+# ---- lane M1 (wave 2): MCP core ----
+mcp_spec.rb:647	N/A	Ruby-only: Process.fork of a process whose listener thread a child does not inherit; a tokio runtime does not survive fork, so the port has no forked-child listener
+mcp_spec.rb:782	N/A	Ruby-only: class inheritance of MCP settings (extensions copied to subclasses); McpBuilder is a value you clone
+mcp/listener_spec.rb:130	N/A	Rails-only: callbacks wrapped in Rails.application.executor; there is no Rails executor in Rust

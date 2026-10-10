@@ -247,11 +247,12 @@ pub async fn paint(prompt: &str, options: PaintOptions<'_>) -> Result<Images> {
             ),
         ])
     });
-    let result = tracing::Instrument::instrument(
-        crate::accounting::owned_by(owner, paint_inner(prompt, options)),
-        event.span(),
-    )
-    .await;
+    let result = event
+        .instrument(crate::accounting::owned_by(
+            owner,
+            paint_inner(prompt, options),
+        ))
+        .await;
     if let Ok(images) = &result {
         let all: Vec<&Image> = match images {
             Images::One(i) => vec![i],

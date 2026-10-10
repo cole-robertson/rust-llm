@@ -158,6 +158,8 @@ pub struct Chat {
     /// `@cancellation_checker`: an outside signal (e.g. a persisted record) consulted with the flag.
     cancellation_checker: Option<CancellationChecker>,
     mcp: crate::mcp::Collection,
+    /// `@mcp_deferrals`: per server name, `with_mcp(defer:)`; `None` follows the server.
+    mcp_deferrals: HashMap<String, Option<bool>>,
     /// `@tool_call_inputs`: per tool call id, the paused state (`InputRequiredError#to_h`).
     tool_call_inputs: HashMap<String, Value>,
     provider_tools: Vec<crate::provider_tools::ProviderTool>,
@@ -268,6 +270,7 @@ impl Chat {
             cancelled: Arc::new(AtomicBool::new(false)),
             cancellation_checker: None,
             mcp: crate::mcp::Collection::default(),
+            mcp_deferrals: HashMap::new(),
             tool_call_inputs: HashMap::new(),
             provider_tools: Vec::new(),
             concurrency,
@@ -412,14 +415,32 @@ impl Chat {
             .collect()
     }
 
-    /// `ToolSearch#deferred_tool_names`. MCP servers' deferral joins here once `with_mcp(defer:)`
-    /// is ported.
+    /// `ToolSearch#deferred_tool_names`: registered tools deferred with `with_tools(defer:)`,
+    /// then each server's tools, deferred by `with_mcp(defer:)` or else by the server's own
+    /// `defer`.
     fn deferred_tool_names(&self) -> Vec<String> {
-        self.tool_deferrals
+        let mut names: Vec<String> = self
+            .tool_deferrals
             .iter()
             .filter(|(_, deferred)| **deferred)
             .map(|(name, _)| name.clone())
-            .collect()
+            .collect();
+        for server in self.mcp.iter() {
+            let explicit = self.mcp_deferrals.get(&server.name()).copied().flatten();
+            let Some(Ok(tools)) = server.cached_tools() else {
+                continue;
+            };
+            for tool in tools {
+                let name = tool.name();
+                let deferred = explicit.unwrap_or_else(|| {
+                    server.defers(&*tool, server.server_name_of(&name).as_deref())
+                });
+                if deferred {
+                    names.push(name);
+                }
+            }
+        }
+        names
     }
 
     /// `ToolSearch#request_tools`: the tool set rendered for a request, deferred tools wrapped
@@ -441,14 +462,24 @@ impl Chat {
 
     /// `with_mcp(server)`: gives the model the server's tools. The server is contacted when the
     /// chat first needs its tools.
-    pub fn with_mcp(mut self, server: crate::mcp::Mcp) -> Self {
+    pub fn with_mcp(self, server: crate::mcp::Mcp) -> Self {
+        self.with_mcp_deferred(server, None)
+    }
+
+    /// `with_mcp(server, defer:)`: `Some(true)` keeps every tool of the server out of the
+    /// model's context until the provider's tool search loads it, `Some(false)` offers them up
+    /// front despite the server's `defer`, `None` follows the server. See
+    /// [`Chat::deferred_tools`].
+    pub fn with_mcp_deferred(mut self, server: crate::mcp::Mcp, defer: Option<bool>) -> Self {
+        self.mcp_deferrals.insert(server.name(), defer);
         self.mcp.push(server);
         self
     }
 
-    /// `with_mcp(nil)`: disconnects every server.
+    /// `with_mcp(nil)`: disconnects every server, forgetting their deferrals.
     pub fn clear_mcp(&mut self) -> &mut Self {
         self.mcp = crate::mcp::Collection::default();
+        self.mcp_deferrals.clear();
         self
     }
 
@@ -471,14 +502,23 @@ impl Chat {
         Ok(())
     }
 
-    /// `Chat#tools`, over the servers whose tool lists have been fetched.
+    /// `Chat#tools`, over the servers whose tool lists have been fetched. MCP tools that only
+    /// the UI of an MCP App may call are left out (`hidden_from_model?`).
     fn combined_tools(&self) -> Result<Vec<SharedTool>> {
-        let mut tools = self.tools.clone();
+        let mut tools: Vec<SharedTool> = self
+            .tools
+            .iter()
+            .filter(|t| t.is_model_visible())
+            .cloned()
+            .collect();
         for server in self.mcp.iter() {
             let Some(server_tools) = server.cached_tools() else {
                 continue;
             };
             for tool in server_tools? {
+                if !tool.is_model_visible() {
+                    continue;
+                }
                 let name = tool.name();
                 if tools.iter().any(|t| t.name() == name) {
                     return Err(Error::Argument(format!(
@@ -1008,6 +1048,9 @@ impl Chat {
 
     /// `complete`: run until `complete?` or parked on an approval.
     pub async fn complete(&mut self) -> Result<Message> {
+        if self.is_awaiting_tasks() {
+            self.run_tools().await?;
+        }
         while !self.is_complete() && !self.waiting() {
             self.step_inner(None).await?;
         }
@@ -1057,7 +1100,10 @@ impl Chat {
         if self.is_complete() {
             return Ok(None);
         }
-        self.raise_if_cancelled()?;
+        if let Err(e) = self.raise_if_cancelled() {
+            self.cancel_tasks().await;
+            return Err(e);
+        }
         if self.pending_tool_response().is_none() {
             return self.generate_inner(on_chunk).await.map(Some);
         }
@@ -1470,12 +1516,23 @@ impl Chat {
         chunks_yielded: &mut bool,
     ) -> Result<Message> {
         self.raise_if_cancelled()?;
-        let event = self.instrumentation_event("chat.rust_llm", on_chunk.is_some());
-        let result = tracing::Instrument::instrument(
-            self.generate_once_inner(on_chunk, chunks_yielded),
-            event.span(),
-        )
-        .await;
+        let entries_before = self.usage_entries.len();
+        let mut event = self.instrumentation_event("chat.rust_llm", on_chunk.is_some());
+        let result = event
+            .instrument(self.generate_once_inner(on_chunk, chunks_yielded))
+            .await;
+        // `event[:response_tokens]`: this attempt's tokens, or on failure what the attempts
+        // recorded during this event were billed, so a fallback's usage stays on its own span.
+        event.set("response_tokens", || {
+            crate::instrumentation::tokens_h(&match &result {
+                Ok(message) => message.tokens(),
+                Err(_) => Tokens::aggregate(
+                    self.usage_entries[entries_before.min(self.usage_entries.len())..]
+                        .iter()
+                        .map(|e| &e.tokens),
+                ),
+            })
+        });
         self.finish_completion_event(event, &result);
         result
     }
@@ -1880,7 +1937,7 @@ impl Chat {
         self.raise_if_cancelled()?;
         self.raise_if_pending_tool_calls()?;
         let event = self.instrumentation_event("compaction.rust_llm", false);
-        let result = tracing::Instrument::instrument(self.compact_inner(), event.span()).await;
+        let result = event.instrument(self.compact_inner()).await;
         self.finish_completion_event(event, &result);
         result
     }
@@ -2066,11 +2123,23 @@ impl Chat {
         }
     }
 
-    /// Execute the pending tool calls of the latest response (`run_tools`).
+    /// Execute the pending tool calls of the latest response (`run_tools`). Calls paused on an
+    /// MCP task check on it once. A cancelled chat cancels the tasks its calls wait on.
     pub async fn run_tools(&mut self) -> Result<&mut Self> {
+        match self.run_pending_tools().await {
+            Err(Error::Cancelled) => {
+                self.cancel_tasks().await;
+                Err(Error::Cancelled)
+            }
+            Err(e) => Err(e),
+            Ok(()) => Ok(self),
+        }
+    }
+
+    async fn run_pending_tools(&mut self) -> Result<()> {
         self.raise_if_cancelled()?;
         let Some(response) = self.pending_tool_response().cloned() else {
-            return Ok(self);
+            return Ok(());
         };
         self.load_mcp_tools().await?;
         let mut executable = Vec::new();
@@ -2132,6 +2201,10 @@ impl Chat {
                                 .insert(call.id.clone(), paused.input.to_h());
                             continue;
                         }
+                        Err(Error::McpTask(task)) => {
+                            self.tool_call_inputs.insert(call.id.clone(), task.to_h());
+                            continue;
+                        }
                         other => other?,
                     };
                     self.tool_call_inputs.remove(&call.id);
@@ -2152,7 +2225,7 @@ impl Chat {
         ) {
             self.tool_prefs.choice = None;
         }
-        Ok(self)
+        Ok(())
     }
 
     /// `handle_concurrent_tool_calls` (`Chat::ToolConcurrency.run`): every call starts at once and
@@ -2178,6 +2251,10 @@ impl Chat {
                 Err(Error::McpInputRequired(paused)) => {
                     self.tool_call_inputs
                         .insert(call.id.clone(), paused.input.to_h());
+                    continue;
+                }
+                Err(Error::McpTask(task)) => {
+                    self.tool_call_inputs.insert(call.id.clone(), task.to_h());
                     continue;
                 }
                 Err(e) => {
@@ -2242,7 +2319,7 @@ impl Chat {
             let Some(mut event) = event else {
                 return run.await;
             };
-            let result = tracing::Instrument::instrument(run, event.span()).await;
+            let result = event.instrument(run).await;
             if let Ok(r) = &result {
                 event.set("result", || r.content.clone().into());
                 event.set("result_content", || r.content.clone().into());
@@ -2290,7 +2367,10 @@ impl Chat {
                 Ok(e)
                     if matches!(
                         *e,
-                        Error::Cancelled | Error::Mcp(_) | Error::McpInputRequired(_)
+                        Error::Cancelled
+                            | Error::Mcp(_)
+                            | Error::McpInputRequired(_)
+                            | Error::McpTask(_)
                     ) =>
                 {
                     if matches!(*e, Error::Cancelled) {
@@ -2323,6 +2403,8 @@ impl Chat {
     fn push_tool_result(&mut self, call: &ToolCall, result: ToolResult) {
         let mut m = Message::tool_result(call.id.clone(), result.content);
         m.attachments = result.attachments;
+        // `mcp_result = result if result.is_a?(MCP::Result) && result.ui_uri`.
+        m.mcp_result = result.mcp_result.filter(|r| r.ui_uri.is_some());
         self.push_tool_message(m);
     }
 
@@ -2395,6 +2477,56 @@ impl Chat {
     /// least one waits on input.
     pub fn is_awaiting_input(&self) -> bool {
         self.waiting() && !self.pending_inputs().is_empty()
+    }
+
+    /// `awaiting_tasks?`: every pending tool call waits on a task, input, or an approval
+    /// decision, and at least one waits on a task. `complete` checks on the tasks again.
+    pub fn is_awaiting_tasks(&self) -> bool {
+        self.waiting() && !self.pending_tasks().is_empty()
+    }
+
+    /// `pending_tasks`: the MCP tasks that tool calls wait on, as they were when the chat last
+    /// checked. `Task::refresh` checks on one without resuming the chat; `complete` checks on
+    /// all of them and resumes their calls once they are done.
+    pub fn pending_tasks(&self) -> Vec<crate::mcp::Task> {
+        let Some(response) = self.pending_tool_response() else {
+            return Vec::new();
+        };
+        self.pending_tool_calls(response)
+            .into_iter()
+            .filter_map(|call| {
+                let state = self.tool_call_inputs.get(&call.id)?;
+                (state.get("task").is_some() && !self.input_pending(&call))
+                    .then(|| self.task_for(&call, state))
+            })
+            .collect()
+    }
+
+    /// `task_for(tool_call, state)`: through the call's tool when it is connected.
+    fn task_for(&self, call: &ToolCall, state: &Value) -> crate::mcp::Task {
+        self.find_tool(&call.name)
+            .and_then(|tool| tool.mcp_task(state, call))
+            .unwrap_or_else(|| crate::mcp::Task::load(None, state, Some(call.clone())))
+    }
+
+    /// `cancel_tasks`: cancels the tasks pending tool calls wait on and forgets them.
+    async fn cancel_tasks(&mut self) {
+        let Some(response) = self.pending_tool_response().cloned() else {
+            return;
+        };
+        for call in self.pending_tool_calls(&response) {
+            let Some(state) = self.tool_call_inputs.get(&call.id).cloned() else {
+                continue;
+            };
+            if state.get("task").is_none() {
+                continue;
+            }
+            let mut task = self.task_for(&call, &state);
+            if let Err(e) = task.cancel().await {
+                tracing::debug!("RustLLM could not cancel task {}: {e}", task.id);
+            }
+            self.tool_call_inputs.remove(&call.id);
+        }
     }
 
     /// `pending_inputs`: the unanswered requests that paused MCP tool calls. Settle each with
@@ -2503,7 +2635,7 @@ impl Chat {
         names.dedup();
         Err(Error::PendingToolCalls(format!(
             "The last response has unanswered tool calls ({}). Run complete, recording approve or deny \
-             decisions for calls that require approval and answering pending inputs, before asking again.",
+             decisions for calls that require approval, answering pending inputs, and waiting for tasks, before asking again.",
             names.join(", ")
         )))
     }

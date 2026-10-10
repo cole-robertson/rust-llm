@@ -162,14 +162,12 @@ pub async fn rerank(
             ),
         ])
     });
-    let result = tracing::Instrument::instrument(
-        crate::accounting::owned_by(
+    let result = event
+        .instrument(crate::accounting::owned_by(
             owner,
             rerank_inner(query, documents, options, config.clone(), model, provider),
-        ),
-        event.span(),
-    )
-    .await;
+        ))
+        .await;
     if let Ok(r) = &result {
         crate::accounting::report(&config, &r.usage_entries).await;
         event.set("result", || {

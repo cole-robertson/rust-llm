@@ -188,6 +188,10 @@ pub trait Agent {
     fn mcp(&self) -> Vec<crate::mcp::Mcp> {
         Vec::new()
     }
+    /// `mcp ..., defer:`: passed to `with_mcp(defer:)` for the servers `mcp` declares.
+    fn mcp_defer(&self) -> Option<bool> {
+        None
+    }
     /// `provider_tools :web_search`: applied via `with_provider_tools`.
     fn provider_tools(&self) -> Vec<crate::provider_tools::ProviderTool> {
         Vec::new()
@@ -273,7 +277,7 @@ fn apply_configuration<A: Agent + ?Sized>(
     }
     chat = chat.with_tools(agent.tools());
     for server in agent.mcp() {
-        chat = chat.with_mcp(server);
+        chat = chat.with_mcp_deferred(server, agent.mcp_defer());
     }
     if let Some(choice) = agent.tool_choice() {
         chat = chat.with_tool_choice(choice)?;
