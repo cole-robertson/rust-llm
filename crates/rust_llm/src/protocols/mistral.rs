@@ -43,7 +43,39 @@ pub(crate) fn parse_conversation_content(output: &[Value]) -> Content {
     {
         parse_conversation_parts(entry.get("content"), &mut result);
     }
+    result.attachments.extend(
+        output
+            .iter()
+            .filter(|e| {
+                e.get("type").and_then(Value::as_str) == Some("tool.execution")
+                    && e.get("name").and_then(Value::as_str) == Some("image_generation")
+            })
+            .filter_map(|e| parse_generated_image(e.pointer("/info/result"))),
+    );
+    uniq_by_source(&mut result.attachments);
     result
+}
+
+/// `parse_generated_image`: a hosted image tool's result, `{"url": ...}` as a JSON string.
+fn parse_generated_image(result: Option<&Value>) -> Option<Attachment> {
+    let text = result?.as_str()?;
+    let parsed: Value = serde_json::from_str(text).ok()?;
+    parsed
+        .get("url")
+        .and_then(Value::as_str)
+        .map(Attachment::new)
+}
+
+/// `uniq!(&:source)`: the first attachment for each source.
+fn uniq_by_source(attachments: &mut Vec<Attachment>) {
+    let mut seen: Vec<crate::attachment::Source> = Vec::new();
+    attachments.retain(|a| {
+        if seen.contains(&a.source) {
+            return false;
+        }
+        seen.push(a.source.clone());
+        true
+    });
 }
 
 /// `parse_conversation_parts`.
@@ -425,6 +457,7 @@ fn parse_conversation_steps(output: &[Value]) -> Vec<ServerToolCall> {
             input: e.get("arguments").cloned(),
             result: e.get("info").cloned(),
             raw: e.clone(),
+            search_suggestions: None,
         })
         .collect()
 }
@@ -434,7 +467,31 @@ fn parse_conversation_usage(m: &mut Message, usage: &Value) {
     m.tokens.input = int(usage.get("prompt_tokens"))
         .map(|p| p + int(usage.get("connector_tokens")).unwrap_or(0));
     m.tokens.output = int(usage.get("completion_tokens"));
-    m.tokens.server_tool_use = usage.get("connectors").and_then(Value::as_object).cloned();
+    m.tokens.server_tool_use = parse_connector_usage(usage.get("connectors"));
+}
+
+/// `SERVER_TOOL_USAGE_NAMES`: connector names that differ from the tool alias that turns them on.
+const SERVER_TOOL_USAGE_NAMES: [(&str, &str); 2] = [
+    ("code_interpreter", "code_execution"),
+    ("document_library", "file_search"),
+];
+
+/// `parse_connector_usage`: each connector count as `<name>_requests`, then `Tokens.new`'s
+/// positive-count normalization.
+fn parse_connector_usage(connectors: Option<&Value>) -> Option<Map<String, Value>> {
+    let renamed: Map<String, Value> = connectors
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+        .map(|(connector, count)| {
+            let name = SERVER_TOOL_USAGE_NAMES
+                .iter()
+                .find(|(from, _)| from == connector)
+                .map_or(connector.as_str(), |(_, to)| to);
+            (format!("{name}_requests"), count.clone())
+        })
+        .collect();
+    crate::tokens::Tokens::positive_counts(&Value::Object(renamed))
 }
 
 // ---- Conversations::Streaming -----------------------------------------------------------------
@@ -638,19 +695,15 @@ pub(crate) fn render_image_payload(
     Ok(payload)
 }
 
-/// `parse_image_responses` minus the download: the generated file ids and the usage the first
-/// image carries (`{ "input_tokens", "output_tokens" }`).
-pub(crate) fn parse_image_files(data: &Value) -> Result<(Vec<String>, Value)> {
+/// `parse_image_responses` minus the download: the generated attachments (provider files or
+/// hosted URLs) and the usage the first image carries (`{ "input_tokens", "output_tokens" }`).
+pub(crate) fn parse_image_files(data: &Value) -> Result<(Vec<Attachment>, Value)> {
     let output = data
         .get("outputs")
         .and_then(Value::as_array)
         .cloned()
-        .unwrap_or_default();
-    let files: Vec<String> = parse_conversation_content(&output)
-        .attachments
-        .iter()
-        .filter_map(|a| a.provider_file_id().map(str::to_string))
-        .collect();
+        .ok_or_else(|| Error::Api("key not found: \"outputs\"".into(), None))?;
+    let files = parse_conversation_content(&output).attachments;
     if files.is_empty() {
         return Err(Error::Api(
             "Mistral returned no generated image".into(),
@@ -716,7 +769,7 @@ pub fn parse_multi_message(data: &Value, raw: Option<RawResponse>) -> Result<Opt
             m
         })
         .collect();
-    let content = parse_conversation_content(&output);
+    let mut content = parse_conversation_content(&output);
     let results: BTreeMap<String, &Value> = messages
         .iter()
         .filter(|m| m.get("role").and_then(Value::as_str) == Some("tool"))
@@ -773,6 +826,7 @@ pub fn parse_multi_message(data: &Value, raw: Option<RawResponse>) -> Result<Opt
                 input: call.pointer("/function/arguments").cloned(),
                 result: result.get("content").cloned(),
                 raw: (*result).clone(),
+                search_suggestions: None,
             })
         })
         .collect();
@@ -784,10 +838,13 @@ pub fn parse_multi_message(data: &Value, raw: Option<RawResponse>) -> Result<Opt
         &shell,
         raw.clone().unwrap_or_else(empty_raw),
     )?;
+    let mut attachments = std::mem::take(&mut content.attachments);
+    attachments.extend(parse_multi_images(&calls, &results));
+    uniq_by_source(&mut attachments);
     let mut m = Message::chunk();
     m.content = Some(content.text.clone());
     m.thinking = Thinking::build(content.thinking(), None);
-    m.attachments = content.attachments;
+    m.attachments = attachments;
     m.citations = content.citations;
     m.tool_calls = super::tool_call_map(tool_calls);
     m.server_tool_calls = steps;
@@ -799,6 +856,21 @@ pub fn parse_multi_message(data: &Value, raw: Option<RawResponse>) -> Result<Opt
     m.finish_reason = base.finish_reason;
     m.raw = raw;
     Ok(Some(m.normalized()))
+}
+
+/// `parse_multi_images`: the images of completed hosted calls whose `metadata.tool_type` is
+/// `image`, so a URL a local tool returned is never taken for a generated image.
+fn parse_multi_images(calls: &[&Value], results: &BTreeMap<String, &Value>) -> Vec<Attachment> {
+    calls
+        .iter()
+        .filter_map(|call| {
+            let result = results.get(call.get("id").and_then(Value::as_str).unwrap_or(""))?;
+            if call.pointer("/metadata/tool_type").and_then(Value::as_str) != Some("image") {
+                return None;
+            }
+            parse_generated_image(result.get("content"))
+        })
+        .collect()
 }
 
 fn empty_raw() -> RawResponse {

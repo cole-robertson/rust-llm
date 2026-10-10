@@ -56,6 +56,7 @@ impl Cost {
             tokens,
             text: &text,
             tier,
+            cache_write_multipliers: cache_write_multipliers(tokens, model),
         };
         let mut cost = Cost {
             complete: true,
@@ -331,6 +332,26 @@ struct Pricer<'a> {
     tokens: &'a Tokens,
     text: &'a PricingCategory,
     tier: Tier,
+    /// `cache_write_multipliers`: lifetimes the model's provider prices as a multiple of input.
+    cache_write_multipliers: Vec<(String, f64)>,
+}
+
+/// `cache_write_multipliers` (`cost.rb`): each reported cache-write lifetime the model's provider
+/// prices from the input price (`Provider.cache_write_input_multiplier`).
+fn cache_write_multipliers(tokens: &Tokens, model: Option<&Model>) -> Vec<(String, f64)> {
+    let provider = model.and_then(|m| crate::providers::Provider::resolve(&m.provider));
+    let (Some(provider), Some(by_ttl)) = (provider, tokens.cache_write_by_ttl.as_ref()) else {
+        return Vec::new();
+    };
+    let id = model.map(|m| m.id.as_str()).unwrap_or_default();
+    by_ttl
+        .keys()
+        .filter_map(|ttl| {
+            provider
+                .cache_write_input_multiplier(id, ttl)
+                .map(|m| (ttl.clone(), m))
+        })
+        .collect()
 }
 
 impl Component {
@@ -422,7 +443,47 @@ impl Pricer<'_> {
         }
     }
 
+    /// `cache_write_parts`: `[count, price]` pairs, the provider-priced lifetimes first, then the
+    /// rest of the writes at the registry's cache-write price.
+    fn cache_write_parts(&self) -> Vec<(i64, Option<f64>)> {
+        let by_ttl = self.tokens.cache_write_by_ttl.as_ref();
+        let input = self.price_for(Component::Input);
+        let mut parts: Vec<(i64, Option<f64>)> = self
+            .cache_write_multipliers
+            .iter()
+            .map(|(ttl, multiplier)| {
+                let count = by_ttl
+                    .and_then(|t| t.get(ttl))
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(0);
+                (count, input.map(|p| p * multiplier))
+            })
+            .collect();
+        let standard =
+            self.tokens.cache_write.unwrap_or(0) - parts.iter().map(|(c, _)| c).sum::<i64>();
+        if standard > 0 {
+            parts.push((standard, self.price_for(Component::CacheWrite)));
+        }
+        parts
+    }
+
+    fn cache_write_missing(&self) -> bool {
+        self.cache_write_parts().iter().any(|(_, p)| p.is_none())
+    }
+
     fn amount_for(&self, component: Component) -> Option<f64> {
+        if component == Component::CacheWrite && !self.cache_write_multipliers.is_empty() {
+            if self.cache_write_missing() {
+                return None;
+            }
+            let parts = self.cache_write_parts();
+            return Some(
+                parts
+                    .iter()
+                    .map(|(c, p)| *c as f64 * p.unwrap_or(0.0) / PER_MILLION)
+                    .sum(),
+            );
+        }
         let count = self.tokens_for(component)?;
         if count == 0 {
             return Some(0.0);
@@ -431,6 +492,9 @@ impl Pricer<'_> {
     }
 
     fn missing(&self, component: Component) -> bool {
+        if component == Component::CacheWrite && !self.cache_write_multipliers.is_empty() {
+            return self.cache_write_missing();
+        }
         if component == Component::Thinking && !self.thinking_priced_separately() {
             return false;
         }

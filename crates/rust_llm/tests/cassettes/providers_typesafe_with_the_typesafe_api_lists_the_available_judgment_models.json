@@ -5,12 +5,16 @@
     "request_body": "",
     "status": 200,
     "response_headers": {
-      "Date": "Mon, 21 Sep 2026 16:06:37 GMT",
-      "Server": "istio-envoy",
-      "Content-Length": "311",
+      "Date": "Wed, 07 Oct 2026 12:57:53 GMT",
       "Content-Type": "application/json",
-      "X-Typesafe-Request-Id": "req_01a0c4b827797addaad26625c2485f45",
-      "X-Envoy-Upstream-Service-Time": "11"
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Server": "cloudflare",
+      "Set-Cookie": "<COOKIE>",
+      "X-Typesafe-Request-Id": "req_01a116711a4d7778ae2de757319413bd",
+      "Cf-Cache-Status": "DYNAMIC",
+      "Cf-Ray": "<CF_RAY>",
+      "Alt-Svc": "h3=\":443\"; ma=86400"
     },
     "response_body": "{\"models\":[{\"name\":\"jev-latest\",\"description\":\"The latest iteration of TypeSafe's System One Model: Jev\",\"release_date\":\"2026-09-10T18:38:01.391457+00:00\"},{\"name\":\"jev-preview\",\"description\":\"A preview version of `jev-latest`: should be better in most ways\",\"release_date\":\"2026-09-10T18:39:06.057655+00:00\"}]}"
   }

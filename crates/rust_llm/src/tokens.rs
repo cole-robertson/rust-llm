@@ -12,6 +12,12 @@ pub struct Tokens {
     pub cache_read: Option<i64>,
     pub cache_write: Option<i64>,
     pub thinking: Option<i64>,
+    /// `#cache_write_by_ttl`: `cache_write` split by cache lifetime (`"5m"`, `"1h"`), lifetimes
+    /// with no writes left out; `None` when the provider reported no split.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_write_by_ttl: Option<Map<String, Value>>,
+    /// `#server_tool_use`: how many times each provider-executed tool ran, keyed like
+    /// `"web_search_requests"`. Tools that did not run are left out; `None` when none ran.
     pub server_tool_use: Option<Map<String, Value>>,
     pub reported_cost: Option<f64>,
 }
@@ -35,26 +41,65 @@ impl Tokens {
             .iter()
             .filter_map(|t| t.reported_cost)
             .fold(None, |acc: Option<f64>, v| Some(acc.unwrap_or(0.0) + v));
-        let mut server_tool_use: Option<Map<String, Value>> = None;
-        for counters in tokens.iter().filter_map(|t| t.server_tool_use.as_ref()) {
-            let total = server_tool_use.get_or_insert_with(Map::new);
-            for (tool, count) in counters {
-                let prev = total.get(tool).and_then(Value::as_i64).unwrap_or(0);
-                total.insert(
-                    tool.clone(),
-                    Value::from(prev + count.as_i64().unwrap_or(0)),
-                );
+        // `aggregate_counts`: sums each key across the attempts that reported any.
+        fn counts<'a>(
+            maps: impl Iterator<Item = &'a Map<String, Value>>,
+        ) -> Option<Map<String, Value>> {
+            let mut out: Option<Map<String, Value>> = None;
+            for counters in maps {
+                let total = out.get_or_insert_with(Map::new);
+                for (key, count) in counters {
+                    let prev = total.get(key).and_then(Value::as_i64).unwrap_or(0);
+                    total.insert(key.clone(), Value::from(prev + count.as_i64().unwrap_or(0)));
+                }
             }
+            out
         }
+        let server_tool_use = counts(tokens.iter().filter_map(|t| t.server_tool_use.as_ref()));
+        let cache_write_by_ttl =
+            counts(tokens.iter().filter_map(|t| t.cache_write_by_ttl.as_ref()));
         Tokens {
             input: sum(tokens.iter().map(|t| t.input)),
             output: sum(tokens.iter().map(|t| t.output)),
             cache_read: sum(tokens.iter().map(|t| t.cache_read)),
             cache_write: sum(tokens.iter().map(|t| t.cache_write)),
             thinking: sum(tokens.iter().map(|t| t.thinking)),
+            cache_write_by_ttl,
             server_tool_use,
             reported_cost,
         }
+    }
+
+    /// `positive_counts`: String keys with Integer counts, keeping only counts above zero;
+    /// `None` when nothing is left. `Tokens.new` applies it to `server_tool_use:` and
+    /// `cache_write_by_ttl:`.
+    pub fn positive_counts(counts: &Value) -> Option<Map<String, Value>> {
+        let used: Map<String, Value> = counts
+            .as_object()
+            .into_iter()
+            .flatten()
+            .filter_map(|(key, count)| {
+                let n = count
+                    .as_i64()
+                    .or_else(|| count.as_f64().map(|f| f as i64))
+                    .or_else(|| count.as_str().and_then(|s| s.trim().parse().ok()))
+                    .unwrap_or(0);
+                (n > 0).then(|| (key.clone(), Value::from(n)))
+            })
+            .collect();
+        (!used.is_empty()).then_some(used)
+    }
+
+    /// `Tokens.new(server_tool_use:)`: sets the counts, normalized by [`Tokens::positive_counts`].
+    pub fn with_server_tool_use(mut self, counts: &Value) -> Tokens {
+        self.server_tool_use = Tokens::positive_counts(counts);
+        self
+    }
+
+    /// `Tokens.new(cache_write_by_ttl:)`: sets the split, normalized by [`Tokens::positive_counts`].
+    pub fn with_cache_write_by_ttl(mut self, counts: &Value) -> Tokens {
+        self.cache_write_by_ttl = Tokens::positive_counts(counts);
+        self
     }
 
     pub fn is_empty(&self) -> bool {
@@ -82,6 +127,9 @@ impl Tokens {
         }
         if other.thinking.is_some() {
             self.thinking = other.thinking;
+        }
+        if other.cache_write_by_ttl.is_some() {
+            self.cache_write_by_ttl = other.cache_write_by_ttl.clone();
         }
         if other.server_tool_use.is_some() {
             self.server_tool_use = other.server_tool_use.clone();

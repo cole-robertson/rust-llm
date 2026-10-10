@@ -89,7 +89,7 @@ async fn prefers_the_failed_http_response_status_over_a_generic_parsed_stream_st
     );
 }
 
-// spec: protocol/streaming_spec.rb:67 raises the provider error when a failed response body parses to a bare JSON string
+// spec: protocol/streaming_spec.rb:75 raises the provider error when a failed response body parses to a bare JSON string
 #[tokio::test]
 async fn raises_the_provider_error_when_a_failed_response_body_parses_to_a_bare_json_string() {
     let server = serve(404, r#""model unavailable""#).await;
@@ -137,7 +137,7 @@ fn serve_in_reads(parts: &'static [&'static str]) -> String {
     base
 }
 
-// spec: protocol/streaming_spec.rb:171 raises an error event that arrives split across reads
+// spec: protocol/streaming_spec.rb:179 raises an error event that arrives split across reads
 #[tokio::test]
 async fn raises_an_error_event_that_arrives_split_across_reads() {
     let base = serve_in_reads(&[
@@ -151,7 +151,7 @@ async fn raises_an_error_event_that_arrives_split_across_reads() {
     assert!(yielded.is_empty());
 }
 
-// spec: protocol/streaming_spec.rb:188 ignores an error event that is not valid JSON
+// spec: protocol/streaming_spec.rb:294 ignores an error event that is not valid JSON
 #[tokio::test]
 async fn ignores_an_error_event_that_is_not_valid_json() {
     let (yielded, result) = handle("event: error\ndata: broken\n\n").await;
@@ -159,7 +159,7 @@ async fn ignores_an_error_event_that_is_not_valid_json() {
     assert!(yielded.is_empty());
 }
 
-// spec: protocol/streaming_spec.rb:196 ignores a data chunk that is not valid JSON
+// spec: protocol/streaming_spec.rb:302 ignores a data chunk that is not valid JSON
 #[tokio::test]
 async fn ignores_a_data_chunk_that_is_not_valid_json() {
     let (yielded, result) = handle("data: {broken\n\n").await;
@@ -167,7 +167,7 @@ async fn ignores_a_data_chunk_that_is_not_valid_json() {
     assert!(yielded.is_empty());
 }
 
-// spec: protocol/streaming_spec.rb:224 reports an unknown streaming error when the payload names none
+// spec: protocol/streaming_spec.rb:330 reports an unknown streaming error when the payload names none
 #[tokio::test]
 async fn reports_an_unknown_streaming_error_when_the_payload_names_none() {
     let (yielded, result) = handle("data: {\"error\":{}}\n\n").await;

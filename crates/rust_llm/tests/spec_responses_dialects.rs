@@ -406,7 +406,7 @@ async fn xai_preserves_collection_citations_from_completed_streams() {
     assert_citation(&chunk.citations[0], COLLECTION_SOURCE, 0);
 }
 
-// spec: providers/xai/responses_spec.rb:45 #parse_usage > converts cost_in_usd_ticks into a reported cost in dollars
+// spec: providers/xai/responses_spec.rb:74 #parse_usage > converts cost_in_usd_ticks into a reported cost in dollars
 #[tokio::test]
 async fn xai_converts_cost_in_usd_ticks_into_dollars() {
     let usage = json!({ "input_tokens": 10, "output_tokens": 5, "cost_in_usd_ticks": 2_909_000 });
@@ -424,7 +424,7 @@ async fn xai_converts_cost_in_usd_ticks_into_dollars() {
     assert!((cost - 0.0002909).abs() <= 1e-12, "{cost}");
 }
 
-// spec: providers/xai/responses_spec.rb:52 #parse_usage > leaves reported cost nil when ticks are absent
+// spec: providers/xai/responses_spec.rb:81 #parse_usage > leaves reported cost nil when ticks are absent
 #[tokio::test]
 async fn xai_leaves_reported_cost_nil_without_ticks() {
     let server = serve(vec![

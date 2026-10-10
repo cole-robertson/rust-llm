@@ -266,7 +266,7 @@ fn xai_paint<'a>(server: &MockServer, model: &'a str) -> PaintOptions<'a> {
     }
 }
 
-// spec: providers/xai/images_spec.rb:7 .render_image_payload > drops the size parameter xAI rejects
+// UPSTREAM-REMOVED in 2.1 (was spec: providers/xai/images_spec.rb:7) .render_image_payload > drops the size parameter xAI rejects
 #[tokio::test]
 async fn xai_image_payload_drops_the_size() {
     let server = json_server(xai_image_body()).await;
@@ -397,7 +397,7 @@ async fn openrouter_video_maps_references_to_first_and_last_frames() {
     );
 }
 
-// spec: providers/openrouter/videos_spec.rb:47 #parse_video_job > reads the job id and status from the accepted job
+// spec: providers/openrouter/videos_spec.rb:59 #parse_video_job > reads the job id and status from the accepted job
 #[tokio::test]
 async fn openrouter_video_reads_the_job_id_and_status() {
     let accepted = json!({ "id": "abc123", "polling_url": "https://openrouter.ai/api/v1/videos/abc123", "status": "pending" });
@@ -417,7 +417,7 @@ async fn openrouter_video_reads_the_job_id_and_status() {
     assert_eq!(requests[1].url.path(), "/api/v1/videos/abc123");
 }
 
-// spec: providers/openrouter/videos_spec.rb:65 #parse_video_job_status > stays pending while the job is in progress
+// spec: providers/openrouter/videos_spec.rb:77 #parse_video_job_status > stays pending while the job is in progress
 #[tokio::test]
 async fn openrouter_video_stays_pending_while_in_progress() {
     let status = json!({ "id": "abc123", "status": "in_progress" });
@@ -437,7 +437,7 @@ async fn openrouter_video_stays_pending_while_in_progress() {
     assert_eq!(job.raw, status);
 }
 
-// spec: providers/openrouter/videos_spec.rb:73 #parse_video_job_status > completes when the job reports completed
+// spec: providers/openrouter/videos_spec.rb:85 #parse_video_job_status > completes when the job reports completed
 #[tokio::test]
 async fn openrouter_video_completes_when_reported_completed() {
     let status = json!({
@@ -462,7 +462,7 @@ async fn openrouter_video_completes_when_reported_completed() {
     assert_eq!(job.raw, status);
 }
 
-// spec: providers/openrouter/videos_spec.rb:85 #parse_video_job_status > fails with the reported error
+// spec: providers/openrouter/videos_spec.rb:113 #parse_video_job_status > fails with the reported error
 #[tokio::test]
 async fn openrouter_video_fails_with_the_reported_error() {
     let status = json!({ "status": "failed", "error": "provider rejected" });
@@ -478,7 +478,7 @@ async fn openrouter_video_fails_with_the_reported_error() {
     assert_eq!(job.error.as_deref(), Some("provider rejected"));
 }
 
-// spec: providers/openrouter/videos_spec.rb:95 #download_video > downloads the job content with the API connection
+// spec: providers/openrouter/videos_spec.rb:123 #download_video > downloads the job content with the API connection
 #[tokio::test]
 async fn openrouter_video_downloads_content_with_the_api_connection() {
     let server = MockServer::start().await;
@@ -567,7 +567,7 @@ async fn xai_video_inlines_a_local_image_as_a_data_uri() {
     );
 }
 
-// spec: providers/xai/videos_spec.rb:76 video editing and extension > references uploaded images and videos using file_id fields
+// spec: providers/xai/videos_spec.rb:88 video editing and extension > references uploaded images and videos using file_id fields
 #[tokio::test]
 async fn xai_video_references_uploaded_files_by_file_id() {
     let file = uploaded("file_video", "xai", "clip.mp4", "video/mp4");
@@ -594,7 +594,7 @@ async fn xai_video_references_uploaded_files_by_file_id() {
     assert_eq!(extension["video"], json!({ "file_id": "file_video" }));
 }
 
-// spec: providers/xai/videos_spec.rb:97 video editing and extension > rejects conflicting sources and invalid extension inputs before sending requests
+// spec: providers/xai/videos_spec.rb:109 video editing and extension > rejects conflicting sources and invalid extension inputs before sending requests
 // `extend: [video, video]` cannot be expressed with `VideoSource`; the "exactly one video" error is
 // reached by a `Video` carrying no clip, the one source the type admits that is not one video.
 #[tokio::test]

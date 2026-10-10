@@ -15,6 +15,7 @@ use crate::error::{Error, Result};
 use crate::message::{Citation, Message, RawResponse, Role, ServerToolCall, Thinking, ToolCall};
 use crate::providers::Provider;
 use crate::thinking::Display;
+use crate::tokens::Tokens;
 use crate::tool::{Tool, tool_schema};
 
 const FINISH_REASONS: &[(&str, &str)] = &[
@@ -162,34 +163,45 @@ fn system_input_item(msg: &Message, boundaries: bool) -> bool {
         && ((boundaries && msg.cache_until_here) || !msg.attachments.is_empty())
 }
 
-fn format_instructions(messages: &[Message], boundaries: bool) -> Option<String> {
-    let parts: Vec<String> = messages
-        .iter()
-        .filter(|m| m.role == Role::System && !system_input_item(m, boundaries))
-        .map(|m| m.content().to_string())
-        .collect();
-    (!parts.is_empty()).then(|| parts.join("\n\n"))
+/// `system_input_items?`: when any system message must be an input item, every one is, so their
+/// order holds.
+fn system_input_items(messages: &[Message], boundaries: bool) -> bool {
+    messages.iter().any(|m| system_input_item(m, boundaries))
 }
 
-/// `format_input`: a compaction result replaces everything before it except system items.
+/// `format_instructions`: the system messages joined, unless they ride along as input items.
+fn format_instructions(messages: &[Message], boundaries: bool) -> Option<String> {
+    let system: Vec<&Message> = messages.iter().filter(|m| m.role == Role::System).collect();
+    if system.is_empty() || system.iter().any(|m| system_input_item(m, boundaries)) {
+        return None;
+    }
+    Some(
+        system
+            .iter()
+            .map(|m| m.content().to_string())
+            .collect::<Vec<_>>()
+            .join("\n\n"),
+    )
+}
+
+/// `format_input`: the system items (when there are any) lead, in their original order, then the
+/// conversation, where a compaction result replaces everything before it.
 fn format_input(provider: Provider, messages: &[Message], boundaries: bool) -> Result<Vec<Value>> {
     let mut input = Vec::new();
-    let mut system_items = Vec::new();
-    for msg in messages {
-        if msg.role == Role::System && !system_input_item(msg, boundaries) {
-            continue;
+    if system_input_items(messages, boundaries) {
+        for msg in messages.iter().filter(|m| m.role == Role::System) {
+            input.extend(format_item(provider, msg, boundaries)?);
         }
-        if let Some(output) = compaction_output(msg) {
-            input = system_items.clone();
-            input.extend(output.iter().cloned());
-            continue;
-        }
-        let items = format_item(provider, msg, boundaries)?;
-        if msg.role == Role::System {
-            system_items.extend(items.iter().cloned());
-        }
-        input.extend(items);
     }
+    let mut conversation = Vec::new();
+    for msg in messages.iter().filter(|m| m.role != Role::System) {
+        if let Some(output) = compaction_output(msg) {
+            conversation = output.clone();
+            continue;
+        }
+        conversation.extend(format_item(provider, msg, boundaries)?);
+    }
+    input.extend(conversation);
     Ok(input)
 }
 
@@ -324,17 +336,17 @@ fn format_item(provider: Provider, msg: &Message, boundaries: bool) -> Result<Ve
                 return Ok(raw.clone());
             }
             let mut items = Vec::new();
-            // `DeepSeek::Responses#format_assistant_items`: DeepSeek reads its reasoning back as
-            // `reasoning_text` parts, signed or not; its `format_reasoning_item` overrides the base one.
+            // `DeepSeek::Responses#format_assistant_items`: DeepSeek reads its unsigned reasoning
+            // back as `reasoning_text` parts; its `format_reasoning_item` overrides the base one.
             let deepseek_text = provider == Provider::DeepSeek
-                && msg
-                    .thinking
-                    .as_ref()
-                    .is_some_and(|t| t.text.as_deref().is_some_and(|x| !x.is_empty()));
+                && msg.thinking.as_ref().is_some_and(|t| {
+                    t.signature.is_none() && t.text.as_deref().is_some_and(|x| !x.is_empty())
+                });
+            // `own_signature(msg)`: the API gets back only the reasoning it produced.
             if let Some(t) = msg
                 .thinking
                 .as_ref()
-                .filter(|t| t.signature.is_some() || deepseek_text)
+                .filter(|_| msg.own_signature(provider.slug()).is_some() || deepseek_text)
             {
                 if provider == Provider::DeepSeek {
                     items.push(json!({ "type": "reasoning", "content": [{ "type": "reasoning_text", "text": t.text }] }));
@@ -398,12 +410,7 @@ fn format_content(
             AttachmentType::Image => {
                 let mut part = json!({ "type": "input_image", "image_url": a.url_or_data_uri()? });
                 if let Some(res) = a.resolution {
-                    part["detail"] = if res == crate::attachment::Resolution::Low {
-                        "low"
-                    } else {
-                        "high"
-                    }
-                    .into();
+                    part["detail"] = res.image_detail(provider.is_original_image_detail()).into();
                 }
                 part
             }
@@ -429,7 +436,8 @@ fn format_content(
     Ok(Value::Array(parts))
 }
 
-fn tool_for(tool: &dyn Tool) -> Value {
+/// `Tools.tool_for` (public for the tool-search specs).
+pub fn tool_for(tool: &dyn Tool) -> Value {
     let mut definition = json!({
         "type": "function",
         "name": tool.name(),
@@ -437,6 +445,9 @@ fn tool_for(tool: &dyn Tool) -> Value {
         "parameters": tool_schema(tool).unwrap_or_else(empty_parameters_schema),
         "strict": false,
     });
+    if tool.is_deferred_registration() {
+        definition["defer_loading"] = true.into();
+    }
     let opts = tool.provider_options();
     if !opts.is_empty() {
         deep_merge(&mut definition, &Value::Object(opts));
@@ -444,7 +455,7 @@ fn tool_for(tool: &dyn Tool) -> Value {
     definition
 }
 
-fn parse_usage(provider: Provider, message: &mut Message, usage: &Value) {
+pub(crate) fn parse_usage(provider: Provider, message: &mut Message, usage: &Value) {
     let mut usage = usage.clone();
     if provider == Provider::Perplexity {
         let details = usage
@@ -471,13 +482,6 @@ fn parse_usage(provider: Provider, message: &mut Message, usage: &Value) {
     message.tokens.thinking = int(usage.pointer("/output_tokens_details/reasoning_tokens"));
     match provider {
         Provider::XAI => {
-            let mut counters = Map::new();
-            for key in ["num_sources_used", "num_server_side_tools_used"] {
-                if let Some(v) = usage.get(key).filter(|v| v.as_i64().unwrap_or(0) != 0) {
-                    counters.insert(key.into(), v.clone());
-                }
-            }
-            message.tokens.server_tool_use = (!counters.is_empty()).then_some(counters);
             message.tokens.reported_cost = usage
                 .get("cost_in_usd_ticks")
                 .and_then(Value::as_f64)
@@ -486,17 +490,100 @@ fn parse_usage(provider: Provider, message: &mut Message, usage: &Value) {
         Provider::Perplexity => {
             message.tokens.reported_cost = usage.pointer("/cost/total_cost").and_then(Value::as_f64)
         }
-        // `OpenRouter::Responses#parse_usage`: the billed cost and the hosted tool counters.
+        // `OpenRouter::Responses#parse_usage`: the billed cost.
         Provider::OpenRouter => {
             message.tokens.reported_cost = super::chat_completions::reported_cost(provider, &usage);
-            message.tokens.server_tool_use = usage
-                .get("server_tool_use")
-                .or_else(|| usage.get("server_tool_use_details"))
-                .and_then(Value::as_object)
-                .cloned();
         }
         _ => {}
     }
+}
+
+/// `parse_server_tool_use(response)`, normalized by `Tokens.new` ([`Tokens::positive_counts`]).
+/// Responses bills searches by `tool_usage`, not by the web_search_call items, which can each run
+/// several. xAI counts each `*_calls` detail (`XAI::Responses`), Perplexity its `tool_calls_details`
+/// invocations (`Perplexity::Agent`), and OpenRouter keeps the Chat Completions `*_requests`
+/// counters (`OpenRouter::Responses`).
+fn parse_server_tool_use(provider: Provider, response: &Value) -> Option<Map<String, Value>> {
+    let entries = |v: Option<&Value>| v.and_then(Value::as_object).cloned().unwrap_or_default();
+    let counts: Map<String, Value> = match provider {
+        Provider::XAI => entries(response.pointer("/usage/server_side_tool_usage_details"))
+            .into_iter()
+            .filter_map(|(counter, count)| {
+                let tool = counter.strip_suffix("_calls").filter(|t| !t.is_empty())?;
+                let tool = if tool == "code_interpreter" {
+                    "code_execution"
+                } else {
+                    tool
+                };
+                Some((format!("{tool}_requests"), count))
+            })
+            .collect(),
+        Provider::Perplexity => entries(response.pointer("/usage/tool_calls_details"))
+            .into_iter()
+            .map(|(tool, details)| {
+                let tool = match tool.as_str() {
+                    "search_web" => "web_search",
+                    "fetch_url" => "web_fetch",
+                    other => other,
+                };
+                (
+                    format!("{tool}_requests"),
+                    details.get("invocation").cloned().unwrap_or(Value::Null),
+                )
+            })
+            .collect(),
+        Provider::OpenRouter => {
+            super::chat_completions::server_tool_use(response.get("usage").unwrap_or(&Value::Null))
+        }
+        _ => entries(response.get("tool_usage"))
+            .into_iter()
+            .filter_map(|(tool, usage)| {
+                // `if usage['num_requests']`: present and truthy.
+                let n = usage
+                    .get("num_requests")
+                    .filter(|n| !n.is_null() && **n != Value::Bool(false))?;
+                Some((format!("{tool}_requests"), n.clone()))
+            })
+            .collect(),
+    };
+    Tokens::positive_counts(&Value::Object(counts))
+}
+
+const ERROR_STATUSES: &[(&str, u16)] = &[
+    ("server_error", 500),
+    ("rate_limit_exceeded", 429),
+    ("too_many_requests", 429),
+    ("insufficient_quota", 429),
+];
+
+/// `Responses::Streaming#parse_streaming_error`: OpenAI reports a flat error event carrying a code;
+/// Azure nests the code and type under an error object, as a failed response does. The code's
+/// status wins, then the type's, else 400; anything else is `Protocol`'s 500 (`None`).
+pub(crate) fn streaming_error_status(data: &str) -> Option<u16> {
+    let event: Value = serde_json::from_str(data).ok()?;
+    let error = match event.get("error") {
+        Some(e @ Value::Object(_)) => e,
+        _ if event.get("type").and_then(Value::as_str) == Some("error") => &event,
+        _ => return None,
+    };
+    let status = |key: &str| {
+        let kind = error.get(key).and_then(Value::as_str)?;
+        ERROR_STATUSES
+            .iter()
+            .find(|(k, _)| *k == kind)
+            .map(|(_, s)| *s)
+    };
+    Some(status("code").or_else(|| status("type")).unwrap_or(400))
+}
+
+/// `keep_raw_output?`: the output replays raw when hosted tools ran, or when a function call
+/// carries the namespace tool search assigned (the API requires it back).
+fn keep_raw_output(output: &[Value], server_calls: &[ServerToolCall]) -> bool {
+    !server_calls.is_empty()
+        || output.iter().any(|item| {
+            item.get("type").and_then(Value::as_str) == Some("function_call")
+                && item.get("namespace").is_some_and(|n| !n.is_null())
+        })
 }
 
 const CLIENT_OUTPUT_ITEM_TYPES: &[&str] = &["message", "reasoning", "function_call"];
@@ -531,6 +618,7 @@ fn server_tool_items(output: &[Value]) -> Vec<ServerToolCall> {
                     .cloned()
             }),
             raw: item.clone(),
+            search_suggestions: None,
         })
         .collect()
 }
@@ -828,11 +916,12 @@ pub fn parse_completion_body(
         &output,
         finish.as_ref().map(|f| f.as_str()),
     )?);
-    m.raw_content = (!server_calls.is_empty()).then(|| Value::Array(output.clone()));
+    m.raw_content = keep_raw_output(&output, &server_calls).then(|| Value::Array(output.clone()));
     m.server_tool_calls = server_calls;
     m.model = str_of(data.get("model"));
     m.finish_reason = finish;
     parse_usage(provider, &mut m, data.get("usage").unwrap_or(&json!({})));
+    m.tokens.server_tool_use = parse_server_tool_use(provider, data);
     m.raw = Some(raw);
     Ok(m.normalized())
 }
@@ -957,7 +1046,8 @@ pub fn build_chunk(provider: Provider, state: &mut StreamState, data: &Value) ->
             chunk.model = str_of(response.get("model"));
             chunk.citations = parse_citations(provider, &response, &output, None);
             let server_calls = server_tool_items(&output);
-            chunk.raw_content = (!server_calls.is_empty()).then(|| Value::Array(output.clone()));
+            chunk.raw_content =
+                keep_raw_output(&output, &server_calls).then(|| Value::Array(output.clone()));
             chunk.server_tool_calls = server_calls;
             chunk.finish_reason = finish;
             parse_usage(
@@ -965,6 +1055,7 @@ pub fn build_chunk(provider: Provider, state: &mut StreamState, data: &Value) ->
                 &mut chunk,
                 response.get("usage").unwrap_or(&json!({})),
             );
+            chunk.tokens.server_tool_use = parse_server_tool_use(provider, &response);
         }
         // `OpenRouter::Responses#build_chunk`: the finished arguments of a remote MCP call.
         "response.mcp_call_arguments.done" if provider == Provider::OpenRouter => {
@@ -975,13 +1066,18 @@ pub fn build_chunk(provider: Provider, state: &mut StreamState, data: &Value) ->
                 input: data.get("arguments").cloned(),
                 result: None,
                 raw: data.clone(),
+                search_suggestions: None,
             }];
         }
+        // `raise_failed_response`: the response's error, classified like a stream error event.
         "response.failed" => {
-            return Err(Error::Api(
-                str_of(data.pointer("/response/error/message"))
-                    .unwrap_or_else(|| "response failed".into()),
-                None,
+            let body =
+                json!({ "error": data.pointer("/response/error").cloned().unwrap_or(Value::Null) })
+                    .to_string();
+            return Err(crate::error::error_for_status_message(
+                streaming_error_status(&body).unwrap_or(500),
+                &body,
+                provider.parse_error(&body),
             ));
         }
         _ => {}

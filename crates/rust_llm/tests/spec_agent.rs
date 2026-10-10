@@ -225,7 +225,7 @@ impl Agent for Tenanted {
     }
 }
 
-// spec: agent_dsl_spec.rb:262 resolves the safety identifier from the agent inputs
+// spec: agent_dsl_spec.rb:292 resolves the safety identifier from the agent inputs
 #[test]
 fn the_end_user_comes_from_the_agent_inputs() {
     keys();
@@ -487,7 +487,7 @@ mod support {
     }
 }
 
-// spec: agent_dsl_spec.rb:422 underscores the class name into a prompt directory
+// spec: agent_dsl_spec.rb:452 underscores the class name into a prompt directory
 #[test]
 fn the_class_name_underscores_into_a_prompt_directory() {
     assert_eq!(

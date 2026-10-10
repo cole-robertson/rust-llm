@@ -4,12 +4,16 @@
 use std::sync::LazyLock;
 
 use regex::Regex;
+use serde_json::Value;
 
 /// The HTTP exchange an API error came from, kept like RubyLLM's `error.response`.
 #[derive(Debug, Clone, Default)]
 pub struct ErrorResponse {
     pub status: u16,
     pub body: String,
+    /// `Error#request_protocol` and `#request_payload`: the conversation request the error
+    /// answered, which `Error::request_shape` reads back. Set by the chat (`claim_error`).
+    pub request: Option<crate::request_shape::ClaimedRequest>,
 }
 
 /// Every failure RubyLLM raises, one variant per Ruby error class.
@@ -35,6 +39,10 @@ pub enum Error {
     ServiceUnavailable(String, Option<ErrorResponse>),
     #[error("{0}")]
     Overloaded(String, Option<ErrorResponse>),
+    /// `ContentFilterError`: the provider's content filters blocked a transcription and no
+    /// transcript came back. The message names the provider's reason, such as `SAFETY`.
+    #[error("{0}")]
+    ContentFilter(String, Option<ErrorResponse>),
     #[error("{message}")]
     ToolCallParse {
         message: String,
@@ -85,6 +93,10 @@ pub enum Error {
     /// `MCP::InputRequiredError`: a server needs input from the user that no callback gave.
     #[error(transparent)]
     McpInputRequired(Box<crate::mcp::InputRequiredError>),
+    /// A tool call an MCP server runs in the background (`MCP::Task`): a chat pauses the call
+    /// until the task is done, and `McpTool::call` hands the task back this way.
+    #[error("{} runs the call as task {}", .0.server_name(), .0.id)]
+    McpTask(Box<crate::mcp::Task>),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error(transparent)]
@@ -147,6 +159,17 @@ impl Error {
         }
     }
 
+    /// `error.class.name`, spelled for Rust: `rust_llm::Error::<Variant>` (`rust_llm::Error::Api`,
+    /// `rust_llm::Error::Cancelled`). Never includes the message, so it is safe to export.
+    pub fn class_name(&self) -> String {
+        let debug = format!("{self:?}");
+        let variant: String = debug
+            .chars()
+            .take_while(char::is_ascii_alphanumeric)
+            .collect();
+        format!("rust_llm::Error::{variant}")
+    }
+
     pub fn response(&self) -> Option<&ErrorResponse> {
         match self {
             Error::Api(_, r)
@@ -158,7 +181,8 @@ impl Error {
             | Error::ContextLengthExceeded(_, r)
             | Error::Server(_, r)
             | Error::ServiceUnavailable(_, r)
-            | Error::Overloaded(_, r) => r.as_ref(),
+            | Error::Overloaded(_, r)
+            | Error::ContentFilter(_, r) => r.as_ref(),
             Error::ToolCallParse { response, .. } => response.as_ref(),
             _ => None,
         }
@@ -175,6 +199,52 @@ impl Error {
                 | ErrorKind::Timeout
                 | ErrorKind::ConnectionFailed
         )
+    }
+
+    /// `Error#request_shape`: a [`RequestShape`](crate::RequestShape) describing the conversation
+    /// request the error answered, each turn's parts and their sizes, never their contents, and
+    /// the problems providers are known to refuse. `None` for errors raised before a request goes
+    /// out, such as an unsupported attachment, and for operations that send no conversation, such
+    /// as embeddings. The payload is read the first time only.
+    pub fn request_shape(&self) -> Option<&crate::RequestShape> {
+        self.response()?.request.as_ref()?.shape()
+    }
+
+    fn response_mut(&mut self) -> Option<&mut ErrorResponse> {
+        match self {
+            Error::Api(_, r)
+            | Error::BadRequest(_, r)
+            | Error::Unauthorized(_, r)
+            | Error::PaymentRequired(_, r)
+            | Error::Forbidden(_, r)
+            | Error::RateLimit(_, r)
+            | Error::ContextLengthExceeded(_, r)
+            | Error::Server(_, r)
+            | Error::ServiceUnavailable(_, r)
+            | Error::Overloaded(_, r)
+            | Error::ContentFilter(_, r) => r.as_mut(),
+            Error::ToolCallParse { response, .. } => response.as_mut(),
+            _ => None,
+        }
+    }
+
+    /// `Protocol#claim_error`: an error that answered a request (one with a response) remembers
+    /// the payload `protocol` rendered for it, unless an inner operation claimed it first.
+    pub(crate) fn claim(
+        mut self,
+        protocol: crate::ProtocolName,
+        provider: &str,
+        model: &str,
+        payload: &Value,
+    ) -> Error {
+        if let Some(response) = self.response_mut()
+            && response.request.is_none()
+        {
+            response.request = Some(crate::request_shape::ClaimedRequest::new(
+                protocol, provider, model, payload,
+            ));
+        }
+        self
     }
 
     pub(crate) fn tool_call_parse(finish_reason: Option<&str>) -> Self {
@@ -234,7 +304,7 @@ static CONTEXT_LENGTH_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         "context window",
         "exceeds?.*context size",
         "maximum context",
-        "request too large",
+        "request (?:was )?too large",
         "too many tokens",
         "token count exceeds",
         r"input[_\s-]?token",
@@ -244,10 +314,27 @@ static CONTEXT_LENGTH_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         "context limit",
     ])
 });
-static RATE_LIMIT_PATTERNS: LazyLock<Vec<Regex>> =
-    LazyLock::new(|| patterns(&["rate limit", "per minute", "per hour", "per day"]));
+static RATE_LIMIT_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+    patterns(&[
+        "rate limit",
+        "per minute",
+        "per hour",
+        "per day",
+        "quota exceeded",
+        "wait before trying again",
+    ])
+});
 static OVERLOAD_PATTERNS: LazyLock<Vec<Regex>> =
     LazyLock::new(|| patterns(&["currently overloaded"]));
+static PAYMENT_REQUIRED_PATTERNS: LazyLock<Vec<Regex>> =
+    LazyLock::new(|| patterns(&["credit balance is too low"]));
+static AUTHENTICATION_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+    patterns(&[
+        "api key not valid",
+        "incorrect api key",
+        "security token included in the request is (?:invalid|expired)",
+    ])
+});
 
 fn matches_any(list: &[Regex], message: &str) -> bool {
     list.iter().any(|re| re.is_match(message))
@@ -281,6 +368,41 @@ pub(crate) fn parse_error_message(body: &str) -> Option<String> {
             .or_else(|| obj.get("message").and_then(|m| m.as_str()))
             .or_else(|| obj.get("detail").and_then(|m| m.as_str()))
             .map(str::to_string)
+            .or_else(|| validation_detail_message(obj.get("detail")))
+    }
+    // `validation_detail_message`: a FastAPI `detail` array of `{loc:, msg:}` validation errors
+    // as `"loc.path: msg"`, joined by `"; "`.
+    fn validation_detail_message(detail: Option<&serde_json::Value>) -> Option<String> {
+        let messages: Vec<String> = detail?
+            .as_array()?
+            .iter()
+            .filter_map(|error| {
+                let error = error.as_object()?;
+                let loc = match error.get("loc") {
+                    Some(serde_json::Value::Array(parts)) => parts
+                        .iter()
+                        .map(|p| p.as_str().map_or_else(|| p.to_string(), str::to_string))
+                        .collect::<Vec<_>>()
+                        .join("."),
+                    Some(serde_json::Value::String(s)) => s.clone(),
+                    Some(serde_json::Value::Null) | None => String::new(),
+                    Some(other) => other.to_string(),
+                };
+                let msg = error.get("msg").and_then(|m| match m {
+                    serde_json::Value::Null => None,
+                    serde_json::Value::String(s) => Some(s.clone()),
+                    other => Some(other.to_string()),
+                });
+                let text: Vec<String> = [Some(loc), msg]
+                    .into_iter()
+                    .flatten()
+                    .filter(|t| !t.is_empty())
+                    .collect();
+                let text = text.join(": ");
+                (!text.is_empty()).then_some(text)
+            })
+            .collect();
+        (!messages.is_empty()).then(|| messages.join("; "))
     }
     match &json {
         serde_json::Value::Array(parts) => {
@@ -308,15 +430,26 @@ pub(crate) fn error_for_status_message(status: u16, body: &str, message: Option<
     let response = Some(ErrorResponse {
         status,
         body: body.to_string(),
+        request: None,
     });
     let text = message.clone().unwrap_or_default();
     let msg = |default: &str| message.clone().unwrap_or_else(|| default.to_string());
     match status {
+        // `raise_bad_request`: the message decides, in this order.
         400 => {
-            if matches_any(&CONTEXT_LENGTH_PATTERNS, &text) {
+            if matches_any(&AUTHENTICATION_PATTERNS, &text) {
+                Error::Unauthorized(msg("Invalid API key - check your credentials"), response)
+            } else if matches_any(&CONTEXT_LENGTH_PATTERNS, &text) {
                 Error::ContextLengthExceeded(msg("Context length exceeded"), response)
+            } else if matches_any(&RATE_LIMIT_PATTERNS, &text) {
+                Error::RateLimit(msg("Rate limit exceeded - please wait a moment"), response)
             } else if matches_any(&OVERLOAD_PATTERNS, &text) {
                 Error::Overloaded(msg("Service overloaded - please try again later"), response)
+            } else if matches_any(&PAYMENT_REQUIRED_PATTERNS, &text) {
+                Error::PaymentRequired(
+                    msg("Payment required - please top up your account"),
+                    response,
+                )
             } else {
                 Error::BadRequest(msg("Invalid request - please check your input"), response)
             }
@@ -326,10 +459,18 @@ pub(crate) fn error_for_status_message(status: u16, body: &str, message: Option<
             msg("Payment required - please top up your account"),
             response,
         ),
+        // `raise_forbidden`: a rejected key reported as 403 (AWS) is still unauthorized.
+        403 if matches_any(&AUTHENTICATION_PATTERNS, &text) => {
+            Error::Unauthorized(msg("Invalid API key - check your credentials"), response)
+        }
         403 => Error::Forbidden(
             msg("Forbidden - you do not have permission to access this resource"),
             response,
         ),
+        // `raise_too_large`: only a 413 about the request's size is a context length error.
+        413 if matches_any(&CONTEXT_LENGTH_PATTERNS, &text) => {
+            Error::ContextLengthExceeded(msg("Context length exceeded"), response)
+        }
         429 => {
             if !matches_any(&RATE_LIMIT_PATTERNS, &text)
                 && matches_any(&CONTEXT_LENGTH_PATTERNS, &text)

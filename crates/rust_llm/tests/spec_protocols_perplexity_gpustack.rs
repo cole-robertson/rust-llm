@@ -219,7 +219,7 @@ async fn posts_to_the_agent_endpoint_keeping_configured_gateway_base_paths() {
     assert_eq!(requests[0].url.path(), "/perplexity/v1/agent");
 }
 
-// spec: protocols/perplexity/agent_spec.rb:150 counts cache writes apart from fresh input
+// spec: protocols/perplexity/agent_spec.rb:171 counts cache writes apart from fresh input
 #[tokio::test]
 async fn counts_cache_writes_apart_from_fresh_input() {
     let usage = json!({ "input_tokens": 1494, "output_tokens": 7,
@@ -239,7 +239,7 @@ async fn counts_cache_writes_apart_from_fresh_input() {
     );
 }
 
-// spec: protocols/perplexity/agent_spec.rb:209 rejects documents, which the Agent API does not accept
+// spec: protocols/perplexity/agent_spec.rb:230 rejects documents, which the Agent API does not accept
 #[tokio::test]
 async fn rejects_documents_which_the_agent_api_does_not_accept() {
     let server = serve(vec![]).await;

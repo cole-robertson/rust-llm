@@ -63,6 +63,9 @@ impl Parameter {
 pub struct ToolResult {
     pub content: String,
     pub attachments: Vec<Attachment>,
+    /// The `MCP::Result` an MCP tool returned, when this is one. A chat keeps it on the tool
+    /// result message (`Message::mcp_result`) when it has a UI to render.
+    pub mcp_result: Option<Box<crate::mcp::McpResult>>,
 }
 
 impl ToolResult {
@@ -73,6 +76,7 @@ impl ToolResult {
         ToolResult {
             content: content.into(),
             attachments,
+            mcp_result: None,
         }
     }
 
@@ -87,6 +91,7 @@ impl From<String> for ToolResult {
         ToolResult {
             content,
             attachments: Vec::new(),
+            mcp_result: None,
         }
     }
 }
@@ -153,6 +158,34 @@ pub trait Tool: Send + Sync {
     /// `Tool.provider_options`: deep-merged into this tool's provider definition.
     fn provider_options(&self) -> Map<String, Value> {
         Map::new()
+    }
+
+    /// `Tool.defer` / `Tool.deferred?`: keeps this tool's definition out of the model's context
+    /// until the provider's tool search loads it. Pass `Some(false)` to
+    /// `Chat::add_tool_deferred` to offer it up front in one chat. See `Chat::deferred_tools`.
+    fn is_deferred(&self) -> bool {
+        false
+    }
+
+    /// Whether this is a [`Deferred`] registration, the tool set a chat renders for a request.
+    /// Protocols with native tool search mark these `defer_loading`.
+    #[doc(hidden)]
+    fn is_deferred_registration(&self) -> bool {
+        false
+    }
+
+    /// `MCP::Tool#visibility` includes `:model`: chats offer the tool to the model. Tools of an
+    /// MCP App that only its UI may call say no.
+    #[doc(hidden)]
+    fn is_model_visible(&self) -> bool {
+        true
+    }
+
+    /// `MCP::Tool#task(state, tool_call:)`: the MCP task a paused call waits on, from its saved
+    /// state. `None` for tools that never become tasks.
+    #[doc(hidden)]
+    fn mcp_task(&self, _state: &Value, _tool_call: &ToolCall) -> Option<crate::mcp::Task> {
+        None
     }
 
     async fn execute(
@@ -354,6 +387,62 @@ pub(crate) fn validate_arguments(
 }
 
 pub type SharedTool = Arc<dyn Tool>;
+
+/// `Tool::Deferred`: a tool the chat registered as deferred, delegating everything to it. Only
+/// protocols with tool search (Anthropic, OpenAI Responses) treat it differently.
+pub struct Deferred(pub SharedTool);
+
+#[async_trait]
+impl Tool for Deferred {
+    fn description(&self) -> String {
+        self.0.description()
+    }
+    fn name(&self) -> String {
+        self.0.name()
+    }
+    fn parameters(&self) -> Vec<Parameter> {
+        self.0.parameters()
+    }
+    fn parameters_schema(&self) -> Option<Value> {
+        self.0.parameters_schema()
+    }
+    fn requires_approval(&self) -> bool {
+        self.0.requires_approval()
+    }
+    fn approval(&self, tool_call: &ToolCall) -> Option<Option<bool>> {
+        self.0.approval(tool_call)
+    }
+    fn provider_options(&self) -> Map<String, Value> {
+        self.0.provider_options()
+    }
+    fn is_deferred(&self) -> bool {
+        self.0.is_deferred()
+    }
+    fn is_deferred_registration(&self) -> bool {
+        true
+    }
+    fn is_model_visible(&self) -> bool {
+        self.0.is_model_visible()
+    }
+    fn mcp_task(&self, state: &Value, tool_call: &ToolCall) -> Option<crate::mcp::Task> {
+        self.0.mcp_task(state, tool_call)
+    }
+    async fn execute(
+        &self,
+        arguments: Map<String, Value>,
+        tool_call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
+        self.0.execute(arguments, tool_call).await
+    }
+    async fn resume(
+        &self,
+        input: &Value,
+        arguments: Map<String, Value>,
+        tool_call: &ToolCall,
+    ) -> Result<ToolResult, ToolError> {
+        self.0.resume(input, arguments, tool_call).await
+    }
+}
 
 type ToolFnFuture =
     std::pin::Pin<Box<dyn std::future::Future<Output = Result<ToolResult, ToolError>> + Send>>;

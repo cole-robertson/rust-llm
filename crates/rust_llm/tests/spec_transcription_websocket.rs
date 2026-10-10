@@ -258,7 +258,7 @@ async fn streams_partial_and_final_transcription_through_gemini_live() {
 
 // ---- xAI -----------------------------------------------------------------------------------
 
-// spec: protocols/xai/streaming_transcription_spec.rb:91 streams transcription through the public API with typed chunks and word timing
+// spec: protocols/xai/streaming_transcription_spec.rb:99 streams transcription through the public API with typed chunks and word timing
 #[tokio::test]
 async fn xai_streams_transcription_with_typed_chunks_and_word_timing() {
     let cassette = WebsocketCassette::load("transcription_xai");
@@ -434,27 +434,4 @@ async fn openrouter_transcribes_a_real_recording_with_speakers_duration_and_cost
     assert!(speakers(&t.words).contains(&json!(0)));
     assert!(t.duration.unwrap() > 0.0);
     assert!(t.cost().total().unwrap() > 0.0);
-}
-
-// ---- Gemini dedicated transcription --------------------------------------------------------
-
-// spec: protocols/gemini/file_transcription_spec.rb:95 rejects incompatible custom vocabulary and timestamp options before requesting an interaction
-#[tokio::test]
-async fn gemini_rejects_custom_vocabulary_with_timestamps_before_requesting_an_interaction() {
-    let server = wiremock::MockServer::start().await;
-    let opts = TranscribeOptions {
-        timestamps: Some(vec!["word"]),
-        prompt: Some("RubyLLM"),
-        ..options(
-            "gemini-3.5-transcribe",
-            "gemini",
-            config_at("gemini", format!("{}/v1beta", server.uri())),
-        )
-    };
-    let result = transcribe(ruby_wav().as_str(), opts).await;
-    assert!(
-        matches!(&result, Err(Error::Argument(m)) if m.contains("custom vocabulary cannot be combined")),
-        "{result:?}"
-    );
-    assert!(server.received_requests().await.unwrap().is_empty());
 }

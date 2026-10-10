@@ -67,11 +67,9 @@ pub async fn tokenize(text: &str, options: TokenizeOptions<'_>) -> Result<Tokeni
             ("provider", provider.slug().into()),
         ])
     });
-    let result = tracing::Instrument::instrument(
-        tokenize_inner(text, config.clone(), model, provider),
-        event.span(),
-    )
-    .await;
+    let result = event
+        .instrument(tokenize_inner(text, config.clone(), model, provider))
+        .await;
     if let Ok(t) = &result {
         event.set("result", || json!({ "ids": t.ids, "model": t.model }));
     }

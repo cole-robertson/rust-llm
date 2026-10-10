@@ -225,6 +225,10 @@ fn parses_hosted_steps_citation_markers_and_connector_input_tokens_without_infla
         (message.tokens.input, message.tokens.output),
         (Some(120), Some(5))
     );
+    assert_eq!(
+        message.tokens.server_tool_use,
+        json!({ "web_search_requests": 1 }).as_object().cloned()
+    );
     let citation = &message.citations[0];
     assert_eq!(
         (
@@ -384,7 +388,7 @@ async fn stream_conversation(events: Vec<Value>) -> (rust_llm::Result<Message>, 
 
 // ---- conversations/images_spec.rb ---------------------------------------------------------------
 
-// spec: protocols/mistral/conversations/images_spec.rb:12
+// spec: protocols/mistral/conversations/images_spec.rb:13
 #[tokio::test]
 async fn routes_paint_through_conversations_while_preserving_the_default_chat_protocol() {
     let server = MockServer::start().await;
@@ -431,7 +435,7 @@ fn mistral_config(server: &MockServer) -> Arc<Config> {
     Arc::new(c)
 }
 
-// spec: protocols/mistral/conversations/images_spec.rb:20
+// spec: protocols/mistral/conversations/images_spec.rb:21
 #[tokio::test]
 async fn downloads_generated_files_from_the_documented_content_endpoint_and_detects_their_actual_type()
  {
@@ -465,7 +469,7 @@ async fn downloads_generated_files_from_the_documented_content_endpoint_and_dete
     assert_eq!((tokens.input, tokens.output), (Some(15), Some(3)));
 }
 
-// spec: protocols/mistral/conversations/images_spec.rb:34
+// spec: protocols/mistral/conversations/images_spec.rb:48
 #[tokio::test]
 async fn rejects_image_controls_that_the_hosted_tool_cannot_honor() {
     let options = |size, count| PaintOptions {
@@ -488,11 +492,25 @@ async fn rejects_image_controls_that_the_hosted_tool_cannot_honor() {
     );
 }
 
-// spec: protocols/mistral/conversations/images_spec.rb:43
+// spec: protocols/mistral/conversations/images_spec.rb:57
 #[tokio::test]
 async fn generates_and_downloads_an_image_through_paint() {
-    let cassette = Cassette::start(
+    // RubyLLM 2.1 downloads the image URL the hosted tool returned; the recorded response names
+    // the real blob host, so it is pointed at the replay server, which serves the recorded GET.
+    // Faraday's params encoder re-sorted (and VCR decoded) that GET's query string; the port
+    // fetches the URL exactly as Mistral returned it, so the recorded GET is compared against
+    // that URL instead.
+    let cassette = Cassette::start_edited(
         "protocols_mistral_conversations_images_generates_and_downloads_an_image_through_paint",
+        |here, interactions| {
+            let blob = "https://mistralaiblackforestprod.blob.core.windows.net";
+            interactions[0].response_body = interactions[0].response_body.replace(blob, here);
+            let body: Value = serde_json::from_str(&interactions[0].response_body).unwrap();
+            let result: Value =
+                serde_json::from_str(body["outputs"][0]["info"]["result"].as_str().unwrap())
+                    .unwrap();
+            interactions[1].uri = result["url"].as_str().unwrap().to_string();
+        },
     )
     .await
     .unwrap();
@@ -560,6 +578,10 @@ async fn searches_the_web_with_citations_and_replays_hosted_results_in_a_statele
             .is_some_and(|u| u.contains("ruby-lang.org"))
     }));
     assert!(response.tokens().input.is_some_and(|i| i > 0));
+    assert_eq!(
+        response.tokens().server_tool_use,
+        json!({ "web_search_requests": 1 }).as_object().cloned()
+    );
     assert!(
         chat.ask("What version was that announcement for?")
             .await
@@ -570,7 +592,7 @@ async fn searches_the_web_with_citations_and_replays_hosted_results_in_a_statele
     cassette.assert_all_matched().await;
 }
 
-// spec: protocols/mistral/conversations_live_spec.rb:18
+// spec: protocols/mistral/conversations_live_spec.rb:19
 #[tokio::test]
 async fn fetches_a_public_page_through_the_web_fetch_alias() {
     let (cassette, chat) = live("fetches_a_public_page_through_the_web_fetch_alias").await;
@@ -593,7 +615,7 @@ async fn fetches_a_public_page_through_the_web_fetch_alias() {
     cassette.assert_all_matched().await;
 }
 
-// spec: protocols/mistral/conversations_live_spec.rb:27
+// spec: protocols/mistral/conversations_live_spec.rb:28
 #[tokio::test]
 async fn streams_hosted_python_execution_with_complete_tool_history_and_usage() {
     let (cassette, chat) =
@@ -616,11 +638,8 @@ async fn streams_hosted_python_execution_with_complete_tool_history_and_usage() 
     );
     let tokens = response.tokens();
     assert_eq!(
-        tokens
-            .server_tool_use
-            .as_ref()
-            .and_then(|s| s.get("code_interpreter")),
-        Some(&json!(1))
+        tokens.server_tool_use,
+        json!({ "code_execution_requests": 1 }).as_object().cloned()
     );
     assert!(tokens.output.is_some_and(|o| o > 0));
     assert!(
@@ -635,7 +654,7 @@ async fn streams_hosted_python_execution_with_complete_tool_history_and_usage() 
 
 // The example's library setup (create, upload, poll, delete) goes through Faraday directly; this
 // port has no public Mistral libraries API, so the test replays those exchanges with raw requests.
-// spec: protocols/mistral/conversations_live_spec.rb:40
+// spec: protocols/mistral/conversations_live_spec.rb:41
 #[tokio::test]
 async fn searches_an_uploaded_document_through_the_file_search_alias() {
     let (cassette, chat) =
@@ -707,6 +726,14 @@ async fn searches_an_uploaded_document_through_the_file_search_alias() {
             .server_tool_calls
             .iter()
             .any(|c| c.name.as_deref() == Some("document_library"))
+    );
+    assert_eq!(
+        response
+            .tokens()
+            .server_tool_use
+            .as_ref()
+            .and_then(|s| s.get("file_search_requests")),
+        Some(&json!(1))
     );
     // The multipart upload body is not JSON; the replay compares its path and method only.
     cassette.assert_all_matched().await;
@@ -794,7 +821,7 @@ async fn keeps_an_unanswered_local_function_call_separate_from_completed_hosted_
     assert!(!calls.values().next().unwrap().remote);
 }
 
-// spec: protocols/mistral/multi_completion_spec.rb:49
+// spec: protocols/mistral/multi_completion_spec.rb:67
 #[test]
 fn refuses_to_execute_an_unfinished_hosted_call_as_a_local_tool() {
     let err = mistral::parse_multi_message(&multi_body(&multi_messages()[..1]), None).unwrap_err();
@@ -804,7 +831,7 @@ fn refuses_to_execute_an_unfinished_hosted_call_as_a_local_tool() {
     );
 }
 
-// spec: protocols/mistral/multi_completion_spec.rb:54
+// spec: protocols/mistral/multi_completion_spec.rb:72
 #[test]
 fn renders_only_the_hosted_tools_supported_by_chat_completions_without_an_invented_request_flag() {
     let mut chat = Chat::with_config(offline_config(), Some(MODEL), Some("mistral"), false)
@@ -821,7 +848,7 @@ fn renders_only_the_hosted_tools_supported_by_chat_completions_without_an_invent
     assert!(payload.get("multi_completion").is_none());
 }
 
-// spec: protocols/mistral/multi_completion_spec.rb:60
+// spec: protocols/mistral/multi_completion_spec.rb:78
 #[tokio::test]
 async fn sums_separate_streamed_completions_and_does_not_expose_tool_result_text_as_assistant_output()
  {
@@ -858,7 +885,7 @@ async fn sums_separate_streamed_completions_and_does_not_expose_tool_result_text
     assert_eq!(message.attachments.len(), 1);
 }
 
-// spec: protocols/mistral/multi_completion_spec.rb:82
+// spec: protocols/mistral/multi_completion_spec.rb:100
 #[tokio::test]
 async fn streams_and_downloads_a_hosted_image_through_the_default_chat_api() {
     let name = "protocols_mistral_multicompletion_streams_and_downloads_a_hosted_image_through_the_default_chat_api";

@@ -5,9 +5,13 @@
 //! overloads, timeouts, and connection failures, with exponential backoff and jitter, honoring
 //! `Retry-After`/`retry-after-ms`. A stream that has already delivered a chunk is never retried.
 
+pub mod event_stream_parser;
 pub mod websocket_connection;
 
+pub use event_stream_parser::{EventStreamParser, SseEvent};
 pub use websocket_connection::WebsocketConnection;
+
+use event_stream_parser::{MAX_JSON_BODY_BYTES, StreamState, accumulate_failed_body};
 
 use std::time::Duration;
 
@@ -34,79 +38,62 @@ impl std::fmt::Debug for Connection {
     }
 }
 
-/// One server-sent event.
-#[derive(Debug, Clone)]
-pub struct SseEvent {
-    pub event: Option<String>,
-    pub data: String,
+/// The incremental SSE parser the MCP transport shares.
+pub(crate) type SseParser = EventStreamParser;
+
+/// `Connection::Settings`: what a shared HTTP client is cached under. Credentials and the retry
+/// settings are not in it: headers travel with each request, and the retry loop reads each
+/// connection's own configuration. Pooled sockets belong to the tokio runtime that opened them,
+/// so the runtime is part of the key, as Ruby's cache is per process.
+#[derive(PartialEq)]
+struct Settings {
+    provider: Provider,
+    api_base: Option<String>,
+    timeout: Duration,
+    proxy: Option<String>,
+    runtime: tokio::runtime::Id,
 }
 
-/// Incremental SSE parser (`EventStreamParser::Parser`).
-#[derive(Default)]
-pub(crate) struct SseParser {
-    buffer: String,
-    event: Option<String>,
-    data: Vec<String>,
-}
-
-impl SseParser {
-    pub(crate) fn feed(&mut self, bytes: &str) -> Vec<SseEvent> {
-        self.buffer.push_str(bytes);
-        let mut events = Vec::new();
-        while let Some(pos) = self.buffer.find('\n') {
-            let mut line: String = self.buffer.drain(..=pos).collect();
-            line.pop();
-            if line.ends_with('\r') {
-                line.pop();
-            }
-            if line.is_empty() {
-                if !self.data.is_empty() {
-                    events.push(SseEvent {
-                        event: self.event.take(),
-                        data: self.data.join("\n"),
-                    });
-                    self.data.clear();
-                }
-                self.event = None;
-                continue;
-            }
-            if line.starts_with(':') {
-                continue;
-            }
-            let (field, value) = match line.split_once(':') {
-                Some((f, v)) => (f.to_string(), v.strip_prefix(' ').unwrap_or(v).to_string()),
-                None => (line.clone(), String::new()),
-            };
-            match field.as_str() {
-                "event" => self.event = Some(value),
-                "data" => self.data.push(value),
-                _ => {}
-            }
-        }
-        events
-    }
-
-    pub(crate) fn finish(&mut self) -> Vec<SseEvent> {
-        let mut events = self.feed("\n\n");
-        if !self.data.is_empty() {
-            events.push(SseEvent {
-                event: self.event.take(),
-                data: self.data.join("\n"),
-            });
-            self.data.clear();
-        }
-        events
-    }
-}
+/// `Connection::CACHE`.
+static CLIENTS: crate::support::ProcessCache<Settings, reqwest::Client> =
+    crate::support::ProcessCache::new(crate::support::ProcessCache::<(), ()>::LIMIT);
 
 impl Connection {
+    /// `Connection.new(provider, config)`: the HTTP client, and its pool of kept-alive sockets,
+    /// is shared by every connection built from equal settings on this runtime (`15b48ed0`).
     pub fn new(provider: Provider, config: std::sync::Arc<Config>) -> Result<Connection> {
-        let client = basic(&config)?;
+        let client = match tokio::runtime::Handle::try_current() {
+            Ok(runtime) => {
+                let settings = Settings {
+                    provider,
+                    api_base: provider.api_base(&config).ok(),
+                    timeout: config.request_timeout,
+                    proxy: config.http_proxy.clone(),
+                    runtime: runtime.id(),
+                };
+                CLIENTS.try_fetch(settings, || basic(&config))?
+            }
+            Err(_) => basic(&config)?,
+        };
         Ok(Connection {
             client,
             provider,
             config,
         })
+    }
+
+    /// A connection over an HTTP client you built yourself, the counterpart of RubyLLM's
+    /// `config.faraday_adapter`: custom TLS roots, connectors, or pool settings. It is not cached.
+    pub fn with_client(
+        provider: Provider,
+        config: std::sync::Arc<Config>,
+        client: reqwest::Client,
+    ) -> Connection {
+        Connection {
+            client,
+            provider,
+            config,
+        }
     }
 
     pub fn client(&self) -> &reqwest::Client {
@@ -191,10 +178,16 @@ impl Connection {
         url: &str,
         payload: &Value,
         extra: &[(String, String)],
+        stream: bool,
         on_attempt: &mut (dyn FnMut(Option<&Error>) + Send),
     ) -> Result<reqwest::Response> {
-        self.send_built(&|| self.request(url, payload, extra), true, on_attempt)
-            .await
+        self.send_built(
+            &|| self.request(url, payload, extra),
+            true,
+            stream,
+            on_attempt,
+        )
+        .await
     }
 
     /// Sends the request `build` makes, retrying it under the rules above when `retry` is set.
@@ -202,6 +195,7 @@ impl Connection {
         &self,
         build: &(dyn Fn() -> reqwest::RequestBuilder + Send + Sync),
         retry: bool,
+        stream: bool,
         on_attempt: &mut (dyn FnMut(Option<&Error>) + Send),
     ) -> Result<reqwest::Response> {
         // `instrument_request`: one `request.rust_llm` around the call and its retries.
@@ -220,11 +214,9 @@ impl Connection {
                     ("url", request.as_ref().map(|r| r.url().to_string()).into()),
                 ])
             });
-        let result = tracing::Instrument::instrument(
-            self.send_attempts(build, retry, on_attempt),
-            event.span(),
-        )
-        .await;
+        let result = event
+            .instrument(self.send_attempts(build, retry, stream, on_attempt))
+            .await;
         let status = match &result {
             Ok(resp) => Some(resp.status().as_u16()),
             Err(e) => e.response().map(|r| r.status),
@@ -240,6 +232,7 @@ impl Connection {
         &self,
         build: &(dyn Fn() -> reqwest::RequestBuilder + Send + Sync),
         retry: bool,
+        stream: bool,
         on_attempt: &mut (dyn FnMut(Option<&Error>) + Send),
     ) -> Result<reqwest::Response> {
         let mut attempt = 0;
@@ -253,15 +246,18 @@ impl Connection {
                     let status = resp.status().as_u16();
                     let mut headers = header_pairs(&resp);
                     apply_retry_delay(Some(self.provider), status, &mut headers);
-                    let body = resp.text().await.unwrap_or_default();
+                    let body = if stream {
+                        failed_stream_body(resp).await
+                    } else {
+                        resp.text().await.unwrap_or_default()
+                    };
                     let message = self.provider.parse_error(&body);
                     (
                         error_for_status_message(status, &body, message),
                         retry_after_secs(&headers),
                     )
                 }
-                Err(e) if e.is_timeout() => (Error::Timeout(e.to_string()), None),
-                Err(e) => (Error::ConnectionFailed(e.to_string()), None),
+                Err(e) => (transport_error(e), None),
             };
             let delay = if retry {
                 self.retry_delay(&error, attempt, retry_after)
@@ -293,7 +289,7 @@ impl Connection {
     ) -> Result<RawResponse> {
         let url = self.url(path)?;
         let resp = self
-            .send_with_retry(&url, payload, extra, on_attempt)
+            .send_with_retry(&url, payload, extra, false, on_attempt)
             .await?;
         let status = resp.status().as_u16();
         let headers = header_pairs(&resp);
@@ -312,7 +308,7 @@ impl Connection {
             status,
             headers,
             body,
-            request_body: payload.to_string().into(),
+            request_body: "".into(),
         })
     }
 
@@ -412,7 +408,7 @@ impl Connection {
             }
             body(req)
         };
-        self.send_built(&build, retry, on_attempt).await
+        self.send_built(&build, retry, false, on_attempt).await
     }
 
     /// POST JSON and feed each server-sent event to `on_event`. Errors inside the stream
@@ -436,7 +432,7 @@ impl Connection {
             let mut forward =
                 |previous: Option<&Error>| on_attempt(previous.or(first.take().as_ref()));
             let resp = self
-                .send_with_retry(&url, payload, extra, &mut forward)
+                .send_with_retry(&url, payload, extra, true, &mut forward)
                 .await?;
             let status = resp.status().as_u16();
             let headers = header_pairs(&resp);
@@ -450,7 +446,7 @@ impl Connection {
                         status,
                         headers,
                         body: Value::Null,
-                        request_body: payload.to_string().into(),
+                        request_body: "".into(),
                     });
                 }
                 Err(error) if delivered => return Err(error),
@@ -471,6 +467,8 @@ impl Connection {
         }
     }
 
+    /// `process_stream_chunk` for each network read of a successful streaming response: a fresh
+    /// `StreamState` per attempt, so nothing a failed attempt half-parsed reaches the next one.
     pub(crate) async fn read_stream(
         &self,
         resp: reqwest::Response,
@@ -478,8 +476,16 @@ impl Connection {
         streaming_error: fn(&str) -> Option<u16>,
         delivered: &mut bool,
     ) -> Result<()> {
-        let mut parser = SseParser::default();
+        let mut state = StreamState::new(MAX_JSON_BODY_BYTES);
         let mut stream = resp.bytes_stream();
+        // `raise_stream_error`: the protocol's status for the error (500 by default).
+        let raise = |text: &str| {
+            error_for_status_message(
+                streaming_error(text).unwrap_or(500),
+                text,
+                self.provider.parse_error(text),
+            )
+        };
         let mut handle = |event: SseEvent| -> Result<()> {
             if event.data == "[DONE]" {
                 return Ok(());
@@ -492,12 +498,7 @@ impl Connection {
                 || data.get("error").is_some()
                 || data.get("type").and_then(Value::as_str) == Some("error");
             if is_error {
-                let code = streaming_error(&event.data).unwrap_or(500);
-                return Err(error_for_status_message(
-                    code,
-                    &event.data,
-                    self.provider.parse_error(&event.data),
-                ));
+                return Err(raise(&event.data));
             }
             *delivered = true;
             // `stream_events`: `block.call(data) if data.is_a?(Hash)`; `data: true` is skipped
@@ -508,28 +509,48 @@ impl Connection {
             on_event(event, data)
         };
         while let Some(bytes) = stream.next().await {
-            let bytes = bytes.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
-            for event in parser.feed(&String::from_utf8_lossy(&bytes)) {
-                handle(event)?;
+            let bytes = bytes.map_err(transport_error)?;
+            if let Some(error_body) = state.read(&bytes, &mut handle)? {
+                return Err(raise(&error_body));
             }
         }
-        for event in parser.finish() {
+        for event in state.parser.finish() {
             handle(event)?;
         }
         Ok(())
     }
 }
 
+/// A `reqwest` failure as the error class Faraday raises for it: a timeout, or any other
+/// connection failure (refused, reset, TLS, a body cut short), all of which are retried.
+fn transport_error(error: reqwest::Error) -> Error {
+    if error.is_timeout() {
+        Error::Timeout(error.to_string())
+    } else {
+        Error::ConnectionFailed(error.to_string())
+    }
+}
+
+/// `handle_failed_response`: a failed streaming response's body, read as it arrives and kept
+/// only while it fits `MAX_JSON_BODY_BYTES`; past that it is dropped and the status alone picks
+/// the error (`6f16112c`).
+async fn failed_stream_body(resp: reqwest::Response) -> String {
+    let mut buffer = Vec::new();
+    let mut stream = resp.bytes_stream();
+    while let Some(Ok(bytes)) = stream.next().await {
+        if !accumulate_failed_body(&mut buffer, &bytes, MAX_JSON_BODY_BYTES) {
+            return String::new();
+        }
+    }
+    String::from_utf8_lossy(&buffer).into_owned()
+}
+
 /// Reads a JSON body the way `post` does: an empty body is an error, a non-JSON one a string.
+/// The request is not kept (`release_request`), so `_request_body` is unused.
 pub(crate) async fn json_response(
     resp: reqwest::Response,
-    request_body: Value,
+    _request_body: Value,
 ) -> Result<RawResponse> {
-    let request_body: std::sync::Arc<str> = if request_body.is_null() {
-        "".into()
-    } else {
-        request_body.to_string().into()
-    };
     let status = resp.status().as_u16();
     let headers = header_pairs(&resp);
     let text = resp
@@ -547,7 +568,7 @@ pub(crate) async fn json_response(
         status,
         headers,
         body,
-        request_body,
+        request_body: "".into(),
     })
 }
 
@@ -630,19 +651,4 @@ fn retry_after_secs(headers: &[(String, String)]) -> Option<f64> {
             Err(_) => v.trim().parse::<f64>().unwrap_or(0.0),
         })
         .reduce(f64::max)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn sse_events_split_across_reads_are_reassembled() {
-        let mut p = SseParser::default();
-        assert!(p.feed("event: message_start\ndata: {\"a\":").is_empty());
-        let events = p.feed("1}\n\nevent: ping\ndata: {}\n\n");
-        assert_eq!(events.len(), 2);
-        assert_eq!(events[0].event.as_deref(), Some("message_start"));
-        assert_eq!(events[0].data, "{\"a\":1}");
-    }
 }

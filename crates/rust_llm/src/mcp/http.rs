@@ -2,8 +2,19 @@
 //! with a JSON body or with an event stream that carries the request's notifications before its
 //! response. Plain HTTP is only allowed on loopback addresses, URLs cannot carry credentials, and
 //! redirects are never followed. A cancelled chat closes the stream, which is how 2026-07-28
-//! cancels a request.
+//! cancels a request. Servers that predate it may keep a session, which ends with a DELETE when
+//! the transport closes.
+//!
+//! When a stream ends before the response, 2026-07-28 sends the request again with a new ID,
+//! while older servers resume the stream from its last event ID after the wait they ask for, a
+//! few times at most.
+//!
+//! A subscription's stream stays open; older servers send changes on the session's event stream
+//! instead. A server's own requests, on any stream, are answered right away: pings with a
+//! result, the rest with method not found, so a server never waits on RustLLM.
 
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -12,23 +23,77 @@ use base64::Engine;
 use futures::StreamExt;
 use serde_json::Value;
 
+use super::oauth::Recovery;
 use super::{McpError, OnNotification, Transport, client};
 use crate::error::{Error, ErrorResponse, Result};
 use crate::transport::SseParser;
 
 const LOOPBACK_HOSTS: &[&str] = &["localhost", "127.0.0.1", "[::1]", "::1"];
+const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
+const RECONNECTS: usize = 3;
+const RECONNECT_DELAY: Duration = Duration::from_secs(1);
+const CHECK_INTERVAL: Duration = Duration::from_millis(100);
 
-/// Headers sent with every request, resolved per request (`headers: -> { ... }`).
-pub type HeaderSource = Arc<dyn Fn() -> Vec<(String, String)> + Send + Sync>;
+/// Headers sent with every request, resolved per request for its HTTP verb (`headers: ->(verb)
+/// { ... }`).
+pub type HeaderSource = Arc<dyn Fn(&str) -> Vec<(String, String)> + Send + Sync>;
 
 /// The OAuth side of `HTTP.new(headers:, unauthorized:)`: the `Authorization` header, resolved
 /// per request (refreshing an expiring token), and the `unauthorized` callback, which receives
 /// the `WWW-Authenticate` header and status of a 401 or 403 and returns whether a 401 is worth
 /// one retry.
+///
+/// DPoP (RFC 9449) needs more than one header and a proof per HTTP verb: `authorization_headers`
+/// returns every header that authorizes a `verb` request, `recover` also receives the response's
+/// `DPoP-Nonce` and the ways the request already recovered, and `responded` receives the
+/// `DPoP-Nonce` of every response. Their defaults use the first two methods.
 #[async_trait]
 pub trait Authorization: Send + Sync {
     async fn authorization(&self) -> Result<Option<String>>;
     async fn unauthorized(&self, www_authenticate: Option<&str>, status: u16) -> bool;
+
+    /// `headers.call(verb)`'s OAuth part: `oauth.authorization_headers(verb)`.
+    async fn authorization_headers(&self, _verb: &str) -> Result<Vec<(String, String)>> {
+        Ok(self
+            .authorization()
+            .await?
+            .map(|value| vec![("Authorization".to_string(), value)])
+            .unwrap_or_default())
+    }
+
+    /// `unauthorized.call(headers, status, recovered)`: how to send a rejected request again, or
+    /// `None`. Fails when getting a new token fails, such as when a grant is refused.
+    async fn recover(
+        &self,
+        www_authenticate: Option<&str>,
+        status: u16,
+        _nonce: Option<&str>,
+        _recovered: &[Recovery],
+    ) -> Result<Option<Recovery>> {
+        Ok(self
+            .unauthorized(www_authenticate, status)
+            .await
+            .then_some(Recovery::Token))
+    }
+
+    /// `responded.call(headers)`: the `DPoP-Nonce` a response carried.
+    fn responded(&self, _nonce: Option<&str>) {}
+}
+
+fn dpop_nonce(response: &reqwest::Response) -> Option<String> {
+    response
+        .headers()
+        .get("dpop-nonce")
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string)
+}
+
+/// A failed response: its status, `WWW-Authenticate` header, and the stream of its body.
+struct Failure {
+    status: u16,
+    challenge: Option<String>,
+    stream: Stream,
+    nonce: Option<String>,
 }
 
 /// `RubyLLM::MCP::HTTP`.
@@ -36,7 +101,9 @@ pub struct Http {
     url: reqwest::Url,
     headers: HeaderSource,
     client: reqwest::Client,
+    timeout: Duration,
     session: Mutex<Option<String>>,
+    version: Mutex<Option<String>>,
     authorization: Option<Arc<dyn Authorization>>,
 }
 
@@ -61,7 +128,9 @@ impl Http {
             .is_some_and(|u| u.host_str().is_some_and(|h| LOOPBACK_HOSTS.contains(&h)))
     }
 
-    /// Raises `Error::Argument` for insecure URLs, like `HTTP.new`.
+    /// Raises `Error::Argument` for insecure URLs, like `HTTP.new`. `timeout` bounds connecting
+    /// and each read, as Faraday's `options.timeout` does, so a stream that keeps sending stays
+    /// open.
     pub fn new(url: &str, headers: HeaderSource, timeout: Duration) -> Result<Http> {
         if !Http::is_secure(url) {
             return Err(Error::Argument(format!(
@@ -70,7 +139,8 @@ impl Http {
         }
         let url = reqwest::Url::parse(url).map_err(|e| Error::Argument(e.to_string()))?;
         let client = reqwest::Client::builder()
-            .timeout(timeout)
+            .connect_timeout(timeout)
+            .read_timeout(timeout)
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|e| Error::Configuration(e.to_string()))?;
@@ -78,7 +148,9 @@ impl Http {
             url,
             headers,
             client,
+            timeout,
             session: Mutex::new(None),
+            version: Mutex::new(None),
             authorization: None,
         })
     }
@@ -103,7 +175,33 @@ impl Http {
         }
     }
 
-    /// `post(..., retried:)`: a 401 the `unauthorized` callback fixes is sent once more.
+    fn take_session(&self) -> Option<String> {
+        self.session.lock().ok().and_then(|mut s| s.take())
+    }
+
+    fn last_version(&self) -> Option<String> {
+        self.version.lock().ok().and_then(|v| v.clone())
+    }
+
+    /// `custom_headers(verb)` plus the OAuth `Authorization` header.
+    async fn custom_headers(
+        &self,
+        mut request: reqwest::RequestBuilder,
+        verb: &str,
+    ) -> Result<reqwest::RequestBuilder> {
+        for (key, value) in (self.headers)(verb) {
+            request = request.header(key, value);
+        }
+        if let Some(authorization) = &self.authorization {
+            for (key, value) in authorization.authorization_headers(verb).await? {
+                request = request.header(key, value);
+            }
+        }
+        Ok(request)
+    }
+
+    /// `post(..., recovered:)`: a 401 the `unauthorized` callback fixes is sent once more; a 404
+    /// for a request in a session means the session ended.
     async fn post(
         &self,
         message: &Value,
@@ -111,76 +209,111 @@ impl Http {
         timeout: Option<Duration>,
         params: &[(String, String)],
         on_notification: &mut OnNotification<'_>,
-    ) -> Result<Vec<Value>> {
-        let mut retried = false;
+        subscription: bool,
+    ) -> Result<Stream> {
+        let method = message.get("method").and_then(Value::as_str);
+        let session = if method == Some("initialize") {
+            None
+        } else {
+            self.session()
+        };
+        let mut recovered: Vec<Recovery> = Vec::new();
         loop {
-            match self
-                .post_once(message, version, timeout, params, on_notification)
+            let failure = match self
+                .post_once(
+                    message,
+                    version,
+                    timeout,
+                    params,
+                    session.as_deref(),
+                    on_notification,
+                    subscription,
+                )
                 .await?
             {
-                Ok(replies) => return Ok(replies),
-                Err((status, challenge, error)) => {
-                    if !self
-                        .is_reauthorized(status, challenge.as_deref(), retried)
-                        .await
-                    {
-                        return Err(error);
-                    }
-                    retried = true;
-                }
+                Ok(stream) => return Ok(stream),
+                Err(failure) => failure,
+            };
+            if failure.stream.is_answered() {
+                return Ok(failure.stream);
             }
+            if session.is_some() && message.get("id").is_some() && failure.status == 404 {
+                return Err(McpError::session_expired(format!(
+                    "{} ended the session",
+                    self.host()
+                ))
+                .into());
+            }
+            let Some(recovery) = self.recover(&failure, &recovered).await? else {
+                return Err(self.failure(failure.status, &failure.stream));
+            };
+            recovered.push(recovery);
         }
     }
 
-    /// `reauthorized?`: a 403 only reports its challenge; a first 401 retries when refreshed.
-    async fn is_reauthorized(&self, status: u16, challenge: Option<&str>, retried: bool) -> bool {
+    /// `recover(response, recovered)`: a 403 only reports its challenge; a 401 is sent again
+    /// once per way it recovers, such as with a new token or a nonce for its proof.
+    async fn recover(&self, failure: &Failure, recovered: &[Recovery]) -> Result<Option<Recovery>> {
         let Some(authorization) = &self.authorization else {
-            return false;
+            return Ok(None);
         };
-        if !(status == 403 || (status == 401 && !retried)) {
-            return false;
+        if !matches!(failure.status, 401 | 403) {
+            return Ok(None);
         }
-        authorization.unauthorized(challenge, status).await && status == 401
+        let recovery = authorization
+            .recover(
+                failure.challenge.as_deref(),
+                failure.status,
+                failure.nonce.as_deref(),
+                recovered,
+            )
+            .await?;
+        Ok(recovery.filter(|r| failure.status == 401 && !recovered.contains(r)))
     }
 
-    /// One POST: the replies, or the status, `WWW-Authenticate` header, and error of a failure.
-    #[allow(clippy::type_complexity)]
+    /// `responded(headers)`.
+    fn responded(&self, nonce: Option<&str>) {
+        if let Some(authorization) = &self.authorization {
+            authorization.responded(nonce);
+        }
+    }
+
+    /// One POST: its stream, or the failure of an error status.
+    #[allow(clippy::too_many_arguments)]
     async fn post_once(
         &self,
         message: &Value,
         version: Option<&str>,
         timeout: Option<Duration>,
         params: &[(String, String)],
+        session: Option<&str>,
         on_notification: &mut OnNotification<'_>,
-    ) -> Result<std::result::Result<Vec<Value>, (u16, Option<String>, Error)>> {
-        let method = message.get("method").and_then(Value::as_str).unwrap_or("");
+        subscription: bool,
+    ) -> Result<std::result::Result<Stream, Failure>> {
+        let method = message.get("method").and_then(Value::as_str);
         let mut request = self
             .client
             .post(self.url.clone())
             .header("Content-Type", "application/json")
             .header("Accept", "application/json, text/event-stream")
-            .header("Mcp-Method", method)
             .body(message.to_string());
         if let Some(version) = version {
             request = request.header("MCP-Protocol-Version", version);
         }
-        if let Some(session) = self.session() {
+        if let Some(session) = session {
             request = request.header("Mcp-Session-Id", session);
+        }
+        if let Some(method) = method {
+            request = request.header("Mcp-Method", method);
         }
         let name = message
             .pointer("/params/name")
-            .or_else(|| message.pointer("/params/uri"));
+            .or_else(|| message.pointer("/params/uri"))
+            .or_else(|| message.pointer("/params/taskId"));
         if let Some(name) = name.and_then(|n| header_value(&text_of(n))) {
             request = request.header("Mcp-Name", name);
         }
-        for (key, value) in (self.headers)() {
-            request = request.header(key, value);
-        }
-        if let Some(authorization) = &self.authorization
-            && let Some(value) = authorization.authorization().await?
-        {
-            request = request.header("Authorization", value);
-        }
+        request = self.custom_headers(request, "POST").await?;
         for (key, value) in params {
             if let Some(value) = header_value(value) {
                 request = request.header(format!("Mcp-Param-{key}"), value);
@@ -189,57 +322,242 @@ impl Http {
         if let Some(timeout) = timeout {
             request = request.timeout(timeout);
         }
-        let response = request.send().await.map_err(|e| {
-            if e.is_timeout() {
-                Error::Timeout(e.to_string())
-            } else {
-                Error::ConnectionFailed(e.to_string())
-            }
-        })?;
+        let mut stream = Stream::new(message.get("id").cloned());
+        stream.ends_when_cancelled = subscription;
+        let response = request.send().await.map_err(request_error)?;
         let status = response.status().as_u16();
         let challenge = response
             .headers()
             .get("www-authenticate")
             .and_then(|v| v.to_str().ok())
             .map(str::to_string);
-        if method == "initialize" {
-            let session = response
-                .headers()
-                .get("mcp-session-id")
-                .and_then(|v| v.to_str().ok())
-                .map(str::to_string);
-            self.set_session(session);
+        let session_id = response
+            .headers()
+            .get("mcp-session-id")
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
+        let nonce = dpop_nonce(&response);
+        self.responded(nonce.as_deref());
+        self.read(&mut stream, response, version, on_notification)
+            .await?;
+        if !(200..300).contains(&status) {
+            return Ok(Err(Failure {
+                status,
+                challenge,
+                stream,
+                nonce,
+            }));
         }
-        let mut stream = Stream::default();
+        // `remember`
+        if let Some(version) = version
+            && let Ok(mut v) = self.version.lock()
+        {
+            *v = Some(version.to_string());
+        }
+        if method == Some("initialize") {
+            self.set_session(session_id);
+        }
+        Ok(Ok(stream))
+    }
+
+    /// `get`: reads the session's event stream, from `last_event_id` when resuming.
+    async fn get(
+        &self,
+        stream: &mut Stream,
+        version: Option<&str>,
+        timeout: Option<Duration>,
+        last_event_id: Option<&str>,
+        on_notification: &mut OnNotification<'_>,
+    ) -> Result<std::result::Result<(), Failure>> {
+        let mut request = self
+            .client
+            .get(self.url.clone())
+            .header("Accept", "text/event-stream");
+        if let Some(version) = version {
+            request = request.header("MCP-Protocol-Version", version);
+        }
+        if let Some(session) = self.session() {
+            request = request.header("Mcp-Session-Id", session);
+        }
+        if let Some(last_event_id) = last_event_id {
+            request = request.header("Last-Event-ID", last_event_id);
+        }
+        request = self.custom_headers(request, "GET").await?;
+        if let Some(timeout) = timeout {
+            request = request.timeout(timeout);
+        }
+        let response = request.send().await.map_err(request_error)?;
+        let status = response.status().as_u16();
+        let challenge = response
+            .headers()
+            .get("www-authenticate")
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
+        let nonce = dpop_nonce(&response);
+        self.responded(nonce.as_deref());
+        if !(200..300).contains(&status) {
+            let mut failed = Stream::new(None);
+            self.read(&mut failed, response, version, on_notification)
+                .await?;
+            return Ok(Err(Failure {
+                status,
+                challenge,
+                stream: failed,
+                nonce,
+            }));
+        }
+        self.read(stream, response, version, on_notification)
+            .await?;
+        Ok(Ok(()))
+    }
+
+    /// `Stream#read`: feeds the body to `stream` until it carries its answer, answering what the
+    /// server asks on the way. An event stream that breaks midway counts as ended.
+    async fn read(
+        &self,
+        stream: &mut Stream,
+        response: reqwest::Response,
+        version: Option<&str>,
+        on_notification: &mut OnNotification<'_>,
+    ) -> Result<()> {
         let mut body = response.bytes_stream();
-        while let Some(chunk) = body.next().await {
+        loop {
+            let chunk = tokio::select! {
+                chunk = body.next() => chunk,
+                () = tokio::time::sleep(CHECK_INTERVAL) => {
+                    if crate::progress::is_cancelled() {
+                        return Err(Error::Cancelled);
+                    }
+                    continue;
+                }
+            };
+            let Some(chunk) = chunk else {
+                stream.finish(on_notification);
+                break;
+            };
             if crate::progress::is_cancelled() {
                 return Err(Error::Cancelled);
             }
-            let chunk = chunk.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
-            stream.feed(&String::from_utf8_lossy(&chunk), on_notification);
+            let chunk = match chunk {
+                Ok(chunk) => chunk,
+                Err(_) if stream.is_events() => break,
+                Err(e) => return Err(request_error(e)),
+            };
+            stream.feed(&chunk, on_notification);
+            for request in std::mem::take(&mut stream.asked) {
+                self.answer(request, version).await;
+            }
+            if stream.is_done() {
+                break;
+            }
         }
-        let replies = stream.replies(on_notification);
-        if (200..300).contains(&status) || answered(&replies, message) {
-            return Ok(Ok(replies));
+        for request in std::mem::take(&mut stream.asked) {
+            self.answer(request, version).await;
         }
-        Ok(Err((
-            status,
-            challenge,
-            self.failure(status, &stream.body, &replies),
-        )))
+        Ok(())
     }
 
-    fn failure(&self, status: u16, body: &str, replies: &[Value]) -> Error {
+    /// `answer`: replies to a request the server sent, without failing the call when the server
+    /// refuses the reply.
+    fn answer<'a>(
+        &'a self,
+        request: Value,
+        version: Option<&'a str>,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>> {
+        Box::pin(async move {
+            let reply = super::Client::reply(&request);
+            if let Err(e) = self
+                .post(&reply, version, None, &[], &mut |_| {}, false)
+                .await
+            {
+                let method = request.get("method").and_then(Value::as_str).unwrap_or("");
+                tracing::debug!("{} did not take the answer to {method}: {e}", self.host());
+            }
+        })
+    }
+
+    /// `resume`: waits as long as the server asked, then reads the stream on from its last
+    /// event. A resumption that fails ends like a stream without the answer.
+    async fn resume(
+        &self,
+        stream: &Stream,
+        version: Option<&str>,
+        timeout: Option<Duration>,
+        on_notification: &mut OnNotification<'_>,
+    ) -> Result<Stream> {
+        wait(stream.retry_after().unwrap_or(RECONNECT_DELAY)).await?;
+        let mut resumed = Stream::new(stream.id.clone());
+        let last_event_id = stream.last_event_id();
+        match self
+            .get(
+                &mut resumed,
+                version,
+                timeout,
+                last_event_id.as_deref(),
+                on_notification,
+            )
+            .await
+        {
+            Err(Error::Cancelled) => Err(Error::Cancelled),
+            Ok(Err(_)) => Ok(Stream::new(stream.id.clone())),
+            _ => Ok(resumed),
+        }
+    }
+
+    /// `resumable?`.
+    fn is_resumable(&self, stream: &Stream, limit: Duration) -> bool {
+        stream.is_interrupted()
+            && stream.last_event_id().is_some()
+            && stream.retry_after().unwrap_or_default() <= limit
+    }
+
+    /// `listen_to_session`: an older server's own event stream.
+    async fn listen_to_session(
+        &self,
+        version: Option<&str>,
+        on_notification: &mut OnNotification<'_>,
+    ) -> Result<Option<Value>> {
+        let mut stream = Stream::new(None);
+        let failure = match self
+            .get(&mut stream, version, None, None, on_notification)
+            .await
+        {
+            Ok(Ok(())) => return Ok(None),
+            Ok(Err(failure)) => failure,
+            Err(Error::Cancelled) => return Err(Error::Cancelled),
+            Err(e @ (Error::Timeout(_) | Error::ConnectionFailed(_))) => {
+                return Err(McpError::new(e.to_string()).into());
+            }
+            Err(e) => return Err(e),
+        };
+        if failure.status == 404 && self.session().is_some() {
+            return Err(
+                McpError::session_expired(format!("{} ended the session", self.host())).into(),
+            );
+        }
+        if failure.status == 405 {
+            return Err(McpError {
+                message: format!("{} sends no events", self.host()),
+                code: Some(client::METHOD_NOT_FOUND),
+                ..Default::default()
+            }
+            .into());
+        }
+        Err(self.failure(failure.status, &failure.stream))
+    }
+
+    fn failure(&self, status: u16, stream: &Stream) -> Error {
         let response = Some(ErrorResponse {
             status,
-            body: body.to_string(),
+            body: stream.body.clone(),
+            ..Default::default()
         });
         match status {
             401 => Error::Unauthorized(format!("{} requires authorization", self.host()), response),
             403 => Error::Forbidden(format!("{} refused the request", self.host()), response),
             _ => {
-                let error = replies
+                let error = stream
+                    .replies
                     .first()
                     .and_then(|r| r.get("error"))
                     .cloned()
@@ -253,6 +571,7 @@ impl Http {
                     code: error.get("code").and_then(Value::as_i64),
                     data: error.get("data").cloned(),
                     response,
+                    ..Default::default()
                 }
                 .into()
             }
@@ -260,12 +579,27 @@ impl Http {
     }
 }
 
-/// Some servers, such as Google's Drive preview, send a complete JSON-RPC result with an error
-/// status. The result is the answer.
-fn answered(replies: &[Value], message: &Value) -> bool {
-    replies
-        .iter()
-        .any(|r| r.get("id") == message.get("id") && r.get("result").is_some())
+fn request_error(e: reqwest::Error) -> Error {
+    if e.is_timeout() {
+        Error::Timeout(e.to_string())
+    } else {
+        Error::ConnectionFailed(e.to_string())
+    }
+}
+
+/// `wait`: sleeps, checking for cancellation every `CHECK_INTERVAL`.
+async fn wait(duration: Duration) -> Result<()> {
+    let deadline = tokio::time::Instant::now() + duration;
+    loop {
+        if crate::progress::is_cancelled() {
+            return Err(Error::Cancelled);
+        }
+        let now = tokio::time::Instant::now();
+        if now >= deadline {
+            return Ok(());
+        }
+        tokio::time::sleep((deadline - now).min(CHECK_INTERVAL)).await;
+    }
 }
 
 fn text_of(value: &Value) -> String {
@@ -292,24 +626,46 @@ fn header_value(value: &str) -> Option<String> {
     })
 }
 
-/// Collects the JSON-RPC messages of one response, yielding notifications as they arrive. The
-/// body is either a single JSON value or a server-sent event stream; the first character tells
-/// them apart.
-#[derive(Default)]
+/// `HTTP::Stream`: collects the answers in one response and yields the messages the server sends
+/// of its own, notifications and requests, as they arrive. The body is either a single JSON value
+/// or a server-sent event stream; the first character tells them apart. An event stream stops
+/// being read once it carries the answer to request `id`, since servers may keep it open. Only
+/// answers are kept, so a stream that stays open does not grow.
 struct Stream {
+    id: Option<Value>,
     parser: SseParser,
     body: String,
     events: Option<bool>,
     replies: Vec<Value>,
+    /// Requests the server sent, waiting to be answered.
+    asked: Vec<Value>,
+    /// A subscription also ends with the server's `notifications/cancelled` for it (Ruby's
+    /// `Client#subscribe` throws on it).
+    ends_when_cancelled: bool,
+    cancelled: Option<Value>,
 }
 
 impl Stream {
-    fn feed(&mut self, chunk: &str, on_notification: &mut OnNotification<'_>) {
-        self.body.push_str(chunk);
+    fn new(id: Option<Value>) -> Stream {
+        Stream {
+            id,
+            parser: SseParser::default(),
+            body: String::new(),
+            events: None,
+            replies: Vec::new(),
+            asked: Vec::new(),
+            ends_when_cancelled: false,
+            cancelled: None,
+        }
+    }
+
+    fn feed(&mut self, chunk: &[u8], on_notification: &mut OnNotification<'_>) {
         if self.events == Some(false) {
+            self.body.push_str(&String::from_utf8_lossy(chunk));
             return;
         }
         let chunk = if self.events.is_none() {
+            self.body.push_str(&String::from_utf8_lossy(chunk));
             let trimmed = self.body.trim_start();
             if trimmed.is_empty() {
                 return;
@@ -318,25 +674,23 @@ impl Stream {
             if self.events == Some(false) {
                 return;
             }
-            self.body.clone()
+            std::mem::take(&mut self.body).into_bytes()
         } else {
-            chunk.to_string()
+            chunk.to_vec()
         };
         for event in self.parser.feed(&chunk) {
-            self.receive(&event.data, on_notification);
+            if !event.data.is_empty() {
+                self.receive(&event.data, on_notification);
+            }
         }
     }
 
-    fn replies(&mut self, on_notification: &mut OnNotification<'_>) -> Vec<Value> {
-        if self.events == Some(true) {
-            for event in self.parser.finish() {
-                self.receive(&event.data, on_notification);
-            }
-        } else if self.events == Some(false) && self.replies.is_empty() {
+    /// The body has ended: a bare JSON body is read now.
+    fn finish(&mut self, on_notification: &mut OnNotification<'_>) {
+        if self.events == Some(false) && self.replies.is_empty() {
             let body = self.body.clone();
             self.receive(&body, on_notification);
         }
-        self.replies.clone()
     }
 
     fn receive(&mut self, data: &str, on_notification: &mut OnNotification<'_>) {
@@ -344,16 +698,61 @@ impl Stream {
             tracing::debug!("MCP server sent a message that is not JSON");
             return;
         };
-        let replies = match parsed {
+        let messages = match parsed {
             Value::Array(items) => items,
             other => vec![other],
         };
-        for reply in replies {
-            if reply.get("method").is_some() && reply.get("id").is_none() {
-                on_notification(&reply);
+        for message in messages.into_iter().filter(Value::is_object) {
+            if message.get("method").is_none_or(Value::is_null) {
+                self.replies.push(message);
+            } else if message.get("id").is_some_and(|id| !id.is_null()) {
+                self.asked.push(message);
+            } else if self.cancels(&message) {
+                self.cancelled = Some(message);
+            } else {
+                on_notification(&message);
             }
-            self.replies.push(reply);
         }
+    }
+
+    fn cancels(&self, message: &Value) -> bool {
+        self.ends_when_cancelled
+            && message.get("method").and_then(Value::as_str) == Some("notifications/cancelled")
+            && message.pointer("/params/requestId") == self.id.as_ref()
+    }
+
+    fn is_events(&self) -> bool {
+        self.events == Some(true)
+    }
+
+    /// Whether to stop reading: the answer (or the cancellation of a subscription) arrived.
+    fn is_done(&self) -> bool {
+        self.is_events() && (self.answer().is_some() || self.cancelled.is_some())
+    }
+
+    /// `answer`: the reply to request `id`.
+    fn answer(&self) -> Option<&Value> {
+        let id = self.id.as_ref()?;
+        self.replies.iter().find(|r| r.get("id") == Some(id))
+    }
+
+    /// `answered?`: some servers, such as Google's Drive preview, send a complete JSON-RPC
+    /// result with an error status. The result is the answer.
+    fn is_answered(&self) -> bool {
+        self.answer().is_some_and(|a| a.get("result").is_some())
+    }
+
+    fn is_interrupted(&self) -> bool {
+        self.is_events() && self.answer().is_none()
+    }
+
+    fn last_event_id(&self) -> Option<String> {
+        let id = self.parser.last_event_id();
+        (!id.is_empty()).then(|| id.to_string())
+    }
+
+    fn retry_after(&self) -> Option<Duration> {
+        self.parser.reconnection_time().map(Duration::from_millis)
     }
 }
 
@@ -367,20 +766,36 @@ impl Transport for Http {
         headers: &[(String, String)],
         on_notification: &mut OnNotification<'_>,
     ) -> Result<Value> {
-        let replies = self
-            .post(message, version, timeout, headers, on_notification)
+        let mut stream = self
+            .post(message, version, timeout, headers, on_notification, false)
             .await?;
-        replies
-            .into_iter()
-            .find(|r| r.get("id") == message.get("id"))
-            .ok_or_else(|| {
-                let method = message.get("method").and_then(Value::as_str).unwrap_or("");
-                McpError::new(format!("{} did not answer {method}", self.host())).into()
-            })
+        for _ in 0..RECONNECTS {
+            if version == Some(client::VERSION) {
+                if !stream.is_interrupted() {
+                    break;
+                }
+                let mut again = message.clone();
+                again["id"] = uuid::Uuid::new_v4().to_string().into();
+                stream = self
+                    .post(&again, version, timeout, headers, on_notification, false)
+                    .await?;
+            } else {
+                if !self.is_resumable(&stream, timeout.unwrap_or(self.timeout)) {
+                    break;
+                }
+                stream = self
+                    .resume(&stream, version, timeout, on_notification)
+                    .await?;
+            }
+        }
+        stream.answer().cloned().ok_or_else(|| {
+            let method = message.get("method").and_then(Value::as_str).unwrap_or("");
+            McpError::new(format!("{} did not answer {method}", self.host())).into()
+        })
     }
 
     async fn notify(&self, message: &Value, version: Option<&str>) -> Result<()> {
-        self.post(message, version, None, &[], &mut |_| {})
+        self.post(message, version, None, &[], &mut |_| {}, false)
             .await
             .map(|_| ())
     }
@@ -392,8 +807,50 @@ impl Transport for Http {
         self.notify(notification, version).await
     }
 
+    async fn listen(
+        &self,
+        message: Option<&Value>,
+        version: Option<&str>,
+        on_notification: &mut OnNotification<'_>,
+    ) -> Result<Option<Value>> {
+        let Some(message) = message else {
+            return self.listen_to_session(version, on_notification).await;
+        };
+        let stream = match self
+            .post(message, version, None, &[], on_notification, true)
+            .await
+        {
+            Ok(stream) => stream,
+            Err(e @ (Error::Timeout(_) | Error::ConnectionFailed(_))) => {
+                return Err(McpError::new(e.to_string()).into());
+            }
+            Err(e) => return Err(e),
+        };
+        match stream.answer().cloned().or(stream.cancelled) {
+            Some(ending) => Ok(Some(ending)),
+            None => Err(McpError::new(format!("{} closed the subscription", self.host())).into()),
+        }
+    }
+
+    /// `close`: ends the session of a server that predates 2026-07-28 with a DELETE.
     async fn close(&self) {
-        self.set_session(None);
+        let Some(session) = self.take_session() else {
+            return;
+        };
+        let mut request = self
+            .client
+            .delete(self.url.clone())
+            .header("Mcp-Session-Id", session)
+            .timeout(CLOSE_TIMEOUT);
+        if let Some(version) = self.last_version() {
+            request = request.header("MCP-Protocol-Version", version);
+        }
+        let Ok(request) = self.custom_headers(request, "DELETE").await else {
+            return;
+        };
+        if let Ok(response) = request.send().await {
+            self.responded(dpop_nonce(&response).as_deref());
+        }
     }
 }
 
@@ -428,5 +885,20 @@ mod tests {
             header_value("=?base64?abc?="),
             Some(encoded("=?base64?abc?="))
         );
+    }
+
+    // spec: mcp/http_spec.rb:800 keeps only the answers of a stream, so one that stays open does not grow
+    #[test]
+    fn keeps_only_the_answers_of_a_stream() {
+        let mut stream = Stream::new(Some(Value::from("listen-1")));
+        let event = format!(
+            "data: {}\n\n",
+            serde_json::json!({ "jsonrpc": "2.0", "method": "notifications/tools/list_changed" })
+        );
+        for _ in 0..100 {
+            stream.feed(event.as_bytes(), &mut |_| {});
+        }
+        assert!(stream.replies.is_empty());
+        assert!(stream.body.is_empty());
     }
 }

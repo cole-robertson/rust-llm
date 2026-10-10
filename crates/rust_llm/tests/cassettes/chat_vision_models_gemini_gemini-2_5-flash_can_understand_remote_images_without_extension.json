@@ -5,7 +5,7 @@
     "request_body": "",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:09:08 GMT",
+      "Date": "Wed, 07 Oct 2026 13:07:40 GMT",
       "Content-Type": "image/jpeg",
       "Content-Length": "35588",
       "Connection": "keep-alive",
@@ -25,15 +25,15 @@
       "X-Gemini-Service-Tier": "standard",
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Thu, 17 Sep 2026 22:09:17 GMT",
+      "Date": "Wed, 07 Oct 2026 13:07:47 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=8940",
+      "Server-Timing": "gfet4t7; dur=6701",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"This image shows a **black-backed jackal** standing in profile, facing towards the left.\\n\\nHere's a more detailed description:\\n\\n*   **Animal:** It's a canid with a slender build, long legs, a pointed snout, and large, erect, pointed ears.\\n*   **Coloration:** Its fur is a mix of colors:\\n    *   The legs, belly, and muzzle are a light tan or sandy color.\\n    *   A distinctive dark grey and black \\\"saddle\\\" pattern runs across its back, giving it its name.\\n    *   The bushy tail is dark, almost black.\\n*   **Pose:** The jackal is standing, appearing to be walking or paused in mid-stride, with its head slightly lowered and looking forward.\\n*   **Background:** The animal is on what appears to be a dirt path or dry ground. The background is slightly blurred and consists of natural, muted tones of brown and green, suggesting an outdoor, possibly arid or semi-arid environment.\\n*   **Lighting:** The animal is well-lit, indicating natural daylight.\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 267,\n    \"candidatesTokenCount\": 232,\n    \"totalTokenCount\": 1467,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 9\n      },\n      {\n        \"modality\": \"IMAGE\",\n        \"tokenCount\": 258\n      }\n    ],\n    \"thoughtsTokenCount\": 968,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"BGWsaqqOL86JvdIP9qWI-Qo\"\n}\n"
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"I see a **Black-backed Jackal** walking in profile.\\n\\nHere's a detailed description:\\n\\n*   **Animal:** It's a medium-sized wild canine with a slender build.\\n*   **Coloration:** It has a very distinctive \\\"saddle\\\" of black and silver fur running along its back from its shoulders to its tail. The rest of its body, including its flanks, legs, and underside, is a lighter sandy or reddish-brown/tan color. Its tail is bushy and dark, predominantly black.\\n*   **Features:** It has a pointed snout, dark eyes, and large, pointed, erect ears.\\n*   **Pose:** The jackal is captured mid-stride, with one front leg lifted, suggesting it is walking. Its head is slightly lowered and turned to the left, looking forward.\\n*   **Background:** The background is out of focus, appearing to be a natural, dry, earthy or sandy terrain, with no specific distinguishing features, allowing the jackal to stand out clearly.\\n\\nThe image is well-lit, likely by natural daylight, and the animal is sharply in focus.\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 267,\n    \"candidatesTokenCount\": 236,\n    \"totalTokenCount\": 1420,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 9\n      },\n      {\n        \"modality\": \"IMAGE\",\n        \"tokenCount\": 258\n      }\n    ],\n    \"thoughtsTokenCount\": 917,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"HUTGavGjCLyfvdIP6s-RoAQ\"\n}\n"
   }
 ]

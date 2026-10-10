@@ -491,7 +491,7 @@ impl Batch {
                 ("requests", requests.len().into()),
             ])
         });
-        let result = tracing::Instrument::instrument(self.create(requests), event.span()).await;
+        let result = event.instrument(self.create(requests)).await;
         if result.is_ok() {
             event.set("batch_id", || self.id.clone().into());
         }
@@ -847,6 +847,7 @@ impl Batch {
         let cost = batch_cost(provider, &tokens, &model);
         Ok(UsageEntry {
             id: UsageEntry::next_id(),
+            owner: crate::accounting::usage_owner(),
             operation,
             provider: provider.slug().into(),
             model: result_model

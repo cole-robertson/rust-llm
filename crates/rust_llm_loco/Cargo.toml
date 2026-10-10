@@ -29,8 +29,16 @@ serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+uuid.workspace = true
+
+[features]
+# rust_llm's optional OpenTelemetry tracing (`rust_llm::open_telemetry::enable`).
+opentelemetry = ["rust_llm/opentelemetry"]
 
 [dev-dependencies]
 serde = { workspace = true }
 tokio.workspace = true
 wiremock = "0.6"
+# tests/spec_open_telemetry_rails.rs: the API and an in-memory span exporter.
+opentelemetry = { version = "0.33", default-features = false, features = ["trace"] }
+opentelemetry_sdk = { version = "0.33", default-features = false, features = ["trace", "testing"] }

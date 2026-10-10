@@ -194,13 +194,35 @@ impl Cassette {
     /// rewritten to this server, so the comparison stays exact.
     pub async fn start_serving(name: &str, hosts: &[&str]) -> Option<Cassette> {
         let mut interactions = load(name)?;
-        let count = interactions.len();
         let server = MockServer::start().await;
         for interaction in &mut interactions {
             for host in hosts {
                 interaction.request_body = interaction.request_body.replace(host, &server.uri());
             }
         }
+        Some(Cassette::serve_on(server, interactions).await)
+    }
+
+    /// Serves interactions loaded elsewhere (another crate's tests reading this crate's
+    /// cassettes) on a fresh replay server.
+    pub async fn serve(interactions: Vec<Interaction>) -> Cassette {
+        Cassette::serve_on(MockServer::start().await, interactions).await
+    }
+
+    /// Serves `interactions` (a loaded cassette the test has edited, e.g. to point a URL in a
+    /// recorded response at this server) on a fresh replay server, whose URI `edit` receives.
+    pub async fn start_edited(
+        name: &str,
+        edit: impl FnOnce(&str, &mut Vec<Interaction>),
+    ) -> Option<Cassette> {
+        let mut interactions = load(name)?;
+        let server = MockServer::start().await;
+        edit(&server.uri(), &mut interactions);
+        Some(Cassette::serve_on(server, interactions).await)
+    }
+
+    async fn serve_on(server: MockServer, interactions: Vec<Interaction>) -> Cassette {
+        let count = interactions.len();
         let mismatches = Arc::new(Mutex::new(Vec::new()));
         Mock::given(wiremock::matchers::any())
             .respond_with(Replay {
@@ -210,11 +232,11 @@ impl Cassette {
             })
             .mount(&server)
             .await;
-        Some(Cassette {
+        Cassette {
             server,
             mismatches,
             count,
-        })
+        }
     }
 
     /// Points every provider this test might use at the replay server.

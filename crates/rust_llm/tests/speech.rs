@@ -232,7 +232,7 @@ async fn streams_speech_from_mistral() {
     );
     // The speech.audio.done event reports usage.
     assert_eq!(speech.tokens().input, Some(134));
-    assert_eq!(speech.tokens().output, Some(142080));
+    assert_eq!(speech.tokens().output, Some(153600));
 }
 
 // ---- `.speak`, `#save`, `#mime_type` ------------------------------------------------------

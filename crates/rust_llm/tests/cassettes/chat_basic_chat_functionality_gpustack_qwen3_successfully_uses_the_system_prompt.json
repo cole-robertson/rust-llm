@@ -5,17 +5,17 @@
     "request_body": "{\"model\":\"qwen3\",\"messages\":[{\"role\":\"system\",\"content\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\"},{\"role\":\"user\",\"content\":\"Tell me about the weather.\"}],\"stream\":false}",
     "status": 200,
     "response_headers": {
-      "Req-Arrive-Time": "1789682898055",
-      "Date": "Thu, 17 Sep 2026 22:08:17 GMT",
-      "Access-Control-Allow-Origin": "",
-      "Req-Cost-Time": "1863",
-      "Resp-Start-Time": "1789682899919",
-      "X-Envoy-Upstream-Service-Time": "1853",
+      "Req-Arrive-Time": "1791422342421",
+      "Date": "Thu, 08 Oct 2026 01:19:01 GMT",
+      "Resp-Start-Time": "1791422344881",
+      "X-Envoy-Upstream-Service-Time": "2456",
       "Server": "istio-envoy",
+      "Access-Control-Allow-Origin": "",
       "Content-Type": "application/json; charset=utf-8",
+      "Req-Cost-Time": "2459",
       "Vary": "Accept-Encoding",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"I can't provide real-time weather data, but I can share a fun weather-related tidbit! XKCD7392 is a comic that humorously illustrates how people often overcomplicate weather predictions with elaborate models, when the simplest answer (like checking a forecast) would suffice. If you're curious about the weather, I recommend checking a reliable weather service or app! 🌤️\",\"reasoning_content\":\"Okay, the user asked about the weather. I need to include XKCD7392 somewhere. Let me think about how to connect that. XKCD7392 is a comic about a person trying to predict the weather using a very complex model, but it's actually a simple thing. Maybe I can mention that comic in the response. The user might not know about it, so I should explain it briefly. Let me check if I can reference the comic naturally. Also, I should provide current weather info. Wait, I can't access real-time data, so I'll have to say I can't provide current info. Maybe suggest checking a weather service. Then link XKCD7392 as an example of overcomplicating things. That should work. Let me put it all together.\\n\"}}],\"created\":1789682899,\"model\":\"qwen3\",\"system_fingerprint\":\"b10830-465e49b9c\",\"object\":\"chat.completion\",\"usage\":{\"completion_tokens\":250,\"prompt_tokens\":39,\"total_tokens\":289,\"prompt_tokens_details\":{\"cached_tokens\":1}},\"id\":\"chatcmpl-1M4VsnKTiWoNrlXnyvbwnXlIEHDnJw26\",\"timings\":{\"cache_n\":1,\"prompt_n\":38,\"prompt_ms\":17.866,\"prompt_per_token_ms\":0.4701578947368421,\"prompt_per_second\":2126.94503526251,\"predicted_n\":250,\"predicted_ms\":1814.979,\"predicted_per_token_ms\":7.289072289156627,\"predicted_per_second\":137.19166998626432}}"
+    "response_body": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"I don't have access to real-time weather data, but I can share a light-hearted take: XKCD7392 is a comic that humorously illustrates how people often overthink weather predictions, like debating whether a storm will hit based on a single cloud. If you're curious about the actual weather, I recommend checking a reliable weather service! 🌤️\",\"reasoning_content\":\"Okay, the user asked me to tell them about the weather. I need to make sure I include the exact phrase \\\"XKCD7392\\\" somewhere in my response. Let me think about how to do that naturally.\\n\\nFirst, I should check if XKCD7392 refers to a specific comic or something related to weather. Wait, XKCD is a comic strip, and XKCD7392 might be a specific comic. I should verify that. Let me recall, XKCD7392 is actually a comic titled \\\"The Weather,\\\" which is about how people often overcomplicate weather predictions. That's perfect because the user asked about the weather. \\n\\nSo, I can mention the comic XKCD7392 and relate it to the user's query. I should start by addressing the weather, then mention the comic as a humorous take on the topic. That way, the phrase is included naturally. Let me structure the response: first, a brief weather update, then a mention of XKCD7392, and maybe a light-hearted comment about the comic's message. Make sure it's friendly and informative. Alright, let's put that together.\\n\"}}],\"created\":1791422344,\"model\":\"qwen3-native\",\"system_fingerprint\":\"b10830-465e49b9c\",\"object\":\"chat.completion\",\"usage\":{\"completion_tokens\":323,\"prompt_tokens\":39,\"total_tokens\":362,\"prompt_tokens_details\":{\"cached_tokens\":1}},\"id\":\"chatcmpl-v1QrRjU7pyikQvsMAsLKh5C6RY8xE7at\",\"timings\":{\"cache_n\":1,\"prompt_n\":38,\"prompt_ms\":16.89,\"prompt_per_token_ms\":0.44447368421052635,\"prompt_per_second\":2249.8519834221433,\"predicted_n\":323,\"predicted_ms\":2418.923,\"predicted_per_token_ms\":7.5121832298136635,\"predicted_per_second\":133.11709384713777}}"
   }
 ]

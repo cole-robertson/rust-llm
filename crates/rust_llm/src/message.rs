@@ -171,12 +171,35 @@ impl Default for ToolArguments {
 }
 
 impl ToolArguments {
+    /// The arguments as a map, keys ordered as [`canonical_arguments`] does. A streamed string is
+    /// parsed the way the finished call Ruby builds from it would be.
     pub fn as_map(&self) -> Map<String, Value> {
-        match self {
+        let map = match self {
             ToolArguments::Parsed(m) => m.clone(),
             ToolArguments::Partial(s) => serde_json::from_str(s).unwrap_or_default(),
-        }
+        };
+        canonical_map(map)
     }
+}
+
+/// `ToolCall#canonical_arguments`: object keys ordered the way PostgreSQL `jsonb` and MySQL
+/// `json` store them (shorter keys first, then bytewise), recursively, so a call reloaded from
+/// the database renders the same request bytes and keeps the provider's prompt cache.
+pub fn canonical_arguments(value: Value) -> Value {
+    match value {
+        Value::Object(map) => Value::Object(canonical_map(map)),
+        Value::Array(items) => Value::Array(items.into_iter().map(canonical_arguments).collect()),
+        other => other,
+    }
+}
+
+fn canonical_map(map: Map<String, Value>) -> Map<String, Value> {
+    let mut entries: Vec<(String, Value)> = map.into_iter().collect();
+    entries.sort_by(|(a, _), (b, _)| (a.len(), a.as_bytes()).cmp(&(b.len(), b.as_bytes())));
+    entries
+        .into_iter()
+        .map(|(k, v)| (k, canonical_arguments(v)))
+        .collect()
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -203,7 +226,7 @@ impl ToolCall {
         ToolCall {
             id: id.into(),
             name: name.into(),
-            arguments: ToolArguments::Parsed(arguments),
+            arguments: ToolArguments::Parsed(canonical_map(arguments)),
             thought_signature: None,
             remote: false,
             starts: true,
@@ -279,12 +302,17 @@ pub struct ServerToolCall {
     pub input: Option<Value>,
     pub result: Option<Value>,
     pub raw: Value,
+    /// `#search_suggestions`: the HTML of the search suggestions the provider requires shown with
+    /// a grounded answer (Google's for Google Search grounding). Only the live response carries
+    /// them: `to_h` leaves them out, so a persisted chat never stores them.
+    #[serde(skip)]
+    pub search_suggestions: Option<String>,
 }
 
-/// The raw HTTP exchange behind a response (`message.raw`). Like Faraday's `env.request_body`,
-/// the request is kept as the exact serialized text that was sent: every message of a long chat
-/// keeps its request, and each request holds the whole conversation so far, so a JSON tree per
-/// message cost ~20x the memory. Parse it on demand with `request_body_json`.
+/// The raw HTTP exchange behind a response (`message.raw`): status, headers, and body. Like
+/// RubyLLM 2.1's `release_request`, provider calls leave `request_body` empty: each request of a
+/// chat holds the whole conversation so far, so keeping one per reply grew a chat's memory
+/// quadratically. Read what a chat sends with `render` or a `before_request` hook instead.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct RawResponse {
     pub status: u16,
@@ -312,6 +340,10 @@ pub enum Operation {
     Ocr,
     Rerank,
     Judgment,
+    /// A finished `VideoJob` (RubyLLM 2.1 `video_job.rb#record_usage`).
+    Video,
+    /// A finished research job (2.1 `Accounting::Usage::OPERATIONS`).
+    Research,
 }
 
 impl Operation {
@@ -326,6 +358,8 @@ impl Operation {
             Operation::Ocr => "ocr",
             Operation::Rerank => "rerank",
             Operation::Judgment => "judgment",
+            Operation::Video => "video",
+            Operation::Research => "research",
         }
     }
 }
@@ -362,6 +396,9 @@ pub struct UsageEntry {
     pub status: UsageStatus,
     pub tokens: Tokens,
     pub cost: Cost,
+    /// `owner`: who the attempt is attributed to, from the operation's `owner:` or the enclosing
+    /// [`crate::accounting::with_usage_owner`] when the attempt started.
+    pub owner: Option<crate::accounting::UsageOwner>,
 }
 
 static NEXT_USAGE_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
@@ -396,7 +433,12 @@ pub struct Message {
     pub finish_reason: Option<FinishReason>,
     pub raw: Option<RawResponse>,
     pub cache_until_here: bool,
+    /// `#cache_ttl`: this boundary's own cache lifetime (`"1h"`), or `None` for the chat's.
+    pub cache_ttl: Option<String>,
     pub usage_entries: Vec<UsageEntry>,
+    /// `mcp_result`: the result of an MCP tool with a UI, kept on its tool result message so
+    /// your app can render the UI again.
+    pub mcp_result: Option<Box<crate::mcp::McpResult>>,
     /// Primary key of the row this message is stored as, set by a persistence layer
     /// (`rust_llm_loco`). `None` means not yet persisted.
     pub record_id: Option<i64>,
@@ -425,11 +467,39 @@ impl Message {
             finish_reason: None,
             raw: None,
             cache_until_here: false,
+            cache_ttl: None,
             usage_entries: Vec::new(),
+            mcp_result: None,
             record_id: None,
             model_info: None,
             supplied_cost: None,
         }
+    }
+
+    /// `Message#cache_until_here(ttl:)`: marks this message as a prompt cache boundary, with its
+    /// own lifetime when `ttl` is given.
+    pub fn with_cache_until_here(mut self, ttl: Option<&str>) -> Message {
+        self.cache_until_here = true;
+        self.cache_ttl = ttl.map(str::to_string);
+        self
+    }
+
+    /// `Message.cache_boundary_options`: `true` (no lifetime) or `{ ttl: }`; `false`/`nil` is
+    /// no boundary. Anything else is an `ArgumentError`.
+    pub fn cache_boundary_options(value: &Value) -> Result<Option<Option<String>>> {
+        match value {
+            Value::Null | Value::Bool(false) => return Ok(None),
+            Value::Bool(true) => return Ok(Some(None)),
+            Value::Object(o) if o.keys().all(|k| k == "ttl") => {
+                return Ok(Some(
+                    o.get("ttl").and_then(Value::as_str).map(str::to_string),
+                ));
+            }
+            _ => {}
+        }
+        Err(Error::Argument(format!(
+            "cache_until_here accepts true, false, or ttl:, got {value}"
+        )))
     }
 
     pub fn system(content: impl Into<String>) -> Message {
@@ -547,10 +617,10 @@ impl Message {
         }
     }
 
-    /// `Message#without_thinking`: what gets replayed to a provider that did not produce the thinking.
     /// The per-request view of a stored message: everything a protocol renders, without the
-    /// bookkeeping it never reads (the HTTP exchange, usage ledger, registry entry). Cloning
-    /// those for every message on every request made long chats quadratic.
+    /// bookkeeping it never reads (the HTTP exchange, registry entry). Cloning those for every
+    /// message on every request made long chats quadratic. Of the usage ledger only the
+    /// producing entry stays: it is what names the producer (`Protocol#producing_entry`).
     pub(crate) fn for_request(&self) -> Message {
         Message {
             role: self.role,
@@ -568,17 +638,39 @@ impl Message {
             finish_reason: self.finish_reason.clone(),
             raw: None,
             cache_until_here: self.cache_until_here,
-            usage_entries: Vec::new(),
+            cache_ttl: self.cache_ttl.clone(),
+            usage_entries: self.producing_entry().cloned().into_iter().collect(),
+            mcp_result: None,
             record_id: self.record_id,
             model_info: None,
             supplied_cost: None,
         }
     }
 
-    pub(crate) fn without_thinking(&self) -> Message {
+    /// `Protocol#producing_entry`: the last succeeded usage entry, the one record of which
+    /// provider and model produced this message.
+    pub(crate) fn producing_entry(&self) -> Option<&UsageEntry> {
+        self.usage_entries
+            .iter()
+            .rev()
+            .find(|e| e.status == UsageStatus::Succeeded)
+    }
+
+    /// `Protocol#own_signature`: the thinking signature, only when `provider` produced it. A
+    /// signature can be another provider's opaque blob, and a message without usage could come
+    /// from anyone.
+    pub(crate) fn own_signature(&self, provider: &str) -> Option<&str> {
+        let signature = self.thinking.as_ref()?.signature.as_deref()?;
+        (self.producing_entry()?.provider == provider).then_some(signature)
+    }
+
+    /// `Message#without_native_content(raw_content:)`: what gets replayed to a model that did
+    /// not produce the thinking, raw reasoning, raw content and call signatures.
+    pub(crate) fn without_native_content(&self, raw_content: Option<Value>) -> Message {
         let mut m = self.clone();
         m.thinking = None;
         m.raw_reasoning = None;
+        m.raw_content = raw_content;
         if let Some(calls) = &mut m.tool_calls {
             for (_, call) in calls.0.iter_mut() {
                 call.thought_signature = None;
@@ -657,7 +749,8 @@ impl Message {
             Some(Value::String(text)) => {
                 Thinking::build(Some(text.clone()), str_of("thinking_signature"))
             }
-            _ => None,
+            // `coerce_thinking`: no thinking text still keeps a signature-only thinking.
+            _ => Thinking::build(None, str_of("thinking_signature")),
         };
         if let Some(citations) = h.get("citations") {
             m.citations = serde_json::from_value(citations.clone())?;
@@ -679,6 +772,7 @@ impl Message {
                 input: call.get("input").cloned(),
                 result: call.get("result").cloned(),
                 raw: call.get("raw").cloned().unwrap_or(Value::Null),
+                search_suggestions: None,
             });
         }
         for a in h
@@ -687,12 +781,7 @@ impl Message {
             .into_iter()
             .flatten()
         {
-            let source = a
-                .as_str()
-                .or_else(|| a.get("source").and_then(Value::as_str));
-            let source = source
-                .ok_or_else(|| Error::Argument(format!("Cannot rebuild an attachment from {a}")))?;
-            m.attachments.push(Attachment::new(source));
+            m.attachments.push(Attachment::from_h(a)?);
         }
         m.raw_content = h.get("raw_content").cloned();
         m.raw_reasoning = h.get("raw_reasoning").cloned();
@@ -704,14 +793,28 @@ impl Message {
             .get("cache_until_here")
             .and_then(Value::as_bool)
             .unwrap_or(false);
+        if m.cache_until_here {
+            m.cache_ttl = h
+                .get("cache_ttl")
+                .and_then(Value::as_str)
+                .map(str::to_string);
+        }
         m.supplied_cost = h.get("cost").map(|c| Cost::from_h(c, None));
+        // `coerce_mcp_result`: a dumped result comes back as an `MCP::Result`.
+        m.mcp_result = h
+            .get("mcp_result")
+            .filter(|r| r.is_object())
+            .map(|r| Box::new(crate::mcp::McpResult::load(r)));
         m.tokens = Tokens {
             input: int_of("input_tokens"),
             output: int_of("output_tokens"),
             cache_read: int_of("cache_read_tokens"),
             cache_write: int_of("cache_write_tokens"),
             thinking: int_of("thinking_tokens"),
-            server_tool_use: h.get("server_tool_use").and_then(Value::as_object).cloned(),
+            cache_write_by_ttl: h
+                .get("cache_write_tokens_by_ttl")
+                .and_then(Tokens::positive_counts),
+            server_tool_use: h.get("server_tool_use").and_then(Tokens::positive_counts),
             reported_cost: h.get("reported_cost").and_then(Value::as_f64),
         };
         Ok(m.normalized())
@@ -739,6 +842,10 @@ impl Message {
                 "cost".into(),
                 crate::instrumentation::cost_h(&self.cost(None)),
             );
+        }
+        // `reported_cost: tokens.reported_cost`: the provider's own price, summed over attempts.
+        if let Some(reported) = self.tokens().reported_cost {
+            h.insert("reported_cost".into(), reported.into());
         }
         if let Some(calls) = &self.tool_calls {
             let calls: Map<String, Value> = calls
@@ -779,11 +886,17 @@ impl Message {
         if let Some(raw) = &self.raw_reasoning {
             h.insert("raw_reasoning".into(), raw.clone());
         }
+        if let Some(result) = &self.mcp_result {
+            h.insert("mcp_result".into(), result.dump());
+        }
         if let Some(r) = &self.finish_reason {
             h.insert("finish_reason".into(), r.as_str().into());
         }
         if self.cache_until_here {
             h.insert("cache_until_here".into(), true.into());
+        }
+        if let Some(ttl) = &self.cache_ttl {
+            h.insert("cache_ttl".into(), ttl.clone().into());
         }
         let t = self.tokens();
         for (k, v) in [
@@ -796,6 +909,12 @@ impl Message {
             if let Some(v) = v {
                 h.insert(k.into(), v.into());
             }
+        }
+        if let Some(by_ttl) = &t.cache_write_by_ttl {
+            h.insert(
+                "cache_write_tokens_by_ttl".into(),
+                Value::Object(by_ttl.clone()),
+            );
         }
         if let Some(s) = &t.server_tool_use {
             h.insert("server_tool_use".into(), Value::Object(s.clone()));
@@ -839,21 +958,5 @@ fn server_tool_call_h(call: &ServerToolCall) -> Value {
 
 /// `Attachment#to_h`: `{ type:, source: }`. In-memory bytes have no source to record (`null`).
 fn attachment_h(a: &Attachment) -> Value {
-    use crate::attachment::{AttachmentType, Source};
-    let kind = match a.kind() {
-        AttachmentType::Image => "image",
-        AttachmentType::Video => "video",
-        AttachmentType::Audio => "audio",
-        AttachmentType::Pdf => "pdf",
-        AttachmentType::Text => "text",
-        AttachmentType::Document => "document",
-        AttachmentType::Unknown => "unknown",
-    };
-    let source = match &a.source {
-        Source::Path(p) => Value::from(p.to_string_lossy().into_owned()),
-        Source::Url(u) => Value::from(u.clone()),
-        Source::ProviderFile(f) => Value::from(f.id.clone()),
-        Source::Bytes(_) => Value::Null,
-    };
-    serde_json::json!({ "type": kind, "source": source })
+    a.to_h()
 }

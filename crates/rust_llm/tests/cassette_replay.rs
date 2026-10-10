@@ -231,7 +231,9 @@ async fn raw_responses() {
             let raw = response.raw.as_ref().ok_or("raw")?;
             check(raw.status == 200, "status")?;
             check(!raw.headers.is_empty(), "headers")?;
-            check(!raw.request_body_json().is_null(), "request body")
+            // 2.1 `release_request`: the raw response keeps no request body; the replay itself
+            // checked the body that was sent.
+            check(raw.request_body_json().is_null(), "no request body")
         }
     );
 }

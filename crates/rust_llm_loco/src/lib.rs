@@ -44,10 +44,14 @@ pub mod entities;
 mod mcp_credential;
 pub mod migrations;
 pub mod model_store;
+mod provider_file;
+mod usage_ledger;
 
 pub use batch::BatchStore;
 pub use mcp_credential::McpCredentialStore;
 pub use model_store::ModelStore;
+pub use provider_file::ProviderFile;
+pub use usage_ledger::UsageLedger;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -240,8 +244,9 @@ fn resolve_model_info(
         .unwrap_or_else(|_| rust_llm::Model::default_for(model, provider)))
 }
 
-/// An instruction applied with `persist: false`: `(text, append, cache_until_here)`.
-type RuntimeInstruction = (String, bool, bool);
+/// An instruction applied with `persist: false`: `(text, append, cache_until_here)`, the boundary
+/// as `with_instructions` takes it (`true`, `false`, or `{ "ttl": "1h" }`).
+type RuntimeInstruction = (String, bool, Value);
 
 /// What [`ChatRecord::complete_stream`] reports while it runs: RubyLLM's `on_new_message`, each
 /// streamed chunk, and `on_end_message`, each with the `messages` row it belongs to.
@@ -417,6 +422,7 @@ impl ChatRecord {
         Ok(rust_llm_usages::Entity::find()
             .filter(rust_llm_usages::Column::ChatType.eq(CHAT_TYPE))
             .filter(rust_llm_usages::Column::ChatId.eq(self.record.id as i64))
+            .order_by_asc(rust_llm_usages::Column::CreatedAt)
             .order_by_asc(rust_llm_usages::Column::Id)
             .all(db)
             .await?)
@@ -436,6 +442,7 @@ impl ChatRecord {
         Ok(rust_llm_tool_calls::Entity::find()
             .filter(rust_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
             .filter(rust_llm_tool_calls::Column::MessageId.is_in(ids))
+            .order_by_asc(rust_llm_tool_calls::Column::CreatedAt)
             .order_by_asc(rust_llm_tool_calls::Column::Id)
             .all(db)
             .await?)
@@ -493,11 +500,12 @@ impl ChatRecord {
             .iter()
             .map(|row| restore_message(row, &calls, &files, &entries))
             .collect::<Result<Vec<_>>>()?;
+        attach_provider_file_stores(db, &restored, &files).await;
         chat.set_messages(restored);
         chat.set_usage_entries(entries.into_iter().map(|(_, _, e)| e).collect());
         apply_tool_call_state(chat, &calls);
         for (text, append, cache_until_here) in &self.runtime_instructions {
-            chat.set_instructions(Some(text.clone()), *append, *cache_until_here);
+            chat.set_instructions_with(Some(text.clone()), *append, cache_until_here)?;
         }
         Ok(())
     }
@@ -520,7 +528,7 @@ impl ChatRecord {
         chat: &mut Chat,
         instructions: &str,
     ) -> Result<()> {
-        self.persist_system_instruction(db, instructions, false, false)
+        self.persist_system_instruction(db, instructions, false, &Value::Bool(false))
             .await?;
         self.sync_messages(db, chat).await
     }
@@ -538,6 +546,29 @@ impl ChatRecord {
         persist: bool,
         cache_until_here: bool,
     ) -> Result<()> {
+        self.set_instructions_with(
+            db,
+            chat,
+            instructions,
+            append,
+            persist,
+            &Value::Bool(cache_until_here),
+        )
+        .await
+    }
+
+    /// [`ChatRecord::set_instructions`] with `cache_until_here: true | false | { ttl: "1h" }`: a
+    /// persisted boundary keeps its lifetime in `messages.cache_ttl`.
+    pub async fn set_instructions_with(
+        &mut self,
+        db: &DatabaseConnection,
+        chat: &mut Chat,
+        instructions: Option<&str>,
+        append: bool,
+        persist: bool,
+        cache_until_here: &Value,
+    ) -> Result<()> {
+        Message::cache_boundary_options(cache_until_here)?;
         match (persist, instructions) {
             (true, None) => self.clear_persisted_system_instructions(db).await?,
             (true, Some(text)) => {
@@ -549,8 +580,11 @@ impl ChatRecord {
                 if !append {
                     self.runtime_instructions.clear();
                 }
-                self.runtime_instructions
-                    .push((text.to_string(), append, cache_until_here));
+                self.runtime_instructions.push((
+                    text.to_string(),
+                    append,
+                    cache_until_here.clone(),
+                ));
             }
         }
         self.sync_messages(db, chat).await
@@ -570,8 +604,11 @@ impl ChatRecord {
         db: &DatabaseConnection,
         text: &str,
         append: bool,
-        cache_until_here: bool,
+        cache_until_here: &Value,
     ) -> Result<()> {
+        // `cache_boundary_attributes`: the flag, and the lifetime (`NULL` without one).
+        let boundary = Message::cache_boundary_options(cache_until_here)?;
+        let (cache_until_here, cache_ttl) = (boundary.is_some(), boundary.flatten());
         let txn = begin_write(db).await?;
         let existing = messages::Entity::find()
             .filter(messages::Column::ChatId.eq(self.record.id))
@@ -583,10 +620,14 @@ impl ChatRecord {
             // `update_persisted_system_instruction`: rewriting the same row keeps it ahead of the
             // conversation instead of moving it behind the user messages.
             let row = existing[0].clone();
-            if row.content.as_deref() != Some(text) || row.cache_until_here != cache_until_here {
+            if row.content.as_deref() != Some(text)
+                || row.cache_until_here != cache_until_here
+                || row.cache_ttl != cache_ttl
+            {
                 let mut row: messages::ActiveModel = row.into();
                 row.content = Set(Some(text.to_string()));
                 row.cache_until_here = Set(cache_until_here);
+                row.cache_ttl = Set(cache_ttl);
                 row.updated_at = Set(now());
                 row.update(&txn).await?;
             }
@@ -596,6 +637,7 @@ impl ChatRecord {
             }
             let mut m = Message::system(text);
             m.cache_until_here = cache_until_here;
+            m.cache_ttl = cache_ttl;
             insert_message(&txn, self.record.id, &m).await?;
         }
         txn.commit().await?;
@@ -686,11 +728,7 @@ impl ChatRecord {
             .filter(rust_llm_tool_calls::Column::MessageId.is_in(ids.clone()))
             .exec(&txn)
             .await?;
-        rust_llm_attachments::Entity::delete_many()
-            .filter(rust_llm_attachments::Column::MessageType.eq(MESSAGE_TYPE))
-            .filter(rust_llm_attachments::Column::MessageId.is_in(ids))
-            .exec(&txn)
-            .await?;
+        purge_attachments(&txn, ids).await?;
         rust_llm_usages::Entity::delete_many()
             .filter(rust_llm_usages::Column::ChatType.eq(CHAT_TYPE))
             .filter(rust_llm_usages::Column::ChatId.eq(self.record.id as i64))
@@ -710,18 +748,30 @@ impl ChatRecord {
     /// `chat.cache_until_here`: marks the latest persisted message as a prompt cache boundary, or
     /// the latest in-memory one when nothing is persisted yet.
     pub async fn cache_until_here(&self, db: &DatabaseConnection, chat: &mut Chat) -> Result<()> {
+        self.cache_until_here_with(db, chat, None).await
+    }
+
+    /// `chat.cache_until_here(ttl:)`: the boundary keeps its own lifetime (`"1h"`) in
+    /// `messages.cache_ttl`.
+    pub async fn cache_until_here_with(
+        &self,
+        db: &DatabaseConnection,
+        chat: &mut Chat,
+        ttl: Option<&str>,
+    ) -> Result<()> {
         let last = messages::Entity::find()
             .filter(messages::Column::ChatId.eq(self.record.id))
             .order_by_desc(messages::Column::Id)
             .one(db)
             .await?;
         let Some(row) = last else {
-            chat.cache_until_here()?;
+            chat.cache_until_here_with(ttl)?;
             return Ok(());
         };
         let id = row.id as i64;
         let mut row: messages::ActiveModel = row.into();
         row.cache_until_here = Set(true);
+        row.cache_ttl = Set(ttl.map(str::to_string));
         row.updated_at = Set(now());
         row.update(db).await?;
         if let Some(m) = chat
@@ -730,6 +780,7 @@ impl ChatRecord {
             .find(|m| m.record_id == Some(id))
         {
             m.cache_until_here = true;
+            m.cache_ttl = ttl.map(str::to_string);
         }
         Ok(())
     }
@@ -902,9 +953,10 @@ impl ChatRecord {
         chat: &mut Chat,
         pending_usages: &UsageRows,
     ) -> Result<()> {
+        self.check_on_tasks(db, chat, pending_usages).await?;
         loop {
             self.refresh_tool_call_state(db, chat).await?;
-            if chat.is_complete() || chat.is_awaiting_approval() || chat.is_awaiting_input() {
+            if chat.is_complete() || chat.is_waiting() {
                 return Ok(());
             }
             let inputs_before = chat.tool_call_inputs().clone();
@@ -921,6 +973,28 @@ impl ChatRecord {
         }
     }
 
+    /// `run_tools if awaiting_tasks?`: `complete` checks on the MCP tasks pending calls wait on
+    /// once, persisting the results of those that finished and the state of the rest. A chat
+    /// another process cancelled cancels the tasks instead.
+    async fn check_on_tasks(
+        &self,
+        db: &DatabaseConnection,
+        chat: &mut Chat,
+        pending_usages: &UsageRows,
+    ) -> Result<()> {
+        self.refresh_tool_call_state(db, chat).await?;
+        if !chat.is_awaiting_tasks() {
+            return Ok(());
+        }
+        let inputs_before = chat.tool_call_inputs().clone();
+        let outcome = chat.run_tools().await.map(|_| ());
+        self.persist_unsaved(db, chat, Usages::Written(pending_usages))
+            .await?;
+        self.persist_tool_call_inputs(db, chat, &inputs_before)
+            .await?;
+        Ok(outcome?)
+    }
+
     /// [`ChatRecord::run_loop`] for [`ChatRecord::complete_stream`]: a response gets its row
     /// before the request (`persist_new_message`) and is written into it afterwards; tool results
     /// are written as they finish.
@@ -931,9 +1005,10 @@ impl ChatRecord {
         pending_usages: &UsageRows,
         on_event: &mut (dyn FnMut(StreamEvent<'_>) + Send),
     ) -> Result<()> {
+        self.check_on_tasks(db, chat, pending_usages).await?;
         loop {
             self.refresh_tool_call_state(db, chat).await?;
-            if chat.is_complete() || chat.is_awaiting_approval() || chat.is_awaiting_input() {
+            if chat.is_complete() || chat.is_waiting() {
                 return Ok(());
             }
             let inputs_before = chat.tool_call_inputs().clone();
@@ -992,17 +1067,24 @@ impl ChatRecord {
         chat.set_async_usage_recorder(Arc::new(move |entry: UsageEntry| {
             let (db, sink) = (db.clone(), sink.clone());
             Box::pin(async move {
-                match insert_usage(&db, chat_id, None, &entry).await {
-                    Ok(id) => {
-                        if let Ok(mut rows) = sink.lock() {
-                            rows.push((entry.id, id));
-                        }
-                    }
-                    Err(e) => tracing::error!("RustLLM: failed to persist usage row: {e}"),
+                if let Some(id) = persist_usage_entry(&db, chat_id, &entry).await
+                    && let Ok(mut rows) = sink.lock()
+                {
+                    rows.push((entry.id, id));
                 }
             })
         }));
         rows
+    }
+
+    /// `persist_usage_entry(entry)`: writes `entry` as this chat's unlinked usage row (its owner
+    /// included), or logs why it could not; the write never fails the chat. Returns the row id.
+    pub async fn persist_usage_entry(
+        &self,
+        db: &DatabaseConnection,
+        entry: &UsageEntry,
+    ) -> Option<i32> {
+        persist_usage_entry(db, self.record.id, entry).await
     }
 
     /// Writes every non-system message without a `record_id`, in history order, and stamps the
@@ -1133,19 +1215,25 @@ impl ChatRecord {
             let mut call: rust_llm_tool_calls::ActiveModel = call.into();
             call.result_type = Set(Some(MESSAGE_TYPE.into()));
             call.result_id = Set(Some(row.id as i64));
+            // `tool_result_attributes`: the result an MCP App UI renders stays on the call.
+            call.mcp_result = Set(m.mcp_result.as_ref().map(|r| r.dump()));
             call.updated_at = Set(now());
             call.update(&txn).await?;
         }
+        let mut blob_keys = Vec::new();
         for (a, bytes) in files {
             let metadata = a
                 .resolution
                 .map(|r| serde_json::json!({ "resolution": resolution_name(r) }));
+            // Active Storage's `generate_unique_secure_token`: never handed out twice.
+            let blob_key = uuid::Uuid::new_v4().simple().to_string();
             rust_llm_attachments::ActiveModel {
                 message_type: Set(MESSAGE_TYPE.into()),
                 message_id: Set(row.id as i64),
                 filename: Set(a.filename.clone().unwrap_or_default()),
                 content_type: Set(a.mime_type.clone()),
                 byte_size: Set(bytes.len() as i64),
+                blob_key: Set(Some(blob_key.clone())),
                 metadata: Set(metadata),
                 data: Set(bytes),
                 created_at: Set(now()),
@@ -1153,6 +1241,7 @@ impl ChatRecord {
             }
             .insert(&txn)
             .await?;
+            blob_keys.push((a, blob_key));
         }
         // `link_usage_entries`: every attempt behind this message, retries included.
         for entry in usages {
@@ -1177,6 +1266,15 @@ impl ChatRecord {
                 .await?;
         }
         txn.commit().await?;
+        // `persist_content`: an attachment the chat uploads later records its upload against the
+        // row it was stored as (`provider_file_store ||= ProviderFile.store { blob key }`).
+        if !blob_keys.is_empty() && provider_file::table_exists(db).await {
+            for (a, blob_key) in blob_keys {
+                if a.provider_file_store().is_none() {
+                    a.set_provider_file_store(Some(provider_file::store_for(db, Some(blob_key))));
+                }
+            }
+        }
         Ok(row.id as i64)
     }
 
@@ -1211,7 +1309,7 @@ impl ChatRecord {
     ) -> Result<()> {
         if let Some(call) = self.find_tool_call(db, tool_call_id).await? {
             let mut call: rust_llm_tool_calls::ActiveModel = call.into();
-            call.pending_input = Set(input);
+            call.mcp_state = Set(input);
             call.updated_at = Set(now());
             call.update(db).await?;
         }
@@ -1313,11 +1411,7 @@ impl ChatRecord {
                 .filter(rust_llm_tool_calls::Column::MessageId.eq(*id as i64))
                 .exec(&txn)
                 .await?;
-            rust_llm_attachments::Entity::delete_many()
-                .filter(rust_llm_attachments::Column::MessageType.eq(MESSAGE_TYPE))
-                .filter(rust_llm_attachments::Column::MessageId.eq(*id as i64))
-                .exec(&txn)
-                .await?;
+            purge_attachments(&txn, vec![*id as i64]).await?;
             rust_llm_usages::Entity::update_many()
                 .col_expr(
                     rust_llm_usages::Column::MessageId,
@@ -1691,6 +1785,7 @@ pub async fn message_to_llm(db: &impl ConnectionTrait, row: &messages::Model) ->
                 .add(rust_llm_tool_calls::Column::MessageId.eq(id))
                 .add(rust_llm_tool_calls::Column::ResultId.eq(id)),
         )
+        .order_by_asc(rust_llm_tool_calls::Column::CreatedAt)
         .order_by_asc(rust_llm_tool_calls::Column::Id)
         .all(db)
         .await?;
@@ -1712,6 +1807,46 @@ pub async fn message_to_llm(db: &impl ConnectionTrait, row: &messages::Model) ->
     restore_message(row, &calls, &files, &entries)
 }
 
+/// `message.attachments.purge`: deletes the attachment rows of these messages and, like the
+/// `after_destroy` hook RubyLLM puts on Active Storage blobs, the provider uploads recorded
+/// against them (`ProviderFile.forget_blob`).
+pub async fn purge_attachments(db: &impl ConnectionTrait, message_ids: Vec<i64>) -> Result<()> {
+    let rows = rust_llm_attachments::Entity::find()
+        .filter(rust_llm_attachments::Column::MessageType.eq(MESSAGE_TYPE))
+        .filter(rust_llm_attachments::Column::MessageId.is_in(message_ids))
+        .all(db)
+        .await?;
+    for row in &rows {
+        if let Some(key) = &row.blob_key {
+            ProviderFile::forget_blob(db, key).await?;
+        }
+    }
+    rust_llm_attachments::Entity::delete_many()
+        .filter(rust_llm_attachments::Column::Id.is_in(rows.iter().map(|r| r.id)))
+        .exec(db)
+        .await?;
+    Ok(())
+}
+
+/// `stored_attachment`: each attachment rebuilt from a row reuses the uploads recorded against
+/// its blob key (`provider_file_store = ProviderFile.store { attachment.blob&.key }`).
+async fn attach_provider_file_stores(
+    db: &DatabaseConnection,
+    messages: &[Message],
+    files: &[rust_llm_attachments::Model],
+) {
+    if files.is_empty() || !provider_file::table_exists(db).await {
+        return;
+    }
+    for m in messages {
+        let Some(id) = m.record_id else { continue };
+        let rows = files.iter().filter(|f| f.message_id == id);
+        for (a, row) in m.attachments.iter().zip(rows) {
+            a.set_provider_file_store(Some(provider_file::store_for(db, row.blob_key.clone())));
+        }
+    }
+}
+
 /// `MessageMethods#to_llm`: one `messages` row as a `rust_llm::Message`, with its tool calls, the
 /// tool call it answers, its attachments, and its usage entries (`entries` are
 /// `(usage id, message id, entry)`).
@@ -1730,6 +1865,7 @@ fn restore_message(
     });
     let mut m = Message::new(Role::parse(&row.role)?, row.content.clone());
     m.cache_until_here = row.cache_until_here;
+    m.cache_ttl = row.cache_ttl.clone().filter(|_| row.cache_until_here);
     m.thinking = Thinking::build(row.thinking_text.clone(), row.thinking_signature.clone());
     m.citations = row
         .citations
@@ -1745,6 +1881,11 @@ fn restore_message(
     m.raw_reasoning = row.raw_reasoning.clone();
     m.finish_reason = row.finish_reason.as_deref().map(FinishReason::from_symbol);
     m.tool_call_id = parent.map(|p| p.tool_call_id.clone());
+    // `mcp_result`: kept on the parent tool call, so the UI renders again after a reload.
+    m.mcp_result = parent
+        .and_then(|p| p.mcp_result.as_ref())
+        .filter(|r| r.is_object())
+        .map(|r| Box::new(rust_llm::mcp::McpResult::load(r)));
     m.attachments = files
         .iter()
         .filter(|f| f.message_id == row.id as i64)
@@ -1805,7 +1946,7 @@ fn apply_tool_call_state(chat: &mut Chat, calls: &[rust_llm_tool_calls::Model]) 
         _ => None,
     }));
     chat.set_tool_call_inputs(calls.iter().filter_map(|c| {
-        c.pending_input
+        c.mcp_state
             .clone()
             .filter(|i| !i.is_null())
             .map(|i| (c.tool_call_id.clone(), i))
@@ -1813,12 +1954,7 @@ fn apply_tool_call_state(chat: &mut Chat, calls: &[rust_llm_tool_calls::Model]) 
 }
 
 fn resolution_name(resolution: Resolution) -> &'static str {
-    match resolution {
-        Resolution::Low => "low",
-        Resolution::Medium => "medium",
-        Resolution::High => "high",
-        Resolution::UltraHigh => "ultra_high",
-    }
+    resolution.name()
 }
 
 /// An attachment row as the `RubyLLM::Attachment` `extract_attachments` builds from a blob.
@@ -1833,13 +1969,7 @@ fn attachment(row: &rust_llm_attachments::Model) -> Attachment {
         .as_ref()
         .and_then(|m| m.get("resolution"))
         .and_then(Value::as_str)
-        .and_then(|r| match r {
-            "low" => Some(Resolution::Low),
-            "medium" => Some(Resolution::Medium),
-            "high" => Some(Resolution::High),
-            "ultra_high" => Some(Resolution::UltraHigh),
-            _ => None,
-        });
+        .and_then(|r| Resolution::parse(r).ok());
     match resolution {
         Some(r) => a.with_resolution(r),
         None => a,
@@ -1868,6 +1998,7 @@ fn message_active_model(chat_id: i32, m: &Message) -> messages::ActiveModel {
         role: Set(m.role.as_str().into()),
         content: Set(m.content.clone()),
         cache_until_here: Set(m.cache_until_here),
+        cache_ttl: Set(m.cache_ttl.clone()),
         thinking_text: Set(m.thinking.as_ref().and_then(|t| t.text.clone())),
         thinking_signature: Set(m.thinking.as_ref().and_then(|t| t.signature.clone())),
         citations: Set(json_list(
@@ -1929,18 +2060,59 @@ fn has_unanswered_tool_calls(chat: &Chat) -> bool {
     })
 }
 
+/// `persist_usage_entry`: [`insert_usage`] in its own transaction (`requires_new: true`), logged
+/// and swallowed when it fails (2.1 keeps the reply when a usage row cannot be written).
+async fn persist_usage_entry(
+    db: &DatabaseConnection,
+    chat_id: i32,
+    entry: &UsageEntry,
+) -> Option<i32> {
+    let write = async {
+        let txn = db.begin().await?;
+        let id = insert_usage(&txn, chat_id, None, entry).await?;
+        txn.commit().await?;
+        Ok::<i32, Error>(id)
+    };
+    match write.await {
+        Ok(id) => Some(id),
+        Err(e) => {
+            tracing::warn!(
+                "RustLLM could not record {} usage: {e}",
+                entry.operation.as_str()
+            );
+            None
+        }
+    }
+}
+
 async fn insert_usage(
     db: &impl ConnectionTrait,
     chat_id: i32,
     message_id: Option<i32>,
     e: &UsageEntry,
 ) -> Result<i32> {
+    let mut row = usage_attributes(e);
+    row.chat_type = Set(Some(CHAT_TYPE.into()));
+    row.chat_id = Set(Some(chat_id as i64));
+    row.message_type = Set(message_id.map(|_| MESSAGE_TYPE.to_string()));
+    row.message_id = Set(message_id.map(|id| id as i64));
+    Ok(row.insert(db).await?.id)
+}
+
+/// `Usage.attributes_for(entry)`: the row's columns for `entry`, attached to no chat. The owner is
+/// kept only when it is a record (`entry.owner.is_a?(ActiveRecord::Base)`).
+pub(crate) fn usage_attributes(e: &UsageEntry) -> rust_llm_usages::ActiveModel {
     let i = |v: Option<i64>| v.map(|v| v as i32);
-    Ok(rust_llm_usages::ActiveModel {
-        chat_type: Set(CHAT_TYPE.into()),
-        chat_id: Set(chat_id as i64),
-        message_type: Set(message_id.map(|_| MESSAGE_TYPE.to_string())),
-        message_id: Set(message_id.map(|id| id as i64)),
+    let (owner_type, owner_id) = match &e.owner {
+        Some(rust_llm::accounting::UsageOwner::Record {
+            owner_type,
+            owner_id,
+        }) => (Some(owner_type.clone()), Some(*owner_id)),
+        _ => (None, None),
+    };
+    rust_llm_usages::ActiveModel {
+        owner_type: Set(owner_type),
+        owner_id: Set(owner_id),
         operation: Set(e.operation.as_str().into()),
         provider: Set(e.provider.clone()),
         model: Set(e.model.clone()),
@@ -1956,13 +2128,11 @@ async fn insert_usage(
         cache_write_cost: Set(e.cost.cache_write),
         thinking_cost: Set(e.cost.thinking),
         total_cost: Set(e.cost.total()),
+        server_tool_use: Set(e.tokens.server_tool_use.clone().map(Value::Object)),
         created_at: Set(now()),
         updated_at: Set(now()),
         ..Default::default()
     }
-    .insert(db)
-    .await?
-    .id)
 }
 
 /// `rust_llm_usages` row -> `Accounting::Usage::Entry` (`Usage#to_entry`). The cost comes from
@@ -1980,6 +2150,11 @@ fn usage_entry(u: &rust_llm_usages::Model) -> UsageEntry {
         cache_read: u.cache_read_tokens.map(i64::from),
         cache_write: u.cache_write_tokens.map(i64::from),
         thinking: u.thinking_tokens.map(i64::from),
+        server_tool_use: u
+            .server_tool_use
+            .as_ref()
+            .and_then(Value::as_object)
+            .cloned(),
         ..Default::default()
     };
     let cost = rust_llm::Cost::from_recorded(
@@ -1995,11 +2170,29 @@ fn usage_entry(u: &rust_llm_usages::Model) -> UsageEntry {
     );
     UsageEntry {
         id: UsageEntry::next_id(),
-        operation: rust_llm::message::Operation::Chat,
+        owner: match (&u.owner_type, u.owner_id) {
+            (Some(owner_type), Some(owner_id)) => Some(rust_llm::accounting::UsageOwner::record(
+                owner_type.clone(),
+                owner_id,
+            )),
+            _ => None,
+        },
+        operation: serde_json::from_value(Value::String(u.operation.clone()))
+            .unwrap_or(rust_llm::message::Operation::Chat),
         provider: u.provider.clone(),
         model: u.model.clone(),
         status,
         cost,
         tokens,
+    }
+}
+
+/// `tool_error_message` (`PayloadHelpers#payload_error_message`): the `error` of a JSON object
+/// payload, such as a failed tool result's content or a tool call's arguments, or `None`.
+pub fn tool_error_message(payload: Option<&str>) -> Option<String> {
+    let parsed: Value = serde_json::from_str(payload?).ok()?;
+    match parsed.get("error")? {
+        Value::String(text) => Some(text.clone()),
+        other => Some(other.to_string()),
     }
 }

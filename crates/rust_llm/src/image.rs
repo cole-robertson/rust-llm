@@ -46,10 +46,14 @@ pub struct Image {
     pub usage_entries: Vec<UsageEntry>,
     raw_usage: Value,
     config: Option<Arc<Config>>,
+    /// `attr_writer :model_info`: set by `Accounting::Usage::Tracker#succeed`.
+    pub(crate) model_info: Option<Model>,
 }
 
 /// `paint` returns one `Image`, or several when a provider generated more than one
 /// (`images.size <= 1 ? images.first : images`).
+// `paint` mostly returns one image; boxing it would change the public `Images::One(Image)`.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum Images {
     One(Image),
@@ -104,6 +108,9 @@ pub struct PaintOptions<'a> {
     pub config: Option<Arc<Config>>,
     /// `metadata:`: added to the `image.rust_llm` event payload, never sent to the provider.
     pub metadata: Option<Value>,
+    /// `owner:`: who the usage is attributed to, such as a user; wins over
+    /// [`crate::accounting::with_usage_owner`].
+    pub owner: Option<crate::accounting::UsageOwner>,
 }
 
 impl Image {
@@ -119,6 +126,7 @@ impl Image {
             usage_entries: Vec::new(),
             raw_usage: usage,
             config: None,
+            model_info: None,
         }
     }
 
@@ -198,9 +206,12 @@ impl Image {
         )
     }
 
-    /// The registry model for `model`, or `None` when it is not in the registry.
+    /// The model `model_info=` set, else the registry model for `model`, or `None` when it is
+    /// not in the registry.
     pub fn model_info(&self) -> Option<Model> {
-        models::models().find(&self.model, None).ok()
+        self.model_info
+            .clone()
+            .or_else(|| models::models().find(&self.model, None).ok())
     }
 }
 
@@ -214,6 +225,7 @@ pub async fn paint(prompt: &str, options: PaintOptions<'_>) -> Result<Images> {
         .to_string();
     let (model, provider) =
         resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let owner = options.owner.clone();
     let mut event = crate::instrumentation::Event::start(&config, "image.rust_llm", || {
         let empty = Tokens::default();
         crate::instrumentation::payload([
@@ -235,14 +247,19 @@ pub async fn paint(prompt: &str, options: PaintOptions<'_>) -> Result<Images> {
             ),
         ])
     });
-    let result = tracing::Instrument::instrument(paint_inner(prompt, options), event.span()).await;
+    let result = event
+        .instrument(crate::accounting::owned_by(
+            owner,
+            paint_inner(prompt, options),
+        ))
+        .await;
     if let Ok(images) = &result {
         let all: Vec<&Image> = match images {
             Images::One(i) => vec![i],
             Images::Many(v) => v.iter().collect(),
         };
         if let Some(billed) = all.first() {
-            crate::instrumentation::usages(&config, &billed.usage_entries);
+            crate::accounting::report(&config, &billed.usage_entries).await;
         }
         event.set("result", || serde_json::json!(all.iter().map(|i| serde_json::json!({ "url": i.url, "mime_type": i.mime_type, "model": i.model, "revised_prompt": i.revised_prompt })).collect::<Vec<_>>()));
         event.set("response_model", || {
@@ -337,6 +354,7 @@ async fn paint_inner(prompt: &str, options: PaintOptions<'_>) -> Result<Images> 
     };
     let entry = |status, tokens: Tokens, cost: Option<Cost>| UsageEntry {
         id: UsageEntry::next_id(),
+        owner: crate::accounting::usage_owner(),
         operation: Operation::Image,
         provider: provider.slug().into(),
         model: model.id.clone(),
@@ -350,11 +368,31 @@ async fn paint_inner(prompt: &str, options: PaintOptions<'_>) -> Result<Images> 
         .into_iter()
         .map(|t| entry(UsageStatus::Failed, t, None))
         .collect();
-    // A failed paint has no result to attach its entries to; Ruby only reports them to
-    // instrumentation, which this port does not have.
-    let mut images = match family {
-        Family::Mistral => mistral_images(&connection, &result?.body, &model.id).await?,
-        _ => result.and_then(|raw| family.parse(&raw.body, &model.id))?,
+    // `track_usage`'s rescue (`fail_pending`): a failed paint has no result to attach its entries
+    // to, so they are only reported, the last attempt keeping the tokens a blocked response billed
+    // (`@usage_tracker.observe_tokens`).
+    let parsed = match result {
+        Err(e) => Err((e, None)),
+        Ok(raw) => match family {
+            Family::Mistral => mistral_images(&connection, &raw.body, &model.id)
+                .await
+                .map_err(|e| (e, None)),
+            _ => family
+                .parse(&raw.body, &model.id)
+                .map_err(|e| (e, family.billed_without_image(&raw.body, &model.id))),
+        },
+    };
+    let mut images = match parsed {
+        Ok(images) => images,
+        Err((e, observed)) => {
+            entries.push(entry(
+                UsageStatus::Failed,
+                failure_tokens(&e, observed),
+                None,
+            ));
+            crate::accounting::report(&config, &entries).await;
+            return Err(e);
+        }
     };
     let billed = &images[0];
     entries.push(entry(
@@ -374,12 +412,21 @@ async fn paint_inner(prompt: &str, options: PaintOptions<'_>) -> Result<Images> 
 }
 
 /// `Conversations::Images#parse_image_responses`: each generated file downloaded from Mistral's
-/// Files API, typed from its bytes; only the first image carries the usage.
+/// Files API, or a hosted tool's image URL fetched (`attachment.content`, with the provider's
+/// configuration), typed from its bytes; only the first image carries the usage.
 async fn mistral_images(connection: &Connection, data: &Value, model: &str) -> Result<Vec<Image>> {
     let (files, usage) = crate::protocols::mistral::parse_image_files(data)?;
     let mut images = Vec::new();
-    for (index, id) in files.iter().enumerate() {
-        let bytes = crate::files::download_file(connection, Provider::Mistral, id).await?;
+    for (index, mut attachment) in files.into_iter().enumerate() {
+        let bytes = match attachment.provider_file_id() {
+            Some(id) => crate::files::download_file(connection, Provider::Mistral, id).await?,
+            None => {
+                attachment
+                    .load(&crate::transport::basic(connection.config())?)
+                    .await?;
+                attachment.bytes()?.to_vec()
+            }
+        };
         let mut image = Image::new(model, if index == 0 { usage.clone() } else { json!({}) });
         image.mime_type = Some(crate::attachment::mime_type_for_bytes(&bytes));
         image.data = Some(base64::engine::general_purpose::STANDARD.encode(&bytes));
@@ -577,6 +624,20 @@ impl Family {
                 Ok((format!("models/{model}:{action}"), payload))
             }
         }
+    }
+
+    /// `Gemini::Images#parse_gemini_image_responses` with no image parts: the tokens Google
+    /// billed for the attempt (`observe_tokens(Tokens.new(input:, output:))`).
+    fn billed_without_image(self, data: &Value, model: &str) -> Option<Tokens> {
+        if !matches!(self, Family::Gemini) || !gemini_image_model(model) {
+            return None;
+        }
+        let usage = gemini_usage(data);
+        Some(Tokens {
+            input: int(usage.get("input_tokens")),
+            output: int(usage.get("output_tokens")),
+            ..Default::default()
+        })
     }
 
     /// `parse_image_responses`.

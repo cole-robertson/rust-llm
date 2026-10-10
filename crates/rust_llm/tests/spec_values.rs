@@ -271,7 +271,7 @@ fn reported(input: Option<i64>, output: Option<i64>, amount: f64) -> Tokens {
     }
 }
 
-// spec: cost_spec.rb:236 prefers the reported cost over the registry estimate
+// spec: cost_spec.rb:273 prefers the reported cost over the registry estimate
 #[test]
 fn cost_prefers_the_reported_cost() {
     let c = cost(&reported(Some(1_000), Some(2_000), 0.0042), Some(&priced()));
@@ -279,7 +279,7 @@ fn cost_prefers_the_reported_cost() {
     assert_eq!(c.total(), Some(0.0042));
 }
 
-// spec: cost_spec.rb:244 returns the reported cost when registry pricing is missing
+// spec: cost_spec.rb:281 returns the reported cost when registry pricing is missing
 #[test]
 fn cost_returns_the_reported_cost_without_registry_pricing() {
     let c = cost(&reported(Some(10), Some(5), 0.0042), None);
@@ -287,7 +287,7 @@ fn cost_returns_the_reported_cost_without_registry_pricing() {
     assert_eq!(c.total(), Some(0.0042));
 }
 
-// spec: cost_spec.rb:252 reports usage even when the provider returned only a cost
+// spec: cost_spec.rb:289 reports usage even when the provider returned only a cost
 #[test]
 fn cost_reports_usage_from_a_cost_alone() {
     let c = cost(&reported(None, None, 0.0042), None);
@@ -295,7 +295,7 @@ fn cost_reports_usage_from_a_cost_alone() {
     assert_eq!(c.total(), Some(0.0042));
 }
 
-// spec: cost_spec.rb:260 estimates from the registry when no cost was reported
+// spec: cost_spec.rb:297 estimates from the registry when no cost was reported
 #[test]
 fn cost_estimates_from_the_registry_without_a_reported_cost() {
     close(
@@ -304,7 +304,7 @@ fn cost_estimates_from_the_registry_without_a_reported_cost() {
     );
 }
 
-// spec: cost_spec.rb:267 sums reported costs across aggregated attempts
+// spec: cost_spec.rb:304 sums reported costs across aggregated attempts
 #[test]
 fn cost_aggregate_sums_reported_costs() {
     let a = cost(&reported(Some(10), None, 0.001), None);
@@ -312,7 +312,7 @@ fn cost_aggregate_sums_reported_costs() {
     close(Cost::aggregate([&a, &b], true).total(), 0.003);
 }
 
-// spec: cost_spec.rb:275 mixes reported and estimated totals in an aggregate
+// spec: cost_spec.rb:312 mixes reported and estimated totals in an aggregate
 #[test]
 fn cost_aggregate_mixes_reported_and_estimated_totals() {
     let a = cost(&reported(Some(10), None, 0.001), None);
@@ -320,7 +320,7 @@ fn cost_aggregate_mixes_reported_and_estimated_totals() {
     close(Cost::aggregate([&a, &b], true).total(), 0.006);
 }
 
-// spec: cost_spec.rb:292 sums costs while preserving nil for missing pricing
+// spec: cost_spec.rb:329 sums costs while preserving nil for missing pricing
 #[test]
 fn cost_aggregate_keeps_missing_pricing_missing() {
     let a = cost(&tokens(Some(10), None), Some(&priced()));
@@ -331,7 +331,7 @@ fn cost_aggregate_keeps_missing_pricing_missing() {
     assert_eq!(agg.total(), None);
 }
 
-// spec: cost_spec.rb:302 ignores entries without token usage
+// spec: cost_spec.rb:339 ignores entries without token usage
 #[test]
 fn cost_aggregate_ignores_entries_without_usage() {
     let empty = cost(&Tokens::default(), Some(&priced()));
@@ -339,7 +339,7 @@ fn cost_aggregate_ignores_entries_without_usage() {
     assert_eq!(Cost::aggregate([&empty, &a], true).total(), Some(0.00001));
 }
 
-// spec: cost_spec.rb:312 reads component amounts and total from a stored breakdown
+// spec: cost_spec.rb:349 reads component amounts and total from a stored breakdown
 // (`Cost.from_h` is `Cost::from_recorded(amounts, total, tokens)`: the stored usage columns.)
 #[test]
 fn cost_from_recorded_reads_amounts_and_total() {
@@ -355,9 +355,9 @@ fn cost_from_recorded_reads_amounts_and_total() {
     assert_eq!(c.total(), Some(0.005));
 }
 
-// spec: cost_spec.rb:327 preserves a recorded total when component costs were not stored
-// spec: cost_spec.rb:333 preserves a recorded total when token counts were not stored
-// spec: cost_spec.rb:464 trusts a recorded total even when components are missing
+// spec: cost_spec.rb:364 preserves a recorded total when component costs were not stored
+// spec: cost_spec.rb:370 preserves a recorded total when token counts were not stored
+// spec: cost_spec.rb:501 trusts a recorded total even when components are missing
 #[test]
 fn cost_from_recorded_trusts_a_recorded_total() {
     let c = Cost::from_recorded([None; 5], Some(0.005), &Tokens::default());
@@ -365,7 +365,7 @@ fn cost_from_recorded_trusts_a_recorded_total() {
     assert!(c.is_reported());
 }
 
-// spec: cost_spec.rb:339 keeps missing historical pricing missing when token usage is known
+// spec: cost_spec.rb:376 keeps missing historical pricing missing when token usage is known
 #[test]
 fn cost_from_recorded_keeps_unpriced_usage_missing() {
     let c = Cost::from_recorded([None; 5], None, &tokens(Some(10), None));
@@ -374,7 +374,7 @@ fn cost_from_recorded_keeps_unpriced_usage_missing() {
     assert!(c.missing().contains(&Component::Input));
 }
 
-// spec: cost_spec.rb:356 returns a nil total when the stored breakdown recorded no total
+// spec: cost_spec.rb:393 returns a nil total when the stored breakdown recorded no total
 // (the stored breakdown has no token counts, so nothing proves the input amount is the whole bill)
 #[test]
 fn cost_from_recorded_without_a_total_and_without_tokens_has_no_total() {
@@ -387,7 +387,7 @@ fn cost_from_recorded_without_a_total_and_without_tokens_has_no_total() {
     assert_eq!(c.total(), None);
 }
 
-// spec: cost_spec.rb:363 aggregates several stored costs
+// spec: cost_spec.rb:400 aggregates several stored costs
 #[test]
 fn cost_aggregate_of_recorded_costs() {
     let a = Cost::from_recorded(
@@ -406,7 +406,7 @@ fn cost_aggregate_of_recorded_costs() {
     close(agg.total(), 0.0075);
 }
 
-// spec: cost_spec.rb:373 aggregates a stored cost mixed with a live cost
+// spec: cost_spec.rb:410 aggregates a stored cost mixed with a live cost
 #[test]
 fn cost_aggregate_of_a_recorded_and_a_live_cost() {
     let stored = Cost::from_recorded(
@@ -421,7 +421,7 @@ fn cost_aggregate_of_a_recorded_and_a_live_cost() {
     close(agg.total(), 0.006);
 }
 
-// spec: cost_spec.rb:385 reports no total when one attempt is still unpriced
+// spec: cost_spec.rb:422 reports no total when one attempt is still unpriced
 #[test]
 fn cost_incomplete_aggregate_has_no_total() {
     let a = cost(&tokens(Some(10), None), Some(&priced()));
@@ -430,7 +430,7 @@ fn cost_incomplete_aggregate_has_no_total() {
     assert_eq!(agg.total(), None);
 }
 
-// spec: cost_spec.rb:395 prices against a model looked up by id
+// spec: cost_spec.rb:432 prices against a model looked up by id
 #[test]
 fn cost_prices_against_a_registry_model() {
     let m = rust_llm::models().find("gpt-4.1-nano", None).unwrap();
@@ -442,7 +442,7 @@ fn cost_prices_against_a_registry_model() {
     );
 }
 
-// spec: cost_spec.rb:429 prices a named category
+// spec: cost_spec.rb:466 prices a named category
 #[test]
 fn cost_prices_the_audio_category() {
     let mut m = Model::default_for("audio-model", "openai");
@@ -451,7 +451,7 @@ fn cost_prices_the_audio_category() {
     assert_eq!((c.input, c.output), (Some(4.0), Some(8.0)));
 }
 
-// spec: cost_spec.rb:457 reports nothing when the stored breakdown is empty
+// spec: cost_spec.rb:494 reports nothing when the stored breakdown is empty
 #[test]
 fn cost_from_an_empty_record_reports_nothing() {
     let c = Cost::from_recorded([None; 5], None, &Tokens::default());
@@ -459,7 +459,7 @@ fn cost_from_an_empty_record_reports_nothing() {
     assert!(!c.is_reported());
 }
 
-// spec: cost_spec.rb:471 flags components that had tokens but no recorded cost
+// spec: cost_spec.rb:508 flags components that had tokens but no recorded cost
 #[test]
 fn cost_from_recorded_flags_components_with_tokens_but_no_cost() {
     let c = Cost::from_recorded(
@@ -531,13 +531,13 @@ fn message_parsed_is_none_for_a_tool_call_turn() {
     assert_eq!(calling(&[("call_1", "weather")]).parsed().unwrap(), None);
 }
 
-// spec: message_spec.rb:110 defaults to an empty array
+// spec: message_spec.rb:208 defaults to an empty array
 #[test]
 fn message_attachments_default_to_empty() {
     assert!(Message::user("hello").attachments.is_empty());
 }
 
-// spec: message_spec.rb:185 calculates cost from the supplied model
+// spec: message_spec.rb:316 calculates cost from the supplied model
 #[test]
 fn message_cost_prices_against_a_supplied_model() {
     let mut m = Message::assistant("Hello");
@@ -547,7 +547,7 @@ fn message_cost_prices_against_a_supplied_model() {
     assert_eq!((c.input, c.output), (Some(0.001), Some(0.004)));
 }
 
-// spec: message_spec.rb:208 returns nil when the message model cannot be found
+// spec: message_spec.rb:339 returns nil when the message model cannot be found
 #[test]
 fn message_cost_is_unknown_for_an_unknown_model() {
     let mut m = Message::assistant("Hello");
@@ -556,7 +556,7 @@ fn message_cost_is_unknown_for_an_unknown_model() {
     assert_eq!(m.cost(None).total(), None);
 }
 
-// spec: message_spec.rb:221 always returns token and cost value objects
+// spec: message_spec.rb:352 always returns token and cost value objects
 #[test]
 fn message_tokens_and_cost_are_empty_values_by_default() {
     let m = Message::user("Hello");
@@ -564,7 +564,7 @@ fn message_tokens_and_cost_are_empty_values_by_default() {
     assert_eq!(m.cost(None).total(), None);
 }
 
-// spec: message_spec.rb:230 exposes every bucket through the token value only
+// spec: message_spec.rb:361 exposes every bucket through the token value only
 #[test]
 fn message_exposes_every_bucket_through_tokens() {
     let mut m = Message::assistant("Hello");
@@ -583,13 +583,14 @@ fn message_exposes_every_bucket_through_tokens() {
     );
 }
 
-// spec: message_spec.rb:253 does not substitute another provider when the recorded model is missing
+// spec: message_spec.rb:384 does not substitute another provider when the recorded model is missing
 #[test]
 fn message_model_info_does_not_substitute_another_provider() {
     let mut m = Message::assistant("ok");
     m.model = Some("gpt-5-nano".into());
     m.usage_entries = vec![rust_llm::UsageEntry {
         id: rust_llm::UsageEntry::next_id(),
+        owner: None,
         operation: rust_llm::message::Operation::Chat,
         provider: "custom".into(),
         model: "gpt-5-nano".into(),
@@ -600,7 +601,7 @@ fn message_model_info_does_not_substitute_another_provider() {
     assert!(m.model_info().is_none());
 }
 
-// spec: message_spec.rb:266 includes finish_reason when present
+// spec: message_spec.rb:397 includes finish_reason when present
 #[test]
 fn message_to_h_includes_the_finish_reason() {
     let mut m = Message::assistant("Hello");
@@ -608,7 +609,7 @@ fn message_to_h_includes_the_finish_reason() {
     assert_eq!(m.to_h()["finish_reason"], json!("length"));
 }
 
-// spec: message_spec.rb:287 returns true for #{predicate} on the normalized #{finish_reason} reason
+// spec: message_spec.rb:418 returns true for #{predicate} on the normalized #{finish_reason} reason
 #[test]
 fn message_finish_reason_predicates() {
     let with = |r: &str| {
@@ -622,7 +623,7 @@ fn message_finish_reason_predicates() {
     assert!(with("content_filter").is_content_filtered());
 }
 
-// spec: message_spec.rb:294 leaves provider spellings to the protocols
+// spec: message_spec.rb:425 leaves provider spellings to the protocols
 #[test]
 fn message_keeps_provider_finish_reasons_verbatim() {
     let mut m = Message::assistant("Hello");
@@ -631,7 +632,7 @@ fn message_keeps_provider_finish_reasons_verbatim() {
     assert_eq!(m.finish_reason.unwrap().as_str(), "end_turn");
 }
 
-// spec: message_spec.rb:301 returns false when finish_reason is nil or unknown
+// spec: message_spec.rb:432 returns false when finish_reason is nil or unknown
 #[test]
 fn message_predicates_are_false_for_unknown_reasons() {
     for reason in [
@@ -649,7 +650,7 @@ fn message_predicates_are_false_for_unknown_reasons() {
     }
 }
 
-// spec: message_spec.rb:311 is inherited by streaming chunks (`Chunk` is `Message` here)
+// spec: message_spec.rb:442 is inherited by streaming chunks (`Chunk` is `Message` here)
 #[test]
 fn chunks_have_the_finish_reason_predicates() {
     let mut chunk: rust_llm::Chunk = Message::new(Role::Assistant, None::<String>);
@@ -657,7 +658,7 @@ fn chunks_have_the_finish_reason_predicates() {
     assert!(chunk.is_max_tokens());
 }
 
-// spec: message_spec.rb:317 reports a tool-call stop even when the provider says the turn completed
+// spec: message_spec.rb:448 reports a tool-call stop even when the provider says the turn completed
 #[test]
 fn message_tool_call_stop_even_when_the_provider_says_stop() {
     let mut m = calling(&[("call_1", "weather")]);
@@ -805,6 +806,7 @@ fn errors_keep_the_response_they_came_from() {
     let response = rust_llm::error::ErrorResponse {
         status: 500,
         body: r#"{"error":"server error"}"#.into(),
+        ..Default::default()
     };
     let e = Error::Server("server error".into(), Some(response));
     assert_eq!(e.to_string(), "server error");
@@ -831,7 +833,7 @@ fn local_errors_are_not_provider_errors() {
     }
 }
 
-// spec: error_spec.rb:74 stores the finish reason when available
+// spec: error_spec.rb:109 stores the finish reason when available
 #[tokio::test]
 async fn tool_call_parse_errors_keep_the_finish_reason() {
     // A truncated tool call from the wire: arguments cut off by the length limit.
@@ -870,8 +872,8 @@ async fn tool_call_parse_errors_keep_the_finish_reason() {
     }
 }
 
-// spec: error_spec.rb:90 uses a simple standard message with the unsupported type and guidance
-// spec: error_spec.rb:128 names the type when there is one
+// spec: error_spec.rb:125 uses a simple standard message with the unsupported type and guidance
+// spec: error_spec.rb:163 names the type when there is one
 #[test]
 fn unsupported_attachment_errors_name_the_type_and_guide() {
     let m = rust_llm::Chat::with_config(
@@ -903,7 +905,7 @@ fn unsupported_attachment_errors_name_the_type_and_guide() {
     );
 }
 
-// spec: error_spec.rb:120 explains #{error_class} when the provider says nothing
+// spec: error_spec.rb:155 explains #{error_class} when the provider says nothing
 #[tokio::test]
 async fn every_error_class_has_its_default_message() {
     for (status, kind, message) in [
@@ -995,8 +997,8 @@ async fn error_for(status: u16, body: &str) -> Error {
     chat.ask("hi").await.unwrap_err()
 }
 
-// spec: transport/error_middleware_spec.rb:147 maps 502 to ServiceUnavailableError
-// spec: transport/error_middleware_spec.rb:163 maps 504 to ServiceUnavailableError
+// spec: transport/error_middleware_spec.rb:159 maps 502 to ServiceUnavailableError
+// spec: transport/error_middleware_spec.rb:175 maps 504 to ServiceUnavailableError
 #[tokio::test]
 async fn gateway_errors_are_service_unavailable() {
     for status in [502, 504] {
@@ -1010,7 +1012,7 @@ async fn gateway_errors_are_service_unavailable() {
     }
 }
 
-// spec: transport/error_middleware_spec.rb:285 raises the base error for a status it does not map
+// spec: transport/error_middleware_spec.rb:364 raises the base error for a status it does not map
 #[tokio::test]
 async fn an_unmapped_status_is_the_base_error_with_the_provider_message() {
     let e = error_for(418, r#"{"error":{"message":"teapot"}}"#).await;
@@ -1219,7 +1221,7 @@ fn model_batch_pricing() {
 
 // ---- models_spec.rb / models/lookup_spec.rb ---------------------------------------------------
 
-// spec: models_spec.rb:15 filters models by provider
+// spec: models_spec.rb:32 filters models by provider
 #[test]
 fn models_filter_by_provider() {
     let registry = rust_llm::models();
@@ -1228,7 +1230,7 @@ fn models_filter_by_provider() {
     assert!(openai.iter().all(|m| m.provider == "openai"));
 }
 
-// spec: models_spec.rb:48 leaves unlisted models out of every listing method but still finds them
+// spec: models_spec.rb:65 leaves unlisted models out of every listing method but still finds them
 #[test]
 fn models_leave_unlisted_models_out_of_listings_but_find_them() {
     let gone = Model {
@@ -1250,7 +1252,7 @@ fn models_leave_unlisted_models_out_of_listings_but_find_them() {
     assert_eq!(registry.find("gone-model", None).unwrap().id, "gone-model");
 }
 
-// spec: models_spec.rb:64 prefers a listed model over an unlisted one when no provider is given
+// spec: models_spec.rb:81 prefers a listed model over an unlisted one when no provider is given
 #[test]
 fn models_prefer_a_listed_model_over_an_unlisted_one() {
     let gone = Model {
@@ -1265,8 +1267,8 @@ fn models_prefer_a_listed_model_over_an_unlisted_one() {
     );
 }
 
-// spec: models_spec.rb:89 finds models by ID
-// spec: models_spec.rb:104 raises ModelNotFoundError for unknown models
+// spec: models_spec.rb:106 finds models by ID
+// spec: models_spec.rb:121 raises ModelNotFoundError for unknown models
 #[test]
 fn models_find_by_id_and_raise_for_unknown_ids() {
     let m = rust_llm::models()
@@ -1282,7 +1284,7 @@ fn models_find_by_id_and_raise_for_unknown_ids() {
     ));
 }
 
-// spec: models_spec.rb:141 prefers the first-party provider when an aggregator serves the same name
+// spec: models_spec.rb:158 prefers the first-party provider when an aggregator serves the same name
 #[test]
 fn models_prefer_the_first_party_provider() {
     assert_eq!(
@@ -1294,8 +1296,8 @@ fn models_prefer_the_first_party_provider() {
     );
 }
 
-// spec: models_spec.rb:453 filters to models that are embedding-capable
-// spec: models_spec.rb:468 excludes models with non-text output modalities
+// spec: models_spec.rb:470 filters to models that are embedding-capable
+// spec: models_spec.rb:485 excludes models with non-text output modalities
 #[test]
 fn models_split_chat_and_embedding_models() {
     let registry = rust_llm::models();
@@ -1329,9 +1331,9 @@ fn lookup_keeps_catalog_order_for_same_provider_duplicates() {
 
 // ---- tool_spec.rb -----------------------------------------------------------------------------
 
-// spec: tool_spec.rb:64 converts class name to snake_case and removes _tool suffix
-// spec: tool_spec.rb:92 handles class names without Tool suffix
-// spec: tool_spec.rb:97 strips :: for class in module namespace (Rust paths drop the module)
+// spec: tool_spec.rb:82 converts class name to snake_case and removes _tool suffix
+// spec: tool_spec.rb:110 handles class names without Tool suffix
+// spec: tool_spec.rb:115 strips :: for class in module namespace (Rust paths drop the module)
 #[test]
 fn tool_names_derive_from_the_type_name() {
     assert_eq!(rust_llm::tool::tool_name_from_type("SampleTool"), "sample");
@@ -1345,8 +1347,8 @@ fn tool_names_derive_from_the_type_name() {
     );
 }
 
-// spec: tool_spec.rb:80 normalizes class name Unicode characters to ASCII
-// spec: tool_spec.rb:85 handles class names with unsupported characters
+// spec: tool_spec.rb:98 normalizes class name Unicode characters to ASCII
+// spec: tool_spec.rb:103 handles class names with unsupported characters
 #[test]
 fn tool_names_normalize_unicode_to_ascii() {
     assert_eq!(rust_llm::tool::tool_name_from_type("SàmpleTòol"), "sample");
@@ -1423,7 +1425,7 @@ async fn call_tool(tool: impl Tool + 'static, name: &str, arguments: Value) -> S
     chat.messages().last().unwrap().content().to_string()
 }
 
-// spec: tool_spec.rb:112 returns an error hash for unknown keyword arguments
+// spec: tool_spec.rb:130 returns an error hash for unknown keyword arguments
 #[tokio::test]
 async fn tools_answer_unknown_arguments_with_an_error() {
     let content = call_tool(
@@ -1438,7 +1440,7 @@ async fn tools_answer_unknown_arguments_with_an_error() {
     );
 }
 
-// spec: tool_spec.rb:124 returns an error hash for missing required keyword arguments
+// spec: tool_spec.rb:142 returns an error hash for missing required keyword arguments
 #[tokio::test]
 async fn tools_answer_missing_arguments_with_an_error() {
     let content = call_tool(Signature, "signature", json!({})).await;
@@ -1448,7 +1450,7 @@ async fn tools_answer_missing_arguments_with_an_error() {
     );
 }
 
-// spec: tool_spec.rb:160 returns an error hash for unknown arguments when execute takes no keywords
+// spec: tool_spec.rb:178 returns an error hash for unknown arguments when execute takes no keywords
 #[tokio::test]
 async fn tools_without_parameters_reject_unexpected_arguments() {
     let content = call_tool(NoArgument, "no_argument", json!({ "unexpected": true })).await;
@@ -1458,7 +1460,7 @@ async fn tools_without_parameters_reject_unexpected_arguments() {
     );
 }
 
-// spec: tool_spec.rb:254 uses an empty object schema for tools without keyword arguments
+// spec: tool_spec.rb:272 uses an empty object schema for tools without keyword arguments
 #[tokio::test]
 async fn tools_without_parameters_render_an_empty_object_schema() {
     let mut config = Config::default();
@@ -1479,8 +1481,8 @@ async fn tools_without_parameters_render_an_empty_object_schema() {
     );
 }
 
-// spec: tool_spec.rb:312 stringifies a result that is neither text nor structured data
-// spec: tool_spec.rb:316 serializes structured results as JSON
+// spec: tool_spec.rb:330 stringifies a result that is neither text nor structured data
+// spec: tool_spec.rb:334 serializes structured results as JSON
 #[test]
 fn tool_results_serialize_structured_data_as_json() {
     assert_eq!(ToolResult::from(json!(42)).content, "42");
@@ -1491,15 +1493,15 @@ fn tool_results_serialize_structured_data_as_json() {
     assert_eq!(ToolResult::from(json!([1, 2])).content, "[1,2]");
 }
 
-// spec: tool_spec.rb:351 reports nowhere outside a chat
+// spec: tool_spec.rb:369 reports nowhere outside a chat
 #[test]
 fn progress_reports_nowhere_outside_a_chat() {
     assert!(rust_llm::progress::listener().is_none());
     rust_llm::progress::report(progress(Some(1.0), Some(2.0), None)); // must not panic
 }
 
-// spec: tool_spec.rb:365 returns nothing without parameters
-// spec: tool_spec.rb:370 gives array parameters a default item type
+// spec: tool_spec.rb:383 returns nothing without parameters
+// spec: tool_spec.rb:388 gives array parameters a default item type
 #[test]
 fn parameter_schemas_default_array_items_to_strings() {
     assert!(rust_llm::tool::schema_from_parameters(&[]).is_none());
@@ -1511,7 +1513,7 @@ fn parameter_schemas_default_array_items_to_strings() {
     );
 }
 
-// spec: tool_spec.rb:391 maps #{declared} to #{expected}
+// spec: tool_spec.rb:409 maps #{declared} to #{expected}
 #[test]
 fn parameter_types_map_like_rubyllm() {
     for (declared, expected) in [
@@ -1785,8 +1787,8 @@ async fn a_parsed_tool_call_turn_has_empty_content() {
     assert_eq!(message.content, Some(String::new()));
 }
 
-// spec: message_spec.rb:138 marks the message as a cache boundary
-// spec: message_spec.rb:273 includes cache_until_here when marked
+// spec: message_spec.rb:236 marks the message as a cache boundary
+// spec: message_spec.rb:404 includes cache_until_here when marked
 #[test]
 fn cache_until_here_marks_the_message() {
     let mut m = Message::user("hello");
@@ -1844,7 +1846,7 @@ fn lookup_prefers_a_first_party_alias() {
     );
 }
 
-// spec: models_spec.rb:116 includes provider-specific refresh guidance for unknown models
+// spec: models_spec.rb:133 includes provider-specific refresh guidance for unknown models
 #[test]
 fn unknown_models_name_the_provider() {
     let err = rust_llm::models()
@@ -1857,7 +1859,7 @@ fn unknown_models_name_the_provider() {
     );
 }
 
-// spec: models_spec.rb:129 prioritizes exact matches over aliases
+// spec: models_spec.rb:146 prioritizes exact matches over aliases
 #[test]
 fn exact_ids_win_over_aliases() {
     assert_eq!(
@@ -1889,7 +1891,7 @@ fn tools_describe_themselves_and_their_parameters() {
     assert_eq!(p.description.as_deref(), Some("Latitude"));
 }
 
-// spec: tool_spec.rb:69 keeps an instance-level override working
+// spec: tool_spec.rb:87 keeps an instance-level override working
 #[test]
 fn tool_name_overrides_win() {
     struct InstanceNamed;

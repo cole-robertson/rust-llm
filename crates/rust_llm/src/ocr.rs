@@ -114,6 +114,9 @@ pub struct OcrOptions<'a> {
     pub config: Option<Arc<Config>>,
     /// `metadata:`: added to the `ocr.rust_llm` event payload, never sent to the provider.
     pub metadata: Option<Value>,
+    /// `owner:`: who the usage is attributed to, such as a user; wins over
+    /// [`crate::accounting::with_usage_owner`].
+    pub owner: Option<crate::accounting::UsageOwner>,
 }
 
 /// `RubyLLM.ocr(file, model:, provider:, pages:, provider_options:, metadata:)`, inside an
@@ -126,6 +129,7 @@ pub async fn ocr(file: impl Into<Attachment>, options: OcrOptions<'_>) -> Result
         .to_string();
     let (model, provider) =
         resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let owner = options.owner.clone();
     let mut event = crate::instrumentation::Event::start(&config, "ocr.rust_llm", || {
         crate::instrumentation::payload([
             ("provider", provider.slug().into()),
@@ -139,13 +143,14 @@ pub async fn ocr(file: impl Into<Attachment>, options: OcrOptions<'_>) -> Result
             ),
         ])
     });
-    let result = tracing::Instrument::instrument(
-        ocr_inner(file.into(), options, config.clone(), model, provider),
-        event.span(),
-    )
-    .await;
+    let result = event
+        .instrument(crate::accounting::owned_by(
+            owner,
+            ocr_inner(file.into(), options, config.clone(), model, provider),
+        ))
+        .await;
     if let Ok(r) = &result {
-        crate::instrumentation::usages(&config, &r.usage_entries);
+        crate::accounting::report(&config, &r.usage_entries).await;
         event.set(
             "result",
             || json!({ "model": r.model, "pages": r.pages.len() }),
@@ -207,6 +212,7 @@ async fn ocr_inner(
     let mut result = Ocr::new(&pages, response_model, usage, data);
     let entry = |status, tokens: Tokens| UsageEntry {
         id: UsageEntry::next_id(),
+        owner: crate::accounting::usage_owner(),
         operation: Operation::Ocr,
         provider: provider.slug().into(),
         model: model.id.clone(),

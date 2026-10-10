@@ -30,7 +30,7 @@ fn gemini_options(config: &Arc<Config>) -> FileOptions<'static> {
     }
 }
 
-// spec: protocols/files_spec.rb:243 raises when Gemini does not hand back an upload URL
+// spec: protocols/files_spec.rb:241 raises when Gemini does not hand back an upload URL
 #[tokio::test]
 async fn gemini_upload_without_an_upload_url_raises() {
     let server = MockServer::start().await;
@@ -55,7 +55,7 @@ async fn gemini_upload_without_an_upload_url_raises() {
     assert_eq!(err.to_string(), "gemini did not return an upload URL");
 }
 
-// spec: protocols/files_spec.rb:255 refuses to download a file with no download URI
+// spec: protocols/files_spec.rb:253 refuses to download a file with no download URI
 #[tokio::test]
 async fn gemini_download_without_a_download_uri_raises() {
     let server = MockServer::start().await;
@@ -73,7 +73,7 @@ async fn gemini_download_without_a_download_uri_raises() {
     assert_eq!(err.to_string(), "gemini file has no download URI");
 }
 
-// spec: protocols/files_spec.rb:263 downloads JSON files without parsing their contents
+// spec: protocols/files_spec.rb:261 downloads JSON files without parsing their contents
 #[tokio::test]
 async fn gemini_downloads_json_files_without_parsing_them() {
     let server = MockServer::start().await;

@@ -318,7 +318,9 @@ async fn real_errors_context_length_exceeded() {
             } else {
                 // RubyLLM sends 'a' * 1_000_000 and VCR records it as `<MASSIVE_TEXT>` (the spec's
                 // `filter_sensitive_data`), so the placeholder is what reproduces the recorded body.
-                for _ in 0..5 {
+                // 2.1 sends three turns to OpenRouter and five elsewhere.
+                let turns = if provider == "openrouter" { 3 } else { 5 };
+                for _ in 0..turns {
                     chat.add_message(Message::user("<MASSIVE_TEXT>"));
                     chat.add_message(Message::assistant("<MASSIVE_TEXT>"));
                 }
@@ -828,6 +830,7 @@ async fn web_search_openrouter_returns_citations_and_counters() {
     cassette.assert_all_matched().await;
 }
 
+// spec: chat_provider_tools_spec.rb:363 web search > with xai/#{model_for(:xai, :provider_tools)} > searches, cites, and counts the sources it used
 #[tokio::test]
 async fn web_search_xai_searches_cites_and_counts() {
     let cassette =
@@ -841,7 +844,7 @@ async fn web_search_xai_searches_cites_and_counts() {
         response
             .tokens()
             .server_tool_use
-            .is_some_and(|u| u.contains_key("num_server_side_tools_used")),
+            .is_some_and(|u| u.get("web_search_requests") == Some(&json!(2))),
         "{:?}",
         response.tokens()
     );

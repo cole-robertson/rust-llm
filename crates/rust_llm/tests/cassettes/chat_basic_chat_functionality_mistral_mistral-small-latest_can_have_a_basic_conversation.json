@@ -5,23 +5,23 @@
     "request_body": "{\"model\":\"mistral-small-latest\",\"messages\":[{\"role\":\"user\",\"content\":\"What's 2 + 2?\"}],\"stream\":false}",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:08:26 GMT",
+      "Date": "Wed, 07 Oct 2026 13:07:25 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Mistral-Correlation-Id": "01a0b169-f4e2-7438-a638-bea79f0b9c7d",
-      "X-Kong-Request-Id": "01a0b169-f4e2-7438-a638-bea79f0b9c7d",
+      "Mistral-Correlation-Id": "01a11679-ce43-7db2-b7fa-c28eca6cb8ab",
+      "X-Kong-Request-Id": "01a11679-ce43-7db2-b7fa-c28eca6cb8ab",
       "X-Max-Retry-Attempts-Reached": "false",
       "X-Ratelimit-Limit-Tokens-Minute": "100000",
-      "X-Ratelimit-Remaining-Tokens-Minute": "99074",
+      "X-Ratelimit-Remaining-Tokens-Minute": "99968",
       "X-Ratelimit-Tokens-Query-Cost": "32",
       "X-Ratelimit-Limit-Req-Minute": "100",
-      "X-Ratelimit-Remaining-Req-Minute": "95",
-      "X-Envoy-Upstream-Service-Time": "215",
+      "X-Ratelimit-Remaining-Req-Minute": "99",
+      "X-Envoy-Upstream-Service-Time": "1522",
       "Server": "cloudflare",
       "Access-Control-Allow-Origin": "*",
-      "X-Kong-Upstream-Latency": "216",
-      "X-Kong-Proxy-Latency": "13",
+      "X-Kong-Upstream-Latency": "1523",
+      "X-Kong-Proxy-Latency": "14",
       "Cf-Cache-Status": "DYNAMIC",
       "Set-Cookie": "<COOKIE>",
       "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
@@ -29,6 +29,6 @@
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\"id\":\"a2f7af6293df4b6c813dc5b8b39ee9f4\",\"created\":1789682906,\"model\":\"mistral-small-latest\",\"usage\":{\"prompt_tokens\":23,\"total_tokens\":32,\"completion_tokens\":9,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":\"2 + 2 equals 4.\"}}]}"
+    "response_body": "{\"id\":\"4c644cb77d38466ebbbb77ddd6351878\",\"created\":1791378443,\"model\":\"mistral-small-latest\",\"usage\":{\"prompt_tokens\":23,\"total_tokens\":32,\"completion_tokens\":9,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":\"2 + 2 equals **4**.\"}}]}"
   }
 ]

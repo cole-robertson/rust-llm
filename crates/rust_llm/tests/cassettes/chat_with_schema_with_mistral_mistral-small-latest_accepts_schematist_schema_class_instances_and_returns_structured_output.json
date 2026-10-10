@@ -5,23 +5,23 @@
     "request_body": "{\"model\":\"mistral-small-latest\",\"messages\":[{\"role\":\"user\",\"content\":\"Generate a person named Alice who is 28 years old\"}],\"stream\":false,\"response_format\":{\"type\":\"json_schema\",\"json_schema\":{\"name\":\"PersonSchemaClass\",\"schema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":\"number\"}},\"required\":[\"name\",\"age\"],\"additionalProperties\":false},\"strict\":true}}}",
     "status": 200,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:08:07 GMT",
+      "Date": "Wed, 07 Oct 2026 13:00:08 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Mistral-Correlation-Id": "01a0b169-ac2a-73d8-80aa-e56101b52f1b",
-      "X-Kong-Request-Id": "01a0b169-ac2a-73d8-80aa-e56101b52f1b",
+      "Mistral-Correlation-Id": "01a11673-271c-75b1-b1c4-c8d7dddda082",
+      "X-Kong-Request-Id": "01a11673-271c-75b1-b1c4-c8d7dddda082",
       "X-Max-Retry-Attempts-Reached": "false",
       "X-Ratelimit-Limit-Tokens-Minute": "100000",
-      "X-Ratelimit-Remaining-Tokens-Minute": "98795",
+      "X-Ratelimit-Remaining-Tokens-Minute": "80700",
       "X-Ratelimit-Tokens-Query-Cost": "29",
       "X-Ratelimit-Limit-Req-Minute": "100",
       "X-Ratelimit-Remaining-Req-Minute": "96",
-      "X-Envoy-Upstream-Service-Time": "247",
+      "X-Envoy-Upstream-Service-Time": "472",
       "Server": "cloudflare",
       "Access-Control-Allow-Origin": "*",
-      "X-Kong-Upstream-Latency": "248",
-      "X-Kong-Proxy-Latency": "8",
+      "X-Kong-Upstream-Latency": "473",
+      "X-Kong-Proxy-Latency": "84",
       "Cf-Cache-Status": "DYNAMIC",
       "Set-Cookie": "<COOKIE>",
       "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
@@ -29,6 +29,6 @@
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\"id\":\"ff71cedb81434476afd27e44436a0b7c\",\"created\":1789682887,\"model\":\"mistral-small-latest\",\"usage\":{\"prompt_tokens\":15,\"total_tokens\":29,\"completion_tokens\":14,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":\"{\\\"name\\\": \\\"Alice\\\", \\\"age\\\": 28}\"}}]}"
+    "response_body": "{\"id\":\"a410a33259754425bf5c34dd1e3581ad\",\"created\":1791378008,\"model\":\"mistral-small-latest\",\"usage\":{\"prompt_tokens\":15,\"total_tokens\":29,\"completion_tokens\":14,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":\"{\\\"name\\\": \\\"Alice\\\", \\\"age\\\": 28}\"}}]}"
   }
 ]

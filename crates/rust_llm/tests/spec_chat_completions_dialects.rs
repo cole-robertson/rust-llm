@@ -300,7 +300,7 @@ async fn openrouter_final_usage_chunk_carries_reported_cost() {
     assert_eq!(chunks.last().unwrap().tokens.reported_cost, Some(9.54e-07));
 }
 
-// spec: providers/openrouter/chat_spec.rb:154 #format_messages keeps non-PDF documents disabled for OpenRouter chat completions
+// spec: providers/openrouter/chat_spec.rb:228 #format_messages keeps non-PDF documents disabled for OpenRouter chat completions
 #[tokio::test]
 async fn openrouter_rejects_non_pdf_documents() {
     let server = MockServer::start().await;
@@ -314,7 +314,7 @@ fn cache_boundary(content: &str) -> Message {
     m
 }
 
-// spec: providers/openrouter/chat_spec.rb:166 #format_messages adds cache_control to a message marked as a cache boundary
+// spec: providers/openrouter/chat_spec.rb:240 #format_messages adds cache_control to a message marked as a cache boundary
 #[tokio::test]
 async fn openrouter_cache_boundary_gets_cache_control() {
     let server = MockServer::start().await;
@@ -327,7 +327,7 @@ async fn openrouter_cache_boundary_gets_cache_control() {
     assert_eq!(last["cache_control"], json!({ "type": "ephemeral" }));
 }
 
-// spec: providers/openrouter/chat_spec.rb:174 #format_messages uses configured cache_control for a cache boundary
+// spec: providers/openrouter/chat_spec.rb:248 #format_messages uses configured cache_control for a cache boundary
 #[tokio::test]
 async fn openrouter_cache_boundary_uses_configured_ttl() {
     let server = MockServer::start().await;
@@ -346,7 +346,7 @@ async fn openrouter_cache_boundary_uses_configured_ttl() {
     );
 }
 
-// spec: providers/openrouter/chat_spec.rb:237 #render_payload uses wrapper schema name and inner schema
+// spec: providers/openrouter/chat_spec.rb:319 #render_payload uses wrapper schema name and inner schema
 #[tokio::test]
 async fn openrouter_uses_wrapper_schema_name_and_inner_schema() {
     let server = MockServer::start().await;
@@ -362,7 +362,7 @@ async fn openrouter_uses_wrapper_schema_name_and_inner_schema() {
     assert_eq!(payload["response_format"]["json_schema"]["strict"], false);
 }
 
-// spec: providers/openrouter/chat_spec.rb:264 #render_payload adds top-level automatic cache_control when caching is enabled without explicit boundaries
+// spec: providers/openrouter/chat_spec.rb:346 #render_payload adds top-level automatic cache_control when caching is enabled without explicit boundaries
 #[tokio::test]
 async fn openrouter_adds_top_level_cache_control() {
     let server = MockServer::start().await;
@@ -376,7 +376,7 @@ async fn openrouter_adds_top_level_cache_control() {
     );
 }
 
-// spec: providers/openrouter/chat_spec.rb:278 #render_payload adds top-level cache_control alongside an explicit boundary
+// spec: providers/openrouter/chat_spec.rb:360 #render_payload adds top-level cache_control alongside an explicit boundary
 #[tokio::test]
 async fn openrouter_adds_top_level_cache_control_alongside_a_boundary() {
     let server = MockServer::start().await;
@@ -406,7 +406,7 @@ async fn openrouter_adds_top_level_cache_control_alongside_a_boundary() {
     );
 }
 
-// spec: providers/openrouter/chat_spec.rb:299 #render_payload rejects caching options it cannot render
+// spec: providers/openrouter/chat_spec.rb:381 #render_payload rejects caching options it cannot render
 #[tokio::test]
 async fn openrouter_rejects_unsupported_caching_options() {
     let server = MockServer::start().await;
@@ -424,7 +424,7 @@ async fn openrouter_rejects_unsupported_caching_options() {
 
 /// Ruby passes a bare `Struct.new(:enabled?)`; the Rust counterpart of "enabled, with no effort,
 /// budget, or explicit toggle" is a config that only sets the display.
-// spec: providers/openrouter/chat_spec.rb:328 #build_reasoning falls back to just enabling reasoning
+// spec: providers/openrouter/chat_spec.rb:410 #build_reasoning falls back to just enabling reasoning
 #[tokio::test]
 async fn openrouter_reasoning_falls_back_to_enabled() {
     let server = MockServer::start().await;
@@ -434,7 +434,7 @@ async fn openrouter_reasoning_falls_back_to_enabled() {
     assert_eq!(payload["reasoning"], json!({ "enabled": true }));
 }
 
-// spec: providers/openrouter/chat_spec.rb:336 #format_thinking ignores native replay data from another protocol
+// spec: providers/openrouter/chat_spec.rb:426 #format_thinking ignores native replay data from another protocol
 #[tokio::test]
 async fn openrouter_ignores_other_protocols_replay_data() {
     let server = MockServer::start().await;
@@ -448,19 +448,32 @@ async fn openrouter_ignores_other_protocols_replay_data() {
     );
 }
 
-// spec: providers/openrouter/chat_spec.rb:350 #format_thinking sends reasoning text with its signature
+// spec: providers/openrouter/chat_spec.rb:440 #format_thinking sends reasoning text with its signature
 #[tokio::test]
 async fn openrouter_sends_reasoning_text_with_signature() {
     let server = MockServer::start().await;
     let payload = render(
         openrouter(&server),
-        vec![assistant_thinking(Some("done"), Some("why"), Some("sig"))],
+        vec![openrouter_answer(Some("why"), Some("sig"))],
     )
     .unwrap();
     assert_eq!(
         payload["messages"][0]["reasoning_details"],
         json!([{ "type": "reasoning.text", "text": "why", "signature": "sig" }])
     );
+}
+
+/// The spec's `answer(thinking)`: an assistant answer OpenRouter produced, as its usage records.
+fn openrouter_answer(text: Option<&str>, signature: Option<&str>) -> Message {
+    let mut m = assistant_thinking(Some("done"), text, signature);
+    let mut entry = rust_llm::UsageEntry::new(
+        rust_llm::message::Operation::Chat,
+        "openrouter",
+        Some("claude-haiku-4-5"),
+    );
+    entry.status = rust_llm::UsageStatus::Succeeded;
+    m.usage_entries = vec![entry];
+    m
 }
 
 /// `extract_thinking_text` / `extract_thinking_signature` on a response message, through `ask`.
@@ -474,7 +487,7 @@ async fn openrouter_thinking(message: Value) -> Option<Thinking> {
         .thinking
 }
 
-// spec: providers/openrouter/chat_spec.rb:372 reasoning details on the way back joins reasoning text and summary details
+// spec: providers/openrouter/chat_spec.rb:471 reasoning details on the way back joins reasoning text and summary details
 #[tokio::test]
 async fn openrouter_joins_reasoning_text_and_summary_details() {
     let thinking = openrouter_thinking(json!({ "reasoning_details": [
@@ -489,13 +502,13 @@ async fn openrouter_joins_reasoning_text_and_summary_details() {
     );
 }
 
-// spec: providers/openrouter/chat_spec.rb:384 reasoning details on the way back is nil when the response carries no reasoning details
+// spec: providers/openrouter/chat_spec.rb:483 reasoning details on the way back is nil when the response carries no reasoning details
 #[tokio::test]
 async fn openrouter_thinking_is_nil_without_reasoning_details() {
     assert_eq!(openrouter_thinking(json!({})).await, None);
 }
 
-// spec: providers/openrouter/chat_spec.rb:389 reasoning details on the way back is nil when the details carry no text
+// spec: providers/openrouter/chat_spec.rb:488 reasoning details on the way back is nil when the details carry no text
 #[tokio::test]
 async fn openrouter_thinking_text_is_nil_when_details_carry_no_text() {
     assert_eq!(
@@ -506,7 +519,7 @@ async fn openrouter_thinking_text_is_nil_when_details_carry_no_text() {
     );
 }
 
-// spec: providers/openrouter/chat_spec.rb:393 reasoning details on the way back prefers an explicit signature over encrypted data
+// spec: providers/openrouter/chat_spec.rb:492 reasoning details on the way back prefers an explicit signature over encrypted data
 #[tokio::test]
 async fn openrouter_prefers_explicit_signature_over_encrypted_data() {
     let thinking = openrouter_thinking(json!({ "reasoning_details": [
@@ -517,7 +530,7 @@ async fn openrouter_prefers_explicit_signature_over_encrypted_data() {
     assert_eq!(thinking.and_then(|t| t.signature).as_deref(), Some("sig"));
 }
 
-// spec: providers/openrouter/chat_spec.rb:404 reasoning details on the way back falls back to encrypted data
+// spec: providers/openrouter/chat_spec.rb:503 reasoning details on the way back falls back to encrypted data
 #[tokio::test]
 async fn openrouter_signature_falls_back_to_encrypted_data() {
     let thinking = openrouter_thinking(
@@ -527,7 +540,7 @@ async fn openrouter_signature_falls_back_to_encrypted_data() {
     assert_eq!(thinking.and_then(|t| t.signature).as_deref(), Some("blob"));
 }
 
-// spec: providers/openrouter/chat_spec.rb:412 #inject_cache_control wraps plain text content in a cacheable block
+// spec: providers/openrouter/chat_spec.rb:511 #inject_cache_control wraps plain text content in a cacheable block
 #[test]
 fn inject_cache_control_wraps_plain_text() {
     assert_eq!(
@@ -536,13 +549,13 @@ fn inject_cache_control_wraps_plain_text() {
     );
 }
 
-// spec: providers/openrouter/chat_spec.rb:418 #inject_cache_control leaves empty content alone
+// spec: providers/openrouter/chat_spec.rb:517 #inject_cache_control leaves empty content alone
 #[test]
 fn inject_cache_control_leaves_empty_content_alone() {
     assert_eq!(inject_cache_control(json!([]), None).unwrap(), json!([]));
 }
 
-// spec: providers/openrouter/chat_spec.rb:422 #inject_cache_control leaves a block that already carries cache_control alone
+// spec: providers/openrouter/chat_spec.rb:521 #inject_cache_control leaves a block that already carries cache_control alone
 #[test]
 fn inject_cache_control_keeps_an_existing_cache_control() {
     let blocks =
@@ -554,7 +567,7 @@ fn inject_cache_control_keeps_an_existing_cache_control() {
     );
 }
 
-// spec: providers/openrouter/chat_spec.rb:428 #inject_cache_control leaves a trailing block it cannot annotate alone
+// spec: providers/openrouter/chat_spec.rb:527 #inject_cache_control leaves a trailing block it cannot annotate alone
 #[test]
 fn inject_cache_control_leaves_a_trailing_non_block_alone() {
     assert_eq!(
@@ -609,7 +622,7 @@ fn mistral_payload(model: &str, thinking: Option<ThinkingConfig>) -> Value {
     render(chat, vec![Message::user("Hello")]).unwrap()
 }
 
-// spec: providers/mistral/chat_spec.rb:26 #render_payload renders system messages before conversation messages for Mistral
+// spec: providers/mistral/chat_spec.rb:30 #render_payload renders system messages before conversation messages for Mistral
 #[tokio::test]
 async fn mistral_renders_system_messages_first() {
     let server = MockServer::start().await;
@@ -627,7 +640,7 @@ async fn mistral_renders_system_messages_first() {
     assert_eq!(roles, ["system", "user"]);
 }
 
-// spec: providers/mistral/chat_spec.rb:38 #render_payload renders Mistral prompt cache key
+// spec: providers/mistral/chat_spec.rb:42 #render_payload renders Mistral prompt cache key
 #[tokio::test]
 async fn mistral_renders_prompt_cache_key() {
     let server = MockServer::start().await;
@@ -640,7 +653,7 @@ async fn mistral_renders_prompt_cache_key() {
     );
 }
 
-// spec: providers/mistral/chat_spec.rb:44 #render_payload rejects caching options Mistral cannot render
+// spec: providers/mistral/chat_spec.rb:48 #render_payload rejects caching options Mistral cannot render
 #[tokio::test]
 async fn mistral_rejects_unsupported_caching_options() {
     let server = MockServer::start().await;
@@ -655,7 +668,7 @@ async fn mistral_rejects_unsupported_caching_options() {
     }
 }
 
-// spec: providers/mistral/chat_spec.rb:60 #render_payload sends the effort the caller asked for rather than a supported one
+// spec: providers/mistral/chat_spec.rb:64 #render_payload sends the effort the caller asked for rather than a supported one
 #[test]
 fn mistral_sends_the_requested_effort() {
     assert_eq!(
@@ -667,7 +680,7 @@ fn mistral_sends_the_requested_effort() {
     );
 }
 
-// spec: providers/mistral/chat_spec.rb:69 #render_payload keeps explicit none effort
+// spec: providers/mistral/chat_spec.rb:73 #render_payload keeps explicit none effort
 #[test]
 fn mistral_keeps_explicit_none_effort() {
     assert_eq!(
@@ -676,7 +689,7 @@ fn mistral_keeps_explicit_none_effort() {
     );
 }
 
-// spec: providers/mistral/chat_spec.rb:78 #render_payload sends reasoning_effort without checking the model id
+// spec: providers/mistral/chat_spec.rb:82 #render_payload sends reasoning_effort without checking the model id
 #[test]
 fn mistral_sends_effort_for_any_model_id() {
     let payload = mistral_payload("pixtral-12b", Some(ThinkingConfig::effort("medium")));
@@ -684,7 +697,7 @@ fn mistral_sends_effort_for_any_model_id() {
     assert!(payload.get("prompt_mode").is_none());
 }
 
-// spec: providers/mistral/chat_spec.rb:222 reasoning effort leaves every effort the caller picks untouched
+// spec: providers/mistral/chat_spec.rb:253 reasoning effort leaves every effort the caller picks untouched
 #[test]
 fn mistral_leaves_every_effort_untouched() {
     for effort in ["high", "none", "low", "medium", "xhigh"] {
@@ -698,7 +711,7 @@ fn mistral_leaves_every_effort_untouched() {
     }
 }
 
-// spec: providers/mistral/chat_spec.rb:97 #format_messages keeps parallel tool results consecutive and moves attachment carriers after the run
+// spec: providers/mistral/chat_spec.rb:101 #format_messages keeps parallel tool results consecutive and moves attachment carriers after the run
 #[tokio::test]
 async fn mistral_keeps_parallel_tool_results_consecutive() {
     let server = MockServer::start().await;
@@ -754,8 +767,8 @@ impl Tool for Named {
     }
 }
 
-// spec: providers/mistral/chat_spec.rb:152 #build_tool_choice maps required tool choice to the Mistral any mode
-// spec: providers/mistral/chat_spec.rb:247 #normalize_required_tool_choice leaves a multi-tool request on the any mode
+// spec: providers/mistral/chat_spec.rb:167 #build_tool_choice maps required tool choice to the Mistral any mode
+// spec: providers/mistral/chat_spec.rb:278 #normalize_required_tool_choice leaves a multi-tool request on the any mode
 #[tokio::test]
 async fn mistral_required_tool_choice_is_any_for_several_tools() {
     let server = MockServer::start().await;
@@ -772,7 +785,7 @@ async fn mistral_required_tool_choice_is_any_for_several_tools() {
 
 /// Ruby's payload has `function: {}`; a Rust tool always has a name, so its provider options null
 /// the name out the same way a deep merge would.
-// spec: providers/mistral/chat_spec.rb:261 #normalize_required_tool_choice leaves the payload alone when the single tool has no name
+// spec: providers/mistral/chat_spec.rb:292 #normalize_required_tool_choice leaves the payload alone when the single tool has no name
 #[tokio::test]
 async fn mistral_leaves_any_for_a_nameless_single_tool() {
     let server = MockServer::start().await;
@@ -790,6 +803,20 @@ async fn mistral_leaves_any_for_a_nameless_single_tool() {
     );
 }
 
+/// `answer(thinking)` in `providers/mistral/chat_spec.rb`: an assistant message Mistral produced
+/// (its succeeded usage entry names the producer, so its signature is Mistral's own).
+fn mistral_answer(content: Option<&str>, text: Option<&str>, signature: Option<&str>) -> Message {
+    let mut m = assistant_thinking(content, text, signature);
+    let mut entry = rust_llm::message::UsageEntry::new(
+        rust_llm::message::Operation::Chat,
+        "mistral",
+        Some("magistral-small-latest"),
+    );
+    entry.status = rust_llm::message::UsageStatus::Succeeded;
+    m.usage_entries = vec![entry];
+    m
+}
+
 fn mistral_content(message: Message) -> Value {
     let mut c = Config::default();
     c.set("mistral_api_base", "http://127.0.0.1:9");
@@ -804,20 +831,20 @@ fn mistral_content(message: Message) -> Value {
     render(chat, vec![message]).unwrap()["messages"][0]["content"].clone()
 }
 
-// spec: providers/mistral/chat_spec.rb:182 #build_thinking_blocks wraps thinking text in a text block
+// spec: providers/mistral/chat_spec.rb:203 #build_thinking_blocks wraps thinking text in a text block
 #[test]
 fn mistral_wraps_thinking_text_with_its_signature() {
-    let content = mistral_content(assistant_thinking(Some("Done"), Some("why"), Some("sig")));
+    let content = mistral_content(mistral_answer(Some("Done"), Some("why"), Some("sig")));
     assert_eq!(
         content[0],
         json!({ "type": "thinking", "thinking": [{ "type": "text", "text": "why" }], "signature": "sig" })
     );
 }
 
-// spec: providers/mistral/chat_spec.rb:190 #build_thinking_blocks sends a signature-only block
+// spec: providers/mistral/chat_spec.rb:211 #build_thinking_blocks sends a signature-only block
 #[test]
 fn mistral_sends_a_signature_only_thinking_block() {
-    let content = mistral_content(assistant_thinking(Some("Done"), None, Some("sig")));
+    let content = mistral_content(mistral_answer(Some("Done"), None, Some("sig")));
     assert_eq!(
         content[0],
         json!({ "type": "thinking", "signature": "sig" })
@@ -826,11 +853,11 @@ fn mistral_sends_a_signature_only_thinking_block() {
 
 /// The formatted content is a list of parts when the message carries attachments; the parts follow
 /// the thinking block flat rather than nested.
-// spec: providers/mistral/chat_spec.rb:198 #append_formatted_content concatenates a list of parts
+// spec: providers/mistral/chat_spec.rb:229 #append_formatted_content concatenates a list of parts
 #[test]
 fn mistral_concatenates_a_list_of_parts_after_the_thinking_block() {
     let png = Attachment::from_bytes(b"png bytes".to_vec(), "chart.png", None);
-    let message = assistant_thinking(Some("hi"), None, Some("sig")).with_attachments(vec![png]);
+    let message = mistral_answer(Some("hi"), None, Some("sig")).with_attachments(vec![png]);
     let content = mistral_content(message);
     assert_eq!(
         content,
@@ -842,18 +869,18 @@ fn mistral_concatenates_a_list_of_parts_after_the_thinking_block() {
     );
 }
 
-// spec: providers/mistral/chat_spec.rb:212 #append_formatted_content leaves the blocks alone for empty content
+// spec: providers/mistral/chat_spec.rb:243 #append_formatted_content leaves the blocks alone for empty content
 #[test]
 fn mistral_leaves_thinking_blocks_alone_for_empty_content() {
     for content in [None, Some("")] {
         assert_eq!(
-            mistral_content(assistant_thinking(content, None, Some("sig"))),
+            mistral_content(mistral_answer(content, None, Some("sig"))),
             json!([{ "type": "thinking", "signature": "sig" }])
         );
     }
 }
 
-// spec: providers/mistral/chat_spec.rb:235 #prompt_cache_params renders only the cache key
+// spec: providers/mistral/chat_spec.rb:266 #prompt_cache_params renders only the cache key
 #[tokio::test]
 async fn mistral_prompt_cache_params_render_only_the_key() {
     let server = MockServer::start().await;
@@ -871,7 +898,7 @@ async fn mistral_prompt_cache_params_render_only_the_key() {
     }
 }
 
-// spec: providers/mistral/chat_spec.rb:239 #prompt_cache_params rejects options Mistral cannot render
+// spec: providers/mistral/chat_spec.rb:270 #prompt_cache_params rejects options Mistral cannot render
 #[tokio::test]
 async fn mistral_prompt_cache_params_reject_ttl() {
     let server = MockServer::start().await;

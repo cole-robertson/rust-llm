@@ -152,6 +152,48 @@ impl Provider {
         }
     }
 
+    /// `Provider#original_image_detail?`: OpenAI sends `detail: "original"` for
+    /// `resolution: :original`; the rest map it to high detail.
+    pub fn is_original_image_detail(&self) -> bool {
+        *self == Provider::OpenAI
+    }
+
+    /// `Provider#account_identity`: a SHA-256 hex digest naming the account that owns this
+    /// provider's uploads (the endpoint and API key, plus OpenAI's organization and project), or
+    /// `None` for providers whose uploads are kept within the process that made them.
+    pub fn account_identity(&self, config: &Config) -> Option<String> {
+        let key = |option: &str| config.get(option).unwrap_or_default().to_string();
+        let base = self.api_base(config).unwrap_or_default();
+        let parts = match self {
+            Provider::OpenAI => vec![
+                base,
+                key("openai_api_key"),
+                key("openai_organization_id"),
+                key("openai_project_id"),
+            ],
+            Provider::Anthropic => vec![base, key("anthropic_api_key")],
+            Provider::Gemini => vec![base, key("gemini_api_key")],
+            Provider::OpenRouter => vec![base, key("openrouter_api_key")],
+            Provider::XAI => vec![base, key("xai_api_key")],
+            Provider::DeepSeek => vec![base, key("deepseek_api_key")],
+            _ => return None,
+        };
+        // `account_digest(*parts)`: `Digest::SHA256.hexdigest(parts.join("\0"))`.
+        use sha2::{Digest, Sha256};
+        let digest = Sha256::digest(parts.join("\0").as_bytes());
+        Some(digest.iter().map(|b| format!("{b:02x}")).collect())
+    }
+
+    /// `Provider.cache_write_input_multiplier`: the multiple of the input price a cache write
+    /// with lifetime `ttl` costs, or `None` where the registry's cache-write price applies.
+    /// models.dev prices Anthropic's five-minute write; a one-hour write is twice the input price.
+    pub fn cache_write_input_multiplier(&self, _model_id: &str, ttl: &str) -> Option<f64> {
+        match (self, ttl) {
+            (Provider::Anthropic, "1h") => Some(2.0),
+            _ => None,
+        }
+    }
+
     /// `Provider.local?`: local providers skip the registry (models are assumed to exist).
     pub fn is_local(&self) -> bool {
         matches!(self, Provider::Ollama | Provider::GPUStack)

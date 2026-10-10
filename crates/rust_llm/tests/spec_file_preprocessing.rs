@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use rust_llm::{Attachment, Chat, Config, Error, Message, ProtocolName};
+use rust_llm::{Attachment, Chat, Config, Message, ProtocolName};
 use serde_json::{Value, json};
 use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, MockServer, Request, ResponseTemplate};
@@ -111,7 +111,7 @@ fn responses_file_id(request: &Request) -> Value {
     body(request)["input"][0]["content"][1]["file_id"].clone()
 }
 
-// spec: protocol_file_preprocessing_spec.rb:54 replaces an upload past its retention window
+// spec: protocol_file_preprocessing_spec.rb:72 replaces an upload past its retention window
 #[tokio::test]
 async fn an_upload_past_its_retention_window_is_replaced() {
     let server = MockServer::start().await;
@@ -154,7 +154,7 @@ async fn an_upload_past_its_retention_window_is_replaced() {
     assert_eq!(starts, 2, "uploaded twice");
 }
 
-// spec: protocol_file_preprocessing_spec.rb:72 uploads separately for each provider
+// spec: protocol_file_preprocessing_spec.rb:90 uploads separately for each provider
 #[tokio::test]
 async fn each_provider_gets_its_own_upload() {
     let server = MockServer::start().await;
@@ -213,7 +213,7 @@ async fn each_provider_gets_its_own_upload() {
     assert_eq!(uploads, ["/upload/v1beta/files", "/v1/files"]);
 }
 
-// spec: protocol_file_preprocessing_spec.rb:96 uploads again for the same provider under different credentials
+// spec: protocol_file_preprocessing_spec.rb:114 uploads again for the same provider under different credentials
 #[tokio::test]
 async fn the_same_provider_under_other_credentials_uploads_again() {
     let server = MockServer::start().await;
@@ -268,7 +268,7 @@ async fn responses_auto_upload(filename: &str, id: &str) -> (Request, Request) {
     (requests[0].clone(), requests[1].clone())
 }
 
-// spec: protocol_file_preprocessing_spec.rb:130 uses OpenAI user_data purpose for automatic Responses uploads
+// spec: protocol_file_preprocessing_spec.rb:148 uses OpenAI user_data purpose for automatic Responses uploads
 #[tokio::test]
 async fn responses_auto_uploads_use_the_user_data_purpose() {
     let (upload, chat) = responses_auto_upload("large.pdf", "file_123").await;
@@ -276,7 +276,7 @@ async fn responses_auto_uploads_use_the_user_data_purpose() {
     assert_eq!(responses_file_id(&chat), "file_123");
 }
 
-// spec: protocol_file_preprocessing_spec.rb:150 uploads oversized Responses documents beyond PDFs
+// spec: protocol_file_preprocessing_spec.rb:168 uploads oversized Responses documents beyond PDFs
 #[tokio::test]
 async fn responses_auto_uploads_documents_beyond_pdfs() {
     let (upload, chat) = responses_auto_upload("large.docx", "file_456").await;
@@ -284,24 +284,40 @@ async fn responses_auto_uploads_documents_beyond_pdfs() {
     assert_eq!(responses_file_id(&chat), "file_456");
 }
 
-// spec: protocol_file_preprocessing_spec.rb:168 raises before uploading files above the provider file limit
+// spec: protocol_file_preprocessing_spec.rb:186 leaves the upload size limit to the provider
 #[tokio::test]
-async fn files_above_the_provider_limit_raise_before_uploading() {
+async fn leaves_the_upload_size_limit_to_the_provider() {
     let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/v1/files"))
+        .respond_with(openai_file("file_789", "huge.pdf"))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/api/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "id": "gen_1", "model": "anthropic/claude-haiku-4.5",
+            "choices": [{ "message": { "role": "assistant", "content": "ok" }, "finish_reason": "stop" }],
+            "usage": { "prompt_tokens": 1, "completion_tokens": 1 }
+        })))
+        .mount(&server)
+        .await;
     let config = config(&server, "test");
     let mut chat = chat(&config, "anthropic/claude-haiku-4.5", "openrouter")
         .with_protocol(ProtocolName::ChatCompletions);
-    let err = chat
-        .ask_with("Summarize this", vec![large("huge.pdf", 101 * MB)])
+    chat.ask_with("Summarize this", vec![large("huge.pdf", 101 * MB)])
         .await
-        .unwrap_err();
-    assert!(matches!(err, Error::Api(..)), "{err:?}");
-    assert!(
-        err.to_string()
-            .starts_with("OpenRouter file uploads support files up to"),
-        "{err}"
+        .unwrap();
+    let requests = server.received_requests().await.unwrap();
+    assert_eq!(
+        paths(&requests),
+        ["/api/v1/files", "/api/v1/chat/completions"]
     );
-    assert!(server.received_requests().await.unwrap().is_empty());
+    assert!(
+        body(&requests[1]).to_string().contains("file_789"),
+        "the chat references the upload"
+    );
 }
 
 async fn anthropic(server: &MockServer) {
@@ -329,7 +345,7 @@ async fn anthropic(server: &MockServer) {
         .await;
 }
 
-// spec: protocol_file_preprocessing_spec.rb:182 preprocesses at request time rather than when messages are added
+// spec: protocol_file_preprocessing_spec.rb:200 preprocesses at request time rather than when messages are added
 #[tokio::test]
 async fn preprocessing_happens_at_request_time_not_when_adding_messages() {
     let server = MockServer::start().await;
@@ -352,7 +368,7 @@ async fn preprocessing_happens_at_request_time_not_when_adding_messages() {
     );
 }
 
-// spec: protocol_file_preprocessing_spec.rb:193 preprocesses the messages it counts tokens for
+// spec: protocol_file_preprocessing_spec.rb:211 preprocesses the messages it counts tokens for
 #[tokio::test]
 async fn count_tokens_preprocesses_the_messages_it_counts() {
     let server = MockServer::start().await;

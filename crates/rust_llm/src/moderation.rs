@@ -33,6 +33,19 @@ pub struct ModerationResult {
 }
 
 impl ModerationResult {
+    /// `Moderation::Result.new(flagged:, categories:, category_scores:)`.
+    pub fn new(
+        flagged: bool,
+        categories: Vec<String>,
+        category_scores: Map<String, Value>,
+    ) -> ModerationResult {
+        ModerationResult {
+            flagged,
+            categories,
+            category_scores,
+        }
+    }
+
     /// `Result.from_h`.
     fn from_h(data: &Value) -> ModerationResult {
         let categories: Vec<String> = data
@@ -180,6 +193,9 @@ pub struct ModerateOptions<'a> {
     pub config: Option<Arc<Config>>,
     /// `metadata:`: added to the `moderation.rust_llm` event payload, never sent to the provider.
     pub metadata: Option<Value>,
+    /// `owner:`: who the usage is attributed to, such as a user; wins over
+    /// [`crate::accounting::with_usage_owner`].
+    pub owner: Option<crate::accounting::UsageOwner>,
 }
 
 /// `RubyLLM.moderate(input, model:, with:, provider:, assume_model_exists:, provider_options:,
@@ -201,6 +217,7 @@ pub async fn moderate(
         .to_string();
     let (model, provider) =
         resolve_model(&model_id, options.provider, options.assume_model_exists)?;
+    let owner = options.owner.clone();
     let mut event = crate::instrumentation::Event::start(&config, "moderation.rust_llm", || {
         let empty = Tokens::default();
         crate::instrumentation::payload([
@@ -221,13 +238,14 @@ pub async fn moderate(
             ),
         ])
     });
-    let result = tracing::Instrument::instrument(
-        moderate_inner(input, options, config.clone(), model, provider),
-        event.span(),
-    )
-    .await;
+    let result = event
+        .instrument(crate::accounting::owned_by(
+            owner,
+            moderate_inner(input, options, config.clone(), model, provider),
+        ))
+        .await;
     if let Ok(m) = &result {
-        crate::instrumentation::usages(&config, &m.usage_entries);
+        crate::accounting::report(&config, &m.usage_entries).await;
         event.set(
             "result",
             || json!({ "id": m.id, "model": m.model, "results": m.raw.get("results") }),
@@ -282,6 +300,7 @@ async fn moderate_inner(
     let mut moderation = parse_response(&raw.body, &model.id)?;
     let entry = |status, tokens: Tokens| UsageEntry {
         id: UsageEntry::next_id(),
+        owner: crate::accounting::usage_owner(),
         operation: Operation::Moderation,
         provider: provider.slug().into(),
         model: model.id.clone(),

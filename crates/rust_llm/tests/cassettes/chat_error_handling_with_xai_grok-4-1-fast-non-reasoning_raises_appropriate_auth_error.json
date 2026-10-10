@@ -5,7 +5,7 @@
     "request_body": "{\"model\":\"grok-4.3\",\"input\":[{\"role\":\"user\",\"content\":\"Hello\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"]}",
     "status": 400,
     "response_headers": {
-      "Date": "Thu, 17 Sep 2026 22:06:32 GMT",
+      "Date": "Wed, 07 Oct 2026 12:59:15 GMT",
       "Content-Type": "application/json",
       "Content-Length": "118",
       "Connection": "keep-alive",

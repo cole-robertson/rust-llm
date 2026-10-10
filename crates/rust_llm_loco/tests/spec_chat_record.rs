@@ -119,8 +119,8 @@ async fn usage_row(
     status: &str,
 ) {
     rust_llm_usages::ActiveModel {
-        chat_type: Set("Chat".into()),
-        chat_id: Set(chat_id as i64),
+        chat_type: Set(Some("Chat".into())),
+        chat_id: Set(Some(chat_id as i64)),
         message_type: Set(Some("Message".into())),
         message_id: Set(Some(message_id as i64)),
         operation: Set("chat".into()),
@@ -184,7 +184,7 @@ async fn polls_the_row_at_most_once_per_interval() {
 
 // ---- chat_methods_spec: model assignment and context -----------------------------------------
 
-// spec: active_record/chat_methods_spec.rb:133 model assignment falls back to the configured default model
+// spec: active_record/chat_methods_spec.rb:135 model assignment falls back to the configured default model
 #[tokio::test]
 async fn falls_back_to_the_configured_default_model() {
     let db = db().await;
@@ -198,7 +198,7 @@ async fn falls_back_to_the_configured_default_model() {
     assert_eq!(chat.model().id, default);
 }
 
-// spec: active_record/chat_methods_spec.rb:191 #with_context rebinds the record and any built chat
+// spec: active_record/chat_methods_spec.rb:193 #with_context rebinds the record and any built chat
 #[tokio::test]
 async fn with_context_rebinds_the_record_and_any_built_chat() {
     let db = db().await;
@@ -222,7 +222,7 @@ async fn with_context_rebinds_the_record_and_any_built_chat() {
     );
 }
 
-// spec: active_record/chat_methods_spec.rb:815 #with_context before the chat is built records the context before the chat is built
+// spec: active_record/chat_methods_spec.rb:933 #with_context before the chat is built records the context before the chat is built
 #[tokio::test]
 async fn with_context_before_the_chat_is_built() {
     let db = db().await;
@@ -239,7 +239,7 @@ async fn with_context_before_the_chat_is_built() {
 
 // ---- chat_methods_spec: add_message / add_completion -----------------------------------------
 
-// spec: active_record/chat_methods_spec.rb:331 #add_message copies an existing message record into the conversation
+// spec: active_record/chat_methods_spec.rb:351 #add_message copies an existing message record into the conversation
 #[tokio::test]
 async fn add_message_copies_an_existing_message_record() {
     let db = db().await;
@@ -269,7 +269,7 @@ async fn add_message_copies_an_existing_message_record() {
     assert_eq!(contents(&destination, &db).await, ["Keep this context"]);
 }
 
-// spec: active_record/chat_methods_spec.rb:495 delegation to the underlying chat persists completions added out of band
+// spec: active_record/chat_methods_spec.rb:560 delegation to the underlying chat persists completions added out of band
 #[tokio::test]
 async fn persists_completions_added_out_of_band() {
     let db = db().await;
@@ -292,7 +292,7 @@ async fn persists_completions_added_out_of_band() {
 
 // ---- chat_methods_spec: orphaned tool result cleanup -----------------------------------------
 
-// spec: active_record/chat_methods_spec.rb:560 orphaned tool result cleanup destroys the whole round when a tool call is still unanswered
+// spec: active_record/chat_methods_spec.rb:625 orphaned tool result cleanup destroys the whole round when a tool call is still unanswered
 #[tokio::test]
 async fn cleanup_destroys_a_round_with_an_unanswered_call() {
     let db = db().await;
@@ -317,7 +317,7 @@ async fn cleanup_destroys_a_round_with_an_unanswered_call() {
     assert!(record.messages(&db).await.unwrap().is_empty());
 }
 
-// spec: active_record/chat_methods_spec.rb:577 orphaned tool result cleanup keeps a completed round
+// spec: active_record/chat_methods_spec.rb:642 orphaned tool result cleanup keeps a completed round
 #[tokio::test]
 async fn cleanup_keeps_a_completed_round() {
     let db = db().await;
@@ -341,7 +341,7 @@ async fn cleanup_keeps_a_completed_round() {
     assert_eq!(record.messages(&db).await.unwrap().len(), 2);
 }
 
-// spec: active_record/chat_methods_spec.rb:588 orphaned tool result cleanup leaves a plain conversation alone
+// spec: active_record/chat_methods_spec.rb:653 orphaned tool result cleanup leaves a plain conversation alone
 #[tokio::test]
 async fn cleanup_leaves_a_plain_conversation_alone() {
     let db = db().await;
@@ -362,7 +362,7 @@ async fn cleanup_leaves_a_plain_conversation_alone() {
 
 // ---- acts_as_spec -----------------------------------------------------------------------------
 
-// spec: active_record/acts_as_spec.rb:231 tool-call persistence removes internal tool and usage rows when their chat is destroyed
+// spec: active_record/acts_as_spec.rb:239 tool-call persistence removes internal tool and usage rows when their chat is destroyed
 #[tokio::test]
 async fn destroying_a_chat_removes_its_tool_call_and_usage_rows() {
     let db = db().await;
@@ -482,7 +482,7 @@ async fn a_reloaded_video_attachment_is_a_video() {
     );
 }
 
-// spec: active_record/attachment_helpers_spec.rb:86 #persist_content keeps the media resolution across a reload
+// spec: active_record/attachment_helpers_spec.rb:85 #persist_content keeps the media resolution across a reload
 #[tokio::test]
 async fn keeps_the_media_resolution_across_a_reload() {
     let db = db().await;
@@ -558,6 +558,7 @@ async fn drops_a_persisted_gemini_signature_when_the_chat_moves_to_anthropic() {
             .unwrap();
     message.usage_entries = vec![UsageEntry {
         id: UsageEntry::next_id(),
+        owner: None,
         operation: Operation::Chat,
         provider: "gemini".into(),
         model: "gemini-2.5-flash".into(),
@@ -1250,7 +1251,7 @@ async fn keeps_answers_aligned_when_a_chat_was_deleted() {
     assert_eq!(contents(&survivor, &db).await.last().unwrap(), "second");
 }
 
-// spec: active_record/acts_as_spec.rb:127 usage persistence persists a batch response as one usage attempt
+// spec: active_record/acts_as_spec.rb:135 usage persistence persists a batch response as one usage attempt
 #[tokio::test]
 async fn persists_a_batch_response_as_one_usage_attempt() {
     let db = db().await;

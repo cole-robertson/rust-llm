@@ -240,7 +240,7 @@ fn includes_the_function_name_with_a_local_result() {
     );
 }
 
-// spec: protocols/interactions_spec.rb:82
+// spec: protocols/interactions_spec.rb:104
 #[test]
 fn replays_edited_history_and_signed_results_after_serialization_without_a_remote_cursor() {
     let mut chat = chat();
@@ -268,7 +268,7 @@ fn replays_edited_history_and_signed_results_after_serialization_without_a_remot
     );
 }
 
-// spec: protocols/interactions_spec.rb:98
+// spec: protocols/interactions_spec.rb:120
 #[tokio::test]
 async fn replays_a_local_function_call_and_its_named_result_without_provider_storage() {
     let mut data = body();
@@ -289,7 +289,7 @@ async fn replays_a_local_function_call_and_its_named_result_without_provider_sto
     );
 }
 
-// spec: protocols/interactions_spec.rb:114
+// spec: protocols/interactions_spec.rb:136
 #[test]
 fn renders_json_schema_and_specific_tool_choice_in_the_documented_fields() {
     let schema = json!({ "type": "object", "properties": { "answer": { "type": "integer" } }, "required": ["answer"] });
@@ -315,7 +315,7 @@ fn renders_json_schema_and_specific_tool_choice_in_the_documented_fields() {
     );
 }
 
-// spec: protocols/interactions_spec.rb:123
+// spec: protocols/interactions_spec.rb:145
 #[test]
 fn converts_citation_byte_offsets_to_characters_across_multiple_output_parts() {
     let mut data = body();
@@ -345,7 +345,7 @@ fn converts_citation_byte_offsets_to_characters_across_multiple_output_parts() {
     );
 }
 
-// spec: protocols/interactions_spec.rb:139
+// spec: protocols/interactions_spec.rb:161
 #[test]
 fn separates_thinking_effort_from_summary_display_and_rejects_an_unsupported_off_control() {
     for effort in ["minimal", "low", "medium", "high"] {
@@ -399,7 +399,7 @@ fn separates_thinking_effort_from_summary_display_and_rejects_an_unsupported_off
     );
 }
 
-// spec: protocols/interactions_spec.rb:155
+// spec: protocols/interactions_spec.rb:177
 #[tokio::test]
 async fn renders_image_and_pdf_attachments_as_content() {
     let fixtures = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
@@ -445,7 +445,7 @@ async fn stream(events: Vec<Value>) -> (rust_llm::Result<Message>, Vec<Message>)
     (result, chunks)
 }
 
-// spec: protocols/interactions_spec.rb:162
+// spec: protocols/interactions_spec.rb:184
 #[tokio::test]
 async fn accumulates_streamed_mcp_steps_and_never_yields_remote_result_text_as_assistant_text() {
     let body = body();
@@ -493,7 +493,7 @@ async fn accumulates_streamed_mcp_steps_and_never_yields_remote_result_text_as_a
     assert_eq!((last.input, last.output), (Some(46), Some(15)));
 }
 
-// spec: protocols/interactions_spec.rb:182
+// spec: protocols/interactions_spec.rb:241
 #[tokio::test]
 async fn rejects_failed_or_truncated_streams_and_unsupported_required_actions() {
     let (truncated, _) = stream(vec![
@@ -519,7 +519,7 @@ async fn rejects_failed_or_truncated_streams_and_unsupported_required_actions() 
     assert!(matches!(parse(&data), Err(Error::Api(m, _)) if m.contains("unsupported action")));
 }
 
-// spec: protocols/interactions_spec.rb:191
+// spec: protocols/interactions_spec.rb:324
 #[tokio::test]
 async fn accumulates_local_function_argument_deltas_after_an_empty_object_in_the_initial_step() {
     let mut completed = body();
@@ -577,7 +577,7 @@ fn microsoft_learn() -> ProviderTool {
     )
 }
 
-// spec: protocols/interactions_spec.rb:222
+// spec: protocols/interactions_spec.rb:355
 #[tokio::test]
 async fn executes_a_remote_mcp_tool_and_replays_its_signed_results_through_stateless_chat() {
     let (cassette, chat) =
@@ -589,14 +589,12 @@ async fn executes_a_remote_mcp_tool_and_replays_its_signed_results_through_state
         message
             .server_tool_calls
             .iter()
-            .any(|c| c.kind == "mcp_server_tool_call")
+            .any(|c| matches!(c.kind.as_str(), "mcp_server_tool_call" | "function_call"))
     );
-    assert!(
-        message
-            .server_tool_calls
-            .iter()
-            .any(|c| c.kind == "mcp_server_tool_result")
-    );
+    assert!(message.server_tool_calls.iter().any(|c| matches!(
+        c.kind.as_str(),
+        "mcp_server_tool_result" | "function_result"
+    )));
     assert!(!message.is_tool_call());
     assert!(
         message.content().to_lowercase().contains("functions"),
@@ -618,7 +616,7 @@ async fn executes_a_remote_mcp_tool_and_replays_its_signed_results_through_state
     cassette.assert_all_matched().await;
 }
 
-// spec: protocols/interactions_spec.rb:233
+// spec: protocols/interactions_spec.rb:367
 #[tokio::test]
 async fn streams_remote_mcp_results_and_preserves_the_complete_signed_history() {
     let (cassette, chat) =
@@ -630,12 +628,10 @@ async fn streams_remote_mcp_results_and_preserves_the_complete_signed_history() 
         .await
         .unwrap();
     assert_eq!(text, message.content());
-    assert!(
-        message
-            .server_tool_calls
-            .iter()
-            .any(|c| c.kind == "mcp_server_tool_result")
-    );
+    assert!(message.server_tool_calls.iter().any(|c| matches!(
+        c.kind.as_str(),
+        "mcp_server_tool_result" | "function_result"
+    )));
     assert!(message.tokens().input.is_some_and(|i| i > 0));
     let steps = message
         .raw_content
@@ -650,7 +646,7 @@ async fn streams_remote_mcp_results_and_preserves_the_complete_signed_history() 
     cassette.assert_all_matched().await;
 }
 
-// spec: protocols/interactions_spec.rb:246
+// spec: protocols/interactions_spec.rb:394
 #[tokio::test]
 async fn executes_local_tools_and_returns_json_schema_output_through_interactions() {
     let (cassette, chat) =
@@ -671,7 +667,7 @@ async fn executes_local_tools_and_returns_json_schema_output_through_interaction
     cassette.assert_all_matched().await;
 }
 
-// spec: protocols/interactions_spec.rb:254
+// spec: protocols/interactions_spec.rb:402
 #[tokio::test]
 async fn streams_local_function_arguments_and_continues_with_the_actual_tool_result() {
     let (cassette, chat) =
@@ -739,4 +735,310 @@ fn passes_an_object_through_unchanged() {
 fn wraps_malformed_json_in_a_tool_call_parse_error() {
     let err = call(Some(json!("{\"tz\":"))).unwrap_err();
     assert!(matches!(err, Error::ToolCallParse { .. }), "{err:?}");
+}
+
+// ---- 2.1: answered calls, Google Search, signatures, stream errors -------------------------------
+
+// spec: protocols/interactions_spec.rb:82 does not execute function calls already answered by the provider
+#[test]
+fn does_not_execute_function_calls_already_answered_by_the_provider() {
+    let answered: Vec<Value> = steps()
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|step| {
+            let mut step = step.clone();
+            let kind = match step["type"].as_str().unwrap() {
+                "mcp_server_tool_call" => "function_call",
+                "mcp_server_tool_result" => "function_result",
+                other => other,
+            }
+            .to_string();
+            step["type"] = kind.into();
+            step
+        })
+        .collect();
+    let mut data = body();
+    data["status"] = "requires_action".into();
+    data["steps"] = Value::Array(answered.clone());
+    let message = parse(&data).unwrap();
+    assert!(!message.is_tool_call());
+    assert_eq!(message.finish_reason, Some(rust_llm::FinishReason::Stop));
+    let kinds: Vec<&str> = message
+        .server_tool_calls
+        .iter()
+        .map(|c| c.kind.as_str())
+        .collect();
+    assert_eq!(kinds, ["function_call", "function_result"]);
+    assert_eq!(
+        message.raw_content.as_ref().unwrap()["response"]["steps"],
+        Value::Array(answered.clone())
+    );
+    let mut chat = chat();
+    chat.add_message(message);
+    chat.ask_later("Continue").unwrap();
+    let replay = chat.render().unwrap()["input"].clone();
+    assert_eq!(replay[0], without_signature(&answered[0]));
+    assert_eq!(replay[1], without_signature(&answered[1]));
+    assert_eq!(replay[2]["signature"], "thought-signature");
+
+    let mut different = answered;
+    different[1]["call_id"] = "different-call".into();
+    data["steps"] = Value::Array(different);
+    let message = parse(&data).unwrap();
+    let ids: Vec<&String> = message.tool_calls.as_ref().unwrap().keys().collect();
+    assert_eq!(ids, ["remote1"]);
+    assert_eq!(
+        message.finish_reason,
+        Some(rust_llm::FinishReason::ToolCalls)
+    );
+}
+
+/// `search_steps(suggestions)`.
+fn search_steps(suggestions: &str) -> Value {
+    json!([
+        { "id": "call_1", "signature": "call-signature", "type": "google_search_call",
+          "arguments": { "queries": ["latest stable Ruby version"] }, "search_type": "web_search" },
+        { "call_id": "call_1", "signature": "result-signature", "type": "google_search_result",
+          "result": [{ "search_suggestions": suggestions }], "is_error": false },
+        { "signature": "thought-signature", "type": "thought" },
+        { "type": "model_output", "content": [{ "type": "text", "text": "Ruby 4.0.7 is the latest." }] }
+    ])
+}
+
+// spec: protocols/interactions_spec.rb:216 Google Search > shows the suggestions on the live result and replays the step without them
+#[test]
+fn shows_the_suggestions_on_the_live_result_and_replays_the_step_without_them() {
+    let suggestions =
+        r#"<style>.container { display: flex; }</style><div class="container">Ruby 4.0.7</div>"#;
+    let searched = search_steps(suggestions);
+    let mut data = body();
+    data["steps"] = searched.clone();
+    let message = parse(&data).unwrap();
+    let result = message
+        .server_tool_calls
+        .iter()
+        .find(|c| c.kind == "google_search_result")
+        .unwrap();
+    assert_eq!(result.search_suggestions.as_deref(), Some(suggestions));
+    assert!(
+        !serde_json::to_string(&message.server_tool_calls)
+            .unwrap()
+            .contains("container")
+    );
+    assert!(
+        !message
+            .raw_content
+            .as_ref()
+            .unwrap()
+            .to_string()
+            .contains("container")
+    );
+    let mut chat = chat();
+    chat.add_message(Message::user("Which Ruby is the latest?"));
+    chat.add_message(message);
+    chat.ask_later("Thanks").unwrap();
+    let input = chat.render().unwrap()["input"].clone();
+    let input = input.as_array().unwrap();
+    let mut result_step = searched[1].clone();
+    result_step["result"] = json!([{}]);
+    assert!(input.contains(&searched[0]), "{input:?}");
+    assert!(input.contains(&result_step), "{input:?}");
+}
+
+// spec: protocols/interactions_spec.rb:230 Google Search > counts the searches the grounding reports
+#[test]
+fn counts_the_searches_the_grounding_reports() {
+    let mut data = body();
+    data["steps"] = search_steps("<style></style>");
+    data["usage"]["grounding_tool_count"] =
+        json!([{ "type": "google_search", "count": 2, "search_query_count": 2 }]);
+    let message = parse(&data).unwrap();
+    assert_eq!(
+        message.tokens.server_tool_use,
+        json!({ "web_search_requests": 2 }).as_object().cloned()
+    );
+}
+
+fn multiply_call(id: &str, signature: Option<&str>) -> ToolCall {
+    let mut call = ToolCall::new(id, "multiply", Map::new());
+    call.thought_signature = signature.map(str::to_string);
+    call
+}
+
+fn calling(calls: Vec<ToolCall>, content: Option<&str>) -> Message {
+    let mut m = Message::new(Role::Assistant, content.map(str::to_string));
+    let mut map = IndexMap::new();
+    for call in calls {
+        map.insert(call.id.clone(), call);
+    }
+    m.tool_calls = Some(map);
+    m
+}
+
+// spec: protocols/interactions_spec.rb:250 continues a tool round another protocol began without an empty answer step
+#[test]
+fn continues_a_tool_round_another_protocol_began_without_an_empty_answer_step() {
+    let mut args = Map::new();
+    args.insert("left".into(), 17.into());
+    args.insert("right".into(), 19.into());
+    let mut chat = chat();
+    chat.add_message(Message::user("Multiply 17 by 19"));
+    chat.add_message(calling(
+        vec![ToolCall::new("call_1", "multiply", args)],
+        None,
+    ));
+    chat.add_message(Message::tool_result("call_1", "323"));
+    assert_eq!(
+        chat.render().unwrap()["input"],
+        json!([
+            { "type": "user_input", "content": [{ "type": "text", "text": "Multiply 17 by 19" }] },
+            { "type": "function_call", "id": "call_1", "name": "multiply",
+              "arguments": { "left": 17, "right": 19 }, "signature": "skip_thought_signature_validator" },
+            { "type": "function_result", "call_id": "call_1", "name": "multiply",
+              "result": [{ "type": "text", "text": "323" }] }
+        ])
+    );
+}
+
+// spec: protocols/interactions_spec.rb:264 signs the first call of each step in the current turn only, keeping signatures Gemini made
+#[test]
+fn signs_the_first_call_of_each_step_in_the_current_turn_only() {
+    let mut chat = chat();
+    chat.add_message(Message::user("Question?"));
+    chat.add_message(calling(vec![multiply_call("a", None)], Some("")));
+    chat.add_message(Message::tool_result("a", "A"));
+    chat.add_message(Message::assistant("Answer."));
+    chat.add_message(Message::user("Again?"));
+    chat.add_message(calling(
+        vec![multiply_call("b", None), multiply_call("c", None)],
+        Some(""),
+    ));
+    chat.add_message(Message::tool_result("b", "B"));
+    chat.add_message(Message::tool_result("c", "C"));
+    chat.add_message(calling(
+        vec![multiply_call("d", Some("gemini-signature"))],
+        Some(""),
+    ));
+    chat.add_message(Message::tool_result("d", "D"));
+    let input = chat.render().unwrap()["input"].clone();
+    let signatures: Vec<Value> = input
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|s| s["type"] == "function_call")
+        .map(|s| s.get("signature").cloned().unwrap_or(Value::Null))
+        .collect();
+    assert_eq!(
+        signatures,
+        [
+            Value::Null,
+            json!("skip_thought_signature_validator"),
+            Value::Null,
+            json!("gemini-signature")
+        ]
+    );
+}
+
+/// `stream_failing_with(code, message)`.
+async fn stream_failing_with(code: &str, message: &str) -> Error {
+    let created = json!({ "event_type": "interaction.created",
+                          "interaction": { "id": "interaction1", "status": "in_progress" } });
+    let error = json!({ "event_type": "error", "error": { "code": code, "message": message } });
+    let body =
+        format!("event: interaction.created\ndata: {created}\n\nevent: error\ndata: {error}\n\n");
+    let server = wiremock::MockServer::start().await;
+    wiremock::Mock::given(wiremock::matchers::any())
+        .respond_with(wiremock::ResponseTemplate::new(200).set_body_raw(body, "text/event-stream"))
+        .mount(&server)
+        .await;
+    let mut config = Config::default();
+    config.set("gemini_api_key", "test");
+    config.set("gemini_api_base", server.uri());
+    config.max_retries = 0;
+    chat_with(Arc::new(config))
+        .ask_stream("Hello", |_| {})
+        .await
+        .unwrap_err()
+}
+
+// spec: protocols/interactions_spec.rb:302 stream errors > raises the error class the code of an error event documents
+#[tokio::test]
+async fn raises_the_error_class_the_code_of_an_error_event_documents() {
+    for (code, kind) in [
+        ("rate_limit_exceeded", rust_llm::ErrorKind::RateLimit),
+        ("invalid_request", rust_llm::ErrorKind::BadRequest),
+        (
+            "service_unavailable",
+            rust_llm::ErrorKind::ServiceUnavailable,
+        ),
+        ("deadline_exceeded", rust_llm::ErrorKind::ServiceUnavailable),
+        ("permission_denied", rust_llm::ErrorKind::Forbidden),
+    ] {
+        let err = stream_failing_with(code, "Failed").await;
+        assert_eq!(err.kind(), kind, "{code}: {err:?}");
+        assert_eq!(err.to_string(), "Failed", "{code}");
+    }
+}
+
+// spec: protocols/interactions_spec.rb:310 stream errors > falls back to a server error for a code it does not know
+#[tokio::test]
+async fn falls_back_to_a_server_error_for_a_code_it_does_not_know() {
+    let err = stream_failing_with("brand_new_code", "Failed").await;
+    assert_eq!(err.kind(), rust_llm::ErrorKind::Server, "{err:?}");
+    assert_eq!(err.to_string(), "Failed");
+}
+
+// spec: protocols/interactions_spec.rb:315 sends the result of a tool that returned nothing as an empty list
+#[test]
+fn sends_the_result_of_a_tool_that_returned_nothing_as_an_empty_list() {
+    let mut chat = chat();
+    chat.add_message(Message::user("Go"));
+    chat.add_message(calling(vec![multiply_call("call_1", None)], None));
+    chat.add_message(Message::tool_result("call_1", ""));
+    let input = chat.render().unwrap()["input"].clone();
+    assert_eq!(
+        input.as_array().unwrap().last().unwrap(),
+        &json!({ "type": "function_result", "call_id": "call_1", "name": "multiply", "result": [] })
+    );
+}
+
+// spec: protocols/interactions_spec.rb:381 streams a Google Search answer with suggestions it does not keep for replay
+#[tokio::test]
+async fn streams_a_google_search_answer_with_suggestions_it_does_not_keep_for_replay() {
+    let (cassette, chat) =
+        replay("streams_a_google_search_answer_with_suggestions_it_does_not_keep_for_replay").await;
+    let mut chat = chat.with_provider_tools([ProviderTool::alias("web_search")]);
+    let mut streamed = String::new();
+    let message = chat
+        .ask_stream(
+            "Search the web: what is the latest stable Ruby version? Answer in one sentence.",
+            |c| {
+                for call in &c.server_tool_calls {
+                    streamed.push_str(call.search_suggestions.as_deref().unwrap_or(""));
+                }
+            },
+        )
+        .await
+        .unwrap();
+    assert!(streamed.contains("<style>"));
+    let kept: String = message
+        .server_tool_calls
+        .iter()
+        .filter_map(|c| c.search_suggestions.as_deref())
+        .collect();
+    assert!(kept.contains("<style>"));
+    assert!(
+        !message
+            .raw_content
+            .as_ref()
+            .unwrap()
+            .to_string()
+            .contains("search_suggestions")
+    );
+    assert_eq!(
+        message.tokens().server_tool_use,
+        json!({ "web_search_requests": 2 }).as_object().cloned()
+    );
+    cassette.assert_all_matched().await;
 }

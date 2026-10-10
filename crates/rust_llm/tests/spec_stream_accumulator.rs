@@ -167,7 +167,31 @@ fn deduplicates_citations_repeated_across_chunks() {
     assert_eq!(finish(acc).citations, vec![citation]);
 }
 
-// spec: protocol/stream_accumulator_spec.rb:105 #add > retains distinct server events without ids and replaces repeated identified events
+// spec: protocol/stream_accumulator_spec.rb:105 #add > reads each citation of a repeated list once to deduplicate it
+// Ruby spies on `Citation#to_h` to count reads; the port keys each incoming citation by its
+// serialized attributes exactly once (a hash-set insert), which is not observable from outside,
+// so this checks what the keying must preserve: the first occurrences, in order.
+#[test]
+fn reads_each_citation_of_a_repeated_list_once_to_deduplicate_it() {
+    let build = || {
+        (0..5)
+            .map(|index| Citation {
+                url: Some(format!("https://example.com/{index}")),
+                ..Default::default()
+            })
+            .collect::<Vec<_>>()
+    };
+    let first = build();
+    let mut acc = StreamAccumulator::default();
+    for (text, citations) in [("Hello", first.clone()), (" world", build())] {
+        let mut c = chunk(Some(text));
+        c.citations = citations;
+        acc.add(&c);
+    }
+    assert_eq!(finish(acc).citations, first);
+}
+
+// spec: protocol/stream_accumulator_spec.rb:119 #add > retains distinct server events without ids and replaces repeated identified events
 #[test]
 fn retains_distinct_server_events_without_ids_and_replaces_repeated_identified_events() {
     let mut acc = StreamAccumulator::default();
@@ -178,6 +202,7 @@ fn retains_distinct_server_events_without_ids_and_replaces_repeated_identified_e
         input: None,
         result: result.map(Value::from),
         raw: json!({}),
+        search_suggestions: None,
     };
     let calls = [
         server_call("tool_result", None, Some("first")),
@@ -205,7 +230,7 @@ fn retains_distinct_server_events_without_ids_and_replaces_repeated_identified_e
     );
 }
 
-// spec: protocol/stream_accumulator_spec.rb:119 #add > resolves citation text spans from the accumulated content
+// spec: protocol/stream_accumulator_spec.rb:133 #add > resolves citation text spans from the accumulated content
 #[test]
 fn resolves_citation_text_spans_from_the_accumulated_content() {
     let mut acc = StreamAccumulator::default();
@@ -226,7 +251,7 @@ fn resolves_citation_text_spans_from_the_accumulated_content() {
     );
 }
 
-// spec: protocol/stream_accumulator_spec.rb:131 #add > preserves the final non-nil finish reason
+// spec: protocol/stream_accumulator_spec.rb:145 #add > preserves the final non-nil finish reason
 #[test]
 fn preserves_the_final_non_nil_finish_reason() {
     let mut acc = StreamAccumulator::default();
@@ -240,7 +265,7 @@ fn preserves_the_final_non_nil_finish_reason() {
     );
 }
 
-// spec: protocol/stream_accumulator_spec.rb:156 content accumulation > leaves markup in the content alone
+// spec: protocol/stream_accumulator_spec.rb:170 content accumulation > leaves markup in the content alone
 #[test]
 fn leaves_markup_in_the_content_alone() {
     let mut acc = StreamAccumulator::default();
@@ -253,7 +278,7 @@ fn leaves_markup_in_the_content_alone() {
     assert_eq!(message.thinking, None);
 }
 
-// spec: protocol/stream_accumulator_spec.rb:165 thinking deltas > keeps the first signature and joins the text
+// spec: protocol/stream_accumulator_spec.rb:179 thinking deltas > keeps the first signature and joins the text
 #[test]
 fn keeps_the_first_signature_and_joins_the_text() {
     let mut acc = StreamAccumulator::default();
@@ -275,7 +300,7 @@ fn keeps_the_first_signature_and_joins_the_text() {
     assert_eq!(thinking.signature.as_deref(), Some("sig-1"));
 }
 
-// spec: protocol/stream_accumulator_spec.rb:198 tool call fragments > keeps parallel id-less tool calls separate and keys them by their generated ids
+// spec: protocol/stream_accumulator_spec.rb:212 tool call fragments > keeps parallel id-less tool calls separate and keys them by their generated ids
 #[test]
 fn keeps_parallel_id_less_tool_calls_separate_and_keys_them_by_their_generated_ids() {
     let mut acc = StreamAccumulator::default();
@@ -296,7 +321,7 @@ fn keeps_parallel_id_less_tool_calls_separate_and_keys_them_by_their_generated_i
     assert_ne!(ids[0], ids[1]);
 }
 
-// spec: protocol/stream_accumulator_spec.rb:214 tool call fragments > keeps text arriving in the same chunk as a tool call
+// spec: protocol/stream_accumulator_spec.rb:228 tool call fragments > keeps text arriving in the same chunk as a tool call
 #[test]
 fn keeps_text_arriving_in_the_same_chunk_as_a_tool_call() {
     let mut acc = StreamAccumulator::default();
@@ -310,7 +335,7 @@ fn keeps_text_arriving_in_the_same_chunk_as_a_tool_call() {
     assert_eq!(keys, ["call_1"]);
 }
 
-// spec: protocol/stream_accumulator_spec.rb:241 tool call fragments > treats a nil argument fragment as empty
+// spec: protocol/stream_accumulator_spec.rb:255 tool call fragments > treats a nil argument fragment as empty
 #[test]
 fn treats_a_nil_argument_fragment_as_empty() {
     let mut acc = StreamAccumulator::default();
@@ -328,7 +353,7 @@ fn treats_a_nil_argument_fragment_as_empty() {
     );
 }
 
-// spec: protocol/stream_accumulator_spec.rb:265 tool call fragments > adopts a thought signature that arrives with a later fragment
+// spec: protocol/stream_accumulator_spec.rb:279 tool call fragments > adopts a thought signature that arrives with a later fragment
 #[test]
 fn adopts_a_thought_signature_that_arrives_with_a_later_fragment() {
     let mut acc = StreamAccumulator::default();
@@ -346,7 +371,7 @@ fn adopts_a_thought_signature_that_arrives_with_a_later_fragment() {
     );
 }
 
-// spec: protocol/stream_accumulator_spec.rb:283 tool call fragments > keeps hash arguments as they arrived
+// spec: protocol/stream_accumulator_spec.rb:297 tool call fragments > keeps hash arguments as they arrived
 #[test]
 fn keeps_hash_arguments_as_they_arrived() {
     let mut acc = StreamAccumulator::default();
@@ -364,7 +389,7 @@ fn keeps_hash_arguments_as_they_arrived() {
     );
 }
 
-// spec: protocol/stream_accumulator_spec.rb:314 citation spans > leaves a citation alone when the span falls outside the content
+// spec: protocol/stream_accumulator_spec.rb:328 citation spans > leaves a citation alone when the span falls outside the content
 #[test]
 fn leaves_a_citation_alone_when_the_span_falls_outside_the_content() {
     let mut acc = StreamAccumulator::default();

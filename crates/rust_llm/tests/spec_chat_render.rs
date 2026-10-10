@@ -167,7 +167,7 @@ fn renders_anthropic_aliases_into_versioned_tool_entries() {
     );
 }
 
-// spec: chat_provider_tools_spec.rb:104 renders OpenAI Responses aliases
+// spec: chat_provider_tools_spec.rb:130 renders OpenAI Responses aliases
 #[test]
 fn renders_openai_responses_aliases() {
     let payload = chat("gpt-5.2", "openai")
@@ -185,7 +185,7 @@ fn renders_openai_responses_aliases() {
     );
 }
 
-// spec: chat_provider_tools_spec.rb:113 renders Gemini aliases with options nested inside the tool key
+// spec: chat_provider_tools_spec.rb:139 renders Gemini aliases with options nested inside the tool key
 #[test]
 fn renders_gemini_aliases_with_options_nested_inside_the_tool_key() {
     let payload = chat("gemini-3.5-flash", "gemini")
@@ -206,7 +206,7 @@ fn renders_gemini_aliases_with_options_nested_inside_the_tool_key() {
     );
 }
 
-// spec: chat_provider_tools_spec.rb:122 renders xAI Responses aliases with passthrough options
+// spec: chat_provider_tools_spec.rb:148 renders xAI Responses aliases with passthrough options
 #[test]
 fn renders_xai_responses_aliases_with_passthrough_options() {
     let payload = chat("grok-4.3", "xai")
@@ -235,7 +235,7 @@ fn renders_xai_responses_aliases_with_passthrough_options() {
     );
 }
 
-// spec: chat_provider_tools_spec.rb:134 renders the xAI MCP alias with server options
+// spec: chat_provider_tools_spec.rb:160 renders the xAI MCP alias with server options
 #[test]
 fn renders_the_xai_mcp_alias_with_server_options() {
     let payload = chat("grok-4.3", "xai")
@@ -577,7 +577,7 @@ async fn compact_cancelled_during_the_request_leaves_history_and_keeps_billed_us
 
 // ---- chat_thinking_spec.rb ---------------------------------------------------------------------
 
-// spec: chat_thinking_spec.rb:330 renders stored reasoning_details verbatim
+// spec: chat_thinking_spec.rb:332 renders stored reasoning_details verbatim
 #[test]
 fn openrouter_renders_stored_reasoning_details_verbatim() {
     let details = json!([{
@@ -733,7 +733,7 @@ async fn deepseek_answering(body: Value) -> (Chat, MockServer) {
     )
 }
 
-// spec: chat_error_spec.rb:102 raises a RubyLLM::Error instead of an obscure NoMethodError
+// spec: chat_error_spec.rb:105 raises a RubyLLM::Error instead of an obscure NoMethodError
 #[tokio::test]
 async fn no_completion_message_raises_an_api_error_with_the_response() {
     let (mut chat, _server) = deepseek_answering(json!({ "choices": [] })).await;
@@ -745,7 +745,7 @@ async fn no_completion_message_raises_an_api_error_with_the_response() {
     assert!(err.response().is_some());
 }
 
-// spec: chat_error_spec.rb:114 surfaces the finish_reason when the provider gives one
+// spec: chat_error_spec.rb:117 surfaces the finish_reason when the provider gives one
 #[tokio::test]
 async fn no_completion_message_surfaces_the_finish_reason() {
     let (mut chat, _server) =
@@ -977,7 +977,7 @@ fn error_chunk_config(provider: &str) -> (Value, u16, ErrorKind) {
     }
 }
 
-// spec: chat_streaming_spec.rb:87 #{provider}/#{model} supports handling streaming error chunks
+// spec: chat_streaming_spec.rb:89 #{provider}/#{model} supports handling streaming error chunks
 // (The Faraday 1/2 variants exercise Ruby's two streaming adapters; the port has one transport.)
 #[tokio::test]
 async fn supports_handling_streaming_error_chunks() {

@@ -135,7 +135,7 @@ async fn token_usage_example(
     Ok(())
 }
 
-// spec: chat_streaming_spec.rb:39 #{provider}/#{token_model} reports token usage with and without streaming
+// spec: chat_streaming_spec.rb:41 #{provider}/#{token_model} reports token usage with and without streaming
 #[tokio::test]
 async fn reports_token_usage_with_and_without_streaming() {
     let it = "reports token usage with and without streaming";

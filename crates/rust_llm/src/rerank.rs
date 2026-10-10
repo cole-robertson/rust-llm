@@ -46,9 +46,24 @@ pub struct Rerank {
     pub usage_entries: Vec<UsageEntry>,
     input_tokens: Option<i64>,
     reported_cost: Option<f64>,
+    /// `attr_writer :model_info`: set by `Accounting::Usage::Tracker#succeed`.
+    pub(crate) model_info: Option<Model>,
 }
 
 impl Rerank {
+    /// `Rerank.new(results:, model:, input_tokens:)`.
+    pub fn new(results: Vec<RerankResult>, model: &str, input_tokens: Option<i64>) -> Rerank {
+        Rerank {
+            results,
+            model: model.to_string(),
+            raw: Value::Null,
+            usage_entries: Vec::new(),
+            input_tokens,
+            reported_cost: None,
+            model_info: None,
+        }
+    }
+
     /// Usage across every attempt, or what the response reported.
     pub fn tokens(&self) -> Tokens {
         if !self.usage_entries.is_empty() {
@@ -70,9 +85,11 @@ impl Rerank {
         embeddings_cost(&self.tokens(), self.model_info().as_ref())
     }
 
-    /// The registry entry for `model`, or `None`.
+    /// The model `model_info=` set, else the registry entry for `model`, or `None`.
     pub fn model_info(&self) -> Option<Model> {
-        models::models().find(&self.model, None).ok()
+        self.model_info
+            .clone()
+            .or_else(|| models::models().find(&self.model, None).ok())
     }
 }
 
@@ -108,6 +125,9 @@ pub struct RerankOptions<'a> {
     pub config: Option<Arc<Config>>,
     /// `metadata:`: added to the `rerank.rust_llm` event payload, never sent to the provider.
     pub metadata: Option<Value>,
+    /// `owner:`: who the usage is attributed to, such as a user; wins over
+    /// [`crate::accounting::with_usage_owner`].
+    pub owner: Option<crate::accounting::UsageOwner>,
 }
 
 /// `RubyLLM.rerank(query, documents, model:, provider:, top_n:, provider_options:, metadata:)`,
@@ -120,6 +140,7 @@ pub async fn rerank(
 ) -> Result<Rerank> {
     let config = options.config.clone().unwrap_or_else(crate::config);
     let (model, provider) = resolve_model(model, options.provider, options.assume_model_exists)?;
+    let owner = options.owner.clone();
     let mut event = crate::instrumentation::Event::start(&config, "rerank.rust_llm", || {
         let empty = Tokens::default();
         crate::instrumentation::payload([
@@ -141,13 +162,14 @@ pub async fn rerank(
             ),
         ])
     });
-    let result = tracing::Instrument::instrument(
-        rerank_inner(query, documents, options, config.clone(), model, provider),
-        event.span(),
-    )
-    .await;
+    let result = event
+        .instrument(crate::accounting::owned_by(
+            owner,
+            rerank_inner(query, documents, options, config.clone(), model, provider),
+        ))
+        .await;
     if let Ok(r) = &result {
-        crate::instrumentation::usages(&config, &r.usage_entries);
+        crate::accounting::report(&config, &r.usage_entries).await;
         event.set("result", || {
             json!({ "model": r.model, "results": r.results.iter().map(|x| json!({ "index": x.index, "score": x.score })).collect::<Vec<_>>() })
         });
@@ -194,6 +216,7 @@ async fn rerank_inner(
     let mut result = parse_response(raw.body, &model.id, documents)?;
     let entry = |status, tokens: Tokens, cost: Option<Cost>| UsageEntry {
         id: UsageEntry::next_id(),
+        owner: crate::accounting::usage_owner(),
         operation: Operation::Rerank,
         provider: provider.slug().into(),
         model: model.id.clone(),
@@ -278,6 +301,7 @@ fn parse_response(data: Value, model: &str, documents: &[&str]) -> Result<Rerank
         reported_cost: usage.get("cost").and_then(Value::as_f64),
         raw: data,
         usage_entries: Vec::new(),
+        model_info: None,
     })
 }
 

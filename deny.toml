@@ -2,7 +2,8 @@
 # https://embarkstudios.github.io/cargo-deny/
 
 [graph]
-all-features = false
+# Check optional dependencies too (rust_llm's `opentelemetry` feature).
+all-features = true
 
 # Security advisories from the RustSec database (the same data `cargo audit` uses).
 [advisories]

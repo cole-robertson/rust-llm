@@ -1,6 +1,8 @@
 //! Judgments: typed questions about your data, answered by a System One model such as TypeSafe's
-//! Jev. Port of `lib/ruby_llm/judge.rb`, `judge/question.rb`, `judgment.rb`, `probability.rb`,
-//! `choice.rb`, `score.rb`, and `protocols/system_one/*.rb`.
+//! Jev, a local decision model through Ollama, or OpenAI Decisions. Port of
+//! `lib/ruby_llm/judge.rb`, `judge/question.rb`, `judgment.rb`, `probability.rb`, `choice.rb`,
+//! `score.rb`, `protocols/system_one/*.rb`, and `providers/ollama/judgments.rb`; OpenAI Decisions
+//! is in [`decisions`].
 //!
 //! ```ruby
 //! class Urgency < RubyLLM::Judge
@@ -20,10 +22,13 @@
 //! A judgment is one request: every question is answered about the same input. Nothing is
 //! generated and no conversation history is kept.
 
+pub mod decisions;
+
 use std::sync::Arc;
 
 use serde_json::{Map, Value, json};
 
+use crate::attachment::{Attachment, AttachmentType};
 use crate::chat::{failure_tokens, resolve_model};
 use crate::config::Config;
 use crate::cost::{Cost, Tier};
@@ -34,11 +39,6 @@ use crate::providers::Provider;
 use crate::tokens::Tokens;
 use crate::transport::Connection;
 
-/// `System One choices support at most 255 options`.
-const MAX_CHOICES: usize = 255;
-/// `System One scores support at most 10 levels`.
-const MAX_LEVELS: usize = 10;
-
 /// The three question types (`probability`, `choice`, `score`), with their wire names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QuestionType {
@@ -48,6 +48,15 @@ pub enum QuestionType {
 }
 
 impl QuestionType {
+    /// The declared type name (`:probability`, `:choice`, `:score`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            QuestionType::Probability => "probability",
+            QuestionType::Choice => "choice",
+            QuestionType::Score => "score",
+        }
+    }
+
     /// `Judgments::TYPES`.
     fn wire(&self) -> &'static str {
         match self {
@@ -197,6 +206,15 @@ impl Question {
         })
     }
 
+    /// `question.instructions` when it is a plain value; `None` when absent or resolved per
+    /// judgment (a proc in RubyLLM).
+    pub fn instructions(&self) -> Option<&Value> {
+        match &self.instructions {
+            Some(Dynamic::Value(v)) => Some(v),
+            _ => None,
+        }
+    }
+
     /// `Question.from_h`: one entry of `RubyLLM.judge(questions: { ... })`.
     pub fn from_value(name: impl Into<String>, definition: &Value) -> Result<Question> {
         let Some(def) = definition.as_object() else {
@@ -289,13 +307,12 @@ impl Question {
                 }
                 validate_descriptions(map.values())?;
             }
+            // `validate_score!` (2.1): the provider enforces how many levels it takes and whether
+            // each needs a description.
             QuestionType::Score => {
-                let levels = criteria
-                    .as_array()
-                    .filter(|l| l.len() >= 2 && l.iter().all(|v| !v.is_null()));
-                let Some(levels) = levels else {
+                let Some(levels) = criteria.as_array().filter(|l| !l.is_empty()) else {
                     return Err(Error::Argument(
-                        "A score needs at least two non-nil levels".into(),
+                        "A score needs a nonempty Array of levels".into(),
                     ));
                 };
                 validate_descriptions(levels)?;
@@ -345,6 +362,13 @@ pub struct JudgeOptions {
     pub config: Option<Arc<Config>>,
     /// `metadata:`: added to the `judgment.rust_llm` event payload, never sent to the provider.
     pub metadata: Option<Value>,
+    /// `owner:`: who the usage is attributed to, such as a user; wins over
+    /// [`crate::accounting::with_usage_owner`].
+    pub owner: Option<crate::accounting::UsageOwner>,
+    /// `with:`: images to judge, with or without text input. Only providers whose judgment
+    /// protocol takes images accept them (OpenAI Decisions, Ollama); System One raises
+    /// `UnsupportedAttachment` before sending.
+    pub with: Vec<Attachment>,
 }
 
 impl Judge {
@@ -400,6 +424,11 @@ impl Judge {
         }
         self.questions.push(question);
         Ok(self)
+    }
+
+    /// `question_definitions`: the declared questions, in order.
+    pub fn questions(&self) -> &[Question] {
+        &self.questions
     }
 
     /// Replaces an inherited question of the same name (a subclass redeclaring it).
@@ -509,7 +538,9 @@ impl Judge {
             )));
         }
         let input = input.into();
-        if !matches!(input, Value::String(_) | Value::Object(_) | Value::Array(_)) {
+        // `Judgment.validate_input!`: input may be omitted (null) when images are supplied.
+        let omitted = input.is_null() && !options.with.is_empty();
+        if !omitted && !matches!(input, Value::String(_) | Value::Object(_) | Value::Array(_)) {
             return Err(Error::Argument(
                 "Judgment input must be text, a Hash, or an Array".into(),
             ));
@@ -547,17 +578,22 @@ impl Judge {
             (None, Some(d)) => d.resolve(&options.inputs),
             (None, None) => Value::Object(Map::new()),
         };
-        judge_request(
-            input,
-            &resolved,
-            model,
-            options.provider.or_else(|| self.model.provider.clone()),
-            options
-                .assume_model_exists
-                .unwrap_or(self.model.assume_model_exists),
-            provider_options,
-            options.config.or_else(|| self.config.clone()),
-            options.metadata,
+        let owner = options.owner.clone();
+        crate::accounting::owned_by(
+            owner,
+            judge_request(
+                input,
+                &resolved,
+                model,
+                options.provider.or_else(|| self.model.provider.clone()),
+                options
+                    .assume_model_exists
+                    .unwrap_or(self.model.assume_model_exists),
+                provider_options,
+                options.config.or_else(|| self.config.clone()),
+                options.metadata,
+                options.with,
+            ),
         )
         .await
     }
@@ -591,6 +627,7 @@ async fn judge_request(
     provider_options: Value,
     config: Option<Arc<Config>>,
     metadata: Option<Value>,
+    with: Vec<Attachment>,
 ) -> Result<Judgment> {
     let config = config.unwrap_or_else(crate::config);
     let model_id = model
@@ -613,6 +650,7 @@ async fn judge_request(
             ("provider_class", display.into()),
             ("model", id.into()),
             ("question_count", questions.len().into()),
+            ("attachment_count", with.len().into()),
             ("provider_options", provider_options.clone()),
             ("metadata", crate::instrumentation::metadata(&metadata)),
             ("tokens", crate::instrumentation::tokens_h(&empty)),
@@ -627,10 +665,11 @@ async fn judge_request(
         assume_model_exists,
         provider_options,
         config.clone(),
+        with,
     );
-    let result = tracing::Instrument::instrument(request, event.span()).await;
+    let result = event.instrument(request).await;
     if let Ok(j) = &result {
-        crate::instrumentation::usages(&config, &j.usage_entries);
+        crate::accounting::report(&config, &j.usage_entries).await;
         event.set("result", || {
             serde_json::json!(j.answers.iter().map(|(k, _)| k.clone()).collect::<Vec<_>>())
         });
@@ -641,6 +680,82 @@ async fn judge_request(
     result
 }
 
+/// Where a provider sends judgments (`resolve_protocol(nil, model, operation: :judge)`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum JudgmentProtocol {
+    /// `Protocols::SystemOne` at `v1/systemone` (TypeSafe).
+    SystemOne,
+    /// `Providers::Ollama::SystemOne`: System One at `systemone` under the OpenAI-compatible
+    /// base, with images as base64 (`providers/ollama/judgments.rb`).
+    OllamaSystemOne,
+    /// `Protocols::OpenAI::Decisions` at `decisions`.
+    Decisions,
+}
+
+impl JudgmentProtocol {
+    fn for_provider(provider: Provider) -> Option<JudgmentProtocol> {
+        match provider {
+            Provider::TypeSafe => Some(JudgmentProtocol::SystemOne),
+            Provider::Ollama => Some(JudgmentProtocol::OllamaSystemOne),
+            Provider::OpenAI => Some(JudgmentProtocol::Decisions),
+            _ => None,
+        }
+    }
+
+    /// `judgment_url`.
+    fn url(&self) -> &'static str {
+        match self {
+            JudgmentProtocol::SystemOne => "v1/systemone",
+            JudgmentProtocol::OllamaSystemOne => "systemone",
+            JudgmentProtocol::Decisions => decisions::JUDGMENT_URL,
+        }
+    }
+}
+
+/// Reads what an image judgment sends: what `Attachment.new` reads (local files, a URL whose
+/// name leaves its type unknown), then every image's bytes, downloading image URLs so they go
+/// inline. Uploaded provider files are sent by ID and need no bytes.
+async fn load_images(with: &mut [Attachment], client: &reqwest::Client) -> Result<()> {
+    for a in with.iter_mut() {
+        a.prepare(client).await?;
+    }
+    for a in with
+        .iter_mut()
+        .filter(|a| a.kind() == AttachmentType::Image)
+    {
+        a.load(client).await?;
+    }
+    Ok(())
+}
+
+/// `Ollama::Judgments#render_judgment_payload`: the System One payload, plus `images` as base64
+/// when there are any.
+fn render_ollama_payload(
+    input: &Value,
+    questions: &[Resolved],
+    model: &str,
+    with: &[Attachment],
+    provider_options: &Value,
+) -> Result<Value> {
+    let images = with
+        .iter()
+        .map(|a| {
+            if a.kind() != AttachmentType::Image {
+                return Err(Error::UnsupportedAttachment(
+                    crate::protocols::anthropic::unsupported(&a.mime_type),
+                ));
+            }
+            a.encoded().map(Value::String)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let mut payload = render_payload(input, questions, model, provider_options)?;
+    if !images.is_empty() {
+        payload["images"] = images.into();
+    }
+    Ok(payload)
+}
+
+#[allow(clippy::too_many_arguments)]
 async fn judge_request_inner(
     input: Value,
     questions: &[Resolved],
@@ -649,21 +764,40 @@ async fn judge_request_inner(
     assume_model_exists: bool,
     provider_options: Value,
     config: Arc<Config>,
+    mut with: Vec<Attachment>,
 ) -> Result<Judgment> {
     let model_id = model.unwrap_or_else(|| config.default_judgment_model.clone());
     if model_id.is_empty() {
         return Err(Error::Argument("A judgment requires a model".into()));
     }
     let (model, provider) = resolve_model(&model_id, provider.as_deref(), assume_model_exists)?;
-    if provider != Provider::TypeSafe {
+    let Some(protocol) = JudgmentProtocol::for_provider(provider) else {
         return Err(Error::Api(
             format!("{} doesn't support judgments", provider.display()),
             None,
         ));
-    }
+    };
     provider.ensure_configured(&config)?;
-    let payload = render_payload(&input, questions, &model.id, &provider_options)?;
     let connection = Connection::new(provider, config)?;
+    let payload = match protocol {
+        // `SystemOne::Judgments#render_judgment_payload`: System One takes no attachments.
+        JudgmentProtocol::SystemOne => {
+            if let Some(a) = with.first() {
+                return Err(Error::UnsupportedAttachment(
+                    crate::protocols::anthropic::unsupported(&a.mime_type),
+                ));
+            }
+            render_payload(&input, questions, &model.id, &provider_options)?
+        }
+        JudgmentProtocol::OllamaSystemOne => {
+            load_images(&mut with, connection.client()).await?;
+            render_ollama_payload(&input, questions, &model.id, &with, &provider_options)?
+        }
+        JudgmentProtocol::Decisions => {
+            load_images(&mut with, connection.client()).await?;
+            decisions::render_payload(&input, questions, &model.id, &with, &provider_options)?
+        }
+    };
 
     // `track_usage(:judgment)`: one entry per HTTP attempt.
     let mut retried: Vec<Tokens> = Vec::new();
@@ -673,12 +807,20 @@ async fn judge_request_inner(
         }
     };
     let raw = connection
-        .post("v1/systemone", &payload, &[], &mut on_attempt)
+        .post(protocol.url(), &payload, &[], &mut on_attempt)
         .await
-        .map_err(system_one_error)?;
-    let mut judgment = parse_response(raw, questions, &model)?;
+        // `TypeSafe#parse_error`: System One's own error shapes; the others use the provider's.
+        .map_err(|e| match protocol {
+            JudgmentProtocol::SystemOne => system_one_error(e),
+            _ => e,
+        })?;
+    let mut judgment = match protocol {
+        JudgmentProtocol::Decisions => decisions::parse_response(raw, questions, &model)?,
+        _ => parse_response(raw, questions, &model)?,
+    };
     let entry = |status, tokens: Tokens| UsageEntry {
         id: UsageEntry::next_id(),
+        owner: crate::accounting::usage_owner(),
         operation: Operation::Judgment,
         provider: provider.slug().into(),
         model: model.id.clone(),
@@ -716,7 +858,7 @@ fn render_payload(
     }
     let mut rendered = Map::new();
     for q in questions {
-        rendered.insert(q.name.clone(), render_question(q)?);
+        rendered.insert(q.name.clone(), render_question(q));
     }
     let mut payload = json!({ "model": model, "state": input, "questions": rendered });
     for (k, v) in options {
@@ -725,23 +867,8 @@ fn render_payload(
     Ok(payload)
 }
 
-/// `Judgments#render_question`.
-fn render_question(q: &Resolved) -> Result<Value> {
-    if q.kind == QuestionType::Choice
-        && q.criteria
-            .as_object()
-            .is_some_and(|c| c.len() > MAX_CHOICES)
-    {
-        return Err(Error::Argument(
-            "System One choices support at most 255 options".into(),
-        ));
-    }
-    if q.kind == QuestionType::Score && q.criteria.as_array().is_some_and(|c| c.len() > MAX_LEVELS)
-    {
-        return Err(Error::Argument(
-            "System One scores support at most 10 levels".into(),
-        ));
-    }
+/// `Judgments#render_question`. System One enforces its own option and level limits (2.1).
+fn render_question(q: &Resolved) -> Value {
     let criteria = match (&q.kind, &q.criteria) {
         // BOOLEAN_KEYS: yes/no go out as "true"/"false".
         (QuestionType::Probability, Value::Object(map)) => Value::Object(
@@ -769,7 +896,7 @@ fn render_question(q: &Resolved) -> Result<Value> {
     if !criteria.is_null() {
         out.insert("criteria".into(), criteria);
     }
-    Ok(Value::Object(out))
+    Value::Object(out)
 }
 
 /// `SystemOne#parse_error_response`: FastAPI-style `detail` as a string, `{message}`, or a list.
@@ -1010,6 +1137,7 @@ fn parse_response(raw: RawResponse, questions: &[Resolved], model: &Model) -> Re
     let response = crate::error::ErrorResponse {
         status: raw.status,
         body: raw.body.to_string(),
+        ..Default::default()
     };
     parse_response_body(raw, questions, model).map_err(|e| match e {
         Error::Api(message, None) => Error::Api(message, Some(response)),
