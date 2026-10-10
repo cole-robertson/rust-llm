@@ -491,7 +491,7 @@ impl Batch {
                 ("requests", requests.len().into()),
             ])
         });
-        let result = tracing::Instrument::instrument(self.create(requests), event.span()).await;
+        let result = event.instrument(self.create(requests)).await;
         if result.is_ok() {
             event.set("batch_id", || self.id.clone().into());
         }

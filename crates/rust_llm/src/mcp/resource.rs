@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use base64::Engine;
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use super::{Mcp, content};
 use crate::attachment::Attachment;
@@ -42,6 +42,10 @@ pub struct Resource {
     pub title: Option<String>,
     pub description: Option<String>,
     pub mime_type: Option<String>,
+    /// The `_meta` the server sent with the resource, empty when there is none. A resource read
+    /// with `Mcp::resource` has the `_meta` of its contents; one from `Mcp::resources` has the
+    /// `_meta` of the listing.
+    pub meta: Map<String, Value>,
     data: Value,
     mcp: Mcp,
 }
@@ -65,6 +69,11 @@ impl Resource {
             title: s("title"),
             description: s("description"),
             mime_type: s("mimeType"),
+            meta: data
+                .get("_meta")
+                .and_then(Value::as_object)
+                .cloned()
+                .unwrap_or_default(),
             uri,
             data,
             mcp,

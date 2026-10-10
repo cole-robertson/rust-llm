@@ -1,22 +1,34 @@
 //! Port of `lib/ruby_llm/mcp/stdio.rb`. The server is a child process that reads one JSON-RPC
 //! message per line on stdin and writes one per line on stdout. Reads never block past the
 //! deadline, even on a partial line. It starts on the first request, restarts after it exits,
-//! and handles one request at a time. Its stderr is the parent's.
+//! and handles one request at a time. Its stderr is the parent's. A server that predates
+//! 2026-07-28 keeps its session for the life of its process, so after a restart its requests fail
+//! with a session-expired error until the client initializes it again.
+//!
+//! Subscriptions share the channel, so whichever task reads a message that belongs to one hands
+//! it to the subscription's listener: a request waiting for its answer, or the listener itself
+//! while no request reads.
 
 use std::path::PathBuf;
 use std::process::Stdio as ProcessStdio;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::Value;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
+use tokio::sync::mpsc;
 
+use super::client::{CHANGES, Client, VERSION};
 use super::{McpError, OnNotification, Transport};
 use crate::error::{Error, Result};
 
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(2);
 const CHECK_INTERVAL: Duration = Duration::from_millis(500);
+const LISTEN_INTERVAL: Duration = Duration::from_millis(50);
+const SUBSCRIPTION_ID: &str = "io.modelcontextprotocol/subscriptionId";
 
 /// `RubyLLM::MCP::Stdio`.
 pub struct Stdio {
@@ -25,6 +37,10 @@ pub struct Stdio {
     directory: Option<PathBuf>,
     timeout: Duration,
     process: tokio::sync::Mutex<Option<Process>>,
+    subscriptions: Mutex<Vec<Arc<Subscription>>>,
+    started: AtomicU64,
+    current: AtomicU64,
+    session: AtomicU64,
 }
 
 struct Process {
@@ -32,6 +48,43 @@ struct Process {
     stdin: ChildStdin,
     stdout: ChildStdout,
     buffer: Vec<u8>,
+}
+
+/// The messages of the subscription opened by request `id`, or with no `id`, the changes a
+/// server that predates subscriptions announces.
+struct Subscription {
+    id: Option<Value>,
+    messages: mpsc::UnboundedSender<Value>,
+}
+
+impl Subscription {
+    fn claims(&self, message: &Value) -> bool {
+        let method = message.get("method").and_then(Value::as_str);
+        let Some(id) = &self.id else {
+            return message.get("id").is_none() && method.is_some_and(|m| CHANGES.contains(&m));
+        };
+        let params = message.get("params").filter(|p| p.is_object());
+        params.and_then(|p| p.pointer("/_meta").and_then(|m| m.get(SUBSCRIPTION_ID))) == Some(id)
+            || self.is_answer(message)
+            || self.is_cancelled_by(message)
+    }
+
+    fn is_answer(&self, message: &Value) -> bool {
+        self.id.is_some()
+            && message.get("id") == self.id.as_ref()
+            && message.get("method").is_none()
+    }
+
+    fn is_cancelled_by(&self, message: &Value) -> bool {
+        self.id.is_some()
+            && message.get("method").and_then(Value::as_str) == Some("notifications/cancelled")
+            && message.pointer("/params/requestId") == self.id.as_ref()
+    }
+}
+
+fn is_alive(slot: &mut Option<Process>) -> bool {
+    slot.as_mut()
+        .is_some_and(|p| matches!(p.child.try_wait(), Ok(None)))
 }
 
 impl Stdio {
@@ -47,6 +100,10 @@ impl Stdio {
             directory,
             timeout,
             process: tokio::sync::Mutex::new(None),
+            subscriptions: Mutex::new(Vec::new()),
+            started: AtomicU64::new(0),
+            current: AtomicU64::new(0),
+            session: AtomicU64::new(0),
         }
     }
 
@@ -57,6 +114,18 @@ impl Stdio {
 
     fn exited(&self) -> Error {
         McpError::new(format!("{} exited", self.name())).into()
+    }
+
+    /// `check_session`: an older server's requests need the process its session started on.
+    fn check_session(&self, slot: &mut Option<Process>, version: Option<&str>) -> Result<()> {
+        if version.is_none_or(|v| v == VERSION) {
+            return Ok(());
+        }
+        let current = self.current.load(Ordering::SeqCst);
+        if is_alive(slot) && current != 0 && current == self.session.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+        Err(McpError::session_expired(format!("{} exited", self.name())).into())
     }
 
     fn start(&self) -> Result<Process> {
@@ -79,6 +148,8 @@ impl Stdio {
             .map_err(|e| McpError::new(format!("{} could not start: {e}", self.name())))?;
         let stdin = child.stdin.take().ok_or_else(|| self.exited())?;
         let stdout = child.stdout.take().ok_or_else(|| self.exited())?;
+        let generation = self.started.fetch_add(1, Ordering::SeqCst) + 1;
+        self.current.store(generation, Ordering::SeqCst);
         Ok(Process {
             child,
             stdin,
@@ -87,12 +158,13 @@ impl Stdio {
         })
     }
 
+    async fn stop(&self, slot: &mut Option<Process>) {
+        self.current.store(0, Ordering::SeqCst);
+        stop(slot).await;
+    }
+
     async fn write(&self, slot: &mut Option<Process>, message: &Value) -> Result<()> {
-        let alive = match slot.as_mut() {
-            Some(p) => matches!(p.child.try_wait(), Ok(None)),
-            None => false,
-        };
-        if !alive {
+        if !is_alive(slot) {
             *slot = Some(self.start()?);
         }
         let Some(process) = slot.as_mut() else {
@@ -106,7 +178,7 @@ impl Stdio {
         }
         .await;
         if written.is_err() {
-            stop(slot).await;
+            self.stop(slot).await;
             return Err(self.exited());
         }
         Ok(())
@@ -115,13 +187,22 @@ impl Stdio {
     async fn read(&self, slot: &mut Option<Process>, deadline: Instant) -> Result<Value> {
         loop {
             let line = self.next_line(slot, deadline).await?;
-            let text = String::from_utf8_lossy(&line);
-            if text.trim().is_empty() {
-                continue;
+            if let Some(message) = self.parse(&line) {
+                return Ok(message);
             }
-            match serde_json::from_str(&text) {
-                Ok(value) => return Ok(value),
-                Err(_) => tracing::debug!("{} wrote a line that is not JSON", self.name()),
+        }
+    }
+
+    fn parse(&self, line: &[u8]) -> Option<Value> {
+        let text = String::from_utf8_lossy(line);
+        if text.trim().is_empty() {
+            return None;
+        }
+        match serde_json::from_str::<Value>(&text) {
+            Ok(value) if value.is_object() => Some(value),
+            _ => {
+                tracing::debug!("{} wrote a line that is not JSON", self.name());
+                None
             }
         }
     }
@@ -152,7 +233,7 @@ impl Stdio {
             match read {
                 Err(_) => continue,
                 Ok(Ok(0)) | Ok(Err(_)) => {
-                    stop(slot).await;
+                    self.stop(slot).await;
                     return Err(self.exited());
                 }
                 Ok(Ok(n)) => process.buffer.extend_from_slice(&chunk[..n]),
@@ -160,15 +241,117 @@ impl Stdio {
         }
     }
 
-    /// Answers a request the server sends while it works: `ping`, or "method not found".
-    async fn answer(&self, slot: &mut Option<Process>, request: &Value) -> Result<()> {
-        let id = request.get("id").cloned().unwrap_or(Value::Null);
-        let reply = if request.get("method").and_then(Value::as_str) == Some("ping") {
-            json!({ "jsonrpc": "2.0", "id": id, "result": {} })
-        } else {
-            json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32_601, "message": "Method not found" } })
+    /// `route`: hands a message to the subscription it belongs to.
+    fn route(&self, message: &Value) -> bool {
+        let Ok(subscriptions) = self.subscriptions.lock() else {
+            return false;
         };
-        self.write(slot, &reply).await
+        match subscriptions.iter().find(|s| s.claims(message)) {
+            Some(subscription) => {
+                let _ = subscription.messages.send(message.clone());
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// `handled?`: routes a message, or answers a request the server sends.
+    async fn handle(&self, slot: &mut Option<Process>, message: &Value) -> Result<bool> {
+        if self.route(message) {
+            return Ok(true);
+        }
+        if message.get("method").is_none() || message.get("id").is_none() {
+            return Ok(false);
+        }
+        self.write(slot, &Client::reply(message)).await?;
+        Ok(true)
+    }
+
+    /// `drain`: reads what the server wrote while no request reads, for the subscriptions.
+    async fn drain(&self, slot: &mut Option<Process>) -> Result<()> {
+        loop {
+            let message = {
+                let Some(process) = slot.as_mut() else {
+                    return Err(self.exited());
+                };
+                match process.buffer.iter().position(|b| *b == b'\n') {
+                    Some(pos) => Some(process.buffer.drain(..=pos).collect::<Vec<u8>>()),
+                    None => None,
+                }
+            };
+            if let Some(line) = message {
+                if let Some(message) = self.parse(&line) {
+                    self.handle(slot, &message).await?;
+                }
+                continue;
+            }
+            let Some(process) = slot.as_mut() else {
+                return Err(self.exited());
+            };
+            let mut chunk = vec![0u8; 65_536];
+            match tokio::time::timeout(LISTEN_INTERVAL, process.stdout.read(&mut chunk)).await {
+                Err(_) => return Ok(()),
+                Ok(Ok(0)) | Ok(Err(_)) => {
+                    self.stop(slot).await;
+                    return Err(self.exited());
+                }
+                Ok(Ok(n)) => process.buffer.extend_from_slice(&chunk[..n]),
+            }
+        }
+    }
+
+    async fn subscribe(
+        &self,
+        subscription: &Arc<Subscription>,
+        message: Option<&Value>,
+    ) -> Result<u64> {
+        let mut slot = self.process.lock().await;
+        if message.is_none() && !is_alive(&mut slot) {
+            return Err(self.exited());
+        }
+        if let Ok(mut subscriptions) = self.subscriptions.lock() {
+            subscriptions.push(subscription.clone());
+        }
+        if let Some(message) = message {
+            self.write(&mut slot, message).await?;
+        }
+        Ok(self.current.load(Ordering::SeqCst))
+    }
+
+    async fn follow(
+        &self,
+        subscription: &Subscription,
+        messages: &mut mpsc::UnboundedReceiver<Value>,
+        generation: u64,
+        on_notification: &mut OnNotification<'_>,
+    ) -> Result<Option<Value>> {
+        loop {
+            while let Ok(reply) = messages.try_recv() {
+                if subscription.is_answer(&reply) || subscription.is_cancelled_by(&reply) {
+                    return Ok(Some(reply));
+                }
+                on_notification(&reply);
+            }
+            if crate::progress::is_cancelled() {
+                return Err(Error::Cancelled);
+            }
+            if self.current.load(Ordering::SeqCst) != generation {
+                return Err(self.exited());
+            }
+            match self.process.try_lock() {
+                Ok(mut slot) => self.drain(&mut slot).await?,
+                Err(_) => {
+                    if let Ok(Some(reply)) =
+                        tokio::time::timeout(LISTEN_INTERVAL, messages.recv()).await
+                    {
+                        if subscription.is_answer(&reply) || subscription.is_cancelled_by(&reply) {
+                            return Ok(Some(reply));
+                        }
+                        on_notification(&reply);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -198,13 +381,18 @@ impl Transport for Stdio {
     async fn request(
         &self,
         message: &Value,
-        _version: Option<&str>,
+        version: Option<&str>,
         timeout: Option<Duration>,
         _headers: &[(String, String)],
         on_notification: &mut OnNotification<'_>,
     ) -> Result<Value> {
         let mut slot = self.process.lock().await;
+        self.check_session(&mut slot, version)?;
         self.write(&mut slot, message).await?;
+        if message.get("method").and_then(Value::as_str) == Some("initialize") {
+            self.session
+                .store(self.current.load(Ordering::SeqCst), Ordering::SeqCst);
+        }
         let deadline = Instant::now() + timeout.unwrap_or(self.timeout);
         let id = message.get("id");
         loop {
@@ -213,9 +401,7 @@ impl Transport for Stdio {
             if reply.get("id") == id && !has_method {
                 return Ok(reply);
             }
-            if has_method && reply.get("id").is_some() {
-                self.answer(&mut slot, &reply).await?;
-            } else if has_method {
+            if !self.handle(&mut slot, &reply).await? && has_method {
                 on_notification(&reply);
             }
         }
@@ -232,6 +418,30 @@ impl Transport for Stdio {
 
     async fn close(&self) {
         let mut slot = self.process.lock().await;
-        stop(&mut slot).await;
+        self.stop(&mut slot).await;
+    }
+
+    async fn listen(
+        &self,
+        message: Option<&Value>,
+        _version: Option<&str>,
+        on_notification: &mut OnNotification<'_>,
+    ) -> Result<Option<Value>> {
+        let (sender, mut messages) = mpsc::unbounded_channel();
+        let subscription = Arc::new(Subscription {
+            id: message.and_then(|m| m.get("id").cloned()),
+            messages: sender,
+        });
+        let result = match self.subscribe(&subscription, message).await {
+            Ok(generation) => {
+                self.follow(&subscription, &mut messages, generation, on_notification)
+                    .await
+            }
+            Err(e) => Err(e),
+        };
+        if let Ok(mut subscriptions) = self.subscriptions.lock() {
+            subscriptions.retain(|s| !Arc::ptr_eq(s, &subscription));
+        }
+        result
     }
 }

@@ -355,14 +355,12 @@ async fn run(
             ),
         ])
     });
-    let result = tracing::Instrument::instrument(
-        crate::accounting::owned_by(
+    let result = event
+        .instrument(crate::accounting::owned_by(
             owner,
             transcribe_inner(audio, options, on_chunk, config.clone(), model, provider),
-        ),
-        event.span(),
-    )
-    .await;
+        ))
+        .await;
     if let Ok(t) = &result {
         crate::accounting::report(&config, &t.usage_entries).await;
         event.set("result", || {

@@ -436,6 +436,9 @@ pub struct Message {
     /// `#cache_ttl`: this boundary's own cache lifetime (`"1h"`), or `None` for the chat's.
     pub cache_ttl: Option<String>,
     pub usage_entries: Vec<UsageEntry>,
+    /// `mcp_result`: the result of an MCP tool with a UI, kept on its tool result message so
+    /// your app can render the UI again.
+    pub mcp_result: Option<Box<crate::mcp::McpResult>>,
     /// Primary key of the row this message is stored as, set by a persistence layer
     /// (`rust_llm_loco`). `None` means not yet persisted.
     pub record_id: Option<i64>,
@@ -466,6 +469,7 @@ impl Message {
             cache_until_here: false,
             cache_ttl: None,
             usage_entries: Vec::new(),
+            mcp_result: None,
             record_id: None,
             model_info: None,
             supplied_cost: None,
@@ -636,6 +640,7 @@ impl Message {
             cache_until_here: self.cache_until_here,
             cache_ttl: self.cache_ttl.clone(),
             usage_entries: self.producing_entry().cloned().into_iter().collect(),
+            mcp_result: None,
             record_id: self.record_id,
             model_info: None,
             supplied_cost: None,
@@ -795,6 +800,11 @@ impl Message {
                 .map(str::to_string);
         }
         m.supplied_cost = h.get("cost").map(|c| Cost::from_h(c, None));
+        // `coerce_mcp_result`: a dumped result comes back as an `MCP::Result`.
+        m.mcp_result = h
+            .get("mcp_result")
+            .filter(|r| r.is_object())
+            .map(|r| Box::new(crate::mcp::McpResult::load(r)));
         m.tokens = Tokens {
             input: int_of("input_tokens"),
             output: int_of("output_tokens"),
@@ -875,6 +885,9 @@ impl Message {
         }
         if let Some(raw) = &self.raw_reasoning {
             h.insert("raw_reasoning".into(), raw.clone());
+        }
+        if let Some(result) = &self.mcp_result {
+            h.insert("mcp_result".into(), result.dump());
         }
         if let Some(r) = &self.finish_reason {
             h.insert("finish_reason".into(), r.as_str().into());

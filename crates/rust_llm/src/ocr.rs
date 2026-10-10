@@ -143,14 +143,12 @@ pub async fn ocr(file: impl Into<Attachment>, options: OcrOptions<'_>) -> Result
             ),
         ])
     });
-    let result = tracing::Instrument::instrument(
-        crate::accounting::owned_by(
+    let result = event
+        .instrument(crate::accounting::owned_by(
             owner,
             ocr_inner(file.into(), options, config.clone(), model, provider),
-        ),
-        event.span(),
-    )
-    .await;
+        ))
+        .await;
     if let Ok(r) = &result {
         crate::accounting::report(&config, &r.usage_entries).await;
         event.set(

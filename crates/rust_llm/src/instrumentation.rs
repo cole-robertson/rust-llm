@@ -23,6 +23,8 @@
 //!
 //! Every event also runs inside a `tracing` span named `rust_llm` with an `event` field, and logs
 //! its duration at debug level, so a `tracing` subscriber sees the work without an instrumenter.
+//! With [`crate::open_telemetry::enable`], traced events also get an OpenTelemetry span
+//! (`Support::Instrumentation.subscribe`), which [`Event::instrument`] makes current.
 
 use std::future::Future;
 use std::sync::Arc;
@@ -73,38 +75,44 @@ pub(crate) async fn with_workflow<F: Future>(context: Map<String, Value>, future
 }
 
 /// One instrumented block: `RubyLLM.instrument(name, payload) { |event| ... }`. The payload is
-/// only built when an instrumenter is configured.
+/// only built when an instrumenter is configured or OpenTelemetry traces the event.
 pub struct Event {
     name: String,
     payload: Option<Map<String, Value>>,
     config: Arc<Config>,
     started: Instant,
     span: tracing::Span,
+    /// The OpenTelemetry span (`OpenTelemetry#instrument`), ended on finish or drop.
+    otel: crate::open_telemetry::Span,
 }
 
 impl Event {
-    /// Starts an event. `payload` runs only when `config.instrumenter` is set; the current
-    /// workflow context is merged over it, as Ruby merges it at the start of the block.
+    /// Starts an event. `payload` runs only when `config.instrumenter` is set or OpenTelemetry
+    /// traces the event; the current workflow context is merged over it, as Ruby merges it at the
+    /// start of the block.
     pub fn start(
         config: &Arc<Config>,
         name: &str,
         payload: impl FnOnce() -> Map<String, Value>,
     ) -> Event {
-        let payload = config.instrumenter.as_ref().map(|_| {
-            let mut payload = payload();
-            payload.extend(current_workflow().unwrap_or_default());
-            payload
-        });
+        let payload = (config.instrumenter.is_some() || crate::open_telemetry::is_traced(name))
+            .then(|| {
+                let mut payload = payload();
+                payload.extend(current_workflow().unwrap_or_default());
+                payload
+            });
+        let otel = crate::open_telemetry::Span::start(name, payload.as_ref());
         Event {
             name: name.to_string(),
             payload,
             config: config.clone(),
             started: Instant::now(),
             span: tracing::debug_span!("rust_llm", event = name),
+            otel,
         }
     }
 
-    /// Whether an instrumenter will receive this event.
+    /// Whether this event's payload is built (an instrumenter or OpenTelemetry will read it).
     pub fn is_enabled(&self) -> bool {
         self.payload.is_some()
     }
@@ -121,6 +129,13 @@ impl Event {
         self.span.clone()
     }
 
+    /// Runs `future` as the instrumented work: inside [`Event::span`], and with this event's
+    /// OpenTelemetry span as the current context on every poll (`Trace.with_span`).
+    pub fn instrument<F: Future>(&self, future: F) -> impl Future<Output = F::Output> + use<F> {
+        self.otel
+            .instrument(tracing::Instrument::instrument(future, self.span.clone()))
+    }
+
     /// Ends the block and delivers the event, with `exception` added when it failed.
     pub fn finish(mut self, error: Option<&Error>) {
         if let Some(e) = error {
@@ -128,6 +143,7 @@ impl Event {
                 json!([format!("{:?}", e.kind()), e.to_string()])
             });
         }
+        self.otel.finish(self.payload.as_ref(), error);
         let elapsed = self.started.elapsed();
         self.emit(Some(elapsed));
     }
@@ -149,7 +165,7 @@ pub async fn instrument<T>(
     future: impl Future<Output = crate::Result<T>>,
 ) -> crate::Result<T> {
     let event = Event::start(config, name, || payload);
-    let result = tracing::Instrument::instrument(future, event.span()).await;
+    let result = event.instrument(future).await;
     event.finish(result.as_ref().err());
     result
 }
@@ -161,6 +177,7 @@ pub fn instrument_event(config: &Arc<Config>, name: &str, payload: Map<String, V
 
 /// `Accounting::Usage.instrument`: `usage.rust_llm` for one finished provider attempt.
 pub(crate) fn usage(config: &Arc<Config>, entry: &UsageEntry) {
+    crate::evaluation::capture_usage(entry);
     if config.instrumenter.is_none() {
         return;
     }

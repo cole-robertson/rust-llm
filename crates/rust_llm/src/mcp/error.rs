@@ -14,12 +14,25 @@ pub struct McpError {
     /// Additional information the server attached to the error.
     pub data: Option<Value>,
     pub response: Option<ErrorResponse>,
+    /// `MCP::SessionExpired` (`mcp/session_expired.rb`): the session of a server that predates
+    /// 2026-07-28 has ended (it answered 404, or its stdio process exited), so the client starts
+    /// a new one.
+    pub session_expired: bool,
 }
 
 impl McpError {
     pub fn new(message: impl Into<String>) -> McpError {
         McpError {
             message: message.into(),
+            ..Default::default()
+        }
+    }
+
+    /// `SessionExpired.new(message)`.
+    pub fn session_expired(message: impl Into<String>) -> McpError {
+        McpError {
+            message: message.into(),
+            session_expired: true,
             ..Default::default()
         }
     }

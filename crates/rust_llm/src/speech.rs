@@ -250,11 +250,12 @@ async fn run(
             ),
         ])
     });
-    let result = tracing::Instrument::instrument(
-        crate::accounting::owned_by(owner, run_inner(input, options, on_chunk)),
-        event.span(),
-    )
-    .await;
+    let result = event
+        .instrument(crate::accounting::owned_by(
+            owner,
+            run_inner(input, options, on_chunk),
+        ))
+        .await;
     if let Ok(speech) = &result {
         crate::accounting::report(&config, &speech.usage_entries).await;
         event.set("result", || {

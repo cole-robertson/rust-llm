@@ -915,7 +915,7 @@ fn http_client(server: &MockServer, headers: Vec<(&'static str, &'static str)>) 
         .collect();
     let http = Http::new(
         &format!("{}/mcp", server.uri()),
-        Arc::new(move || headers.clone()),
+        Arc::new(move |_| headers.clone()),
         Duration::from_secs(10),
     )
     .unwrap();
@@ -1213,7 +1213,7 @@ async fn http_resolves_headers_on_every_request_and_mcp_inputs_reach_them() {
     let tokens = Arc::new(Mutex::new(VecDeque::from(["first", "second"])));
     let http = Http::new(
         &format!("{}/mcp", server.uri()),
-        Arc::new(move || {
+        Arc::new(move |_| {
             vec![(
                 "Authorization".to_string(),
                 tokens.lock().unwrap().pop_front().unwrap_or("").to_string(),

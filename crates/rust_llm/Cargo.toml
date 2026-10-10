@@ -38,10 +38,21 @@ minijinja.workspace = true
 # WebSocket transport for streaming transcription (Gemini Live, xAI), over rustls with ring like reqwest.
 tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "handshake", "rustls-tls-webpki-roots"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+# ES256/RSA JWS for MCP OAuth (DPoP proofs, private_key_jwt); already in the tree through rustls.
+ring = "0.17"
 webpki-roots = "0.26"
+# Optional OpenTelemetry tracing (`open_telemetry::enable`): the API crate only, never an SDK.
+opentelemetry = { version = "0.33", optional = true, default-features = false, features = ["trace"] }
+
+[features]
+# `RubyLLM::OpenTelemetry`, which requires the optional `opentelemetry-api` gem.
+opentelemetry = ["dep:opentelemetry"]
 
 [dev-dependencies]
 futures.workspace = true
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
 serde_yaml = "0.9"
 wiremock = "0.6"
+# In-memory span exporter for tests/spec_open_telemetry.rs (the Ruby specs use opentelemetry-sdk).
+opentelemetry = { version = "0.33", default-features = false, features = ["trace"] }
+opentelemetry_sdk = { version = "0.33", default-features = false, features = ["trace", "testing"] }

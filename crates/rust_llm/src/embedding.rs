@@ -284,11 +284,12 @@ pub async fn embed(input: impl Into<EmbedInput>, options: EmbedOptions<'_>) -> R
             ),
         ])
     });
-    let result = tracing::Instrument::instrument(
-        crate::accounting::owned_by(owner, embed_inner(input, options)),
-        event.span(),
-    )
-    .await;
+    let result = event
+        .instrument(crate::accounting::owned_by(
+            owner,
+            embed_inner(input, options),
+        ))
+        .await;
     if let Ok(e) = &result {
         crate::accounting::report(&config, &e.usage_entries).await;
         event.set("result", || {

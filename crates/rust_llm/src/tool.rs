@@ -63,6 +63,9 @@ impl Parameter {
 pub struct ToolResult {
     pub content: String,
     pub attachments: Vec<Attachment>,
+    /// The `MCP::Result` an MCP tool returned, when this is one. A chat keeps it on the tool
+    /// result message (`Message::mcp_result`) when it has a UI to render.
+    pub mcp_result: Option<Box<crate::mcp::McpResult>>,
 }
 
 impl ToolResult {
@@ -73,6 +76,7 @@ impl ToolResult {
         ToolResult {
             content: content.into(),
             attachments,
+            mcp_result: None,
         }
     }
 
@@ -87,6 +91,7 @@ impl From<String> for ToolResult {
         ToolResult {
             content,
             attachments: Vec::new(),
+            mcp_result: None,
         }
     }
 }
@@ -167,6 +172,20 @@ pub trait Tool: Send + Sync {
     #[doc(hidden)]
     fn is_deferred_registration(&self) -> bool {
         false
+    }
+
+    /// `MCP::Tool#visibility` includes `:model`: chats offer the tool to the model. Tools of an
+    /// MCP App that only its UI may call say no.
+    #[doc(hidden)]
+    fn is_model_visible(&self) -> bool {
+        true
+    }
+
+    /// `MCP::Tool#task(state, tool_call:)`: the MCP task a paused call waits on, from its saved
+    /// state. `None` for tools that never become tasks.
+    #[doc(hidden)]
+    fn mcp_task(&self, _state: &Value, _tool_call: &ToolCall) -> Option<crate::mcp::Task> {
+        None
     }
 
     async fn execute(
@@ -401,6 +420,12 @@ impl Tool for Deferred {
     }
     fn is_deferred_registration(&self) -> bool {
         true
+    }
+    fn is_model_visible(&self) -> bool {
+        self.0.is_model_visible()
+    }
+    fn mcp_task(&self, state: &Value, tool_call: &ToolCall) -> Option<crate::mcp::Task> {
+        self.0.mcp_task(state, tool_call)
     }
     async fn execute(
         &self,

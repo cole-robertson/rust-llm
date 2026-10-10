@@ -214,11 +214,9 @@ impl Connection {
                     ("url", request.as_ref().map(|r| r.url().to_string()).into()),
                 ])
             });
-        let result = tracing::Instrument::instrument(
-            self.send_attempts(build, retry, stream, on_attempt),
-            event.span(),
-        )
-        .await;
+        let result = event
+            .instrument(self.send_attempts(build, retry, stream, on_attempt))
+            .await;
         let status = match &result {
             Ok(resp) => Some(resp.status().as_u16()),
             Err(e) => e.response().map(|r| r.status),

@@ -76,14 +76,30 @@ impl InputRequest {
         !self.is_url()
     }
 
-    /// `answer(**values)`: a form request takes the values; a URL request takes none, meaning
-    /// the user agreed to visit the page.
+    /// `answer(**values)`: a form request takes the values, and the fields you leave out take
+    /// the defaults the server gave them; a URL request takes none, meaning the user agreed to
+    /// visit the page.
     pub fn answer(&mut self, values: Map<String, Value>) {
         self.response = Some(if self.is_url() {
             json!({ "action": "accept" })
         } else {
-            json!({ "action": "accept", "content": values })
+            json!({ "action": "accept", "content": self.with_defaults(values) })
         });
+    }
+
+    fn with_defaults(&self, values: Map<String, Value>) -> Map<String, Value> {
+        let mut content: Map<String, Value> = self
+            .fields
+            .iter()
+            .filter_map(|f| {
+                f.default
+                    .clone()
+                    .filter(|d| !d.is_null())
+                    .map(|d| (f.name.clone(), d))
+            })
+            .collect();
+        content.extend(values);
+        content
     }
 
     /// `decline`.
@@ -150,18 +166,23 @@ fn choices(property: &Value) -> Option<Vec<Value>> {
 }
 
 /// The requests a paused call waits on, plus the server's opaque state, which is everything
-/// needed to answer them later and resume the call.
+/// needed to answer them later and resume the call. A call paused on a task's requests keeps the
+/// task (`Task#to_h`, its `task` and `answered`) too.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InputState {
     pub requests: Vec<InputRequest>,
     pub request_state: Option<Value>,
+    pub task: Option<Value>,
 }
 
 impl InputState {
     /// `InputRequiredError#to_h`: serializes to JSON for persistence.
     pub fn to_h(&self) -> Value {
-        let mut h =
-            json!({ "requests": self.requests.iter().map(InputRequest::to_h).collect::<Vec<_>>() });
+        let mut h = match &self.task {
+            Some(Value::Object(task)) => Value::Object(task.clone()),
+            _ => json!({}),
+        };
+        h["requests"] = self.requests.iter().map(InputRequest::to_h).collect();
         if let Some(state) = &self.request_state {
             h["request_state"] = state.clone();
         }
@@ -176,9 +197,17 @@ impl InputState {
             .flatten()
             .map(|r| InputRequest::from_h(r, None))
             .collect();
+        let task = data.get("task").filter(|t| !t.is_null()).map(|task| {
+            let mut state = json!({ "task": task });
+            if let Some(answered) = data.get("answered").filter(|a| !a.is_null()) {
+                state["answered"] = answered.clone();
+            }
+            state
+        });
         InputState {
             requests,
             request_state: data.get("request_state").filter(|s| !s.is_null()).cloned(),
+            task,
         }
     }
 }
