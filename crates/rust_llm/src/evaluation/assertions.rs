@@ -175,13 +175,17 @@ impl<'a> Assertions<'a> {
 
     /// `assert(condition, message)`.
     pub fn assert(&mut self, condition: bool, message: Option<&str>) -> Check {
-        let message = message.unwrap_or("Expected false to be truthy.").to_string();
+        let message = message
+            .unwrap_or("Expected false to be truthy.")
+            .to_string();
         self.check(condition, || message)
     }
 
     /// `refute(condition, message)`.
     pub fn refute(&mut self, condition: bool, message: Option<&str>) -> Check {
-        let message = message.unwrap_or("Expected true to not be truthy.").to_string();
+        let message = message
+            .unwrap_or("Expected true to not be truthy.")
+            .to_string();
         self.check(!condition, || message)
     }
 
@@ -215,7 +219,9 @@ impl<'a> Assertions<'a> {
         self.check(responds, || {
             format!("Expected {} to respond to #empty?.", inspect(value))
         })?;
-        self.check(!empty, || format!("Expected {} to not be empty.", inspect(value)))
+        self.check(!empty, || {
+            format!("Expected {} to not be empty.", inspect(value))
+        })
     }
 
     /// `assert_includes(collection, item)`.
@@ -242,7 +248,10 @@ impl<'a> Assertions<'a> {
             Value::Object(_) => "object",
         };
         self.check(actual == kind, || {
-            format!("Expected {} to be a kind of {kind}, not {actual}.", inspect(value))
+            format!(
+                "Expected {} to be a kind of {kind}, not {actual}.",
+                inspect(value)
+            )
         })
     }
 }

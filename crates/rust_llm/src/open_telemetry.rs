@@ -141,15 +141,18 @@ impl Span {
             return Either::Left(future);
         };
         let span = cx.clone();
-        let guarded = async move {
-            match futures::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(future)).await {
+        // Combinators rather than an `async` block, which would hold `future` twice and double
+        // the size of every instrumented future it nests in.
+        let guarded = futures::FutureExt::map(
+            futures::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(future)),
+            move |result| match result {
                 Ok(output) => output,
                 Err(panic) => {
                     record_error(&span, "panic");
                     std::panic::resume_unwind(panic)
                 }
-            }
-        };
+            },
+        );
         Either::Right(opentelemetry::context::FutureExt::with_context(guarded, cx))
     }
 

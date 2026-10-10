@@ -25,6 +25,8 @@ jobs:
       # Unit tests, cassette replays of RubyLLM's recordings, the Loco persistence test, and the
       # generator tests. No network and no API keys.
       - run: cargo test --workspace --all-targets
+      # The optional OpenTelemetry tracing (`rust_llm::open_telemetry`, off by default).
+      - run: cargo test -p rust_llm -p rust_llm_loco --features opentelemetry --all-targets
       # Doctests, including every ```rust sample in docs/*.md (the rust_llm_docs crate).
       - run: cargo test --workspace --doc
 
@@ -58,6 +60,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo clippy -p rust_llm -p rust_llm_loco --features opentelemetry --all-targets -- -D warnings
 
   docs:
     runs-on: ubuntu-latest

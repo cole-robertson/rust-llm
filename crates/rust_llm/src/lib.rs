@@ -34,7 +34,7 @@
 //! ## Guides
 //!
 //! The [user guides](https://github.com/cole-robertson/rust-llm/tree/main/docs) cover each
-//! feature in depth. RustLLM is a port of [RubyLLM](https://github.com/crmne/ruby_llm) 2.0, and
+//! feature in depth. RustLLM is a port of [RubyLLM](https://github.com/crmne/ruby_llm) 2.1, and
 //! keeps its names where Rust allows (`ask`, `ask_later`, `complete`, `with_tools`,
 //! `before_tool_call`, ...), with `?`-suffixed predicates spelled `is_*`;
 //! [RubyLLM vs RustLLM](https://github.com/cole-robertson/rust-llm/blob/main/docs/rubyllm.md)
