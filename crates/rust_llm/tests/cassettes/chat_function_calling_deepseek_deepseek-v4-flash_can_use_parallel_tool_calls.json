@@ -8,41 +8,41 @@
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Date": "Wed, 07 Oct 2026 13:04:42 GMT",
+      "Date": "Sun, 11 Oct 2026 21:08:27 GMT",
       "Server": "elb",
       "Vary": "origin, access-control-request-method, access-control-request-headers",
       "Access-Control-Allow-Credentials": "true",
-      "X-Ds-Trace-Id": "25b72127517104a34b1af7036c7340a3",
+      "X-Ds-Trace-Id": "baaf6f61812f98a01a0e22996099aae8",
       "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
       "X-Content-Type-Options": "nosniff",
       "X-Cache": "Miss from cloudfront",
-      "Via": "1.1 826a57ac22bb182622bb767d7ed86c26.cloudfront.net (CloudFront)",
-      "X-Amz-Cf-Pop": "TXL52-P4",
-      "X-Amz-Cf-Id": "osaC9nGpRj3TxARiZJX3BX7uRHmIMsuFyyhRhD94sf-xmhxhwHkWVw=="
+      "Via": "1.1 bdb48db5b688ca8c8dee7661b221599a.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL50-P3",
+      "X-Amz-Cf-Id": "MiKCbTi3YAT3lfVEBnQidROEQCZj3sCqVfjNQVL4PNWRZ-jELbyhmw=="
     },
-    "response_body": "{\"id\":\"9bddd2eb-2b82-4165-8c4d-c15cfa8edd43\",\"object\":\"chat.completion\",\"created\":1791378282,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning_content\":\"We need answer. Need call both tools in parallel. Weather Berlin lat/long. best language. Then summarize.\",\"tool_calls\":[{\"index\":0,\"id\":\"call_00_OOHtZuNTphQWtEgW94829321\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\": \\\"52.5200\\\", \\\"longitude\\\": \\\"13.4050\\\"}\"}},{\"index\":1,\"id\":\"call_01_vt71H25WETDIOXO6Kv2i8726\",\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"arguments\":\"{}\"}}]},\"logprobs\":null,\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":423,\"completion_tokens\":99,\"total_tokens\":522,\"prompt_tokens_details\":{\"cached_tokens\":256},\"completion_tokens_details\":{\"reasoning_tokens\":23},\"prompt_cache_hit_tokens\":256,\"prompt_cache_miss_tokens\":167},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+    "response_body": "{\"id\":\"055612db-a25b-4bf9-a77a-22e0a254691b\",\"object\":\"chat.completion\",\"created\":1791752907,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"I'll fetch both pieces of information for you.\",\"reasoning_content\":\"The user wants weather in Berlin and best language to learn. Both calls are independent, so I can do them in parallel.\",\"tool_calls\":[{\"index\":0,\"id\":\"call_00_3hYiF9tfBq8yintmKfGA2568\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\": \\\"52.5200\\\", \\\"longitude\\\": \\\"13.4050\\\"}\"}},{\"index\":1,\"id\":\"call_01_kqFkEEQ2piP9gdnRwfty3572\",\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"arguments\":\"{}\"}}]},\"logprobs\":null,\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":423,\"completion_tokens\":110,\"total_tokens\":533,\"prompt_tokens_details\":{\"cached_tokens\":256},\"completion_tokens_details\":{\"reasoning_tokens\":25},\"prompt_cache_hit_tokens\":256,\"prompt_cache_miss_tokens\":167},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
   },
   {
     "method": "post",
     "uri": "https://api.deepseek.com/chat/completions",
-    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin (52.5200, 13.4050) and what's the best language to learn?\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_00_OOHtZuNTphQWtEgW94829321\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}},{\"id\":\"call_01_vt71H25WETDIOXO6Kv2i8726\",\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"arguments\":\"{}\"}}],\"reasoning_content\":\"We need answer. Need call both tools in parallel. Weather Berlin lat/long. best language. Then summarize.\",\"reasoning\":\"We need answer. Need call both tools in parallel. Weather Berlin lat/long. best language. Then summarize.\"},{\"role\":\"tool\",\"content\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_00_OOHtZuNTphQWtEgW94829321\"},{\"role\":\"tool\",\"content\":\"Ruby\",\"tool_call_id\":\"call_01_vt71H25WETDIOXO6Kv2i8726\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}},{\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"description\":\"Gets the best language to learn\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin (52.5200, 13.4050) and what's the best language to learn?\"},{\"role\":\"assistant\",\"content\":\"I'll fetch both pieces of information for you.\",\"tool_calls\":[{\"id\":\"call_00_3hYiF9tfBq8yintmKfGA2568\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}},{\"id\":\"call_01_kqFkEEQ2piP9gdnRwfty3572\",\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"arguments\":\"{}\"}}],\"reasoning_content\":\"The user wants weather in Berlin and best language to learn. Both calls are independent, so I can do them in parallel.\",\"reasoning\":\"The user wants weather in Berlin and best language to learn. Both calls are independent, so I can do them in parallel.\"},{\"role\":\"tool\",\"content\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_00_3hYiF9tfBq8yintmKfGA2568\"},{\"role\":\"tool\",\"content\":\"Ruby\",\"tool_call_id\":\"call_01_kqFkEEQ2piP9gdnRwfty3572\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}},{\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"description\":\"Gets the best language to learn\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Date": "Wed, 07 Oct 2026 13:04:43 GMT",
+      "Date": "Sun, 11 Oct 2026 21:08:28 GMT",
       "Server": "elb",
       "Vary": "origin, access-control-request-method, access-control-request-headers",
       "Access-Control-Allow-Credentials": "true",
-      "X-Ds-Trace-Id": "8b07a37a166290646c00e44b96a99778",
+      "X-Ds-Trace-Id": "71ff42844246b6cb6d1ee52568c6d367",
       "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
       "X-Content-Type-Options": "nosniff",
       "X-Cache": "Miss from cloudfront",
-      "Via": "1.1 15481055cb1364f3b30d596d04a295f6.cloudfront.net (CloudFront)",
-      "X-Amz-Cf-Pop": "TXL52-P2",
-      "X-Amz-Cf-Id": "aMCg-013mG1RB3xkYtOCekj1iG2JnPy30Uxol5WTT3oCfDVF3iCKRQ=="
+      "Via": "1.1 7f50c4297c734e04046c5ba262693b20.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL52-P4",
+      "X-Amz-Cf-Id": "5wpqgxXJz5WRFuhvuHa-gFpmUm5lLvzBJ_RL-HafqRzDzWPS_Zzftg=="
     },
-    "response_body": "{\"id\":\"47628e62-f2c2-43b7-ad3f-d707eebd8c96\",\"object\":\"chat.completion\",\"created\":1791378283,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"- **Berlin weather (52.5200, 13.4050):** 15°C with wind at 10 km/h.\\n- **Best language to learn:** Ruby.\",\"reasoning_content\":\"Need respond. Mention weather Berlin: 15°C, wind 10 km/h. Best language to learn per tool: Ruby. Maybe note \\\"based on tool\\\". Also could distinguish programming language vs human language ambiguity? Tool returned Ruby, a programming language. Answer concise.\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":569,\"completion_tokens\":94,\"total_tokens\":663,\"prompt_tokens_details\":{\"cached_tokens\":384},\"completion_tokens_details\":{\"reasoning_tokens\":55},\"prompt_cache_hit_tokens\":384,\"prompt_cache_miss_tokens\":185},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+    "response_body": "{\"id\":\"910ca621-ab3f-4cbb-897a-1d04df8ad24c\",\"object\":\"chat.completion\",\"created\":1791752908,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Here's what I found:\\n\\n**Weather in Berlin (52.5200, 13.4050)**\\n- 🌡️ Temperature: **15°C**\\n- 💨 Wind: **10 km/h**\\n\\nMild conditions — a light jacket would be comfortable.\\n\\n**Best language to learn**\\n- 💻 **Ruby**\\n\\nLet me know if you'd like anything else!\",\"reasoning_content\":\"\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":580,\"completion_tokens\":78,\"total_tokens\":658,\"prompt_tokens_details\":{\"cached_tokens\":384},\"completion_tokens_details\":{\"reasoning_tokens\":0},\"prompt_cache_hit_tokens\":384,\"prompt_cache_miss_tokens\":196},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
   }
 ]

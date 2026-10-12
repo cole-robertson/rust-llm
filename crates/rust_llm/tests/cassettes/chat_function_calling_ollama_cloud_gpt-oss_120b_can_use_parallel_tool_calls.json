@@ -6,60 +6,60 @@
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json",
-      "X-Build-Commit": "aca5aad1d053bda171888c526b817e0c61227261",
-      "X-Build-Time": "2026-10-06T19:15:30-07:00",
+      "X-Build-Commit": "fb036d5c394cd0c23173b2be8d69965e24bc9914",
+      "X-Build-Time": "2026-10-09T17:17:18-07:00",
       "X-Frame-Options": "DENY",
       "X-Request-Id": "<X_REQUEST_ID>",
-      "Content-Length": "718",
-      "Date": "Wed, 07 Oct 2026 13:40:27 GMT",
+      "Content-Length": "590",
+      "Date": "Sun, 11 Oct 2026 21:11:30 GMT",
       "Server": "Google Frontend",
-      "Traceparent": "00-5721f8d32b5d4f1b031e1c3daab2ffe3-1532b9aff3a63cd5-00",
-      "X-Cloud-Trace-Context": "5721f8d32b5d4f1b031e1c3daab2ffe3/1527487388990192853",
+      "Traceparent": "00-3f2d845e4bfa273c308fbf041728b284-bcf829ef323339c9-00",
+      "X-Cloud-Trace-Context": "3f2d845e4bfa273c308fbf041728b284/13616679580670835145",
       "Via": "1.1 google",
       "Alt-Svc": "h3=\":443\"; ma=2592000"
     },
-    "response_body": "{\"id\":\"chatcmpl-64\",\"object\":\"chat.completion\",\"created\":1791380427,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning\":\"User asks two queries: weather in Berlin given lat/long, and best language to learn. Need to call both functions. Probably sequential calls: weather then best_language_to_learn. Then combine in answer.\",\"tool_calls\":[{\"id\":\"call_hx87xc7k\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":194,\"completion_tokens\":82,\"total_tokens\":276,\"prompt_tokens_details\":{\"cached_tokens\":64}}}\n"
+    "response_body": "{\"id\":\"chatcmpl-855\",\"object\":\"chat.completion\",\"created\":1791753090,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning\":\"We need to fetch weather and best language. Use the provided functions.\",\"tool_calls\":[{\"id\":\"call_vu43evck\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":194,\"completion_tokens\":54,\"total_tokens\":248,\"prompt_tokens_details\":{\"cached_tokens\":112}}}\n"
   },
   {
     "method": "post",
     "uri": "https://ollama.com/v1/chat/completions",
-    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin (52.5200, 13.4050) and what's the best language to learn?\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_hx87xc7k\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}],\"reasoning\":\"User asks two queries: weather in Berlin given lat/long, and best language to learn. Need to call both functions. Probably sequential calls: weather then best_language_to_learn. Then combine in answer.\",\"reasoning_content\":\"User asks two queries: weather in Berlin given lat/long, and best language to learn. Need to call both functions. Probably sequential calls: weather then best_language_to_learn. Then combine in answer.\"},{\"role\":\"tool\",\"content\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_hx87xc7k\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}},{\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"description\":\"Gets the best language to learn\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin (52.5200, 13.4050) and what's the best language to learn?\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_vu43evck\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}],\"reasoning\":\"We need to fetch weather and best language. Use the provided functions.\",\"reasoning_content\":\"We need to fetch weather and best language. Use the provided functions.\"},{\"role\":\"tool\",\"content\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_vu43evck\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}},{\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"description\":\"Gets the best language to learn\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json",
-      "X-Build-Commit": "aca5aad1d053bda171888c526b817e0c61227261",
-      "X-Build-Time": "2026-10-06T19:15:30-07:00",
+      "X-Build-Commit": "fb036d5c394cd0c23173b2be8d69965e24bc9914",
+      "X-Build-Time": "2026-10-09T17:17:18-07:00",
       "X-Frame-Options": "DENY",
       "X-Request-Id": "<X_REQUEST_ID>",
-      "Content-Length": "469",
-      "Date": "Wed, 07 Oct 2026 13:40:28 GMT",
+      "Content-Length": "506",
+      "Date": "Sun, 11 Oct 2026 21:11:31 GMT",
       "Server": "Google Frontend",
-      "X-Cloud-Trace-Context": "9a8b5bbccd2c0835f5414bac816507e1/12394770206319821794",
-      "Traceparent": "00-9a8b5bbccd2c0835f5414bac816507e1-ac0311d51449c3e2-00",
+      "Traceparent": "00-cd0ac885a67fdca26042189ce7567096-2cce1edb1738f608-00",
+      "X-Cloud-Trace-Context": "cd0ac885a67fdca26042189ce7567096/3228551909207504392",
       "Via": "1.1 google",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
     },
-    "response_body": "{\"id\":\"chatcmpl-484\",\"object\":\"chat.completion\",\"created\":1791380428,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_yjlpmlo6\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"arguments\":\"{}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":304,\"completion_tokens\":17,\"total_tokens\":321,\"prompt_tokens_details\":{\"cached_tokens\":224}}}\n"
+    "response_body": "{\"id\":\"chatcmpl-698\",\"object\":\"chat.completion\",\"created\":1791753091,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning\":\"Now get best language.\",\"tool_calls\":[{\"id\":\"call_f0apraoo\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"arguments\":\"{}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":276,\"completion_tokens\":28,\"total_tokens\":304,\"prompt_tokens_details\":{\"cached_tokens\":208}}}\n"
   },
   {
     "method": "post",
     "uri": "https://ollama.com/v1/chat/completions",
-    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin (52.5200, 13.4050) and what's the best language to learn?\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_hx87xc7k\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}],\"reasoning\":\"User asks two queries: weather in Berlin given lat/long, and best language to learn. Need to call both functions. Probably sequential calls: weather then best_language_to_learn. Then combine in answer.\",\"reasoning_content\":\"User asks two queries: weather in Berlin given lat/long, and best language to learn. Need to call both functions. Probably sequential calls: weather then best_language_to_learn. Then combine in answer.\"},{\"role\":\"tool\",\"content\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_hx87xc7k\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_yjlpmlo6\",\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"arguments\":\"{}\"}}]},{\"role\":\"tool\",\"content\":\"Ruby\",\"tool_call_id\":\"call_yjlpmlo6\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}},{\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"description\":\"Gets the best language to learn\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin (52.5200, 13.4050) and what's the best language to learn?\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_vu43evck\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}],\"reasoning\":\"We need to fetch weather and best language. Use the provided functions.\",\"reasoning_content\":\"We need to fetch weather and best language. Use the provided functions.\"},{\"role\":\"tool\",\"content\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_vu43evck\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_f0apraoo\",\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"arguments\":\"{}\"}}],\"reasoning\":\"Now get best language.\",\"reasoning_content\":\"Now get best language.\"},{\"role\":\"tool\",\"content\":\"Ruby\",\"tool_call_id\":\"call_f0apraoo\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}},{\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"description\":\"Gets the best language to learn\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json",
-      "X-Build-Commit": "aca5aad1d053bda171888c526b817e0c61227261",
-      "X-Build-Time": "2026-10-06T19:15:30-07:00",
+      "X-Build-Commit": "fb036d5c394cd0c23173b2be8d69965e24bc9914",
+      "X-Build-Time": "2026-10-09T17:17:18-07:00",
       "X-Frame-Options": "DENY",
       "X-Request-Id": "<X_REQUEST_ID>",
-      "Content-Length": "834",
-      "Date": "Wed, 07 Oct 2026 13:40:29 GMT",
+      "Content-Length": "661",
+      "Date": "Sun, 11 Oct 2026 21:11:32 GMT",
       "Server": "Google Frontend",
-      "Traceparent": "00-11136c7ad468f14b689624a4556d1f6d-6cc1f0673b6e44e5-00",
-      "X-Cloud-Trace-Context": "11136c7ad468f14b689624a4556d1f6d/7836809152770753765",
+      "X-Cloud-Trace-Context": "311beefdc472e7b4837b236ef7a5aaca/10263399027591150906",
+      "Traceparent": "00-311beefdc472e7b4837b236ef7a5aaca-8e6eeb09aba8fd3a-00",
       "Via": "1.1 google",
       "Alt-Svc": "h3=\":443\"; ma=2592000"
     },
-    "response_body": "{\"id\":\"chatcmpl-501\",\"object\":\"chat.completion\",\"created\":1791380429,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"**Weather in Berlin (52.5200, 13.4050):**  \\n- Temperature: 15 °C  \\n- Wind: 10 km/h  \\n\\n**Best language to learn (according to the latest data):**  \\n- **Ruby**  \\n\\nRuby is currently highlighted as a top language to learn due to its strong community, versatility in web development (especially with Ruby on Rails), and its continued demand in startups and tech companies. If you’re interested in web development, scripting, or building scalable applications, Ruby is a great choice.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":336,\"completion_tokens\":116,\"total_tokens\":452,\"prompt_tokens_details\":{\"cached_tokens\":304}}}\n"
+    "response_body": "{\"id\":\"chatcmpl-712\",\"object\":\"chat.completion\",\"created\":1791753092,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Here’s the information you requested:\\n\\n- **Current weather in Berlin (52.5200 N, 13.4050 E):** 15 °C with a wind speed of 10 km/h.  \\n- **Best language to learn right now:** Ruby.  \\n\\nIf you’d like more details—like a forecast for Berlin or reasons why Ruby is a great language to pick up—just let me know!\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":319,\"completion_tokens\":91,\"total_tokens\":410,\"prompt_tokens_details\":{\"cached_tokens\":272}}}\n"
   }
 ]

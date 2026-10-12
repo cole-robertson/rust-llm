@@ -6,39 +6,39 @@
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json",
-      "X-Build-Commit": "aca5aad1d053bda171888c526b817e0c61227261",
-      "X-Build-Time": "2026-10-06T19:15:30-07:00",
+      "X-Build-Commit": "fb036d5c394cd0c23173b2be8d69965e24bc9914",
+      "X-Build-Time": "2026-10-09T17:17:18-07:00",
       "X-Frame-Options": "DENY",
       "X-Request-Id": "<X_REQUEST_ID>",
-      "Content-Length": "535",
-      "Date": "Wed, 07 Oct 2026 13:40:32 GMT",
+      "Content-Length": "605",
+      "Date": "Sun, 11 Oct 2026 21:11:35 GMT",
       "Server": "Google Frontend",
-      "Traceparent": "00-bc19431120ab79528ca15054f09dbdaf-6e7f190f5d12b185-00",
-      "X-Cloud-Trace-Context": "bc19431120ab79528ca15054f09dbdaf/7962110219991036293",
+      "Traceparent": "00-f9720064c3e4bfbc4e3bcf228caef036-f70b3ae6122a6139-00",
+      "X-Cloud-Trace-Context": "f9720064c3e4bfbc4e3bcf228caef036/17801386711933673785",
       "Via": "1.1 google",
       "Alt-Svc": "h3=\":443\"; ma=2592000"
     },
-    "response_body": "{\"id\":\"chatcmpl-438\",\"object\":\"chat.completion\",\"created\":1791380432,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning\":\"We need to call the function best_language_to_learn.\",\"tool_calls\":[{\"id\":\"call_5w9jj3nv\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"arguments\":\"{}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":132,\"completion_tokens\":35,\"total_tokens\":167,\"prompt_tokens_details\":{\"cached_tokens\":64}}}\n"
+    "response_body": "{\"id\":\"chatcmpl-819\",\"object\":\"chat.completion\",\"created\":1791753095,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning\":\"We need to use the tool best_language_to_learn. We need to call it with no arguments. Then produce answer based on result.\",\"tool_calls\":[{\"id\":\"call_ru0khz7i\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"arguments\":\"{}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":132,\"completion_tokens\":51,\"total_tokens\":183,\"prompt_tokens_details\":{\"cached_tokens\":64}}}\n"
   },
   {
     "method": "post",
     "uri": "https://ollama.com/v1/chat/completions",
-    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"Use the best_language_to_learn tool to tell me which language to learn.\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_5w9jj3nv\",\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"arguments\":\"{}\"}}],\"reasoning\":\"We need to call the function best_language_to_learn.\",\"reasoning_content\":\"We need to call the function best_language_to_learn.\"},{\"role\":\"tool\",\"content\":\"Ruby\",\"tool_call_id\":\"call_5w9jj3nv\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"description\":\"Gets the best language to learn\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"Use the best_language_to_learn tool to tell me which language to learn.\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_ru0khz7i\",\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"arguments\":\"{}\"}}],\"reasoning\":\"We need to use the tool best_language_to_learn. We need to call it with no arguments. Then produce answer based on result.\",\"reasoning_content\":\"We need to use the tool best_language_to_learn. We need to call it with no arguments. Then produce answer based on result.\"},{\"role\":\"tool\",\"content\":\"Ruby\",\"tool_call_id\":\"call_ru0khz7i\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"best_language_to_learn\",\"description\":\"Gets the best language to learn\",\"parameters\":{\"type\":\"object\",\"properties\":{},\"required\":[],\"additionalProperties\":false,\"strict\":true}}}]}",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json",
-      "X-Build-Commit": "aca5aad1d053bda171888c526b817e0c61227261",
-      "X-Build-Time": "2026-10-06T19:15:30-07:00",
+      "X-Build-Commit": "fb036d5c394cd0c23173b2be8d69965e24bc9914",
+      "X-Build-Time": "2026-10-09T17:17:18-07:00",
       "X-Frame-Options": "DENY",
       "X-Request-Id": "<X_REQUEST_ID>",
-      "Content-Length": "580",
-      "Date": "Wed, 07 Oct 2026 13:40:33 GMT",
+      "Content-Length": "841",
+      "Date": "Sun, 11 Oct 2026 21:11:36 GMT",
       "Server": "Google Frontend",
-      "Traceparent": "00-5786f4df683788e0ed8883eecb0aec55-6a5cd2768a43f228-00",
-      "X-Cloud-Trace-Context": "5786f4df683788e0ed8883eecb0aec55/7664232072445424168",
+      "Traceparent": "00-cef1d3782244aa1cd406edf3e6282eec-7d10c503a8e04a17-00",
+      "X-Cloud-Trace-Context": "cef1d3782244aa1cd406edf3e6282eec/9011919473877207575",
       "Via": "1.1 google",
       "Alt-Svc": "h3=\":443\"; ma=2592000"
     },
-    "response_body": "{\"id\":\"chatcmpl-817\",\"object\":\"chat.completion\",\"created\":1791380433,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Based on the tool’s suggestion, **Ruby** is the best language for you to learn right now. If you’d like more details—such as why Ruby is a strong choice, key resources for getting started, or how it fits into your goals—just let me know!\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":182,\"completion_tokens\":60,\"total_tokens\":242,\"prompt_tokens_details\":{\"cached_tokens\":144}}}\n"
+    "response_body": "{\"id\":\"chatcmpl-674\",\"object\":\"chat.completion\",\"created\":1791753096,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Based on the tool’s recommendation, the best language for you to learn right now is **Ruby**. \\n\\nRuby is known for its clean, readable syntax and strong community, especially popular in web development (via Ruby on Rails), scripting, and prototyping. If you’re interested in building web applications, automating tasks, or just enjoying a language that emphasizes developer happiness, Ruby is a solid choice. \\n\\nLet me know if you’d like resources, learning paths, or project ideas to get started!\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":198,\"completion_tokens\":105,\"total_tokens\":303,\"prompt_tokens_details\":{\"cached_tokens\":160}}}\n"
   }
 ]

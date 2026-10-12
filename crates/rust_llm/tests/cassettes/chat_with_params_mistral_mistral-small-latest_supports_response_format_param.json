@@ -5,22 +5,22 @@
     "request_body": "{\"model\":\"mistral-small-latest\",\"messages\":[{\"role\":\"user\",\"content\":\"What is the square root of 64? Answer with a JSON object with the key `result`.\"}],\"stream\":false,\"response_format\":{\"type\":\"json_object\"}}",
     "status": 200,
     "response_headers": {
-      "Date": "Wed, 07 Oct 2026 12:59:14 GMT",
+      "Date": "Sun, 11 Oct 2026 21:06:22 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Mistral-Correlation-Id": "01a11672-545d-71e1-91a0-f08473537b60",
-      "X-Kong-Request-Id": "01a11672-545d-71e1-91a0-f08473537b60",
+      "Mistral-Correlation-Id": "01a12cc9-c15a-7958-a5cb-94044aaa1f9c",
+      "X-Kong-Request-Id": "01a12cc9-c15a-7958-a5cb-94044aaa1f9c",
       "X-Max-Retry-Attempts-Reached": "false",
       "X-Ratelimit-Limit-Tokens-Minute": "100000",
-      "X-Ratelimit-Remaining-Tokens-Minute": "99969",
+      "X-Ratelimit-Remaining-Tokens-Minute": "82832",
       "X-Ratelimit-Tokens-Query-Cost": "31",
       "X-Ratelimit-Limit-Req-Minute": "100",
-      "X-Ratelimit-Remaining-Req-Minute": "98",
-      "X-Envoy-Upstream-Service-Time": "440",
+      "X-Ratelimit-Remaining-Req-Minute": "99",
+      "X-Envoy-Upstream-Service-Time": "646",
       "Server": "cloudflare",
       "Access-Control-Allow-Origin": "*",
-      "X-Kong-Upstream-Latency": "441",
+      "X-Kong-Upstream-Latency": "647",
       "X-Kong-Proxy-Latency": "14",
       "Cf-Cache-Status": "DYNAMIC",
       "Set-Cookie": "<COOKIE>",
@@ -29,6 +29,6 @@
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\"id\":\"dc512e3a27c64cae9985cd4615a21d4f\",\"created\":1791377953,\"model\":\"mistral-small-latest\",\"usage\":{\"prompt_tokens\":24,\"total_tokens\":31,\"completion_tokens\":7,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":\"{\\\"result\\\": 8}\"}}]}"
+    "response_body": "{\"id\":\"25cd3f0ad8d94c4c9f2f875aa5b90796\",\"created\":1791752782,\"model\":\"mistral-small-latest\",\"usage\":{\"prompt_tokens\":24,\"total_tokens\":31,\"completion_tokens\":7,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":\"{\\\"result\\\": 8}\"}}]}"
   }
 ]

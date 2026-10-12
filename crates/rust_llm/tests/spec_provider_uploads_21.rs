@@ -403,7 +403,7 @@ async fn does_not_retry_a_file_the_application_uploaded_itself() {
     assert_eq!(count(&server, "POST", "/v1/messages").await, 1);
 }
 
-// spec: chat_provider_uploads_spec.rb:185 compaction > uploads a file the provider deleted again and compacts once more
+// spec: chat_provider_uploads_spec.rb:314 compaction > uploads a file the provider deleted again and compacts once more
 #[tokio::test]
 async fn compaction_uploads_a_deleted_file_again_and_compacts_once_more() {
     let server = MockServer::start().await;

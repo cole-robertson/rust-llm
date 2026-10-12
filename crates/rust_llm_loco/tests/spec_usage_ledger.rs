@@ -208,7 +208,7 @@ async fn break_usage_writes(db: &DatabaseConnection, message: &str) {
     .unwrap();
 }
 
-// spec: active_record/usage_ledger_spec.rb:50 writes a row for each one-shot operation, attributed to its owner and to no chat
+// spec: active_record/usage_ledger_spec.rb:51 writes a row for each one-shot operation, attributed to its owner and to no chat
 #[tokio::test]
 async fn writes_a_row_for_each_one_shot_operation_attributed_to_its_owner() {
     let db = db().await;
@@ -295,7 +295,7 @@ async fn writes_a_row_for_each_one_shot_operation_attributed_to_its_owner() {
     );
 }
 
-// spec: active_record/usage_ledger_spec.rb:67 attributes rows to the ambient owner, lets the keyword win, and writes unattributed rows
+// spec: active_record/usage_ledger_spec.rb:68 attributes rows to the ambient owner, lets the keyword win, and writes unattributed rows
 #[tokio::test]
 async fn attributes_rows_to_the_ambient_owner_and_writes_unattributed_rows() {
     let db = db().await;
@@ -319,7 +319,7 @@ async fn attributes_rows_to_the_ambient_owner_and_writes_unattributed_rows() {
     assert_eq!((owner_pair(&last), last.chat_id), ((None, None), None));
 }
 
-// spec: active_record/usage_ledger_spec.rb:84 records an attempt that failed after the provider may have billed it
+// spec: active_record/usage_ledger_spec.rb:85 records an attempt that failed after the provider may have billed it
 #[tokio::test]
 async fn records_an_attempt_that_failed_after_the_provider_may_have_billed_it() {
     let db = db().await;
@@ -347,7 +347,7 @@ async fn records_an_attempt_that_failed_after_the_provider_may_have_billed_it() 
     );
 }
 
-// spec: active_record/usage_ledger_spec.rb:93 records a blocked transcription with the tokens the provider billed
+// spec: active_record/usage_ledger_spec.rb:94 records a blocked transcription with the tokens the provider billed
 #[tokio::test]
 async fn records_a_blocked_transcription_with_the_tokens_the_provider_billed() {
     let db = db().await;
@@ -385,7 +385,7 @@ async fn records_a_blocked_transcription_with_the_tokens_the_provider_billed() {
     );
 }
 
-// spec: active_record/usage_ledger_spec.rb:119 writes a row when a video or research job finishes, attributed to the owner at submission
+// spec: active_record/usage_ledger_spec.rb:120 writes a row when a video or research job finishes, attributed to the owner at submission
 #[tokio::test]
 async fn writes_a_row_when_a_video_job_finishes_attributed_to_the_owner_at_submission() {
     let db = db().await;
@@ -451,7 +451,7 @@ async fn writes_a_row_when_a_video_job_finishes_attributed_to_the_owner_at_submi
     );
 }
 
-// spec: active_record/usage_ledger_spec.rb:140 writes a persisted chat attempt once, linked to both its chat and owner
+// spec: active_record/usage_ledger_spec.rb:141 writes a persisted chat attempt once, linked to both its chat and owner
 #[tokio::test]
 async fn writes_a_persisted_chat_attempt_once_linked_to_its_chat_and_owner() {
     let db = db().await;
@@ -481,7 +481,7 @@ async fn writes_a_persisted_chat_attempt_once_linked_to_its_chat_and_owner() {
     assert_eq!(row.input_tokens, Some(9));
 }
 
-// spec: active_record/usage_ledger_spec.rb:150 keeps the owner of each turn when different people use the same chat
+// spec: active_record/usage_ledger_spec.rb:151 keeps the owner of each turn when different people use the same chat
 #[tokio::test]
 async fn keeps_the_owner_of_each_turn() {
     let db = db().await;
@@ -519,7 +519,7 @@ async fn keeps_the_owner_of_each_turn() {
     );
 }
 
-// spec: active_record/usage_ledger_spec.rb:162 keeps the owner of a failed chat attempt that produced no message
+// spec: active_record/usage_ledger_spec.rb:163 keeps the owner of a failed chat attempt that produced no message
 #[tokio::test]
 async fn keeps_the_owner_of_a_failed_chat_attempt() {
     let db = db().await;
@@ -563,7 +563,7 @@ async fn keeps_the_owner_of_a_failed_chat_attempt() {
     );
 }
 
-// spec: active_record/usage_ledger_spec.rb:172 keeps the owner of a cancelled chat attempt with partial usage
+// spec: active_record/usage_ledger_spec.rb:173 keeps the owner of a cancelled chat attempt with partial usage
 #[tokio::test]
 async fn keeps_the_owner_of_a_cancelled_chat_attempt_with_partial_usage() {
     let db = db().await;
@@ -623,7 +623,7 @@ async fn keeps_the_owner_of_a_cancelled_chat_attempt_with_partial_usage() {
     );
 }
 
-// spec: active_record/usage_ledger_spec.rb:191 attributes the rows of a chat without a record to the owner
+// spec: active_record/usage_ledger_spec.rb:192 attributes the rows of a chat without a record to the owner
 #[tokio::test]
 async fn attributes_the_rows_of_a_chat_without_a_record_to_the_owner() {
     let db = db().await;
@@ -653,7 +653,7 @@ async fn attributes_the_rows_of_a_chat_without_a_record_to_the_owner() {
     );
 }
 
-// spec: active_record/usage_ledger_spec.rb:199 writes unattributed rows for an owner that is not a record
+// spec: active_record/usage_ledger_spec.rb:200 writes unattributed rows for an owner that is not a record
 #[tokio::test]
 async fn writes_unattributed_rows_for_an_owner_that_is_not_a_record() {
     let db = db().await;
@@ -683,7 +683,7 @@ async fn writes_unattributed_rows_for_an_owner_that_is_not_a_record() {
     );
 }
 
-// spec: active_record/usage_ledger_spec.rb:213 logs a failed chat row write and returns the reply
+// spec: active_record/usage_ledger_spec.rb:214 logs a failed chat row write and returns the reply
 #[tokio::test]
 async fn logs_a_failed_chat_row_write_and_returns_the_reply() {
     let db = db().await;
@@ -719,7 +719,7 @@ async fn logs_a_failed_chat_row_write_and_returns_the_reply() {
     );
 }
 
-// spec: active_record/usage_ledger_spec.rb:224 logs a failed write and returns the result of the operation
+// spec: active_record/usage_ledger_spec.rb:225 logs a failed write and returns the result of the operation
 #[tokio::test]
 async fn logs_a_failed_write_and_returns_the_result_of_the_operation() {
     let db = db().await;
@@ -744,7 +744,7 @@ async fn logs_a_failed_write_and_returns_the_result_of_the_operation() {
     );
 }
 
-// spec: active_record/usage_ledger_spec.rb:233 keeps the caller transaction usable when a write fails
+// spec: active_record/usage_ledger_spec.rb:234 keeps the caller transaction usable when a write fails
 #[tokio::test]
 async fn keeps_the_caller_transaction_usable_when_a_write_fails() {
     // A file database, so the ledger's own connection and the caller's transaction are separate
@@ -792,7 +792,7 @@ async fn keeps_the_caller_transaction_usable_when_a_write_fails() {
     let _ = std::fs::remove_file(&dir);
 }
 
-// spec: active_record/usage_ledger_spec.rb:246 returns the connection a thread borrowed to write its row
+// spec: active_record/usage_ledger_spec.rb:318 returns the connection a thread borrowed to write its row
 #[tokio::test]
 async fn returns_the_connection_a_task_borrowed_to_write_its_row() {
     let db = db().await;
@@ -819,7 +819,7 @@ async fn returns_the_connection_a_task_borrowed_to_write_its_row() {
     .unwrap();
 }
 
-// spec: active_record/usage_ledger_spec.rb:256 skips attempts without a model, which the ledger cannot store
+// spec: active_record/usage_ledger_spec.rb:328 skips attempts without a model, which the ledger cannot store
 #[tokio::test]
 async fn skips_attempts_without_a_model() {
     let db = db().await;

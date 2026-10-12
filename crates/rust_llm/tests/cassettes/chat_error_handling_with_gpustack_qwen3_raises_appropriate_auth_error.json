@@ -7,12 +7,12 @@
     "response_headers": {
       "Content-Length": "83",
       "Content-Type": "application/json",
-      "Date": "Thu, 08 Oct 2026 01:18:51 GMT",
-      "Req-Arrive-Time": "1791422331623",
-      "Req-Cost-Time": "2",
-      "Resp-Start-Time": "1791422331625",
+      "Date": "Sun, 11 Oct 2026 21:06:12 GMT",
+      "Req-Arrive-Time": "1791752772937",
+      "Req-Cost-Time": "34",
+      "Resp-Start-Time": "1791752772972",
       "Server": "istio-envoy",
-      "X-Envoy-Upstream-Service-Time": "2"
+      "X-Envoy-Upstream-Service-Time": "33"
     },
     "response_body": "{\"code\":401,\"reason\":\"Unauthorized\",\"message\":\"Invalid authentication credentials\"}"
   }

@@ -5,7 +5,7 @@
     "request_body": "{\"requests\":[{\"custom_id\":\"0\",\"params\":{\"model\":\"claude-haiku-4-5\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is 5 + 5?\"}]}],\"stream\":false,\"max_tokens\":64000}}]}",
     "status": 200,
     "response_headers": {
-      "Date": "Wed, 07 Oct 2026 13:12:25 GMT",
+      "Date": "Sun, 11 Oct 2026 21:16:25 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
@@ -17,21 +17,21 @@
       "Anthropic-Workspace-Id": "<ANTHROPIC_WORKSPACE_ID>",
       "Server": "cloudflare",
       "Vary": "Accept-Encoding",
-      "Server-Timing": "x-originResponse;dur=368",
-      "X-Robots-Tag": "none",
       "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+      "Server-Timing": "x-originResponse;dur=271",
       "Cf-Cache-Status": "DYNAMIC",
+      "X-Robots-Tag": "none",
       "Cf-Ray": "<CF_RAY>"
     },
-    "response_body": "{\"id\":\"msgbatch_01SgG8Yhqg9ZJ6B7Q3SrTSBJ\",\"type\":\"message_batch\",\"processing_status\":\"in_progress\",\"request_counts\":{\"processing\":1,\"succeeded\":0,\"errored\":0,\"canceled\":0,\"expired\":0},\"ended_at\":null,\"created_at\":\"2026-10-07T13:12:25.790920+00:00\",\"expires_at\":\"2026-10-08T13:12:25.790920+00:00\",\"archived_at\":null,\"cancel_initiated_at\":null,\"results_url\":null}"
+    "response_body": "{\"id\":\"msgbatch_01Rx4K2ya5bNkRgAjZRxMQ1s\",\"type\":\"message_batch\",\"processing_status\":\"in_progress\",\"request_counts\":{\"processing\":1,\"succeeded\":0,\"errored\":0,\"canceled\":0,\"expired\":0},\"ended_at\":null,\"created_at\":\"2026-10-11T21:16:25.433361+00:00\",\"expires_at\":\"2026-10-12T21:16:25.433361+00:00\",\"archived_at\":null,\"cancel_initiated_at\":null,\"results_url\":null}"
   },
   {
     "method": "post",
-    "uri": "https://api.anthropic.com/v1/messages/batches/msgbatch_01SgG8Yhqg9ZJ6B7Q3SrTSBJ/cancel",
+    "uri": "https://api.anthropic.com/v1/messages/batches/msgbatch_01Rx4K2ya5bNkRgAjZRxMQ1s/cancel",
     "request_body": "{}",
     "status": 200,
     "response_headers": {
-      "Date": "Wed, 07 Oct 2026 13:12:26 GMT",
+      "Date": "Sun, 11 Oct 2026 21:16:25 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
@@ -42,11 +42,11 @@
       "Server": "cloudflare",
       "Vary": "Accept-Encoding",
       "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
-      "Server-Timing": "x-originResponse;dur=148",
+      "Server-Timing": "x-originResponse;dur=177",
       "Cf-Cache-Status": "DYNAMIC",
       "X-Robots-Tag": "none",
       "Cf-Ray": "<CF_RAY>"
     },
-    "response_body": "{\"id\":\"msgbatch_01SgG8Yhqg9ZJ6B7Q3SrTSBJ\",\"type\":\"message_batch\",\"processing_status\":\"canceling\",\"request_counts\":{\"processing\":1,\"succeeded\":0,\"errored\":0,\"canceled\":0,\"expired\":0},\"ended_at\":null,\"created_at\":\"2026-10-07T13:12:25.790920+00:00\",\"expires_at\":\"2026-10-08T13:12:25.790920+00:00\",\"archived_at\":null,\"cancel_initiated_at\":\"2026-10-07T13:12:26.608527+00:00\",\"results_url\":null}"
+    "response_body": "{\"id\":\"msgbatch_01Rx4K2ya5bNkRgAjZRxMQ1s\",\"type\":\"message_batch\",\"processing_status\":\"canceling\",\"request_counts\":{\"processing\":1,\"succeeded\":0,\"errored\":0,\"canceled\":0,\"expired\":0},\"ended_at\":null,\"created_at\":\"2026-10-11T21:16:25.433361+00:00\",\"expires_at\":\"2026-10-12T21:16:25.433361+00:00\",\"archived_at\":null,\"cancel_initiated_at\":\"2026-10-11T21:16:25.760545+00:00\",\"results_url\":null}"
   }
 ]

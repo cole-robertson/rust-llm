@@ -5,32 +5,32 @@
     "request_body": "{\"model\":\"Qwen3.8-27B\",\"messages\":[{\"role\":\"user\",\"content\":\"Who is the creator of the programming language Ruby?\"}],\"stream\":false}",
     "status": 200,
     "response_headers": {
-      "Date": "Wed, 07 Oct 2026 13:07:08 GMT",
+      "Date": "Sun, 11 Oct 2026 21:08:17 GMT",
       "Content-Type": "application/json",
-      "Content-Length": "974",
+      "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
       "Vary": "Origin",
-      "X-Request-Id": "<X_REQUEST_ID>",
       "X-Went-Into-Resp-Headers": "true",
+      "X-Llm-D-Flow-Queue-Duration-Ms": "0",
       "Server": "HeRay"
     },
-    "response_body": "{\"model\":\"Qwen3.8-27B\",\"usage\":{\"prompt_tokens\":62,\"completion_tokens\":55,\"total_tokens\":117,\"completion_tokens_details\":{\"reasoning_tokens\":32},\"prompt_tokens_details\":{\"cached_tokens\":0,\"created_cache_tokens\":0,\"multimodal_tokens\":null}},\"choices\":[{\"message\":{\"content\":\"\\n\\nThe creator of the programming language Ruby is **Yukihiro “Matz” Matsumoto**.\",\"role\":\"assistant\",\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"reasoning\":\"We need answer simple question: creator of programming language Ruby. Done. Need final concise. Ruby created by Yukihiro Matsumoto (Matz).\\n\"},\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"stop_reason\":null,\"token_ids\":null,\"routed_experts\":null}],\"id\":\"chatcmpl-bfb70fc0-311e-49b7-9c31-425cd27f452a\",\"object\":\"chat.completion\",\"created\":1791378426,\"system_fingerprint\":null,\"prompt_logprobs\":null,\"prompt_token_ids\":null,\"prompt_text\":null,\"kv_transfer_params\":null,\"ec_transfer_params\":null,\"metrics\":null}"
+    "response_body": "{\"model\":\"Qwen/Qwen3.8-27B\",\"usage\":{\"prompt_tokens\":62,\"completion_tokens\":70,\"total_tokens\":132,\"completion_tokens_details\":{\"reasoning_tokens\":47},\"prompt_tokens_details\":{\"cached_tokens\":0,\"created_cache_tokens\":0,\"multimodal_tokens\":null}},\"choices\":[{\"message\":{\"content\":\"\\n\\nThe creator of the programming language Ruby is **Yukihiro \\\"Matz\\\" Matsumoto**.\",\"role\":\"assistant\",\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"reasoning\":\"User asks: \\\"Who is the creator of the programming language Ruby?\\\" This is straightforward factual question. Need answer: Yukihiro \\\"Matz\\\" Matsumoto. Could mention he is often called Matz. Final concise.\\n\"},\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"stop_reason\":null,\"token_ids\":null,\"routed_experts\":null}],\"id\":\"chatcmpl-b4757217-bc3e-45c1-91f6-a95df64d9420\",\"object\":\"chat.completion\",\"created\":1791752895,\"system_fingerprint\":null,\"prompt_logprobs\":null,\"prompt_token_ids\":null,\"prompt_text\":null,\"kv_transfer_params\":null,\"ec_transfer_params\":null,\"metrics\":null}"
   },
   {
     "method": "post",
     "uri": "https://inference.hetzner.com/api/v1/chat/completions",
-    "request_body": "{\"model\":\"Qwen3.8-27B\",\"messages\":[{\"role\":\"user\",\"content\":\"Who is the creator of the programming language Ruby?\"},{\"role\":\"assistant\",\"content\":\"\\n\\nThe creator of the programming language Ruby is **Yukihiro “Matz” Matsumoto**.\",\"reasoning\":\"We need answer simple question: creator of programming language Ruby. Done. Need final concise. Ruby created by Yukihiro Matsumoto (Matz).\\n\",\"reasoning_content\":\"We need answer simple question: creator of programming language Ruby. Done. Need final concise. Ruby created by Yukihiro Matsumoto (Matz).\\n\"},{\"role\":\"user\",\"content\":\"What year did he create Ruby?\"}],\"stream\":false}",
+    "request_body": "{\"model\":\"Qwen3.8-27B\",\"messages\":[{\"role\":\"user\",\"content\":\"Who is the creator of the programming language Ruby?\"},{\"role\":\"assistant\",\"content\":\"\\n\\nThe creator of the programming language Ruby is **Yukihiro \\\"Matz\\\" Matsumoto**.\",\"reasoning\":\"User asks: \\\"Who is the creator of the programming language Ruby?\\\" This is straightforward factual question. Need answer: Yukihiro \\\"Matz\\\" Matsumoto. Could mention he is often called Matz. Final concise.\\n\",\"reasoning_content\":\"User asks: \\\"Who is the creator of the programming language Ruby?\\\" This is straightforward factual question. Need answer: Yukihiro \\\"Matz\\\" Matsumoto. Could mention he is often called Matz. Final concise.\\n\"},{\"role\":\"user\",\"content\":\"What year did he create Ruby?\"}],\"stream\":false}",
     "status": 200,
     "response_headers": {
-      "Date": "Wed, 07 Oct 2026 13:07:14 GMT",
+      "Date": "Sun, 11 Oct 2026 21:08:23 GMT",
       "Content-Type": "application/json",
-      "Content-Length": "1184",
+      "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
       "Vary": "Origin",
-      "X-Request-Id": "<X_REQUEST_ID>",
       "X-Went-Into-Resp-Headers": "true",
+      "X-Llm-D-Flow-Queue-Duration-Ms": "0",
       "Server": "HeRay"
     },
-    "response_body": "{\"model\":\"Qwen3.8-27B\",\"usage\":{\"prompt_tokens\":135,\"completion_tokens\":129,\"total_tokens\":264,\"completion_tokens_details\":{\"reasoning_tokens\":92},\"prompt_tokens_details\":{\"cached_tokens\":0,\"created_cache_tokens\":0,\"multimodal_tokens\":null}},\"choices\":[{\"message\":{\"content\":\"\\n\\nMatsumoto began developing Ruby in **1993**, and its first major public release, Ruby 1.0, was in **1995**.\",\"role\":\"assistant\",\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"reasoning\":\"Need answer. User asks what year did he create Ruby. Need perhaps say development began in 1993, first public release 1995. Need be precise: Yukihiro Matsumoto began developing Ruby in 1993; Ruby 1.0 released in 1995. The question wording \\\"What year did he create Ruby?\\\" likely expected 1995 maybe. Need explain nuance.\\n\"},\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"stop_reason\":null,\"token_ids\":null,\"routed_experts\":null}],\"id\":\"chatcmpl-bb280d74-4449-4677-867f-ef91bdd3ea38\",\"object\":\"chat.completion\",\"created\":1791378428,\"system_fingerprint\":null,\"prompt_logprobs\":null,\"prompt_token_ids\":null,\"prompt_text\":null,\"kv_transfer_params\":null,\"ec_transfer_params\":null,\"metrics\":null}"
+    "response_body": "{\"model\":\"Qwen/Qwen3.8-27B\",\"usage\":{\"prompt_tokens\":150,\"completion_tokens\":165,\"total_tokens\":315,\"completion_tokens_details\":{\"reasoning_tokens\":134},\"prompt_tokens_details\":{\"cached_tokens\":0,\"created_cache_tokens\":0,\"multimodal_tokens\":null}},\"choices\":[{\"message\":{\"content\":\"\\n\\nYukihiro Matsumoto started creating Ruby in **1993**. It was first publicly released in **1995**.\",\"role\":\"assistant\",\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"reasoning\":\"We need answer user's follow-up: \\\"What year did he create Ruby?\\\" Need likely 1993? Ruby started in 1993, first public release 1995, 1.0 in 1996. Need be precise: He began development in 1993; released publicly in 1995. The question says \\\"create Ruby\\\" could be asked as year created. Common answer: Ruby was created in 1993 by Yukihiro Matsumoto. But if \\\"release\\\" 1995. Need maybe clarify. Final concise. Ensure no hidden issues.\\n\"},\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"stop_reason\":null,\"token_ids\":null,\"routed_experts\":null}],\"id\":\"chatcmpl-cf13b241-5aa9-4953-bcf1-31a207fa3dd6\",\"object\":\"chat.completion\",\"created\":1791752897,\"system_fingerprint\":null,\"prompt_logprobs\":null,\"prompt_token_ids\":null,\"prompt_text\":null,\"kv_transfer_params\":null,\"ec_transfer_params\":null,\"metrics\":null}"
   }
 ]

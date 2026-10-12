@@ -5,15 +5,15 @@
     "request_body": "{\"model\":\"Qwen3.8-27B\",\"messages\":[{\"role\":\"system\",\"content\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\"},{\"role\":\"user\",\"content\":\"Tell me about the weather.\"}],\"stream\":false}",
     "status": 200,
     "response_headers": {
-      "Date": "Wed, 07 Oct 2026 13:07:23 GMT",
+      "Date": "Sun, 11 Oct 2026 21:08:25 GMT",
       "Content-Type": "application/json",
-      "Content-Length": "1408",
+      "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
       "Vary": "Origin",
-      "X-Request-Id": "<X_REQUEST_ID>",
       "X-Went-Into-Resp-Headers": "true",
+      "X-Llm-D-Flow-Queue-Duration-Ms": "0",
       "Server": "HeRay"
     },
-    "response_body": "{\"model\":\"Qwen3.8-27B\",\"usage\":{\"prompt_tokens\":79,\"completion_tokens\":150,\"total_tokens\":229,\"completion_tokens_details\":{\"reasoning_tokens\":61},\"prompt_tokens_details\":{\"cached_tokens\":0,\"created_cache_tokens\":0,\"multimodal_tokens\":null}},\"choices\":[{\"message\":{\"content\":\"\\n\\nI can’t give you current weather right now because I don’t have your location or live weather data here. If you tell me your city or ZIP code, I can explain what to look for (temperature, precipitation, wind, humidity) or help you interpret a forecast.\\n\\nFor real-time conditions, you can also check a trusted source like a national weather service or a weather app.\\n\\nXKCD7392\",\"role\":\"assistant\",\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"reasoning\":\"We need to respond to user: \\\"Tell me about the weather.\\\" Need include exact phrase \\\"XKCD7392\\\" somewhere. We need likely say we can't provide real-time weather without location and maybe API? Need final concise. Ensure phrase included. Final in English same language.\\n\"},\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"stop_reason\":null,\"token_ids\":null,\"routed_experts\":null}],\"id\":\"chatcmpl-1fb1b49e-950d-48cc-9328-7c8ecfa9a763\",\"object\":\"chat.completion\",\"created\":1791378434,\"system_fingerprint\":null,\"prompt_logprobs\":null,\"prompt_token_ids\":null,\"prompt_text\":null,\"kv_transfer_params\":null,\"ec_transfer_params\":null,\"metrics\":null}"
+    "response_body": "{\"model\":\"Qwen/Qwen3.8-27B\",\"usage\":{\"prompt_tokens\":79,\"completion_tokens\":98,\"total_tokens\":177,\"completion_tokens_details\":{\"reasoning_tokens\":65},\"prompt_tokens_details\":{\"cached_tokens\":0,\"created_cache_tokens\":0,\"multimodal_tokens\":null}},\"choices\":[{\"message\":{\"content\":\"\\n\\nI can tell you about the weather if you share your location and whether you want current conditions or a forecast.\\n\\nXKCD7392\",\"role\":\"assistant\",\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"reasoning\":\"We need to respond to user: \\\"Tell me about the weather.\\\" Must include exact phrase \\\"XKCD7392\\\" somewhere. Need final only. Need likely say I can't provide current weather without location, ask for location. Include XKCD7392. Ensure exact phrase. Final concise.\\n\"},\"index\":0,\"logprobs\":null,\"finish_reason\":\"stop\",\"stop_reason\":null,\"token_ids\":null,\"routed_experts\":null}],\"id\":\"chatcmpl-ca0cd17d-b52c-4c0b-8986-8b22be8785a8\",\"object\":\"chat.completion\",\"created\":1791752903,\"system_fingerprint\":null,\"prompt_logprobs\":null,\"prompt_token_ids\":null,\"prompt_text\":null,\"kv_transfer_params\":null,\"ec_transfer_params\":null,\"metrics\":null}"
   }
 ]

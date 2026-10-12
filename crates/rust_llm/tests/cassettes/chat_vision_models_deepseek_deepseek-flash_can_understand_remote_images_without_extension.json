@@ -5,7 +5,7 @@
     "request_body": "",
     "status": 200,
     "response_headers": {
-      "Date": "Wed, 07 Oct 2026 13:07:25 GMT",
+      "Date": "Sun, 11 Oct 2026 21:09:04 GMT",
       "Content-Type": "image/jpeg",
       "Content-Length": "35588",
       "Connection": "keep-alive",
@@ -25,18 +25,18 @@
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Date": "Wed, 07 Oct 2026 13:07:32 GMT",
+      "Date": "Sun, 11 Oct 2026 21:09:05 GMT",
       "Server": "elb",
       "Vary": "origin, access-control-request-method, access-control-request-headers",
       "Access-Control-Allow-Credentials": "true",
-      "X-Ds-Trace-Id": "129fd39a000295c6182214c8ec5e79e4",
+      "X-Ds-Trace-Id": "240578b06e4bb1c42f410510e6730bc2",
       "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
       "X-Content-Type-Options": "nosniff",
       "X-Cache": "Miss from cloudfront",
-      "Via": "1.1 547a0375ec02f9b604ed007303b6266a.cloudfront.net (CloudFront)",
-      "X-Amz-Cf-Pop": "TXL50-P1",
-      "X-Amz-Cf-Id": "gcClxK56Gcv5YI9g2q7bxe2ZFfsit48f5wCd2jc5hznGVgXccixXAQ=="
+      "Via": "1.1 192214f2b714ecde75ddd74c51389aaa.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL52-P2",
+      "X-Amz-Cf-Id": "mW604v0EpIyOwu_-uI9zTKActwDykOf_eIKcFxi1W_xc5TDrk2mOMw=="
     },
-    "response_body": "{\"id\":\"551b9a8d-a020-4315-a814-5653bc2e40de\",\"object\":\"chat.completion\",\"created\":1791378445,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Based on the image, I see a **black-backed jackal** (also known as a silver-backed jackal). Here are the key features visible:\\n\\n- **Appearance:** It has a slender, dog-like build with large, pointed ears and a narrow muzzle. The coat is primarily tawny or reddish-brown on the legs, flanks, and head, with a distinctive saddle-like patch of black and white speckled fur running along its back. The tail is bushy with a black tip.\\n- **Posture:** The animal is walking from right to left across the frame, with its head slightly lowered as if scanning the ground.\\n- **Environment:** It is standing on dry, sandy or dusty ground with sparse, dry vegetation in the background. The lighting casts a clear shadow to the left, indicating sunlight from the right.\",\"reasoning_content\":\"Oh, I need to extract the text from the image.\\nThe image shows a clear, well-lit photograph of an animal in a natural setting. The text is not present in the image; it's a visual scene. I need to describe what I see: a canid with a slender build, large pointed ears, a narrow muzzle, and a coat that is tawny on the legs, flanks, and head, with a distinctive black-tipped tail and a saddle-like pattern of black and white speckling on its back. The animal is walking on dry, sandy ground with sparse vegetation, casting a shadow to the left. I recognize this as a black-backed jackal. The user asked \\\"What do you see in this image?\\\" — I will provide a direct description of the animal and its features, matching the user's request for visual identification.\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":232,\"completion_tokens\":341,\"total_tokens\":573,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":172},\"prompt_cache_hit_tokens\":0,\"prompt_cache_miss_tokens\":232},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+    "response_body": "{\"id\":\"006a23a0-f598-4ca2-87eb-d6bc80176b87\",\"object\":\"chat.completion\",\"created\":1791752944,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Based on the image, I see a coyote walking across a dry, barren landscape. It has a slender, long-legged build with a mix of gray, tan, and white fur. Its ears are large and pointed, and its muzzle is narrow. The tail is bushy with a black tip. The animal appears to be in mid-stride, casting a shadow on the rocky or sandy ground, which suggests a sunny, arid environment.\",\"reasoning_content\":\"Oh, I need to extract the text from the image.\\nThe user's question is simple: \\\"What do you see in this image?\\\" The image shows a clear, well-lit photograph of a canid animal in a natural setting. I need to describe it accurately. I'll start by identifying the animal's key features: it's a slender, long-legged canine with a mix of gray, tan, and white fur, large pointed ears, a narrow muzzle, and a bushy tail with a black tip. Its posture suggests it's walking or trotting across dry, rocky terrain. I'll note the shadow and the overall arid environment. The description should be factual and detailed, matching what's visible without adding speculation. I'll structure it by first stating the animal type, then detailing its physical traits and the setting. The response should be concise and directly answer the user's question.\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":232,\"completion_tokens\":268,\"total_tokens\":500,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":178},\"prompt_cache_hit_tokens\":0,\"prompt_cache_miss_tokens\":232},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
   }
 ]

@@ -636,7 +636,7 @@ async fn preserves_scalar_and_one_element_array_embedding_shapes_after_reloading
     assert_eq!(array.tokens().input, Some(3));
 }
 
-// spec: providers/mistral/chat_completions/batches_spec.rb:158 #parse_batch_result > keeps a failed embedding request in its original slot
+// spec: providers/mistral/chat_completions/batches_spec.rb:159 #parse_batch_result > keeps a failed embedding request in its original slot
 #[tokio::test]
 async fn keeps_a_failed_embedding_request_in_its_original_slot() {
     let server = MockServer::start().await;
@@ -655,7 +655,7 @@ async fn keeps_a_failed_embedding_request_in_its_original_slot() {
     assert_eq!(batch.statuses(), &[None, None, Some(BatchStatus::Failed)]);
 }
 
-// spec: providers/mistral/chat_completions/batches_spec.rb:184 submits, reloads, and cancels an embedding batch
+// spec: providers/mistral/chat_completions/batches_spec.rb:215 submits, reloads, and cancels an embedding batch
 #[tokio::test]
 async fn submits_reloads_and_cancels_an_embedding_batch() {
     let cassette = Cassette::start(

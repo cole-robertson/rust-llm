@@ -5,7 +5,7 @@
     "request_body": "{\"model\":\"openai/gpt-5-mini\",\"input\":[{\"role\":\"user\",\"content\":\"What is the capital of France?\"}],\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"]}",
     "status": 200,
     "response_headers": {
-      "Date": "Wed, 07 Oct 2026 13:10:19 GMT",
+      "Date": "Sun, 11 Oct 2026 21:09:58 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
@@ -13,7 +13,7 @@
       "Server": "cloudflare",
       "X-Ratelimit-Limit": "1",
       "X-Ratelimit-Remaining": "0",
-      "X-Ratelimit-Reset": "1791378620",
+      "X-Ratelimit-Reset": "1791752999",
       "X-Ratelimit-Used": "1",
       "X-Request-Id": "<X_REQUEST_ID>",
       "Access-Control-Allow-Origin": "*",
@@ -22,6 +22,6 @@
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\"background\":false,\"completed_at\":1791378617,\"created_at\":1791378617,\"error\":null,\"frequency_penalty\":0,\"id\":\"resp_af6ca8ac-dbfe-420b-b6f3-f159cb9238cc\",\"incomplete_details\":null,\"instructions\":null,\"max_output_tokens\":null,\"max_tool_calls\":null,\"metadata\":{},\"model\":\"openai/gpt-5-mini\",\"object\":\"response\",\"output\":[{\"content\":[{\"annotations\":[],\"text\":\"The capital of France is Paris.\",\"type\":\"output_text\"}],\"id\":\"msg_91aafa42-2645-4634-b53d-16aed2178170\",\"role\":\"assistant\",\"status\":\"completed\",\"type\":\"message\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"reasoning\":null,\"safety_identifier\":null,\"service_tier\":\"default\",\"status\":\"completed\",\"store\":false,\"temperature\":1,\"text\":{\"format\":{\"type\":\"text\"}},\"tool_choice\":\"auto\",\"tools\":[],\"top_logprobs\":0,\"top_p\":1,\"truncation\":\"\",\"usage\":{\"cost\":{\"currency\":\"USD\",\"input_cost\":0.00001,\"output_cost\":0.00023,\"total_cost\":0.00024},\"input_tokens\":32,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":117,\"output_tokens_details\":{\"reasoning_tokens\":64},\"total_tokens\":149},\"user\":null}\n"
+    "response_body": "{\"background\":false,\"completed_at\":1791752996,\"created_at\":1791752996,\"error\":null,\"frequency_penalty\":0,\"id\":\"resp_488c6839-dcb0-4e8c-878f-87588e705cda\",\"incomplete_details\":null,\"instructions\":null,\"max_output_tokens\":null,\"max_tool_calls\":null,\"metadata\":{},\"model\":\"openai/gpt-5-mini\",\"object\":\"response\",\"output\":[{\"content\":[{\"annotations\":[],\"text\":\"The capital of France is Paris.\",\"type\":\"output_text\"}],\"id\":\"msg_304610a9-7771-4cde-bebf-9385d43172ce\",\"role\":\"assistant\",\"status\":\"completed\",\"type\":\"message\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"reasoning\":null,\"safety_identifier\":null,\"service_tier\":\"default\",\"status\":\"completed\",\"store\":false,\"temperature\":1,\"text\":{\"format\":{\"type\":\"text\"}},\"tool_choice\":\"auto\",\"tools\":[],\"top_logprobs\":0,\"top_p\":1,\"truncation\":\"\",\"usage\":{\"cost\":{\"currency\":\"USD\",\"input_cost\":0.00001,\"output_cost\":0.00014,\"total_cost\":0.00015},\"input_tokens\":32,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":72,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":104},\"user\":null}\n"
   }
 ]

@@ -6,18 +6,18 @@
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json",
-      "X-Build-Commit": "aca5aad1d053bda171888c526b817e0c61227261",
-      "X-Build-Time": "2026-10-06T19:15:30-07:00",
+      "X-Build-Commit": "fb036d5c394cd0c23173b2be8d69965e24bc9914",
+      "X-Build-Time": "2026-10-09T17:17:18-07:00",
       "X-Frame-Options": "DENY",
       "X-Request-Id": "<X_REQUEST_ID>",
-      "Content-Length": "452",
-      "Date": "Wed, 07 Oct 2026 13:07:55 GMT",
+      "Content-Length": "454",
+      "Date": "Sun, 11 Oct 2026 21:08:49 GMT",
       "Server": "Google Frontend",
-      "Traceparent": "00-bad7a2146ca6d1ce3c5756891f033ea6-48d6f0b27ff63111-00",
-      "X-Cloud-Trace-Context": "bad7a2146ca6d1ce3c5756891f033ea6/5248647065188577553",
+      "Traceparent": "00-6a4c75ca0a77166326ae9fc21af15330-fb042be3512853a4-00",
+      "X-Cloud-Trace-Context": "6a4c75ca0a77166326ae9fc21af15330/18087630258745922468",
       "Via": "1.1 google",
       "Alt-Svc": "h3=\":443\"; ma=2592000"
     },
-    "response_body": "{\"id\":\"chatcmpl-516\",\"object\":\"chat.completion\",\"created\":1791378475,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"2 + 2 = 4.\",\"reasoning\":\"User asks a simple math question: \\\"What's 2 + 2?\\\" Answer: 4. Provide friendly reply.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":74,\"completion_tokens\":44,\"total_tokens\":118,\"prompt_tokens_details\":{\"cached_tokens\":48}}}\n"
+    "response_body": "{\"id\":\"chatcmpl-551\",\"object\":\"chat.completion\",\"created\":1791752929,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"2 + 2 = 4.\",\"reasoning\":\"The user asks a simple arithmetic question: \\\"What's 2 + 2?\\\" Answer: 4. Provide answer.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":74,\"completion_tokens\":44,\"total_tokens\":118,\"prompt_tokens_details\":{\"cached_tokens\":48}}}\n"
   }
 ]

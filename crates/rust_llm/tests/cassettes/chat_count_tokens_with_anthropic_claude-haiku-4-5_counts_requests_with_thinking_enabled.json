@@ -5,7 +5,7 @@
     "request_body": "{\"model\":\"claude-haiku-4-5-20251001\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the capital of France?\"}]}],\"thinking\":{\"type\":\"enabled\",\"budget_tokens\":2048}}",
     "status": 200,
     "response_headers": {
-      "Date": "Wed, 07 Oct 2026 12:59:30 GMT",
+      "Date": "Sun, 11 Oct 2026 21:06:23 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
@@ -15,7 +15,7 @@
       "Vary": "Accept-Encoding",
       "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
       "Server": "cloudflare",
-      "Server-Timing": "x-originResponse;dur=46",
+      "Server-Timing": "x-originResponse;dur=34",
       "Cf-Cache-Status": "DYNAMIC",
       "X-Robots-Tag": "none",
       "Cf-Ray": "<CF_RAY>"

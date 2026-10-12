@@ -5,13 +5,13 @@
     "request_body": "",
     "status": 200,
     "response_headers": {
-      "Date": "Wed, 07 Oct 2026 12:57:53 GMT",
+      "Date": "Sun, 11 Oct 2026 21:07:00 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Server": "cloudflare",
+      "X-Typesafe-Request-Id": "req_01a12cca571d717496cc085ff094b2b6",
       "Set-Cookie": "<COOKIE>",
-      "X-Typesafe-Request-Id": "req_01a116711a4d7778ae2de757319413bd",
+      "Server": "cloudflare",
       "Cf-Cache-Status": "DYNAMIC",
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"

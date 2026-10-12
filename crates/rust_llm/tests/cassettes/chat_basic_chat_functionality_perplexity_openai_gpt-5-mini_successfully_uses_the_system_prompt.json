@@ -5,23 +5,23 @@
     "request_body": "{\"model\":\"openai/gpt-5-mini\",\"input\":[{\"role\":\"user\",\"content\":\"Tell me about the weather.\"}],\"instructions\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\",\"stream\":false,\"store\":false,\"include\":[\"reasoning.encrypted_content\"]}",
     "status": 200,
     "response_headers": {
-      "Date": "Wed, 07 Oct 2026 13:10:27 GMT",
+      "Date": "Sun, 11 Oct 2026 21:10:14 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
+      "Set-Cookie": "<COOKIE>",
       "Server": "cloudflare",
       "X-Ratelimit-Limit": "1",
       "X-Ratelimit-Remaining": "0",
-      "X-Ratelimit-Reset": "1791378628",
+      "X-Ratelimit-Reset": "1791753015",
       "X-Ratelimit-Used": "1",
       "X-Request-Id": "<X_REQUEST_ID>",
       "Access-Control-Allow-Origin": "*",
-      "Cf-Cache-Status": "DYNAMIC",
-      "Set-Cookie": "<COOKIE>",
       "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
+      "Cf-Cache-Status": "DYNAMIC",
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\"background\":false,\"completed_at\":1791378620,\"created_at\":1791378620,\"error\":null,\"frequency_penalty\":0,\"id\":\"resp_16e281f1-9ceb-40f1-987f-edaf469fd6e3\",\"incomplete_details\":null,\"instructions\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\",\"max_output_tokens\":null,\"max_tool_calls\":null,\"metadata\":{},\"model\":\"openai/gpt-5-mini\",\"object\":\"response\",\"output\":[{\"content\":[{\"annotations\":[],\"text\":\"I can — but I need a location. What city, ZIP/postal code, or airport code do you want the weather for (or allow location sharing)? Also tell me which details you want: current conditions, hourly or 7–10 day forecast, radar/precip map, severe-weather alerts, air quality/pollen, or something else. Preferred units: °C or °F? XKCD7392\",\"type\":\"output_text\"}],\"id\":\"msg_b188bb27-9a45-40d6-8394-14a91bec90b7\",\"role\":\"assistant\",\"status\":\"completed\",\"type\":\"message\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"reasoning\":null,\"safety_identifier\":null,\"service_tier\":\"default\",\"status\":\"completed\",\"store\":false,\"temperature\":1,\"text\":{\"format\":{\"type\":\"text\"}},\"tool_choice\":\"auto\",\"tools\":[],\"top_logprobs\":0,\"top_p\":1,\"truncation\":\"\",\"usage\":{\"cost\":{\"currency\":\"USD\",\"input_cost\":0.00001,\"output_cost\":0.00128,\"total_cost\":0.00129},\"input_tokens\":53,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":638,\"output_tokens_details\":{\"reasoning_tokens\":512},\"total_tokens\":691},\"user\":null}\n"
+    "response_body": "{\"background\":false,\"completed_at\":1791753010,\"created_at\":1791753010,\"error\":null,\"frequency_penalty\":0,\"id\":\"resp_a54c6063-3911-40b2-8bdf-171e82d6220a\",\"incomplete_details\":null,\"instructions\":\"You must include the exact phrase \\\"XKCD7392\\\" somewhere in your response.\",\"max_output_tokens\":null,\"max_tool_calls\":null,\"metadata\":{},\"model\":\"openai/gpt-5-mini\",\"object\":\"response\",\"output\":[{\"content\":[{\"annotations\":[],\"text\":\"I don’t have your location — where would you like the weather for (city, ZIP/postal code, or coordinates)? Also tell me the timeframe you want: right now, today, hourly, 7-day forecast, or alerts/radar.\\n\\nIf you want, I can use your device location (if your app/browser allows it) — say “use my location.” I can provide current conditions (temp, feels-like, precipitation, wind, humidity, UV index), hourly or 7-day forecasts, radar and satellite imagery, and any active watches/warnings.\\n\\nReply with a place and timeframe, or say “use my location.” Reference code: XKCD7392.\",\"type\":\"output_text\"}],\"id\":\"msg_f6fb76b6-46bf-4e84-a785-dda25490a583\",\"role\":\"assistant\",\"status\":\"completed\",\"type\":\"message\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"reasoning\":null,\"safety_identifier\":null,\"service_tier\":\"default\",\"status\":\"completed\",\"store\":false,\"temperature\":1,\"text\":{\"format\":{\"type\":\"text\"}},\"tool_choice\":\"auto\",\"tools\":[],\"top_logprobs\":0,\"top_p\":1,\"truncation\":\"\",\"usage\":{\"cost\":{\"currency\":\"USD\",\"input_cost\":0.00001,\"output_cost\":0.00099,\"total_cost\":0.001},\"input_tokens\":53,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":494,\"output_tokens_details\":{\"reasoning_tokens\":320},\"total_tokens\":547},\"user\":null}\n"
   }
 ]

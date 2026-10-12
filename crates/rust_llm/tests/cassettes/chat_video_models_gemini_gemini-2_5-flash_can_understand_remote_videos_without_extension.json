@@ -5,7 +5,7 @@
     "request_body": "",
     "status": 200,
     "response_headers": {
-      "Date": "Wed, 07 Oct 2026 13:18:18 GMT",
+      "Date": "Sun, 11 Oct 2026 21:11:59 GMT",
       "Content-Type": "video/mp4",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
@@ -20,9 +20,9 @@
       "X-Middleton-Display": "staticcontent_sol",
       "X-Middleton-Response": "200",
       "X-Origin-Cache-Control": "",
-      "Age": "95493",
+      "Age": "469513",
       "Cf-Cache-Status": "HIT",
-      "Report-To": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=jjVGnhJegQ%2BWtlKYUUdu7fbJTIxeHNcERKU4OnNoNv4yiRM8OGbzCcSHRGoiFtLE0INof0hqNWZkg8JllsHEW%2BcV%2F9S8CaA6xaFMUqkJrH8PiIHy2iD6lrMsoRplfTNK0s4%3D\"}]}",
+      "Report-To": "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=dPxcfTElWT8uDBGUQX3%2FY%2BR7gXSvu4aNCz3A1MLmHvin6qDEaGdoVjFi73A%2B8IMyPggn71faRYnA5q4mMCc0PCx6PQ%2F18quJU00lkxS53V9M4X8kwo7J4zny0KjJjPBaGT0%3D\"}]}",
       "Nel": "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
@@ -39,15 +39,15 @@
       "X-Gemini-Service-Tier": "standard",
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 13:18:27 GMT",
+      "Date": "Sun, 11 Oct 2026 21:12:07 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=9042",
+      "Server-Timing": "gfet4t7; dur=8177",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"The video shows a beautiful, serene beach scene. Here's a breakdown of what I see:\\n\\n*   **Subject:** A person, seen from behind, is sitting on the sandy beach, facing out towards the ocean. The person appears to be a woman with long, dark hair, wearing a light-colored top (possibly pink or coral) and white shorts or pants. Her hair is visibly blowing and swaying in the wind throughout the video.\\n*   **Foreground (Beach):** The sand is light golden-brown, with some scattered natural debris like small twigs or dried leaves.\\n*   **Midground (Ocean):** The vast blue ocean stretches across the horizon. The water near the shore is a lighter, clear turquoise, gradually transitioning to a deeper blue further out. Gentle waves are visible, softly lapping at the shore.\\n*   **Background (Sky):** The sky is a clear, bright blue with scattered, fluffy white clouds.\\n*   **Overall Impression:** The scene evokes a sense of peace, relaxation, and contemplation, suggesting a warm, breezy day at a tropical or scenic beach.\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 4119,\n    \"candidatesTokenCount\": 229,\n    \"totalTokenCount\": 5284,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 9\n      },\n      {\n        \"modality\": \"VIDEO\",\n        \"tokenCount\": 3682\n      },\n      {\n        \"modality\": \"AUDIO\",\n        \"tokenCount\": 428\n      }\n    ],\n    \"thoughtsTokenCount\": 936,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"m0bGapK6IeCivdIP8PfVoQU\"\n}\n"
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"The video shows a wide shot of a beautiful, sunny beach scene.\\n\\nIn the foreground, a person is sitting on the golden sand with their back to the camera. They appear to be a woman with long, dark hair, wearing a light pink or peach top and white bottoms. Her hair occasionally blows gently in the breeze, suggesting a light wind. She is looking out towards the vast expanse of the ocean, which occupies the midground and stretches to the horizon.\\n\\nThe sand itself is light golden, with a few bits of natural debris like small twigs or leaves scattered around. The ocean is a beautiful blend of clear, light blue near the shore where gentle waves lap at the sand, transitioning to a deeper blue further out. In the far distance, very small figures can be seen in the water, possibly swimming or snorkeling.\\n\\nThe sky above is a bright, clear blue with scattered white, fluffy clouds, indicative of a pleasant sunny day.\\n\\nThe overall impression is one of peace, relaxation, and natural beauty.\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 4119,\n    \"candidatesTokenCount\": 206,\n    \"totalTokenCount\": 5394,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 9\n      },\n      {\n        \"modality\": \"VIDEO\",\n        \"tokenCount\": 3682\n      },\n      {\n        \"modality\": \"AUDIO\",\n        \"tokenCount\": 428\n      }\n    ],\n    \"thoughtsTokenCount\": 1069,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"n_vLapXCHOvjnsEPl_eogAQ\"\n}\n"
   }
 ]

@@ -1628,7 +1628,7 @@ async fn sends_a_request_again_only_once() {
     assert_eq!(server.sent(), ["server/discover", "server/discover"]);
 }
 
-// spec: mcp/client_spec.rb:142 protocol versions > does not shake hands with a modern server that lists only older versions
+// spec: mcp/client_spec.rb:142#GONE protocol versions > does not shake hands with a modern server that lists only older versions
 #[tokio::test]
 async fn does_not_shake_hands_with_a_modern_server_listing_only_older_versions() {
     let server = Scripted::new(|_, _, _| unsupported(&["2025-11-25"]));
@@ -1639,7 +1639,7 @@ async fn does_not_shake_hands_with_a_modern_server_listing_only_older_versions()
     assert!(!server.sent().contains(&"initialize".to_string()));
 }
 
-// spec: mcp/client_spec.rb:149 protocol versions > speaks every version it knows from before 2026-07-28
+// spec: mcp/client_spec.rb:177 protocol versions > speaks every version it knows from before 2026-07-28
 #[tokio::test]
 async fn speaks_every_version_it_knows_from_before_2026_07_28() {
     assert_eq!(
@@ -1653,7 +1653,7 @@ async fn speaks_every_version_it_knows_from_before_2026_07_28() {
     }
 }
 
-// spec: mcp/client_spec.rb:159 protocol versions > declares only its extensions in the handshake
+// spec: mcp/client_spec.rb:187 protocol versions > declares only its extensions in the handshake
 #[tokio::test]
 async fn declares_only_its_extensions_in_the_handshake() {
     let server = legacy_server("2025-06-18");
@@ -1669,7 +1669,7 @@ async fn declares_only_its_extensions_in_the_handshake() {
     );
 }
 
-// spec: mcp/client_spec.rb:168 protocol versions > disconnects from a server that answers the handshake with a version it does not speak
+// spec: mcp/client_spec.rb:196 protocol versions > disconnects from a server that answers the handshake with a version it does not speak
 #[tokio::test]
 async fn disconnects_from_a_server_answering_the_handshake_with_an_unknown_version() {
     let server = legacy_server("2099-01-01");
