@@ -552,7 +552,7 @@ async fn rejects_a_duplicate_embedding_index_without_hydrating_any_request() {
     let embedding = |value: f64| {
         json!({ "custom_id": "0", "response": { "status_code": 200, "body": {
             "object": "list", "model": "text-embedding-3-small",
-            "data": [{ "object": "embedding", "embedding": [value] }], "usage": { "prompt_tokens": 1 } } } })
+            "data": [{ "object": "embedding", "index": 0, "embedding": [value] }], "usage": { "prompt_tokens": 1 } } } })
     };
     get(
         &server,

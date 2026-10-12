@@ -1628,10 +1628,48 @@ async fn sends_a_request_again_only_once() {
     assert_eq!(server.sent(), ["server/discover", "server/discover"]);
 }
 
-// spec: mcp/client_spec.rb:142#GONE protocol versions > does not shake hands with a modern server that lists only older versions
+// spec: mcp/client_spec.rb:142 protocol versions > shakes hands with a server that rejects the revision without listing any
 #[tokio::test]
-async fn does_not_shake_hands_with_a_modern_server_listing_only_older_versions() {
-    let server = Scripted::new(|_, _, _| unsupported(&["2025-11-25"]));
+async fn shakes_hands_with_a_server_rejecting_the_revision_without_listing_any() {
+    let server = Scripted::new(|method, _, _| {
+        if method == "initialize" {
+            handshake("2025-06-18")
+        } else {
+            json!({ "error": { "code": -32_022, "message": "Unsupported protocol version" } })
+        }
+    });
+    let client = Client::new(server.clone(), json!({}));
+    client.server().await.unwrap();
+    assert_eq!(client.version().as_deref(), Some("2025-06-18"));
+    assert_eq!(
+        server.sent(),
+        ["server/discover", "initialize", "notifications/initialized"]
+    );
+}
+
+// spec: mcp/client_spec.rb:158 protocol versions > shakes hands with a server that rejects the revision while listing an older one
+#[tokio::test]
+async fn shakes_hands_with_a_server_rejecting_the_revision_while_listing_an_older_one() {
+    let server = Scripted::new(|method, _, _| {
+        if method == "initialize" {
+            handshake("2025-11-25")
+        } else {
+            unsupported(&["2025-11-25", "2025-06-18"])
+        }
+    });
+    let client = Client::new(server.clone(), json!({}));
+    client.server().await.unwrap();
+    assert_eq!(client.version().as_deref(), Some("2025-11-25"));
+    assert_eq!(
+        server.sent(),
+        ["server/discover", "initialize", "notifications/initialized"]
+    );
+}
+
+// spec: mcp/client_spec.rb:170 protocol versions > does not shake hands with a server that lists no version it speaks
+#[tokio::test]
+async fn does_not_shake_hands_with_a_server_listing_no_version_it_speaks() {
+    let server = Scripted::new(|_, _, _| unsupported(&["2027-01-01"]));
     let Err(Error::Mcp(e)) = Client::new(server.clone(), json!({})).server().await else {
         panic!("expected an MCP error");
     };

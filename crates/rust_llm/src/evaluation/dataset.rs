@@ -198,7 +198,7 @@ fn read(path: &Path) -> Result<Value> {
     let body = || std::fs::read_to_string(path);
     match ext {
         "yml" | "yaml" => {
-            let yaml: serde_yaml::Value = serde_yaml::from_str(&body()?)
+            let yaml: serde_norway::Value = serde_norway::from_str(&body()?)
                 .map_err(|e| Error::Argument(format!("Invalid YAML in {}: {e}", path.display())))?;
             yaml_to_json(yaml)
         }
@@ -217,8 +217,8 @@ fn read(path: &Path) -> Result<Value> {
 }
 
 /// Plain YAML data as JSON. A tag is a request to construct an object (`Psych::DisallowedClass`).
-fn yaml_to_json(value: serde_yaml::Value) -> Result<Value> {
-    use serde_yaml::Value as Y;
+fn yaml_to_json(value: serde_norway::Value) -> Result<Value> {
+    use serde_norway::Value as Y;
     Ok(match value {
         Y::Null => Value::Null,
         Y::Bool(b) => Value::Bool(b),

@@ -1,12 +1,12 @@
 # Changelog
 
 RustLLM's version follows the RubyLLM release it ports: 2.0.x ports RubyLLM 2.0 (upstream
-`crmne/ruby_llm` at `1e91b30`); 2.1.x ports RubyLLM 2.1 (tag `v2.1.0`). Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+`crmne/ruby_llm` at `1e91b30`); 2.1.x ports RubyLLM 2.1 (tag `v2.1.1`). Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-Ports RubyLLM 2.1.0. `docs/PARITY.md` classifies all 4,658 examples in its spec suite: 2,966 ported
-as Rust tests, 176 replayed from their own recorded cassettes, 1,516 not applicable (each with a
+Ports RubyLLM 2.1.1. `docs/PARITY.md` classifies all 4,684 examples in its spec suite: 2,988 ported
+as Rust tests, 176 replayed from their own recorded cassettes, 1,520 not applicable (each with a
 reason), 0 missing. Existing apps: run `rust-llm generate upgrade` and `cargo loco db migrate`.
 
 ### Added (RubyLLM 2.1)
@@ -52,6 +52,17 @@ reason), 0 missing. Existing apps: run `rust-llm generate upgrade` and `cargo lo
   tools; video jobs report the provider's billed cost once; blocked Gemini attempts keep their
   billed tokens.
 - Local limits RubyLLM 2.1 removed are gone (left to the providers).
+
+### Fixed (RubyLLM 2.1.1)
+- MCP servers that reject the 2026-07-28 revision while listing an older one, or listing none, get
+  the `initialize` handshake.
+- Batch embeddings are placed by the position the provider reports (Chat Completions and Mistral);
+  a result with duplicate, missing, or out-of-range positions fails instead of pairing vectors with
+  the wrong inputs.
+- Converted attachments are uploaded again after a provider deletes them, as plain ones are.
+- A persisted chat keeps its reply when a usage row cannot be linked to the message, and logs it.
+- Evaluation datasets read YAML with `serde_norway` instead of the deprecated `serde_yaml`, whose
+  `unsafe-libyaml` is unmaintained (RUSTSEC-2024-0449).
 
 ### Added
 - `rust_llm_loco`: `ChatRecord::ask_stream` and `complete_stream`, RubyLLM's streaming block on a

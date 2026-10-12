@@ -1523,10 +1523,33 @@ fn gemini_response_schema(node: &Value) -> Value {
     }
 }
 
-/// OpenAI-compatible embeddings body to an `Embedding` (`parse_embedding_response`).
+/// OpenAI-compatible embeddings body to an `Embedding` (`parse_embedding_response`), its rows
+/// first put back in the order their `index` names (`body['data'].sort_by { |row| row['index'] }`).
 fn embedding_result(body: &Value, array_input: bool) -> Result<BatchResult> {
-    Embedding::from_openai_body(body, !array_input).map(BatchResult::Embedding)
+    let mut ordered = body.clone();
+    if let Some(rows) = ordered.get_mut("data").and_then(Value::as_array_mut) {
+        rows.sort_by_key(|row| row.get("index").and_then(Value::as_i64));
+    }
+    Embedding::from_openai_body(&ordered, !array_input).map(BatchResult::Embedding)
 }
+
+/// `valid_embedding_positions?` (`protocols/chat_completions/embedding_batches.rb`) and
+/// `embedding_positions?` (`providers/mistral/chat_completions/batches.rb`): a row's index names
+/// the input its vector belongs to, so positions must be Integers forming exactly `0...N`.
+/// False when the body carries no `data` array (not an embeddings body).
+fn invalid_embedding_positions(body: &Value) -> bool {
+    let Some(rows) = body.get("data").and_then(Value::as_array) else {
+        return false;
+    };
+    let mut positions: Vec<Option<i64>> = rows
+        .iter()
+        .map(|row| row.as_object().and_then(|r| r.get("index")?.as_i64()))
+        .collect();
+    positions.sort();
+    positions != (0..rows.len() as i64).map(Some).collect::<Vec<_>>()
+}
+
+const INVALID_EMBEDDING_POSITIONS: &str = "Invalid or duplicate embedding record positions";
 
 // ---- HTTP ---------------------------------------------------------------------------------------
 
@@ -1889,6 +1912,15 @@ impl Http {
                         .map_or((full_id.as_str(), None), |(a, b)| (a, Some(b)));
                     let index = batch_result_index(custom_id)?;
                     match line.pointer("/response/body").filter(|b| !b.is_null()) {
+                        Some(body) if invalid_embedding_positions(body) => rows.push((
+                            index,
+                            None,
+                            batch_failure(
+                                &full_id,
+                                Some(INVALID_EMBEDDING_POSITIONS.into()),
+                                "failed",
+                            ),
+                        )),
                         Some(body) if body.get("data").is_some_and(Value::is_array) => {
                             rows.push((
                                 index,
@@ -1980,6 +2012,12 @@ impl Http {
             .and_then(Value::as_i64)
             .is_some_and(|s| (200..=299).contains(&s));
         let body = response.and_then(|r| r.get("body"));
+        // `EmbeddingBatches#parse_batch_result`: an embeddings body whose rows are not exactly
+        // `0...N` fails before the status is looked at.
+        if kind == Kind::Embeddings && body.is_some_and(invalid_embedding_positions) {
+            let detail = Some(INVALID_EMBEDDING_POSITIONS.to_string());
+            return Ok((index, None, batch_failure(&custom_id, detail, "failed")));
+        }
         match body {
             Some(body) if ok => {
                 let result = match kind {

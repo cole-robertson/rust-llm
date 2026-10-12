@@ -623,7 +623,7 @@ async fn hydrates_embeddings_into_their_staged_requests_and_leaves_failed_slots_
     let failed = json!({ "custom_id": "0", "response": { "status_code": 400, "body": { "error": { "message": "bad input" } } } });
     let ok = json!({ "custom_id": "1", "response": { "status_code": 200, "body": {
         "object": "list", "model": "text-embedding-3-small",
-        "data": [{ "object": "embedding", "embedding": [0.1, 0.2] }], "usage": { "prompt_tokens": 3 } } } });
+        "data": [{ "object": "embedding", "index": 0, "embedding": [0.1, 0.2] }], "usage": { "prompt_tokens": 3 } } } });
     Mock::given(method("GET"))
         .and(path("/v1/files/file-out/content"))
         .respond_with(

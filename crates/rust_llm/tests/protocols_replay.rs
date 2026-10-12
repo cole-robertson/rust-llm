@@ -215,7 +215,7 @@ async fn openrouter_executes_a_hosted_shell() {
     assert!(message.cost(None).total().is_some_and(|t| t > 0.0));
     // `usage.cost`; `server_tool_use_details` reports only OpenRouter's totals spanning tools
     // (`tool_calls_requested`/`tool_calls_executed`), which 2.1 leaves out (d21bf001).
-    assert_eq!(message.tokens().reported_cost, Some(0.0046345));
+    assert_eq!(message.tokens().reported_cost, Some(0.004666));
     assert_eq!(message.tokens().server_tool_use, None);
     cassette.assert_all_matched().await;
 }

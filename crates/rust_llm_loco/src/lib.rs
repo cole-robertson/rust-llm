@@ -65,7 +65,7 @@ use rust_llm::{
 };
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection,
-    EntityTrait, QueryFilter, QueryOrder, TransactionTrait,
+    DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, TransactionTrait,
 };
 use serde_json::{Map, Value};
 
@@ -1248,22 +1248,7 @@ impl ChatRecord {
             insert_usage(&txn, self.record.id, Some(row.id), entry).await?;
         }
         if !written_usages.is_empty() {
-            rust_llm_usages::Entity::update_many()
-                .col_expr(
-                    rust_llm_usages::Column::MessageId,
-                    sea_orm::sea_query::Expr::value(row.id as i64),
-                )
-                .col_expr(
-                    rust_llm_usages::Column::MessageType,
-                    sea_orm::sea_query::Expr::value(MESSAGE_TYPE),
-                )
-                .col_expr(
-                    rust_llm_usages::Column::UpdatedAt,
-                    sea_orm::sea_query::Expr::value(now()),
-                )
-                .filter(rust_llm_usages::Column::Id.is_in(written_usages.to_vec()))
-                .exec(&txn)
-                .await?;
+            link_usage_rows(&txn, row.id, written_usages).await;
         }
         txn.commit().await?;
         // `persist_content`: an attachment the chat uploads later records its upload against the
@@ -2058,6 +2043,42 @@ fn has_unanswered_tool_calls(chat: &Chat) -> bool {
             .iter()
             .any(|m| m.tool_call_id.as_deref() == Some(call.id.as_str()))
     })
+}
+
+/// `link_usage_entries`: points the usage rows already written for a message's attempts at its
+/// row, in a savepoint (`Usage.transaction(requires_new: true)`). A failed link rolls back to the
+/// savepoint and is logged, so the reply, its tool calls, and the rows (still on their chat) stay
+/// (2.1.1).
+async fn link_usage_rows(txn: &DatabaseTransaction, message_id: i32, usage_ids: &[i32]) {
+    let link = async {
+        let savepoint = txn.begin().await?;
+        let linked = rust_llm_usages::Entity::update_many()
+            .col_expr(
+                rust_llm_usages::Column::MessageId,
+                sea_orm::sea_query::Expr::value(message_id as i64),
+            )
+            .col_expr(
+                rust_llm_usages::Column::MessageType,
+                sea_orm::sea_query::Expr::value(MESSAGE_TYPE),
+            )
+            .col_expr(
+                rust_llm_usages::Column::UpdatedAt,
+                sea_orm::sea_query::Expr::value(now()),
+            )
+            .filter(rust_llm_usages::Column::Id.is_in(usage_ids.to_vec()))
+            .exec(&savepoint)
+            .await;
+        match linked {
+            Ok(_) => savepoint.commit().await,
+            Err(e) => {
+                savepoint.rollback().await?;
+                Err(e)
+            }
+        }
+    };
+    if let Err(e) = link.await {
+        tracing::warn!("RustLLM could not link usage to message {message_id}: {e}");
+    }
 }
 
 /// `persist_usage_entry`: [`insert_usage`] in its own transaction (`requires_new: true`), logged

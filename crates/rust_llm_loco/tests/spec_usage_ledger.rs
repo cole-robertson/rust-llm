@@ -5,208 +5,22 @@
 //! Ruby's `owner` is an Active Record (`Chat.create!`); here it is
 //! [`UsageOwner::record`]`("Chat", id)`, the `owner_type`/`owner_id` pair Rails would store.
 
+mod ledger_support;
+
 use std::sync::{Arc, Mutex};
 
 use rust_llm::accounting::{UsageOwner, with_usage_owner};
 use rust_llm::message::Operation;
-use rust_llm::{
-    Chat, Config, EmbedOptions, JudgeOptions, PaintOptions, TranscribeOptions, UsageEntry,
-    UsageStatus,
-};
+use rust_llm::{Chat, JudgeOptions, PaintOptions, UsageEntry, UsageStatus};
 use rust_llm_loco::entities::rust_llm_usages;
 use rust_llm_loco::{ChatRecord, UsageLedger, migrations};
-use sea_orm::{
-    ColumnTrait, ConnectionTrait, Database, DatabaseConnection, EntityTrait, PaginatorTrait,
-    QueryFilter, QueryOrder, TransactionTrait,
-};
+use sea_orm::{Database, DatabaseConnection, EntityTrait, PaginatorTrait, TransactionTrait};
 use sea_orm_migration::SchemaManager;
 use serde_json::{Value, json};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-const ANTHROPIC: &str = "claude-haiku-4-5";
-const EMBEDDING: &str = "text-embedding-3-small";
-const IMAGE: &str = "gpt-image-1";
-const TRANSCRIPTION: &str = "gemini-2.5-flash";
-const JUDGMENT: &str = "jev-latest";
-
-async fn db() -> DatabaseConnection {
-    rust_llm::configure(|c| {
-        c.set("openai_api_key", "test");
-        c.set("anthropic_api_key", "test");
-    });
-    let db = Database::connect("sqlite::memory:").await.unwrap();
-    let manager = SchemaManager::new(&db);
-    for m in migrations() {
-        m.up(&manager).await.unwrap();
-    }
-    db
-}
-
-/// The configured RubyLLM, pointed at `server`, with the Rails ledger (`railtie.rb` sets
-/// `Accounting::Usage.ledger ||= RubyLLM::ActiveRecord::Usage`).
-fn config(server: &MockServer, db: &DatabaseConnection) -> Arc<Config> {
-    let mut c = Config::default();
-    for (provider, base) in [
-        ("openai", "/v1"),
-        ("anthropic", ""),
-        ("gemini", "/v1beta"),
-        ("typesafe", ""),
-    ] {
-        c.set(
-            format!("{provider}_api_base"),
-            format!("{}{base}", server.uri()),
-        );
-        c.set(format!("{provider}_api_key"), "test");
-    }
-    c.max_retries = 0;
-    c.usage_ledger = Some(UsageLedger::shared(db.clone()));
-    Arc::new(c)
-}
-
-async fn json_response(server: &MockServer, route: &str, status: u16, body: Value) {
-    Mock::given(method("POST"))
-        .and(path(route))
-        .respond_with(ResponseTemplate::new(status).set_body_json(body))
-        .mount(server)
-        .await;
-}
-
-async fn stub_embedding(server: &MockServer) {
-    json_response(
-        server,
-        "/v1/embeddings",
-        200,
-        json!({ "model": EMBEDDING, "data": [{ "embedding": [0.1, 0.2] }], "usage": { "prompt_tokens": 3, "total_tokens": 3 } }),
-    )
-    .await;
-}
-
-async fn stub_chat_reply(server: &MockServer) {
-    json_response(
-        server,
-        "/v1/messages",
-        200,
-        json!({ "id": "msg_1", "type": "message", "role": "assistant", "model": ANTHROPIC,
-                "content": [{ "type": "text", "text": "Hi" }], "stop_reason": "end_turn",
-                "usage": { "input_tokens": 9, "output_tokens": 2 } }),
-    )
-    .await;
-}
-
-async fn embed(
-    config: &Arc<Config>,
-    owner: Option<UsageOwner>,
-) -> rust_llm::Result<rust_llm::Embedding> {
-    rust_llm::embed(
-        "Ruby",
-        EmbedOptions {
-            model: Some(EMBEDDING),
-            provider: Some("openai"),
-            config: Some(config.clone()),
-            owner,
-            ..Default::default()
-        },
-    )
-    .await
-}
-
-fn audio() -> rust_llm::Attachment {
-    rust_llm::Attachment::new(format!(
-        "{}/../rust_llm/tests/fixtures/ruby.wav",
-        env!("CARGO_MANIFEST_DIR")
-    ))
-}
-
-async fn transcribe(
-    config: &Arc<Config>,
-    owner: Option<UsageOwner>,
-) -> rust_llm::Result<rust_llm::Transcription> {
-    rust_llm::transcribe(
-        audio(),
-        TranscribeOptions {
-            model: Some(TRANSCRIPTION),
-            provider: Some("gemini"),
-            config: Some(config.clone()),
-            owner,
-            ..Default::default()
-        },
-    )
-    .await
-}
-
-fn owner_of(record: &ChatRecord) -> UsageOwner {
-    UsageOwner::record("Chat", i64::from(record.id()))
-}
-
-/// `described_class.where(owner: record).order(:id)`.
-async fn rows_for(db: &DatabaseConnection, owner: &ChatRecord) -> Vec<rust_llm_usages::Model> {
-    rust_llm_usages::Entity::find()
-        .filter(rust_llm_usages::Column::OwnerType.eq("Chat"))
-        .filter(rust_llm_usages::Column::OwnerId.eq(i64::from(owner.id())))
-        .order_by_asc(rust_llm_usages::Column::Id)
-        .all(db)
-        .await
-        .unwrap()
-}
-
-async fn all_rows(db: &DatabaseConnection) -> Vec<rust_llm_usages::Model> {
-    rust_llm_usages::Entity::find()
-        .order_by_asc(rust_llm_usages::Column::Id)
-        .all(db)
-        .await
-        .unwrap()
-}
-
-fn owner_pair(row: &rust_llm_usages::Model) -> (Option<String>, Option<i64>) {
-    (row.owner_type.clone(), row.owner_id)
-}
-
-/// Collects the warnings RubyLLM's logger would receive.
-#[derive(Clone, Default)]
-struct Warnings(Arc<Mutex<Vec<String>>>);
-
-impl tracing::Subscriber for Warnings {
-    fn enabled(&self, metadata: &tracing::Metadata<'_>) -> bool {
-        *metadata.level() <= tracing::Level::WARN
-    }
-    fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
-        tracing::span::Id::from_u64(1)
-    }
-    fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
-    fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
-    fn event(&self, event: &tracing::Event<'_>) {
-        struct Message<'a>(&'a mut String);
-        impl tracing::field::Visit for Message<'_> {
-            fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
-                if field.name() == "message" {
-                    self.0.push_str(&format!("{value:?}"));
-                }
-            }
-        }
-        let mut text = String::new();
-        event.record(&mut Message(&mut text));
-        self.0.lock().unwrap().push(text);
-    }
-    fn enter(&self, _: &tracing::span::Id) {}
-    fn exit(&self, _: &tracing::span::Id) {}
-}
-
-impl Warnings {
-    fn lines(&self) -> Vec<String> {
-        self.0.lock().unwrap().clone()
-    }
-}
-
-/// `allow(described_class).to receive(:create!).and_raise(ActiveRecord::StatementInvalid, ...)`:
-/// every insert into `rust_llm_usages` fails, through a trigger.
-async fn break_usage_writes(db: &DatabaseConnection, message: &str) {
-    db.execute_unprepared(&format!(
-        "CREATE TRIGGER fail_usage BEFORE INSERT ON rust_llm_usages BEGIN SELECT RAISE(ABORT, '{message}'); END"
-    ))
-    .await
-    .unwrap();
-}
+use ledger_support::*;
 
 // spec: active_record/usage_ledger_spec.rb:51 writes a row for each one-shot operation, attributed to its owner and to no chat
 #[tokio::test]
@@ -683,73 +497,193 @@ async fn writes_unattributed_rows_for_an_owner_that_is_not_a_record() {
     );
 }
 
-// spec: active_record/usage_ledger_spec.rb:214 logs a failed chat row write and returns the reply
+// ---- when a chat row cannot be linked to its message ---------------------------------------------
+
+// spec: active_record/usage_ledger_spec.rb:268 when a chat row cannot be linked to its message > keeps the row with its chat and counts it in the chat totals
 #[tokio::test]
-async fn logs_a_failed_chat_row_write_and_returns_the_reply() {
+async fn keeps_the_unlinked_row_with_its_chat_and_counts_it() {
     let db = db().await;
     let server = MockServer::start().await;
-    let config = config(&server, &db);
     stub_chat_reply(&server).await;
-    let record = ChatRecord::create(&db, ANTHROPIC, None).await.unwrap();
-    let mut chat = record.to_llm_with(&db, config).await.unwrap();
-    break_usage_writes(&db, "disk full").await;
-    let warnings = Warnings::default();
-    let _guard = tracing::subscriber::set_default(warnings.clone());
+    let (record, mut chat) = unlinkable_chat(&db, &server).await;
 
-    let reply = record.ask(&db, &mut chat, "Hello").await.unwrap();
+    record.ask(&db, &mut chat, "Hello").await.unwrap();
+
+    let usages = record.usages(&db).await.unwrap();
+    assert_eq!(usages.len(), 1);
+    let row = &usages[0];
+    assert_eq!(row.status, "succeeded");
+    assert_eq!(row.message_id, None);
+    assert_eq!((row.input_tokens, row.output_tokens), (Some(9), Some(2)));
+    let tokens = ChatRecord::find(&db, record.id())
+        .await
+        .unwrap()
+        .tokens(&db)
+        .await
+        .unwrap();
+    assert_eq!((tokens.input, tokens.output), (Some(9), Some(2)));
+}
+
+/// Statements SQLite ran on a traced connection (`QueryHelpers.matching`).
+static STATEMENTS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+unsafe extern "C" {
+    fn sqlite3_trace_v2(
+        db: *mut std::ffi::c_void,
+        mask: std::ffi::c_uint,
+        callback: Option<
+            unsafe extern "C" fn(
+                std::ffi::c_uint,
+                *mut std::ffi::c_void,
+                *mut std::ffi::c_void,
+                *mut std::ffi::c_void,
+            ) -> std::ffi::c_int,
+        >,
+        context: *mut std::ffi::c_void,
+    ) -> std::ffi::c_int;
+}
+
+/// `SQLITE_TRACE_STMT`: `sql` is the statement's text as written.
+unsafe extern "C" fn record_statement(
+    _: std::ffi::c_uint,
+    _: *mut std::ffi::c_void,
+    _: *mut std::ffi::c_void,
+    sql: *mut std::ffi::c_void,
+) -> std::ffi::c_int {
+    // SAFETY: SQLite passes the statement's NUL-terminated SQL text for SQLITE_TRACE_STMT.
+    let sql = unsafe { std::ffi::CStr::from_ptr(sql.cast()) };
+    STATEMENTS
+        .lock()
+        .unwrap()
+        .push(sql.to_string_lossy().into_owned());
+    0
+}
+
+/// Traces every statement on the in-memory database's one pooled connection.
+async fn trace_statements(db: &DatabaseConnection) {
+    let mut conn = db.get_sqlite_connection_pool().acquire().await.unwrap();
+    let mut handle = conn.lock_handle().await.unwrap();
+    // SAFETY: the handle is locked out of the worker, and the callback only reads its arguments.
+    let status = unsafe {
+        sqlite3_trace_v2(
+            handle.as_raw_handle().as_ptr().cast(),
+            1,
+            Some(record_statement),
+            std::ptr::null_mut(),
+        )
+    };
+    assert_eq!(status, 0);
+}
+
+// spec: active_record/usage_ledger_spec.rb:279 when a chat row cannot be linked to its message > rolls the failed link back to a savepoint
+#[tokio::test]
+async fn rolls_the_failed_link_back_to_a_savepoint() {
+    let db = db().await;
+    let server = MockServer::start().await;
+    stub_chat_reply(&server).await;
+    let (record, mut chat) = unlinkable_chat(&db, &server).await;
+    trace_statements(&db).await;
+
+    record.ask(&db, &mut chat, "Hello").await.unwrap();
+
+    let statements: Vec<String> = STATEMENTS
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|s| s.contains("SAVEPOINT"))
+        .cloned()
+        .collect();
+    assert!(
+        statements
+            .iter()
+            .any(|s| s.starts_with("ROLLBACK TO SAVEPOINT")),
+        "{statements:?}"
+    );
+}
+
+/// `ClockTool`: `def execute = 'noon'`.
+struct Clock;
+
+#[async_trait::async_trait]
+impl rust_llm::Tool for Clock {
+    fn name(&self) -> String {
+        "clock".into()
+    }
+    fn description(&self) -> String {
+        "Tells the time".into()
+    }
+    async fn execute(
+        &self,
+        _: serde_json::Map<String, Value>,
+        _: &rust_llm::ToolCall,
+    ) -> Result<rust_llm::ToolResult, rust_llm::ToolError> {
+        Ok("noon".into())
+    }
+}
+
+// spec: active_record/usage_ledger_spec.rb:288 when a chat row cannot be linked to its message > keeps the tool calls of the reply and finishes the tool loop
+#[tokio::test]
+async fn keeps_the_tool_calls_of_the_reply_and_finishes_the_tool_loop() {
+    let db = db().await;
+    let server = MockServer::start().await;
+    let tool_use = json!({ "id": "msg_0", "type": "message", "role": "assistant", "model": ANTHROPIC,
+        "content": [{ "type": "tool_use", "id": "toolu_1", "name": "clock", "input": {} }],
+        "stop_reason": "tool_use", "usage": { "input_tokens": 7, "output_tokens": 3 } });
+    let mut answer = tool_use.clone();
+    answer["content"] = json!([{ "type": "text", "text": "Hi" }]);
+    answer["stop_reason"] = json!("end_turn");
+    let replies = Mutex::new(vec![answer, tool_use]);
+    Mock::given(method("POST"))
+        .and(path("/v1/messages"))
+        .respond_with(move |_: &wiremock::Request| {
+            let mut replies = replies.lock().unwrap();
+            let body = if replies.len() > 1 {
+                replies.pop().unwrap()
+            } else {
+                replies[0].clone()
+            };
+            ResponseTemplate::new(200).set_body_json(body)
+        })
+        .mount(&server)
+        .await;
+    let (record, chat) = unlinkable_chat(&db, &server).await;
+    let mut chat = chat.with_tool(Clock);
+
+    let reply = record
+        .ask(&db, &mut chat, "What time is it?")
+        .await
+        .unwrap();
 
     assert_eq!(reply.content(), "Hi");
+    let rows = record.messages(&db).await.unwrap();
     assert_eq!(
-        record
-            .messages(&db)
-            .await
-            .unwrap()
-            .iter()
-            .map(|m| m.role.as_str())
-            .collect::<Vec<_>>(),
-        ["user", "assistant"]
+        rows.iter().map(|m| m.role.as_str()).collect::<Vec<_>>(),
+        ["user", "assistant", "tool", "assistant"]
     );
-    assert!(
-        warnings
-            .lines()
-            .iter()
-            .any(|l| l.contains("could not record chat usage") && l.contains("disk full")),
-        "{:?}",
-        warnings.lines()
-    );
+    let second = rust_llm_loco::message_to_llm(&db, &rows[1]).await.unwrap();
+    let ids: Vec<String> = second
+        .tool_calls
+        .unwrap()
+        .values()
+        .map(|c| c.id.clone())
+        .collect();
+    assert_eq!(ids, ["toolu_1"]);
+    let message_ids: Vec<Option<i64>> = record
+        .usages(&db)
+        .await
+        .unwrap()
+        .iter()
+        .map(|u| u.message_id)
+        .collect();
+    assert_eq!(message_ids, [None, None]);
 }
 
-// spec: active_record/usage_ledger_spec.rb:225 logs a failed write and returns the result of the operation
+// spec: active_record/usage_ledger_spec.rb:304 when a chat row cannot be linked to its message > keeps the caller transaction usable
 #[tokio::test]
-async fn logs_a_failed_write_and_returns_the_result_of_the_operation() {
-    let db = db().await;
-    let server = MockServer::start().await;
-    let config = config(&server, &db);
-    stub_embedding(&server).await;
-    let owner = ChatRecord::create(&db, ANTHROPIC, None).await.unwrap();
-    break_usage_writes(&db, "disk full").await;
-    let warnings = Warnings::default();
-    let _guard = tracing::subscriber::set_default(warnings.clone());
-
-    let embedding = embed(&config, Some(owner_of(&owner))).await.unwrap();
-
-    assert_eq!(embedding.vectors, rust_llm::Vectors::Single(vec![0.1, 0.2]));
-    assert!(
-        warnings
-            .lines()
-            .iter()
-            .any(|l| l.contains("could not record embedding usage") && l.contains("disk full")),
-        "{:?}",
-        warnings.lines()
-    );
-}
-
-// spec: active_record/usage_ledger_spec.rb:234 keeps the caller transaction usable when a write fails
-#[tokio::test]
-async fn keeps_the_caller_transaction_usable_when_a_write_fails() {
-    // A file database, so the ledger's own connection and the caller's transaction are separate
+async fn keeps_the_caller_transaction_usable_when_a_link_fails() {
+    // A file database, so the caller's transaction and the chat's writes use separate pooled
     // connections, as with Rails' pool.
-    let dir = std::env::temp_dir().join(format!("ledger-{}.sqlite", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("ledger-link-{}.sqlite", std::process::id()));
     let _ = std::fs::remove_file(&dir);
     let mut options = sea_orm::ConnectOptions::new(format!("sqlite://{}?mode=rwc", dir.display()));
     options
@@ -760,35 +694,42 @@ async fn keeps_the_caller_transaction_usable_when_a_write_fails() {
     for m in migrations() {
         m.up(&manager).await.unwrap();
     }
-    rust_llm::configure(|c| {
-        c.set("anthropic_api_key", "test");
-    });
     let server = MockServer::start().await;
-    let config = config(&server, &db);
-    stub_embedding(&server).await;
-    let owner = ChatRecord::create(&db, ANTHROPIC, None).await.unwrap();
-    break_usage_writes(&db, "constraint failed").await;
+    stub_chat_reply(&server).await;
+    let (record, mut chat) = unlinkable_chat(&db, &server).await;
 
-    let warnings = Warnings::default();
-    let _guard = tracing::subscriber::set_default(warnings.clone());
     let txn = db.begin().await.unwrap();
-    embed(&config, Some(owner_of(&owner))).await.unwrap();
-    // The write reached the database and failed there, not on a pool timeout.
-    assert!(
-        warnings
-            .lines()
-            .iter()
-            .any(|l| l.contains("constraint failed")),
-        "{:?}",
-        warnings.lines()
-    );
-    rust_llm_loco::entities::chats::Entity::find()
-        .count(&txn)
+    record.ask(&db, &mut chat, "Hello").await.unwrap();
+    let later = rust_llm_loco::entities::chats::ActiveModel {
+        rust_llm_model_id: sea_orm::ActiveValue::Set(
+            rust_llm_loco::entities::chats::Entity::find_by_id(record.id())
+                .one(&txn)
+                .await
+                .unwrap()
+                .unwrap()
+                .rust_llm_model_id,
+        ),
+        cancelled: sea_orm::ActiveValue::Set(false),
+        created_at: sea_orm::ActiveValue::Set(chrono::Utc::now().into()),
+        updated_at: sea_orm::ActiveValue::Set(chrono::Utc::now().into()),
+        ..Default::default()
+    };
+    let later = sea_orm::ActiveModelTrait::insert(later, &txn)
         .await
         .unwrap();
     txn.commit().await.unwrap();
 
-    assert!(rows_for(&db, &owner).await.is_empty());
+    assert!(
+        rust_llm_loco::entities::chats::Entity::find_by_id(later.id)
+            .one(&db)
+            .await
+            .unwrap()
+            .is_some()
+    );
+    assert_eq!(
+        roles_and_contents(&db, &record).await.last().unwrap().1,
+        "Hi"
+    );
     let _ = std::fs::remove_file(&dir);
 }
 

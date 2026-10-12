@@ -187,10 +187,10 @@ async fn uploads_a_pdf(
 #[tokio::test]
 async fn anthropic_uploads_a_pdf_through_the_files_api() {
     let (file, requests, recorded) = uploads_a_pdf("anthropic", None).await;
-    assert_eq!(file.id, "file_013WdkzVoWhQXMN86PMMPhjC");
+    assert_eq!(file.id, "file_01MrUrZps2BhiQvWqGtgUWJQ");
     assert_eq!(file.mime_type.as_deref(), Some("application/pdf"));
     assert_eq!(file.downloadable, Some(false));
-    assert_eq!(file.created_at.map(|t| t.timestamp()), Some(1791377967));
+    assert_eq!(file.created_at.map(|t| t.timestamp()), Some(1791752808));
     assert_eq!(requests[0].method.as_str(), "POST");
     assert_eq!(requests[0].url.path(), "/v1/files");
     assert_eq!(
@@ -207,7 +207,7 @@ async fn anthropic_uploads_a_pdf_through_the_files_api() {
 #[tokio::test]
 async fn openai_uploads_a_pdf_through_the_files_api() {
     let (file, requests, recorded) = uploads_a_pdf("openai", Some("user_data")).await;
-    assert_eq!(file.id, "file-JxdyqrXagjmVcDLvELUhFU");
+    assert_eq!(file.id, "file-JetQUP1wiRccU3sTaH5sqt");
     assert_eq!(file.purpose.as_deref(), Some("user_data"));
     assert_eq!(file.status.as_deref(), Some("processed"));
     assert_eq!(file.expires_at, None);
@@ -233,7 +233,7 @@ async fn mistral_uploads_a_pdf_through_the_files_api() {
 #[tokio::test]
 async fn xai_uploads_a_pdf_through_the_files_api() {
     let (file, requests, recorded) = uploads_a_pdf("xai", None).await;
-    assert_eq!(file.id, "file_8e8bc0c2-2e67-45b1-a96b-783f535c443c");
+    assert_eq!(file.id, "file_fc710150-3ef3-4327-8c5c-a28b4bb87bc6");
     assert_eq!(requests[0].url.path(), "/v1/files");
     // xAI sends neither purpose nor expires_after when they aren't given: only the file part.
     assert_same_form(&recorded[0], &requests[0]);
@@ -281,14 +281,14 @@ fn assert_gemini_resumable_upload(requests: &[wiremock::Request], recorded: &[In
 #[tokio::test]
 async fn gemini_uploads_a_pdf_through_the_files_api() {
     let (file, requests, recorded) = uploads_a_pdf("gemini", None).await;
-    assert_eq!(file.id, "files/aurmd9vp5ypk");
+    assert_eq!(file.id, "files/bd8ys4y7ygqy");
     assert_eq!(file.filename.as_deref(), Some("sample.pdf"));
     assert_eq!(file.status.as_deref(), Some("ACTIVE"));
     assert_eq!(
         file.uri.as_deref(),
-        Some("https://generativelanguage.googleapis.com/v1beta/files/aurmd9vp5ypk")
+        Some("https://generativelanguage.googleapis.com/v1beta/files/bd8ys4y7ygqy")
     );
-    assert_eq!(file.expires_at.map(|t| t.timestamp()), Some(1791550769));
+    assert_eq!(file.expires_at.map(|t| t.timestamp()), Some(1791925609));
     assert_gemini_resumable_upload(&requests, &recorded);
 }
 

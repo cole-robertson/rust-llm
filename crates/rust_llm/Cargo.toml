@@ -36,7 +36,7 @@ uuid.workspace = true
 unicode-normalization.workspace = true
 minijinja.workspace = true
 # Evaluation datasets in app/evals/*.yml (`YAML.safe_load_file`).
-serde_yaml = "0.9"
+serde_norway = "0.9"
 # WebSocket transport for streaming transcription (Gemini Live, xAI), over rustls with ring like reqwest.
 tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "handshake", "rustls-tls-webpki-roots"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }

@@ -421,6 +421,12 @@ impl Attachment {
         self
     }
 
+    /// `provider_uploads.values.map(&:id)`: the ids of the files this attachment was uploaded as.
+    #[doc(hidden)]
+    pub fn provider_upload_ids(&self) -> Vec<String> {
+        self.provider_uploads.ids()
+    }
+
     /// `Attachment#provider_file_store`: the store set with
     /// [`Attachment::set_provider_file_store`], if any.
     pub fn provider_file_store(&self) -> Option<Arc<dyn crate::files::ProviderFileStore>> {

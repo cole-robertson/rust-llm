@@ -105,9 +105,9 @@ async fn gemini_can_paint_images() {
         .into_image();
     assert_eq!(image.mime_type.as_deref(), Some("image/jpeg"));
     assert_eq!(image.model, model);
-    // promptTokenCount 5, candidatesTokenCount 1494.
+    // promptTokenCount 5, candidatesTokenCount 1516.
     assert_eq!(image.tokens().input, Some(5));
-    assert_eq!(image.tokens().output, Some(1494));
+    assert_eq!(image.tokens().output, Some(1516));
     billed_once_as_image(&image, "gemini", model);
     saves_a_real_image(&image).await;
     cassette.assert_all_matched().await;
@@ -179,7 +179,7 @@ async fn openai_paints_several_images_in_one_request() {
     }
     // Billed once: only the first image carries the call's usage.
     billed_once_as_image(&images[0], "openai", "gpt-image-1.5");
-    assert_eq!(images[0].tokens().output, Some(13166));
+    assert_eq!(images[0].tokens().output, Some(13237));
     assert!(images[1].usage_entries.is_empty());
     assert_eq!(images[1].tokens(), Tokens::default());
     cassette.assert_all_matched().await;

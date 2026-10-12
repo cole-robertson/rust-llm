@@ -74,7 +74,7 @@ mod traced {
         ToolCalls, ToolChoice, ToolError, ToolResult,
     };
     use serde_json::{Map, Value, json};
-    use wiremock::matchers::{body_json, method, path};
+    use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, Request, ResponseTemplate};
 
     use super::spec_helpers::{Sequence, config, sse};
@@ -1205,8 +1205,39 @@ mod traced {
         }
     }
 
+    /// A recorded request body with each run of consecutive `tool` messages sorted by
+    /// `tool_call_id`. Concurrent tools add their results as they finish (`on_result` in Ruby's
+    /// `ToolConcurrency`), so their order depends on timing: the 2.1.1 fibers recording has beta
+    /// before alpha. The Ruby spec checks the results with `contain_exactly`; everything else in
+    /// the body still has to match exactly.
+    fn with_tool_results_sorted(mut body: Value) -> Value {
+        if let Some(messages) = body["messages"].as_array_mut() {
+            let mut i = 0;
+            while i < messages.len() {
+                let end = (i..messages.len())
+                    .find(|&j| messages[j]["role"] != "tool")
+                    .unwrap_or(messages.len());
+                messages[i..end]
+                    .sort_by(|a, b| a["tool_call_id"].as_str().cmp(&b["tool_call_id"].as_str()));
+                i = end + 1;
+            }
+        }
+        body
+    }
+
+    /// Matches a request whose body equals the recorded one, comparing concurrent tool results
+    /// without their order ([`with_tool_results_sorted`]).
+    struct RecordedBody(Value);
+
+    impl wiremock::Match for RecordedBody {
+        fn matches(&self, request: &Request) -> bool {
+            serde_json::from_slice::<Value>(&request.body)
+                .is_ok_and(|body| with_tool_results_sorted(body) == self.0)
+        }
+    }
+
     /// Serves a recorded cassette whose requests run concurrently: each recorded request is
-    /// answered once, matched by path and its exact JSON body, in whatever order they arrive.
+    /// answered once, matched by path and its JSON body, in whatever order they arrive.
     async fn serve_concurrent(name: &str) -> (MockServer, Arc<Config>) {
         let interactions = support::load(name).expect(name);
         let server = MockServer::start().await;
@@ -1227,7 +1258,7 @@ mod traced {
                 .to_string();
             Mock::given(method("POST"))
                 .and(path(route))
-                .and(body_json(body))
+                .and(RecordedBody(with_tool_results_sorted(body)))
                 .respond_with(
                     ResponseTemplate::new(interaction.status)
                         .set_body_raw(interaction.response_body.into_bytes(), &content_type),

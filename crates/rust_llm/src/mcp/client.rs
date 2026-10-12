@@ -1,8 +1,10 @@
 //! Port of `lib/ruby_llm/mcp/client.rb`: speaks JSON-RPC to one MCP server over a transport.
 //! It speaks the 2026-07-28 revision and falls back to the `initialize` handshake for servers
 //! that predate it, declaring only its extensions so those servers never call back. A server
-//! that rejects 2026-07-28 while listing it gets the request once more; one that answers the
-//! handshake with a revision missing from [`LEGACY_VERSIONS`] is disconnected.
+//! that rejects 2026-07-28 while listing it gets the request once more; one that rejects it while
+//! listing a revision from [`LEGACY_VERSIONS`], or without listing any, gets the handshake
+//! instead; one that answers the handshake with a revision missing from [`LEGACY_VERSIONS`] is
+//! disconnected.
 //!
 //! Servers that predate 2026-07-28 may announce that their tools, prompts, or resources changed
 //! on the stream of any request. Those notifications reach the [`Client::on_change`] callback
@@ -218,7 +220,10 @@ impl Client {
                     .is_some_and(|v| v.iter().any(|v| v == VERSION))
                     .then_some(result))
             }
-            Err(Error::Mcp(e)) if e.code.is_some_and(|c| MODERN_ERRORS.contains(&c)) => {
+            Err(Error::Mcp(e))
+                if e.code.is_some_and(|c| MODERN_ERRORS.contains(&c))
+                    && !Self::predates_revision(&e) =>
+            {
                 Err(Error::Mcp(e))
             }
             Err(Error::Mcp(_)) => Ok(None),
@@ -441,13 +446,28 @@ impl Client {
 
     /// `offers_version?`: a modern server rejected 2026-07-28 while listing it as supported.
     fn offers_version(&self, error: &McpError) -> bool {
-        let supported = error.data.as_ref().and_then(|d| d.get("supported"));
-        let listed = match supported {
-            Some(Value::Array(versions)) => versions.iter().any(|v| v == VERSION),
-            Some(version) => version == VERSION,
-            None => false,
-        };
-        self.is_modern() && error.code == Some(UNSUPPORTED_VERSION) && listed
+        self.is_modern()
+            && error.code == Some(UNSUPPORTED_VERSION)
+            && Self::supported_versions(error).contains(&VERSION)
+    }
+
+    /// `predates_revision?`: the server rejected 2026-07-28 while listing a revision from
+    /// [`LEGACY_VERSIONS`], or without listing any.
+    fn predates_revision(error: &McpError) -> bool {
+        if error.code != Some(UNSUPPORTED_VERSION) {
+            return false;
+        }
+        let supported = Self::supported_versions(error);
+        supported.is_empty() || supported.iter().any(|v| LEGACY_VERSIONS.contains(v))
+    }
+
+    /// `supported_versions`: `Array(error.data['supported'])` when the data is a record.
+    fn supported_versions(error: &McpError) -> Vec<&str> {
+        match error.data.as_ref().and_then(|d| d.get("supported")) {
+            Some(Value::Array(versions)) => versions.iter().filter_map(Value::as_str).collect(),
+            Some(Value::String(version)) => vec![version.as_str()],
+            _ => Vec::new(),
+        }
     }
 
     fn message(&self, method: &str, params: Value, id: Option<&str>) -> Value {

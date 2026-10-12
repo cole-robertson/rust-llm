@@ -311,7 +311,7 @@ async fn discovers_yaml_by_class_name_under_app_evals_and_rejects_ambiguous_matc
     // `stub_const('GreetingEvaluation', evaluation)`: the same definition under that name.
     let mut e = upcase_evaluation(Evaluation::named("GreetingEvaluation"));
     rooted_at(&mut e, &dir);
-    let yaml = serde_yaml::to_string(&json!({ "cases": rows(&greeting()) })).unwrap();
+    let yaml = serde_norway::to_string(&json!({ "cases": rows(&greeting()) })).unwrap();
     std::fs::write(root.join("greeting_evaluation.yml"), yaml).unwrap();
     assert!(e.run().await.unwrap().is_passed());
     std::fs::write(
@@ -330,7 +330,7 @@ async fn loads_yaml_json_and_jsonl_with_the_same_data_and_explicit_paths() {
     let files = [
         (
             "yml",
-            serde_yaml::to_string(&json!({ "cases": rows(&greeting()) })).unwrap(),
+            serde_norway::to_string(&json!({ "cases": rows(&greeting()) })).unwrap(),
         ),
         ("json", rows(&greeting()).to_string()),
         ("jsonl", greeting()[0].to_h().to_string()),

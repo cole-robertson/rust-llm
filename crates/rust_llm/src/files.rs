@@ -682,6 +682,13 @@ impl ProviderUploads {
         }
     }
 
+    pub(crate) fn ids(&self) -> Vec<String> {
+        self.0
+            .lock()
+            .map(|m| m.values().map(|u| u.id.clone()).collect())
+            .unwrap_or_default()
+    }
+
     fn get(&self, scope: &str) -> Option<UploadedFile> {
         self.0.lock().ok().and_then(|m| m.get(scope).cloned())
     }
@@ -1002,9 +1009,19 @@ pub(crate) async fn discard_missing_uploads(
     connection: &Connection,
 ) -> Vec<UploadedFile> {
     let scope = provider_upload_scope(provider, config);
+    // `attachment_uploads`: each attachment once (`uniq(&:object_id)`), so a replacement shared
+    // by several originals is forgotten once.
+    let mut seen: Vec<&Attachment> = Vec::new();
     let uploads: Vec<(&Attachment, UploadedFile)> = messages
         .iter()
         .flat_map(|m| m.attachments.iter())
+        .filter(|a| {
+            let first = !seen.iter().any(|s| s.same_attachment(a));
+            if first {
+                seen.push(a);
+            }
+            first
+        })
         .filter_map(|a| a.provider_uploads().get(&scope).map(|u| (a, u)))
         .collect();
     // `names_file?`: the error message or the response body mentions the file id.
