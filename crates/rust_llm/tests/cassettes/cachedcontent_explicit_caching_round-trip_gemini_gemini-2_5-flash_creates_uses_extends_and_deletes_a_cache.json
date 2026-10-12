@@ -7,70 +7,70 @@
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 12:59:09 GMT",
+      "Date": "Sun, 11 Oct 2026 21:06:34 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=1267",
+      "Server-Timing": "gfet4t7; dur=1019",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"name\": \"cachedContents/be05os55n4l3j2bl8pytrcyyzxpel5lkghm74lqp\",\n  \"model\": \"models/gemini-2.5-flash\",\n  \"createTime\": \"2026-10-07T12:59:09.716557Z\",\n  \"updateTime\": \"2026-10-07T12:59:09.716557Z\",\n  \"expireTime\": \"2026-10-07T13:04:08.748550361Z\",\n  \"displayName\": \"\",\n  \"usageMetadata\": {\n    \"totalTokenCount\": 9609\n  }\n}\n"
+    "response_body": "{\n  \"name\": \"cachedContents/tge9fvjuu3ynjcnfreo464j9siocup64xsgtx1va\",\n  \"model\": \"models/gemini-2.5-flash\",\n  \"createTime\": \"2026-10-11T21:06:34.072594Z\",\n  \"updateTime\": \"2026-10-11T21:06:34.072594Z\",\n  \"expireTime\": \"2026-10-11T21:11:33.246238522Z\",\n  \"displayName\": \"\",\n  \"usageMetadata\": {\n    \"totalTokenCount\": 9609\n  }\n}\n"
   },
   {
     "method": "post",
     "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"In one short sentence, what does the cached handbook describe?\"}]}],\"generationConfig\":{},\"cachedContent\":\"cachedContents/be05os55n4l3j2bl8pytrcyyzxpel5lkghm74lqp\"}",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"In one short sentence, what does the cached handbook describe?\"}]}],\"generationConfig\":{},\"cachedContent\":\"cachedContents/tge9fvjuu3ynjcnfreo464j9siocup64xsgtx1va\"}",
     "status": 200,
     "response_headers": {
       "X-Gemini-Service-Tier": "standard",
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 12:59:11 GMT",
+      "Date": "Sun, 11 Oct 2026 21:06:35 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=1418",
+      "Server-Timing": "gfet4t7; dur=1406",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"The RubyLLM release engineering handbook describes the crucial checks—cassette hygiene, provider wire format drift, backwards compatibility, and documentation accuracy—that every change must pass before release.\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 9622,\n    \"candidatesTokenCount\": 36,\n    \"totalTokenCount\": 9750,\n    \"cachedContentTokenCount\": 9609,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 9622\n      }\n    ],\n    \"cacheTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 9609\n      }\n    ],\n    \"thoughtsTokenCount\": 92,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"HkLGaqbyBMrT28oP6Kzr8QE\"\n}\n"
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"The RubyLLM release engineering handbook describes cassette hygiene, provider wire format drift, backwards compatibility checks, and documentation accuracy reviews that every change must pass before release.\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 9622,\n    \"candidatesTokenCount\": 32,\n    \"totalTokenCount\": 9759,\n    \"cachedContentTokenCount\": 9609,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 9622\n      }\n    ],\n    \"cacheTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 9609\n      }\n    ],\n    \"thoughtsTokenCount\": 105,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"WvrLaoWGGL_Y7M8PtYypiAQ\"\n}\n"
   },
   {
     "method": "patch",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/cachedContents/be05os55n4l3j2bl8pytrcyyzxpel5lkghm74lqp",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/cachedContents/tge9fvjuu3ynjcnfreo464j9siocup64xsgtx1va",
     "request_body": "{\"ttl\":\"600s\"}",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 12:59:11 GMT",
+      "Date": "Sun, 11 Oct 2026 21:06:36 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=437",
+      "Server-Timing": "gfet4t7; dur=396",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"name\": \"cachedContents/be05os55n4l3j2bl8pytrcyyzxpel5lkghm74lqp\",\n  \"model\": \"models/gemini-2.5-flash\",\n  \"createTime\": \"2026-10-07T12:59:09.716557Z\",\n  \"updateTime\": \"2026-10-07T12:59:11.758088Z\",\n  \"expireTime\": \"2026-10-07T13:09:11.569893994Z\",\n  \"displayName\": \"\",\n  \"usageMetadata\": {\n    \"totalTokenCount\": 9609\n  }\n}\n"
+    "response_body": "{\n  \"name\": \"cachedContents/tge9fvjuu3ynjcnfreo464j9siocup64xsgtx1va\",\n  \"model\": \"models/gemini-2.5-flash\",\n  \"createTime\": \"2026-10-11T21:06:34.072594Z\",\n  \"updateTime\": \"2026-10-11T21:06:36.006460Z\",\n  \"expireTime\": \"2026-10-11T21:16:35.814581223Z\",\n  \"displayName\": \"\",\n  \"usageMetadata\": {\n    \"totalTokenCount\": 9609\n  }\n}\n"
   },
   {
     "method": "delete",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/cachedContents/be05os55n4l3j2bl8pytrcyyzxpel5lkghm74lqp",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/cachedContents/tge9fvjuu3ynjcnfreo464j9siocup64xsgtx1va",
     "request_body": "",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 12:59:12 GMT",
+      "Date": "Sun, 11 Oct 2026 21:06:36 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=653",
+      "Server-Timing": "gfet4t7; dur=667",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },

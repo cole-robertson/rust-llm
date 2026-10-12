@@ -5,7 +5,7 @@
     "request_body": "{\"model\":\"pplx-embed-v1-0.6b\",\"input\":\"Ruby is a programmer's best friend\"}",
     "status": 200,
     "response_headers": {
-      "Date": "Wed, 07 Oct 2026 12:59:57 GMT",
+      "Date": "Sun, 11 Oct 2026 21:06:48 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
@@ -13,7 +13,7 @@
       "Server": "cloudflare",
       "X-Ratelimit-Limit": "83",
       "X-Ratelimit-Remaining": "82",
-      "X-Ratelimit-Reset": "1791377998",
+      "X-Ratelimit-Reset": "1791752809",
       "X-Ratelimit-Used": "1",
       "X-Request-Id": "<X_REQUEST_ID>",
       "Access-Control-Allow-Origin": "*",

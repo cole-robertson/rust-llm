@@ -8,41 +8,41 @@
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Date": "Wed, 07 Oct 2026 12:59:43 GMT",
+      "Date": "Sun, 11 Oct 2026 21:06:33 GMT",
       "Server": "elb",
       "Vary": "origin, access-control-request-method, access-control-request-headers",
       "Access-Control-Allow-Credentials": "true",
-      "X-Ds-Trace-Id": "9582836dc29774afd0846469e3ac7486",
+      "X-Ds-Trace-Id": "7197a3c4806f1a5bca4b320bd0a9e1b0",
       "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
       "X-Content-Type-Options": "nosniff",
       "X-Cache": "Miss from cloudfront",
-      "Via": "1.1 39bfdef5214f9c839a46e8b9d63b9046.cloudfront.net (CloudFront)",
-      "X-Amz-Cf-Pop": "TXL52-P3",
-      "X-Amz-Cf-Id": "7CA1JNQV5jRkt8De7KWC79aTMXw0nSO47YuQ4B1CztUEJOclNfwEgw=="
+      "Via": "1.1 192214f2b714ecde75ddd74c51389aaa.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL52-P2",
+      "X-Amz-Cf-Id": "npsjI8rSeAtAsx2YOXmkHlsNCGYCR3Z_wxjkcU0vZ8GnaTMPaEviLw=="
     },
-    "response_body": "{\"id\":\"701f3e75-eee3-4ce9-a0d5-4216e5eea817\",\"object\":\"chat.completion\",\"created\":1791377983,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The file `ruby.txt` contains the text:\\n\\n`Ruby is the best.`\",\"reasoning_content\":\"We need answer user asks \\\"What's in this file?\\\" with file name ruby.txt mime_type text/plain content \\\"Ruby is the best.\\\" Need respond. Simple. Could quote content. Need maybe mention file contains text: \\\"Ruby is the best.\\\" final. Ensure no extra. \"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":59,\"completion_tokens\":78,\"total_tokens\":137,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":59},\"prompt_cache_hit_tokens\":0,\"prompt_cache_miss_tokens\":59},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+    "response_body": "{\"id\":\"81e8f9b0-de0c-4bea-90b2-20d94ce00dd0\",\"object\":\"chat.completion\",\"created\":1791752793,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The file `ruby.txt` contains the text:\\n\\n`Ruby is the best.`\",\"reasoning_content\":\"We need answer. User asks \\\"What's in this file?\\\" with file name ruby.txt mime text/plain content \\\"Ruby is the best.\\\" Need respond. Simple. Mention content. Could say file contains text: \\\"Ruby is the best.\\\" Ensure no extra. Maybe note filename. Final.\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":59,\"completion_tokens\":79,\"total_tokens\":138,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":60},\"prompt_cache_hit_tokens\":0,\"prompt_cache_miss_tokens\":59},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
   },
   {
     "method": "post",
     "uri": "https://api.deepseek.com/chat/completions",
-    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What's in this file?\"},{\"type\":\"text\",\"text\":\"<file name='ruby.txt' mime_type='text/plain'>Ruby is the best.</file>\"}]},{\"role\":\"assistant\",\"content\":\"The file `ruby.txt` contains the text:\\n\\n`Ruby is the best.`\",\"reasoning_content\":\"We need answer user asks \\\"What's in this file?\\\" with file name ruby.txt mime_type text/plain content \\\"Ruby is the best.\\\" Need respond. Simple. Could quote content. Need maybe mention file contains text: \\\"Ruby is the best.\\\" final. Ensure no extra. \",\"reasoning\":\"We need answer user asks \\\"What's in this file?\\\" with file name ruby.txt mime_type text/plain content \\\"Ruby is the best.\\\" Need respond. Simple. Could quote content. Need maybe mention file contains text: \\\"Ruby is the best.\\\" final. Ensure no extra. \"},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"and in this one?\"},{\"type\":\"text\",\"text\":\"<file name='ruby.xml' mime_type='application/xml'><truism>Ruby is the best</truism></file>\"}]}],\"stream\":false}",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What's in this file?\"},{\"type\":\"text\",\"text\":\"<file name='ruby.txt' mime_type='text/plain'>Ruby is the best.</file>\"}]},{\"role\":\"assistant\",\"content\":\"The file `ruby.txt` contains the text:\\n\\n`Ruby is the best.`\",\"reasoning_content\":\"We need answer. User asks \\\"What's in this file?\\\" with file name ruby.txt mime text/plain content \\\"Ruby is the best.\\\" Need respond. Simple. Mention content. Could say file contains text: \\\"Ruby is the best.\\\" Ensure no extra. Maybe note filename. Final.\",\"reasoning\":\"We need answer. User asks \\\"What's in this file?\\\" with file name ruby.txt mime text/plain content \\\"Ruby is the best.\\\" Need respond. Simple. Mention content. Could say file contains text: \\\"Ruby is the best.\\\" Ensure no extra. Maybe note filename. Final.\"},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"and in this one?\"},{\"type\":\"text\",\"text\":\"<file name='ruby.xml' mime_type='application/xml'><truism>Ruby is the best</truism></file>\"}]}],\"stream\":false}",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Date": "Wed, 07 Oct 2026 12:59:45 GMT",
+      "Date": "Sun, 11 Oct 2026 21:06:34 GMT",
       "Server": "elb",
       "Vary": "origin, access-control-request-method, access-control-request-headers",
       "Access-Control-Allow-Credentials": "true",
-      "X-Ds-Trace-Id": "3523e05d0be0a1ae049ad44e660d80aa",
+      "X-Ds-Trace-Id": "662a0991f875d12baee2b621210873b3",
       "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
       "X-Content-Type-Options": "nosniff",
       "X-Cache": "Miss from cloudfront",
-      "Via": "1.1 1444224b4b97d67af7507c4e96f65844.cloudfront.net (CloudFront)",
-      "X-Amz-Cf-Pop": "TXL50-P1",
-      "X-Amz-Cf-Id": "BYuzGelrrv-4PowDEMVFqfn90jwj7_wC_dORWj5fGjNCDLuiUaJpsA=="
+      "Via": "1.1 12414973c2da1422517a5a4e585ff6a8.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL50-P5",
+      "X-Amz-Cf-Id": "f-LgJiejyOoFKTCE2oNAKk6cQNsS1FoSuTJRBvf7OPbbfIJvwsj6dg=="
     },
-    "response_body": "{\"id\":\"7c67db70-f5f2-4724-8678-6a39da1d7907\",\"object\":\"chat.completion\",\"created\":1791377984,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The file `ruby.xml` contains an XML element:\\n\\n```xml\\n<truism>Ruby is the best</truism>\\n```\\n\\nSo its content is the text **“Ruby is the best”** inside a `<truism>` tag.\",\"reasoning_content\":\"We need answer. User asks \\\"and in this one?\\\" referencing ruby.xml. Need describe contents. We need parse. File name ruby.xml mime application/xml, content: <truism>Ruby is the best</truism>. So it's an XML document with root element <truism> containing text \\\"Ruby is the best\\\". No period. Need answer. Ensure not overcomplicate. Maybe mention XML. We can answer: It contains an XML element named `truism` with the text `Ruby is the best`.\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":118,\"completion_tokens\":165,\"total_tokens\":283,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":112},\"prompt_cache_hit_tokens\":0,\"prompt_cache_miss_tokens\":118},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+    "response_body": "{\"id\":\"33efc76e-399e-4522-9c6d-870372ed61bf\",\"object\":\"chat.completion\",\"created\":1791752794,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The file `ruby.xml` contains an XML document with a single root element:\\n\\n```xml\\n<truism>Ruby is the best</truism>\\n```\\n\\nSo the text inside is: **“Ruby is the best”**.\",\"reasoning_content\":\"We need answer user asks \\\"and in this one?\\\" referring to ruby.xml. Need describe contents. File name ruby.xml mime application/xml. Content: <truism>Ruby is the best</truism>. So it's an XML document with a root element <truism> containing text \\\"Ruby is the best\\\". Note no period maybe. Need answer concise. Ensure no mention maybe. We can say it contains an XML element truism with text. Let's craft.\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":118,\"completion_tokens\":149,\"total_tokens\":267,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":100},\"prompt_cache_hit_tokens\":0,\"prompt_cache_miss_tokens\":118},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
   }
 ]

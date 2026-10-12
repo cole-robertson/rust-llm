@@ -8,15 +8,15 @@
       "X-Gemini-Service-Tier": "standard",
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 13:07:40 GMT",
+      "Date": "Sun, 11 Oct 2026 21:09:10 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=5294",
+      "Server-Timing": "gfet4t7; dur=2667",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"I see a stylized, bright red gemstone, strongly resembling a **ruby**.\\n\\nHere are some details:\\n*   It has a **faceted surface**, with numerous triangular and trapezoidal cuts that reflect light.\\n*   The color is a rich, deep **red**, with lighter crimson and white highlights on its edges and faces, indicating a glossy or polished texture.\\n*   There are darker maroon and shadowed areas, giving it a **three-dimensional** appearance.\\n*   The overall shape is somewhat irregular, with a distinct diagonal line through its upper portion, and a soft, rounded outline.\\n*   It is set against a plain **white background**.\\n\\nThis image is widely recognized as the **logo for the Ruby programming language**.\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 267,\n    \"candidatesTokenCount\": 151,\n    \"totalTokenCount\": 1130,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 9\n      },\n      {\n        \"modality\": \"IMAGE\",\n        \"tokenCount\": 258\n      }\n    ],\n    \"thoughtsTokenCount\": 712,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"FkTGarazO_GpvdIPs4SRoAY\"\n}\n"
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"This image shows a **red, faceted gemstone**, specifically resembling a **ruby**.\\n\\nIt is widely recognized as the official **logo for the Ruby programming language**.\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 267,\n    \"candidatesTokenCount\": 32,\n    \"totalTokenCount\": 690,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 9\n      },\n      {\n        \"modality\": \"IMAGE\",\n        \"tokenCount\": 258\n      }\n    ],\n    \"thoughtsTokenCount\": 391,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"9PrLapHUDvSX28oP7vmu8Q4\"\n}\n"
   }
 ]

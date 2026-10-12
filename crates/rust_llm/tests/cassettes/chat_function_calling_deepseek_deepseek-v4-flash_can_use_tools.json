@@ -8,41 +8,41 @@
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Date": "Wed, 07 Oct 2026 12:59:19 GMT",
+      "Date": "Sun, 11 Oct 2026 21:06:18 GMT",
       "Server": "elb",
       "Vary": "origin, access-control-request-method, access-control-request-headers",
       "Access-Control-Allow-Credentials": "true",
-      "X-Ds-Trace-Id": "b067b3f34d2e581676b692480552aea3",
+      "X-Ds-Trace-Id": "eb042f532d7fce7c4c3235e71fc5331a",
       "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
       "X-Content-Type-Options": "nosniff",
       "X-Cache": "Miss from cloudfront",
-      "Via": "1.1 d4d2d9b3df2f8762a36368cd377cdd3c.cloudfront.net (CloudFront)",
-      "X-Amz-Cf-Pop": "TXL52-P4",
-      "X-Amz-Cf-Id": "t4I_QiemTK1JY0KYd_6I2X-xVql8rezhqZ83MH8D8liMPZmEZJVSiA=="
+      "Via": "1.1 df242d25ee40c422308e69e57aadf5e6.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL50-P5",
+      "X-Amz-Cf-Id": "UtqU0m7gdH6fGdI609TRpysYxcHkXQ-yTce7nzTyhENJx6hnbJImRA=="
     },
-    "response_body": "{\"id\":\"691555ec-33a0-419f-bfd5-dbcb7b5c13b4\",\"object\":\"chat.completion\",\"created\":1791377959,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning_content\":\"Simple weather query.\",\"tool_calls\":[{\"index\":0,\"id\":\"call_00_OxOXQ3wirsxn9kMUygcu3342\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\": \\\"52.5200\\\", \\\"longitude\\\": \\\"13.4050\\\"}\"}}]},\"logprobs\":null,\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":364,\"completion_tokens\":64,\"total_tokens\":428,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens_details\":{\"reasoning_tokens\":4},\"prompt_cache_hit_tokens\":0,\"prompt_cache_miss_tokens\":364},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+    "response_body": "{\"id\":\"8c059ee5-1aee-427f-a394-a39f17fdd4a3\",\"object\":\"chat.completion\",\"created\":1791752778,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning_content\":\"We need answer using weather tool. Let's call.\",\"tool_calls\":[{\"index\":0,\"id\":\"call_00_NXFQGkdJktxpvl5MXp0N2421\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\": \\\"52.5200\\\", \\\"longitude\\\": \\\"13.4050\\\"}\"}}]},\"logprobs\":null,\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":364,\"completion_tokens\":71,\"total_tokens\":435,\"prompt_tokens_details\":{\"cached_tokens\":128},\"completion_tokens_details\":{\"reasoning_tokens\":11},\"prompt_cache_hit_tokens\":128,\"prompt_cache_miss_tokens\":236},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
   },
   {
     "method": "post",
     "uri": "https://api.deepseek.com/chat/completions",
-    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin? (52.5200, 13.4050)\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_00_OxOXQ3wirsxn9kMUygcu3342\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}],\"reasoning_content\":\"Simple weather query.\",\"reasoning\":\"Simple weather query.\"},{\"role\":\"tool\",\"content\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_00_OxOXQ3wirsxn9kMUygcu3342\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}]}",
+    "request_body": "{\"model\":\"deepseek-v4-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"What's the weather in Berlin? (52.5200, 13.4050)\"},{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_00_NXFQGkdJktxpvl5MXp0N2421\",\"type\":\"function\",\"function\":{\"name\":\"weather\",\"arguments\":\"{\\\"latitude\\\":\\\"52.5200\\\",\\\"longitude\\\":\\\"13.4050\\\"}\"}}],\"reasoning_content\":\"We need answer using weather tool. Let's call.\",\"reasoning\":\"We need answer using weather tool. Let's call.\"},{\"role\":\"tool\",\"content\":\"Current weather at 52.5200, 13.4050: 15°C, Wind: 10 km/h\",\"tool_call_id\":\"call_00_NXFQGkdJktxpvl5MXp0N2421\"}],\"stream\":false,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"weather\",\"description\":\"Gets current weather for a location\",\"parameters\":{\"type\":\"object\",\"properties\":{\"latitude\":{\"type\":\"string\",\"description\":\"Latitude (e.g., 52.5200)\"},\"longitude\":{\"type\":\"string\",\"description\":\"Longitude (e.g., 13.4050)\"}},\"required\":[\"latitude\",\"longitude\"],\"additionalProperties\":false,\"strict\":true}}}]}",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Date": "Wed, 07 Oct 2026 12:59:20 GMT",
+      "Date": "Sun, 11 Oct 2026 21:06:19 GMT",
       "Server": "elb",
       "Vary": "origin, access-control-request-method, access-control-request-headers",
       "Access-Control-Allow-Credentials": "true",
-      "X-Ds-Trace-Id": "fde11cdfd952e83c13aa6214b243d613",
+      "X-Ds-Trace-Id": "842154eb949cba3fa5c23cb5dc0dff4c",
       "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
       "X-Content-Type-Options": "nosniff",
       "X-Cache": "Miss from cloudfront",
-      "Via": "1.1 634cb8ef257d85d9d03b5a4d492df944.cloudfront.net (CloudFront)",
-      "X-Amz-Cf-Pop": "TXL50-P1",
-      "X-Amz-Cf-Id": "tYg4ZdvD1qo45iFcp-h73F_XRp7n2gXfGsYFQkcwuxvobPWvixJqFQ=="
+      "Via": "1.1 d478b9a820d52f4705130f24b8ab6b94.cloudfront.net (CloudFront)",
+      "X-Amz-Cf-Pop": "TXL50-P6",
+      "X-Amz-Cf-Id": "di-8dgq7R0XLHhYSVLdxlNoglS6NgVESSoNgzeF4KynYmkDEoAG_gw=="
     },
-    "response_body": "{\"id\":\"ef5def4c-41d7-4b97-bcd9-6e922f8563c6\",\"object\":\"chat.completion\",\"created\":1791377960,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Here's the current weather for Berlin (52.5200, 13.4050):\\n\\n- **Temperature:** 15°C\\n- **Wind:** 10 km/h\\n\\nLet me know if you'd like any other details!\",\"reasoning_content\":\"\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":466,\"completion_tokens\":49,\"total_tokens\":515,\"prompt_tokens_details\":{\"cached_tokens\":256},\"completion_tokens_details\":{\"reasoning_tokens\":0},\"prompt_cache_hit_tokens\":256,\"prompt_cache_miss_tokens\":210},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
+    "response_body": "{\"id\":\"6c00262e-e034-45b9-8e1c-05d22305954a\",\"object\":\"chat.completion\",\"created\":1791752779,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Current weather in Berlin (52.5200, 13.4050): **15°C**, with winds at **10 km/h**.\",\"reasoning_content\":\"We need respond. Current weather in Berlin: 15°C, wind 10 km/h. Keep concise.\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":473,\"completion_tokens\":53,\"total_tokens\":526,\"prompt_tokens_details\":{\"cached_tokens\":256},\"completion_tokens_details\":{\"reasoning_tokens\":23},\"prompt_cache_hit_tokens\":256,\"prompt_cache_miss_tokens\":217},\"system_fingerprint\":\"aeb56401ca74e127821c4f9126dcb669\"}"
   }
 ]

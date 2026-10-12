@@ -6,39 +6,39 @@
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json",
-      "X-Build-Commit": "aca5aad1d053bda171888c526b817e0c61227261",
-      "X-Build-Time": "2026-10-06T19:15:30-07:00",
+      "X-Build-Commit": "fb036d5c394cd0c23173b2be8d69965e24bc9914",
+      "X-Build-Time": "2026-10-09T17:17:18-07:00",
       "X-Frame-Options": "DENY",
       "X-Request-Id": "<X_REQUEST_ID>",
-      "Content-Length": "863",
-      "Date": "Wed, 07 Oct 2026 13:07:58 GMT",
+      "Content-Length": "1212",
+      "Date": "Sun, 11 Oct 2026 21:08:51 GMT",
       "Server": "Google Frontend",
-      "X-Cloud-Trace-Context": "e2705d05f99e53ef429f8db77666fa62/17961368438248279261",
-      "Traceparent": "00-e2705d05f99e53ef429f8db77666fa62-f943996e61b38cdd-00",
+      "X-Cloud-Trace-Context": "07dc29cd5c04fc4ce18a7ee17b5c618f/1948639676797396452",
+      "Traceparent": "00-07dc29cd5c04fc4ce18a7ee17b5c618f-1b0af57632bda5e4-00",
       "Via": "1.1 google",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
     },
-    "response_body": "{\"id\":\"chatcmpl-537\",\"object\":\"chat.completion\",\"created\":1791378478,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The programming language **Ruby** was created by **Yukihiro “Matz” Matsumoto**. He began developing Ruby in 1993 and released the first public version (Ruby 0.95) in 1995. Matsumoto designed Ruby to be a simple, productive, and enjoyable language, blending elements from languages like Perl, Smalltalk, Eiffel, Ada, and Lisp.\",\"reasoning\":\"The user asks: \\\"Who is the creator of the programming language Ruby?\\\" Simple question. Answer: Yukihiro \\\"Matz\\\" Matsumoto. Possibly also mention created in mid-1990s. Provide answer.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":77,\"completion_tokens\":137,\"total_tokens\":214,\"prompt_tokens_details\":{\"cached_tokens\":48}}}\n"
+    "response_body": "{\"id\":\"chatcmpl-658\",\"object\":\"chat.completion\",\"created\":1791752931,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The programming language **Ruby** was created by **Yukihiro “Matz” Matsumoto**, a Japanese software engineer.  \\nMatsumoto began work on Ruby in 1993 and released the first public version (0.95) in December 1995. He designed Ruby to blend the best features of existing languages—such as Perl’s text‑processing prowess, Smalltalk’s pure object‑oriented model, and Python’s simplicity—while emphasizing programmer happiness and productivity. Since then, Matz has remained an active figure in the Ruby community, guiding its evolution and advocating for its philosophy of “optimizing for developer joy.”\",\"reasoning\":\"User asks: \\\"Who is the creator of the programming language Ruby?\\\" Simple answer: Yukihiro \\\"Matz\\\" Matsumoto, a Japanese programmer, created Ruby in the mid-1990s (1995). Provide details maybe. Need to respond in conversational tone.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":77,\"completion_tokens\":199,\"total_tokens\":276,\"prompt_tokens_details\":{\"cached_tokens\":48}}}\n"
   },
   {
     "method": "post",
     "uri": "https://ollama.com/v1/chat/completions",
-    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"Who is the creator of the programming language Ruby?\"},{\"role\":\"assistant\",\"content\":\"The programming language **Ruby** was created by **Yukihiro “Matz” Matsumoto**. He began developing Ruby in 1993 and released the first public version (Ruby 0.95) in 1995. Matsumoto designed Ruby to be a simple, productive, and enjoyable language, blending elements from languages like Perl, Smalltalk, Eiffel, Ada, and Lisp.\",\"reasoning\":\"The user asks: \\\"Who is the creator of the programming language Ruby?\\\" Simple question. Answer: Yukihiro \\\"Matz\\\" Matsumoto. Possibly also mention created in mid-1990s. Provide answer.\",\"reasoning_content\":\"The user asks: \\\"Who is the creator of the programming language Ruby?\\\" Simple question. Answer: Yukihiro \\\"Matz\\\" Matsumoto. Possibly also mention created in mid-1990s. Provide answer.\"},{\"role\":\"user\",\"content\":\"What year did he create Ruby?\"}],\"stream\":false}",
+    "request_body": "{\"model\":\"gpt-oss:120b\",\"messages\":[{\"role\":\"user\",\"content\":\"Who is the creator of the programming language Ruby?\"},{\"role\":\"assistant\",\"content\":\"The programming language **Ruby** was created by **Yukihiro “Matz” Matsumoto**, a Japanese software engineer.  \\nMatsumoto began work on Ruby in 1993 and released the first public version (0.95) in December 1995. He designed Ruby to blend the best features of existing languages—such as Perl’s text‑processing prowess, Smalltalk’s pure object‑oriented model, and Python’s simplicity—while emphasizing programmer happiness and productivity. Since then, Matz has remained an active figure in the Ruby community, guiding its evolution and advocating for its philosophy of “optimizing for developer joy.”\",\"reasoning\":\"User asks: \\\"Who is the creator of the programming language Ruby?\\\" Simple answer: Yukihiro \\\"Matz\\\" Matsumoto, a Japanese programmer, created Ruby in the mid-1990s (1995). Provide details maybe. Need to respond in conversational tone.\",\"reasoning_content\":\"User asks: \\\"Who is the creator of the programming language Ruby?\\\" Simple answer: Yukihiro \\\"Matz\\\" Matsumoto, a Japanese programmer, created Ruby in the mid-1990s (1995). Provide details maybe. Need to respond in conversational tone.\"},{\"role\":\"user\",\"content\":\"What year did he create Ruby?\"}],\"stream\":false}",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json",
-      "X-Build-Commit": "aca5aad1d053bda171888c526b817e0c61227261",
-      "X-Build-Time": "2026-10-06T19:15:30-07:00",
+      "X-Build-Commit": "fb036d5c394cd0c23173b2be8d69965e24bc9914",
+      "X-Build-Time": "2026-10-09T17:17:18-07:00",
       "X-Frame-Options": "DENY",
       "X-Request-Id": "<X_REQUEST_ID>",
-      "Content-Length": "910",
-      "Date": "Wed, 07 Oct 2026 13:07:59 GMT",
+      "Content-Length": "843",
+      "Date": "Sun, 11 Oct 2026 21:08:52 GMT",
       "Server": "Google Frontend",
-      "Traceparent": "00-ef4080e3d275988b7631906b8b353f9b-5524c08eed2dc60f-00",
-      "X-Cloud-Trace-Context": "ef4080e3d275988b7631906b8b353f9b/6135240312482547215",
+      "X-Cloud-Trace-Context": "2cb1e3b53d029577c6dc28fd2465e232/6506288301588510852",
+      "Traceparent": "00-2cb1e3b53d029577c6dc28fd2465e232-5a4afabd0e767884-00",
       "Via": "1.1 google",
-      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
+      "Alt-Svc": "h3=\":443\"; ma=2592000"
     },
-    "response_body": "{\"id\":\"chatcmpl-868\",\"object\":\"chat.completion\",\"created\":1791378479,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Yukihiro “Matz” Matsumoto began **designing and writing the first code for Ruby in 1993**. After a couple of years of development, the language’s first public release (Ruby 0.95) came out in **1995**. So you can think of Ruby as having been created in the early‑1990s, with 1993 marking its inception and 1995 marking its first public availability.\",\"reasoning\":\"User asks \\\"What year did he create Ruby?\\\" Clarify: He started developing in 1993, released first public version 1995. The creation year can be considered 1993 when development started. Provide both.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":176,\"completion_tokens\":149,\"total_tokens\":325,\"prompt_tokens_details\":{\"cached_tokens\":48}}}\n"
+    "response_body": "{\"id\":\"chatcmpl-131\",\"object\":\"chat.completion\",\"created\":1791752932,\"model\":\"gpt-oss:120b\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Yukihiro “Matz” Matsumoto began **developing Ruby in 1993**, and the language’s first public release (version 0.95) came out in **December 1995**. So the creation work started in 1993, with the initial public version appearing in 1995.\",\"reasoning\":\"The user asked: \\\"What year did he create Ruby?\\\" We need to answer. Ruby was created starting in 1993, first public release 1995. So answer year created? We can clarify: started development in 1993, released first version 1995. Provide answer.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":227,\"completion_tokens\":137,\"total_tokens\":364,\"prompt_tokens_details\":{\"cached_tokens\":48}}}\n"
   }
 ]

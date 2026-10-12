@@ -2,145 +2,69 @@
   {
     "method": "post",
     "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:batchGenerateContent",
-    "request_body": "{\"batch\":{\"displayName\":\"ruby_llm_d816ba2425599363\",\"inputConfig\":{\"requests\":{\"requests\":[{\"request\":{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is 2 + 2? Just the number.\"}]}],\"generationConfig\":{},\"model\":\"models/gemini-2.5-flash\"},\"metadata\":{\"custom_id\":\"0\"}},{\"request\":{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Name the largest planet in our solar system. One word.\"}]}],\"generationConfig\":{},\"model\":\"models/gemini-2.5-flash\"},\"metadata\":{\"custom_id\":\"1\"}}]}}}}",
+    "request_body": "{\"batch\":{\"displayName\":\"ruby_llm_eaf6a2d2cbb260cc\",\"inputConfig\":{\"requests\":{\"requests\":[{\"request\":{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is 2 + 2? Just the number.\"}]}],\"generationConfig\":{},\"model\":\"models/gemini-2.5-flash\"},\"metadata\":{\"custom_id\":\"0\"}},{\"request\":{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Name the largest planet in our solar system. One word.\"}]}],\"generationConfig\":{},\"model\":\"models/gemini-2.5-flash\"},\"metadata\":{\"custom_id\":\"1\"}}]}}}}",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 12:59:26 GMT",
+      "Date": "Sun, 11 Oct 2026 21:06:17 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=4523",
+      "Server-Timing": "gfet4t7; dur=5638",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_d816ba2425599363\",\n    \"createTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"updateTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_PENDING\",\n    \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\"\n  }\n}\n"
+    "response_body": "{\n  \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_eaf6a2d2cbb260cc\",\n    \"createTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"updateTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_PENDING\",\n    \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\"\n  }\n}\n"
   },
   {
     "method": "get",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw",
     "request_body": "",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 12:59:26 GMT",
+      "Date": "Sun, 11 Oct 2026 21:06:17 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=338",
+      "Server-Timing": "gfet4t7; dur=279",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_d816ba2425599363\",\n    \"createTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"updateTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\"\n  }\n}\n"
+    "response_body": "{\n  \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_eaf6a2d2cbb260cc\",\n    \"createTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"updateTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\"\n  }\n}\n"
   },
   {
     "method": "get",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw",
     "request_body": "",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 12:59:42 GMT",
+      "Date": "Sun, 11 Oct 2026 21:06:33 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=267",
+      "Server-Timing": "gfet4t7; dur=260",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_d816ba2425599363\",\n    \"createTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"updateTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\"\n  }\n}\n"
+    "response_body": "{\n  \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_eaf6a2d2cbb260cc\",\n    \"createTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"updateTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\"\n  }\n}\n"
   },
   {
     "method": "get",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw",
     "request_body": "",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 12:59:57 GMT",
-      "Server": "scaffolding on HTTPServer2",
-      "X-Xss-Protection": "0",
-      "X-Frame-Options": "SAMEORIGIN",
-      "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=294",
-      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
-      "Transfer-Encoding": "chunked"
-    },
-    "response_body": "{\n  \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_d816ba2425599363\",\n    \"createTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"updateTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\"\n  }\n}\n"
-  },
-  {
-    "method": "get",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f",
-    "request_body": "",
-    "status": 200,
-    "response_headers": {
-      "Content-Type": "application/json; charset=UTF-8",
-      "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 13:00:13 GMT",
-      "Server": "scaffolding on HTTPServer2",
-      "X-Xss-Protection": "0",
-      "X-Frame-Options": "SAMEORIGIN",
-      "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=308",
-      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
-      "Transfer-Encoding": "chunked"
-    },
-    "response_body": "{\n  \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_d816ba2425599363\",\n    \"createTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"updateTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\"\n  }\n}\n"
-  },
-  {
-    "method": "get",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f",
-    "request_body": "",
-    "status": 200,
-    "response_headers": {
-      "Content-Type": "application/json; charset=UTF-8",
-      "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 13:00:28 GMT",
-      "Server": "scaffolding on HTTPServer2",
-      "X-Xss-Protection": "0",
-      "X-Frame-Options": "SAMEORIGIN",
-      "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=294",
-      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
-      "Transfer-Encoding": "chunked"
-    },
-    "response_body": "{\n  \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_d816ba2425599363\",\n    \"createTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"updateTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\"\n  }\n}\n"
-  },
-  {
-    "method": "get",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f",
-    "request_body": "",
-    "status": 200,
-    "response_headers": {
-      "Content-Type": "application/json; charset=UTF-8",
-      "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 13:00:43 GMT",
-      "Server": "scaffolding on HTTPServer2",
-      "X-Xss-Protection": "0",
-      "X-Frame-Options": "SAMEORIGIN",
-      "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=262",
-      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
-      "Transfer-Encoding": "chunked"
-    },
-    "response_body": "{\n  \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_d816ba2425599363\",\n    \"createTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"updateTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\"\n  }\n}\n"
-  },
-  {
-    "method": "get",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f",
-    "request_body": "",
-    "status": 200,
-    "response_headers": {
-      "Content-Type": "application/json; charset=UTF-8",
-      "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 13:00:59 GMT",
+      "Date": "Sun, 11 Oct 2026 21:06:48 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
@@ -149,63 +73,120 @@
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_d816ba2425599363\",\n    \"createTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"updateTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\"\n  }\n}\n"
+    "response_body": "{\n  \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_eaf6a2d2cbb260cc\",\n    \"createTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"updateTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\"\n  }\n}\n"
   },
   {
     "method": "get",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw",
     "request_body": "",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 13:01:14 GMT",
+      "Date": "Sun, 11 Oct 2026 21:07:03 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=295",
+      "Server-Timing": "gfet4t7; dur=269",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_d816ba2425599363\",\n    \"createTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"updateTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\"\n  }\n}\n"
+    "response_body": "{\n  \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_eaf6a2d2cbb260cc\",\n    \"createTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"updateTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\"\n  }\n}\n"
   },
   {
     "method": "get",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw",
     "request_body": "",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 13:01:30 GMT",
+      "Date": "Sun, 11 Oct 2026 21:07:19 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=760",
+      "Server-Timing": "gfet4t7; dur=257",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_d816ba2425599363\",\n    \"output\": {\n      \"inlinedResponses\": {\n        \"inlinedResponses\": [\n          {\n            \"response\": {\n              \"candidates\": [\n                {\n                  \"content\": {\n                    \"parts\": [\n                      {\n                        \"text\": \"4\"\n                      }\n                    ],\n                    \"role\": \"model\"\n                  },\n                  \"finishReason\": \"STOP\",\n                  \"index\": 0\n                }\n              ],\n              \"usageMetadata\": {\n                \"promptTokenCount\": 13,\n                \"candidatesTokenCount\": 1,\n                \"totalTokenCount\": 57,\n                \"promptTokensDetails\": [\n                  {\n                    \"modality\": \"TEXT\",\n                    \"tokenCount\": 13\n                  }\n                ],\n                \"thoughtsTokenCount\": 43,\n                \"serviceTier\": \"standard\"\n              },\n              \"modelVersion\": \"gemini-2.5-flash\",\n              \"responseId\": \"mULGapOgDce1_uMPtPWnmQo\"\n            },\n            \"metadata\": {\n              \"custom_id\": \"0\"\n            }\n          },\n          {\n            \"response\": {\n              \"candidates\": [\n                {\n                  \"content\": {\n                    \"parts\": [\n                      {\n                        \"text\": \"Jupiter\"\n                      }\n                    ],\n                    \"role\": \"model\"\n                  },\n                  \"finishReason\": \"STOP\",\n                  \"index\": 0\n                }\n              ],\n              \"usageMetadata\": {\n                \"promptTokenCount\": 13,\n                \"candidatesTokenCount\": 1,\n                \"totalTokenCount\": 49,\n                \"promptTokensDetails\": [\n                  {\n                    \"modality\": \"TEXT\",\n                    \"tokenCount\": 13\n                  }\n                ],\n                \"thoughtsTokenCount\": 35,\n                \"serviceTier\": \"standard\"\n              },\n              \"modelVersion\": \"gemini-2.5-flash\",\n              \"responseId\": \"mULGarPuC4aY_uMP08yHsAQ\"\n            },\n            \"metadata\": {\n              \"custom_id\": \"1\"\n            }\n          }\n        ]\n      }\n    },\n    \"createTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"endTime\": \"2026-10-07T13:01:21.776623609Z\",\n    \"updateTime\": \"2026-10-07T13:01:21.776623639Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"successfulRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_SUCCEEDED\",\n    \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\"\n  },\n  \"done\": true,\n  \"response\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatchOutput\",\n    \"inlinedResponses\": {\n      \"inlinedResponses\": [\n        {\n          \"response\": {\n            \"candidates\": [\n              {\n                \"content\": {\n                  \"parts\": [\n                    {\n                      \"text\": \"4\"\n                    }\n                  ],\n                  \"role\": \"model\"\n                },\n                \"finishReason\": \"STOP\",\n                \"index\": 0\n              }\n            ],\n            \"usageMetadata\": {\n              \"promptTokenCount\": 13,\n              \"candidatesTokenCount\": 1,\n              \"totalTokenCount\": 57,\n              \"promptTokensDetails\": [\n                {\n                  \"modality\": \"TEXT\",\n                  \"tokenCount\": 13\n                }\n              ],\n              \"thoughtsTokenCount\": 43,\n              \"serviceTier\": \"standard\"\n            },\n            \"modelVersion\": \"gemini-2.5-flash\",\n            \"responseId\": \"mULGapOgDce1_uMPtPWnmQo\"\n          },\n          \"metadata\": {\n            \"custom_id\": \"0\"\n          }\n        },\n        {\n          \"response\": {\n            \"candidates\": [\n              {\n                \"content\": {\n                  \"parts\": [\n                    {\n                      \"text\": \"Jupiter\"\n                    }\n                  ],\n                  \"role\": \"model\"\n                },\n                \"finishReason\": \"STOP\",\n                \"index\": 0\n              }\n            ],\n            \"usageMetadata\": {\n              \"promptTokenCount\": 13,\n              \"candidatesTokenCount\": 1,\n              \"totalTokenCount\": 49,\n              \"promptTokensDetails\": [\n                {\n                  \"modality\": \"TEXT\",\n                  \"tokenCount\": 13\n                }\n              ],\n              \"thoughtsTokenCount\": 35,\n              \"serviceTier\": \"standard\"\n            },\n            \"modelVersion\": \"gemini-2.5-flash\",\n            \"responseId\": \"mULGarPuC4aY_uMP08yHsAQ\"\n          },\n          \"metadata\": {\n            \"custom_id\": \"1\"\n          }\n        }\n      ]\n    }\n  }\n}\n"
+    "response_body": "{\n  \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_eaf6a2d2cbb260cc\",\n    \"createTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"updateTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\"\n  }\n}\n"
   },
   {
     "method": "get",
-    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw",
     "request_body": "",
     "status": 200,
     "response_headers": {
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 13:01:31 GMT",
+      "Date": "Sun, 11 Oct 2026 21:07:34 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=638",
+      "Server-Timing": "gfet4t7; dur=293",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_d816ba2425599363\",\n    \"output\": {\n      \"inlinedResponses\": {\n        \"inlinedResponses\": [\n          {\n            \"response\": {\n              \"candidates\": [\n                {\n                  \"content\": {\n                    \"parts\": [\n                      {\n                        \"text\": \"4\"\n                      }\n                    ],\n                    \"role\": \"model\"\n                  },\n                  \"finishReason\": \"STOP\",\n                  \"index\": 0\n                }\n              ],\n              \"usageMetadata\": {\n                \"promptTokenCount\": 13,\n                \"candidatesTokenCount\": 1,\n                \"totalTokenCount\": 57,\n                \"promptTokensDetails\": [\n                  {\n                    \"modality\": \"TEXT\",\n                    \"tokenCount\": 13\n                  }\n                ],\n                \"thoughtsTokenCount\": 43,\n                \"serviceTier\": \"standard\"\n              },\n              \"modelVersion\": \"gemini-2.5-flash\",\n              \"responseId\": \"mULGapOgDce1_uMPtPWnmQo\"\n            },\n            \"metadata\": {\n              \"custom_id\": \"0\"\n            }\n          },\n          {\n            \"response\": {\n              \"candidates\": [\n                {\n                  \"content\": {\n                    \"parts\": [\n                      {\n                        \"text\": \"Jupiter\"\n                      }\n                    ],\n                    \"role\": \"model\"\n                  },\n                  \"finishReason\": \"STOP\",\n                  \"index\": 0\n                }\n              ],\n              \"usageMetadata\": {\n                \"promptTokenCount\": 13,\n                \"candidatesTokenCount\": 1,\n                \"totalTokenCount\": 49,\n                \"promptTokensDetails\": [\n                  {\n                    \"modality\": \"TEXT\",\n                    \"tokenCount\": 13\n                  }\n                ],\n                \"thoughtsTokenCount\": 35,\n                \"serviceTier\": \"standard\"\n              },\n              \"modelVersion\": \"gemini-2.5-flash\",\n              \"responseId\": \"mULGarPuC4aY_uMP08yHsAQ\"\n            },\n            \"metadata\": {\n              \"custom_id\": \"1\"\n            }\n          }\n        ]\n      }\n    },\n    \"createTime\": \"2026-10-07T12:59:22.296521900Z\",\n    \"endTime\": \"2026-10-07T13:01:21.776623609Z\",\n    \"updateTime\": \"2026-10-07T13:01:21.776623639Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"successfulRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_SUCCEEDED\",\n    \"name\": \"batches/17maar4qucuhd522py8xuguoxh4uvc2knf7f\"\n  },\n  \"done\": true,\n  \"response\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatchOutput\",\n    \"inlinedResponses\": {\n      \"inlinedResponses\": [\n        {\n          \"response\": {\n            \"candidates\": [\n              {\n                \"content\": {\n                  \"parts\": [\n                    {\n                      \"text\": \"4\"\n                    }\n                  ],\n                  \"role\": \"model\"\n                },\n                \"finishReason\": \"STOP\",\n                \"index\": 0\n              }\n            ],\n            \"usageMetadata\": {\n              \"promptTokenCount\": 13,\n              \"candidatesTokenCount\": 1,\n              \"totalTokenCount\": 57,\n              \"promptTokensDetails\": [\n                {\n                  \"modality\": \"TEXT\",\n                  \"tokenCount\": 13\n                }\n              ],\n              \"thoughtsTokenCount\": 43,\n              \"serviceTier\": \"standard\"\n            },\n            \"modelVersion\": \"gemini-2.5-flash\",\n            \"responseId\": \"mULGapOgDce1_uMPtPWnmQo\"\n          },\n          \"metadata\": {\n            \"custom_id\": \"0\"\n          }\n        },\n        {\n          \"response\": {\n            \"candidates\": [\n              {\n                \"content\": {\n                  \"parts\": [\n                    {\n                      \"text\": \"Jupiter\"\n                    }\n                  ],\n                  \"role\": \"model\"\n                },\n                \"finishReason\": \"STOP\",\n                \"index\": 0\n              }\n            ],\n            \"usageMetadata\": {\n              \"promptTokenCount\": 13,\n              \"candidatesTokenCount\": 1,\n              \"totalTokenCount\": 49,\n              \"promptTokensDetails\": [\n                {\n                  \"modality\": \"TEXT\",\n                  \"tokenCount\": 13\n                }\n              ],\n              \"thoughtsTokenCount\": 35,\n              \"serviceTier\": \"standard\"\n            },\n            \"modelVersion\": \"gemini-2.5-flash\",\n            \"responseId\": \"mULGarPuC4aY_uMP08yHsAQ\"\n          },\n          \"metadata\": {\n            \"custom_id\": \"1\"\n          }\n        }\n      ]\n    }\n  }\n}\n"
+    "response_body": "{\n  \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_eaf6a2d2cbb260cc\",\n    \"createTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"updateTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\"\n  }\n}\n"
+  },
+  {
+    "method": "get",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw",
+    "request_body": "",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Sun, 11 Oct 2026 21:07:49 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=239",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_eaf6a2d2cbb260cc\",\n    \"createTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"updateTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"pendingRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_RUNNING\",\n    \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\"\n  }\n}\n"
+  },
+  {
+    "method": "get",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw",
+    "request_body": "",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Sun, 11 Oct 2026 21:08:05 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=641",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_eaf6a2d2cbb260cc\",\n    \"output\": {\n      \"inlinedResponses\": {\n        \"inlinedResponses\": [\n          {\n            \"response\": {\n              \"candidates\": [\n                {\n                  \"content\": {\n                    \"parts\": [\n                      {\n                        \"text\": \"4\"\n                      }\n                    ],\n                    \"role\": \"model\"\n                  },\n                  \"finishReason\": \"STOP\",\n                  \"index\": 0\n                }\n              ],\n              \"usageMetadata\": {\n                \"promptTokenCount\": 13,\n                \"candidatesTokenCount\": 1,\n                \"totalTokenCount\": 58,\n                \"promptTokensDetails\": [\n                  {\n                    \"modality\": \"TEXT\",\n                    \"tokenCount\": 13\n                  }\n                ],\n                \"thoughtsTokenCount\": 44,\n                \"serviceTier\": \"standard\"\n              },\n              \"modelVersion\": \"gemini-2.5-flash\",\n              \"responseId\": \"pfrLaopZre3Psg_E6oSAAQ\"\n            },\n            \"metadata\": {\n              \"custom_id\": \"0\"\n            }\n          },\n          {\n            \"response\": {\n              \"candidates\": [\n                {\n                  \"content\": {\n                    \"parts\": [\n                      {\n                        \"text\": \"Jupiter\"\n                      }\n                    ],\n                    \"role\": \"model\"\n                  },\n                  \"finishReason\": \"STOP\",\n                  \"index\": 0\n                }\n              ],\n              \"usageMetadata\": {\n                \"promptTokenCount\": 13,\n                \"candidatesTokenCount\": 1,\n                \"totalTokenCount\": 67,\n                \"promptTokensDetails\": [\n                  {\n                    \"modality\": \"TEXT\",\n                    \"tokenCount\": 13\n                  }\n                ],\n                \"thoughtsTokenCount\": 53,\n                \"serviceTier\": \"standard\"\n              },\n              \"modelVersion\": \"gemini-2.5-flash\",\n              \"responseId\": \"pfrLaqhv-eOq2w-wq725Cg\"\n            },\n            \"metadata\": {\n              \"custom_id\": \"1\"\n            }\n          }\n        ]\n      }\n    },\n    \"createTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"endTime\": \"2026-10-11T21:08:01.996440369Z\",\n    \"updateTime\": \"2026-10-11T21:08:01.996440405Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"successfulRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_SUCCEEDED\",\n    \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\"\n  },\n  \"done\": true,\n  \"response\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatchOutput\",\n    \"inlinedResponses\": {\n      \"inlinedResponses\": [\n        {\n          \"response\": {\n            \"candidates\": [\n              {\n                \"content\": {\n                  \"parts\": [\n                    {\n                      \"text\": \"4\"\n                    }\n                  ],\n                  \"role\": \"model\"\n                },\n                \"finishReason\": \"STOP\",\n                \"index\": 0\n              }\n            ],\n            \"usageMetadata\": {\n              \"promptTokenCount\": 13,\n              \"candidatesTokenCount\": 1,\n              \"totalTokenCount\": 58,\n              \"promptTokensDetails\": [\n                {\n                  \"modality\": \"TEXT\",\n                  \"tokenCount\": 13\n                }\n              ],\n              \"thoughtsTokenCount\": 44,\n              \"serviceTier\": \"standard\"\n            },\n            \"modelVersion\": \"gemini-2.5-flash\",\n            \"responseId\": \"pfrLaopZre3Psg_E6oSAAQ\"\n          },\n          \"metadata\": {\n            \"custom_id\": \"0\"\n          }\n        },\n        {\n          \"response\": {\n            \"candidates\": [\n              {\n                \"content\": {\n                  \"parts\": [\n                    {\n                      \"text\": \"Jupiter\"\n                    }\n                  ],\n                  \"role\": \"model\"\n                },\n                \"finishReason\": \"STOP\",\n                \"index\": 0\n              }\n            ],\n            \"usageMetadata\": {\n              \"promptTokenCount\": 13,\n              \"candidatesTokenCount\": 1,\n              \"totalTokenCount\": 67,\n              \"promptTokensDetails\": [\n                {\n                  \"modality\": \"TEXT\",\n                  \"tokenCount\": 13\n                }\n              ],\n              \"thoughtsTokenCount\": 53,\n              \"serviceTier\": \"standard\"\n            },\n            \"modelVersion\": \"gemini-2.5-flash\",\n            \"responseId\": \"pfrLaqhv-eOq2w-wq725Cg\"\n          },\n          \"metadata\": {\n            \"custom_id\": \"1\"\n          }\n        }\n      ]\n    }\n  }\n}\n"
+  },
+  {
+    "method": "get",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw",
+    "request_body": "",
+    "status": 200,
+    "response_headers": {
+      "Content-Type": "application/json; charset=UTF-8",
+      "Vary": "Origin",
+      "Date": "Sun, 11 Oct 2026 21:08:06 GMT",
+      "Server": "scaffolding on HTTPServer2",
+      "X-Xss-Protection": "0",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Server-Timing": "gfet4t7; dur=584",
+      "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+      "Transfer-Encoding": "chunked"
+    },
+    "response_body": "{\n  \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\",\n  \"metadata\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatch\",\n    \"model\": \"models/gemini-2.5-flash\",\n    \"displayName\": \"ruby_llm_eaf6a2d2cbb260cc\",\n    \"output\": {\n      \"inlinedResponses\": {\n        \"inlinedResponses\": [\n          {\n            \"response\": {\n              \"candidates\": [\n                {\n                  \"content\": {\n                    \"parts\": [\n                      {\n                        \"text\": \"4\"\n                      }\n                    ],\n                    \"role\": \"model\"\n                  },\n                  \"finishReason\": \"STOP\",\n                  \"index\": 0\n                }\n              ],\n              \"usageMetadata\": {\n                \"promptTokenCount\": 13,\n                \"candidatesTokenCount\": 1,\n                \"totalTokenCount\": 58,\n                \"promptTokensDetails\": [\n                  {\n                    \"modality\": \"TEXT\",\n                    \"tokenCount\": 13\n                  }\n                ],\n                \"thoughtsTokenCount\": 44,\n                \"serviceTier\": \"standard\"\n              },\n              \"modelVersion\": \"gemini-2.5-flash\",\n              \"responseId\": \"pfrLaopZre3Psg_E6oSAAQ\"\n            },\n            \"metadata\": {\n              \"custom_id\": \"0\"\n            }\n          },\n          {\n            \"response\": {\n              \"candidates\": [\n                {\n                  \"content\": {\n                    \"parts\": [\n                      {\n                        \"text\": \"Jupiter\"\n                      }\n                    ],\n                    \"role\": \"model\"\n                  },\n                  \"finishReason\": \"STOP\",\n                  \"index\": 0\n                }\n              ],\n              \"usageMetadata\": {\n                \"promptTokenCount\": 13,\n                \"candidatesTokenCount\": 1,\n                \"totalTokenCount\": 67,\n                \"promptTokensDetails\": [\n                  {\n                    \"modality\": \"TEXT\",\n                    \"tokenCount\": 13\n                  }\n                ],\n                \"thoughtsTokenCount\": 53,\n                \"serviceTier\": \"standard\"\n              },\n              \"modelVersion\": \"gemini-2.5-flash\",\n              \"responseId\": \"pfrLaqhv-eOq2w-wq725Cg\"\n            },\n            \"metadata\": {\n              \"custom_id\": \"1\"\n            }\n          }\n        ]\n      }\n    },\n    \"createTime\": \"2026-10-11T21:06:12.386266376Z\",\n    \"endTime\": \"2026-10-11T21:08:01.996440369Z\",\n    \"updateTime\": \"2026-10-11T21:08:01.996440405Z\",\n    \"batchStats\": {\n      \"requestCount\": \"2\",\n      \"successfulRequestCount\": \"2\"\n    },\n    \"state\": \"BATCH_STATE_SUCCEEDED\",\n    \"name\": \"batches/fe705k6gb3migxan9qcyxnntgcuyj53zp4bw\"\n  },\n  \"done\": true,\n  \"response\": {\n    \"@type\": \"type.googleapis.com/google.ai.generativelanguage.v1main.GenerateContentBatchOutput\",\n    \"inlinedResponses\": {\n      \"inlinedResponses\": [\n        {\n          \"response\": {\n            \"candidates\": [\n              {\n                \"content\": {\n                  \"parts\": [\n                    {\n                      \"text\": \"4\"\n                    }\n                  ],\n                  \"role\": \"model\"\n                },\n                \"finishReason\": \"STOP\",\n                \"index\": 0\n              }\n            ],\n            \"usageMetadata\": {\n              \"promptTokenCount\": 13,\n              \"candidatesTokenCount\": 1,\n              \"totalTokenCount\": 58,\n              \"promptTokensDetails\": [\n                {\n                  \"modality\": \"TEXT\",\n                  \"tokenCount\": 13\n                }\n              ],\n              \"thoughtsTokenCount\": 44,\n              \"serviceTier\": \"standard\"\n            },\n            \"modelVersion\": \"gemini-2.5-flash\",\n            \"responseId\": \"pfrLaopZre3Psg_E6oSAAQ\"\n          },\n          \"metadata\": {\n            \"custom_id\": \"0\"\n          }\n        },\n        {\n          \"response\": {\n            \"candidates\": [\n              {\n                \"content\": {\n                  \"parts\": [\n                    {\n                      \"text\": \"Jupiter\"\n                    }\n                  ],\n                  \"role\": \"model\"\n                },\n                \"finishReason\": \"STOP\",\n                \"index\": 0\n              }\n            ],\n            \"usageMetadata\": {\n              \"promptTokenCount\": 13,\n              \"candidatesTokenCount\": 1,\n              \"totalTokenCount\": 67,\n              \"promptTokensDetails\": [\n                {\n                  \"modality\": \"TEXT\",\n                  \"tokenCount\": 13\n                }\n              ],\n              \"thoughtsTokenCount\": 53,\n              \"serviceTier\": \"standard\"\n            },\n            \"modelVersion\": \"gemini-2.5-flash\",\n            \"responseId\": \"pfrLaqhv-eOq2w-wq725Cg\"\n          },\n          \"metadata\": {\n            \"custom_id\": \"1\"\n          }\n        }\n      ]\n    }\n  }\n}\n"
   }
 ]

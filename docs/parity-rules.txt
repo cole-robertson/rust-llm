@@ -229,9 +229,9 @@ providers/mistral/chat_completions/batches_spec.rb:110	MISSING	no test for Mistr
 providers/mistral/chat_completions/batches_spec.rb:126	MISSING	no test for Mistral find_batch giving up after retries
 providers/mistral/chat_completions/batches_spec.rb:134	MISSING	no test that permission errors are not retried
 providers/mistral/chat_completions/batches_spec.rb:144	MISSING	no test for Mistral embedding result shapes
-providers/mistral/chat_completions/batches_spec.rb:158	MISSING	no test for failed Mistral embedding slot
-providers/mistral/chat_completions/batches_spec.rb:164	PORTED	crates/rust_llm/tests/batches.rs::providers_answer_staged_chats_and_append_the_answers_to_their_conversations
-providers/mistral/chat_completions/batches_spec.rb:184	MISSING	not replayed: embed_later takes one String, cassette stages an array
+providers/mistral/chat_completions/batches_spec.rb:159	MISSING	no test for failed Mistral embedding slot
+providers/mistral/chat_completions/batches_spec.rb:195	PORTED	crates/rust_llm/tests/batches.rs::providers_answer_staged_chats_and_append_the_answers_to_their_conversations
+providers/mistral/chat_completions/batches_spec.rb:215	MISSING	not replayed: embed_later takes one String, cassette stages an array
 providers/mistral/chat_spec.rb:30	MISSING	no test for Mistral moving system messages first
 providers/mistral/chat_spec.rb:42	MISSING	no test for Mistral prompt_cache_key
 providers/mistral/chat_spec.rb:48	MISSING	no test for Mistral rejecting unsupported caching options
@@ -1692,7 +1692,7 @@ mcp/client_spec.rb:42	PORTED	crates/rust_llm/tests/mcp.rs::raises_json_rpc_error
 mcp/client_spec.rb:51	PORTED	crates/rust_llm/tests/mcp.rs::falls_back_to_the_initialize_handshake_and_shakes_hands_again_after_closing
 mcp/client_spec.rb:57	PORTED	crates/rust_llm/tests/mcp.rs::falls_back_to_the_initialize_handshake_and_shakes_hands_again_after_closing
 mcp/client_spec.rb:61	PORTED	crates/rust_llm/tests/mcp.rs::falls_back_to_the_initialize_handshake_and_shakes_hands_again_after_closing
-mcp/client_spec.rb:182	PORTED	crates/rust_llm/tests/mcp.rs::falls_back_when_discovery_answers_without_2026_07_28
+mcp/client_spec.rb:210	PORTED	crates/rust_llm/tests/mcp.rs::falls_back_when_discovery_answers_without_2026_07_28
 mcp/http_spec.rb:24	PORTED	crates/rust_llm/src/mcp/http.rs::tests::refuses_plain_http_outside_loopback_and_urls_with_credentials
 mcp/http_spec.rb:29	PORTED	crates/rust_llm/src/mcp/http.rs::tests::refuses_plain_http_outside_loopback_and_urls_with_credentials
 mcp/http_spec.rb:34	PORTED	crates/rust_llm/tests/mcp.rs::http_sends_the_mcp_headers_mirrored_params_and_encoded_names
@@ -2120,7 +2120,7 @@ chat_unsupported_attachments_spec.rb:119	N/A	provider not ported: Cohere (the on
 # ---- lane RT (RubyLLM 2.1 request shapes, tool search) ----
 protocols/chat_completions/request_shapes_spec.rb:29	N/A	provider not ported: Cohere (the example renders a Cohere chat through Protocols::Cohere)
 # ---- lane P (2.1 parity wave): usage ledger, persistence, generators ----
-active_record/usage_ledger_spec.rb:105	N/A	provider not ported: Bedrock (guardrail moderation and its usage row)
+active_record/usage_ledger_spec.rb:106	N/A	provider not ported: Bedrock (guardrail moderation and its usage row)
 chat/tool_concurrency_rails_spec.rb:35	N/A	Ruby-only mechanism: Rails.error reporting of an error raised in a tool thread; a Rust tool error is returned to the caller (spec_chat_loop.rs), with no global error reporter to keep it out of
 chat/tool_concurrency_rails_spec.rb:57	N/A	Ruby-only mechanism: ActiveSupport::IsolatedExecutionState fiber isolation and Async reactors leasing Active Record connections per fiber; SeaORM pools return connections when the future drops them (spec_chat_methods_21.rs::returns_the_connections_concurrent_tools_lease_while_persisting_results)
 chat/tool_concurrency_rails_spec.rb:64	N/A	Ruby-only mechanism: ActiveSupport::IsolatedExecutionState fiber isolation leasing Active Record connections outside a reactor; SeaORM has no per-fiber connection ownership

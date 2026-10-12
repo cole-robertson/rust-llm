@@ -5,23 +5,23 @@
     "request_body": "{\"model\":\"mistral-small-latest\",\"messages\":[{\"role\":\"user\",\"content\":\"What is the capital of France?\"}],\"stream\":false}",
     "status": 200,
     "response_headers": {
-      "Date": "Wed, 07 Oct 2026 13:07:25 GMT",
+      "Date": "Sun, 11 Oct 2026 21:08:26 GMT",
       "Content-Type": "application/json",
       "Transfer-Encoding": "chunked",
       "Connection": "keep-alive",
-      "Mistral-Correlation-Id": "01a11679-d49d-7e68-a750-9c8b0bab97af",
-      "X-Kong-Request-Id": "01a11679-d49d-7e68-a750-9c8b0bab97af",
+      "Mistral-Correlation-Id": "01a12ccb-a5d7-7d53-a752-444edb8faf27",
+      "X-Kong-Request-Id": "01a12ccb-a5d7-7d53-a752-444edb8faf27",
       "X-Max-Retry-Attempts-Reached": "false",
       "X-Ratelimit-Limit-Tokens-Minute": "100000",
-      "X-Ratelimit-Remaining-Tokens-Minute": "99937",
+      "X-Ratelimit-Remaining-Tokens-Minute": "97727",
       "X-Ratelimit-Tokens-Query-Cost": "31",
       "X-Ratelimit-Limit-Req-Minute": "100",
       "X-Ratelimit-Remaining-Req-Minute": "98",
-      "X-Envoy-Upstream-Service-Time": "191",
+      "X-Envoy-Upstream-Service-Time": "222",
       "Server": "cloudflare",
       "Access-Control-Allow-Origin": "*",
-      "X-Kong-Upstream-Latency": "192",
-      "X-Kong-Proxy-Latency": "16",
+      "X-Kong-Upstream-Latency": "223",
+      "X-Kong-Proxy-Latency": "13",
       "Cf-Cache-Status": "DYNAMIC",
       "Set-Cookie": "<COOKIE>",
       "Strict-Transport-Security": "max-age=15552000; includeSubDomains; preload",
@@ -29,6 +29,6 @@
       "Cf-Ray": "<CF_RAY>",
       "Alt-Svc": "h3=\":443\"; ma=86400"
     },
-    "response_body": "{\"id\":\"2a3883ec9ade46129c5f0813d02f943e\",\"created\":1791378445,\"model\":\"mistral-small-latest\",\"usage\":{\"prompt_tokens\":22,\"total_tokens\":31,\"completion_tokens\":9,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":\"The capital of France is **Paris**.\"}}]}"
+    "response_body": "{\"id\":\"591ab07a7e5b4d988a74a2c1fbc544f4\",\"created\":1791752906,\"model\":\"mistral-small-latest\",\"usage\":{\"prompt_tokens\":22,\"total_tokens\":31,\"completion_tokens\":9,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"object\":\"chat.completion\",\"choices\":[{\"index\":0,\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"tool_calls\":null,\"content\":\"The capital of France is **Paris**.\"}}]}"
   }
 ]

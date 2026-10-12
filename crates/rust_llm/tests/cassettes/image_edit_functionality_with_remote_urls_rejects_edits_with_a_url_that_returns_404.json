@@ -5,7 +5,7 @@
     "request_body": "{\"model\":\"gpt-image-1.5\",\"prompt\":\"turn the logo to green\",\"n\":1,\"images\":[{\"image_url\":\"https://rubyllm.com/some-asset-that-does-not-exist.png\"}]}",
     "status": 400,
     "response_headers": {
-      "Date": "Wed, 07 Oct 2026 13:02:34 GMT",
+      "Date": "Sun, 11 Oct 2026 21:09:15 GMT",
       "Content-Type": "application/json",
       "Content-Length": "180",
       "Connection": "keep-alive",
@@ -13,7 +13,7 @@
       "Openai-Organization": "<OPENAI_ORGANIZATION>",
       "Openai-Project": "<OPENAI_PROJECT>",
       "X-Request-Id": "<X_REQUEST_ID>",
-      "Openai-Processing-Ms": "213",
+      "Openai-Processing-Ms": "344",
       "Server": "cloudflare",
       "Access-Control-Expose-Headers": "CF-Ray",
       "Cf-Cache-Status": "DYNAMIC",

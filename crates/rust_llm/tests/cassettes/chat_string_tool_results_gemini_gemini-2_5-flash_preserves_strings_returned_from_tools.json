@@ -8,35 +8,35 @@
       "X-Gemini-Service-Tier": "standard",
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 13:50:33 GMT",
+      "Date": "Sun, 11 Oct 2026 21:18:03 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=689",
+      "Server-Timing": "gfet4t7; dur=1025",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"functionCall\": {\n              \"name\": \"content_returning\",\n              \"args\": {\n                \"query\": \"test data\"\n              }\n            },\n            \"thoughtSignature\": \"CroCAWkUfRPrG7Bq2lx89f4uyo3qmNmzSJlQXHmtmhtI1mbk1O4W6PFNJvdARZvIjG6Q/iZTN9kyzWUHmGQNxIZFXtWvhaJL5qpmVaFlFYlQqjUWEhzQD4Iwcc1RlrNpQOubHEZbVhExA5AJV8Wtx3vou5v0eSPjXTC8tA0Mtc4dmkD2I0Ivk3BMOvaPGY3LhFSQQsp73U1/SVDvY8ARhtLmWMko8hSXKec+QhKkjMmz5dsauuFu0C/v0lGJ2pspyyqacoOU5r1zKyrqR8x6f1PGKGMumr4iOUkBas0q3I9DREHKEePEZHhZ8yl3WOH8NsP58fHCuI5QvzwlDQ4JQeAcTDJWV3HNkL1cKvB+QsKuigeymGQSdlxIQaxu7xk4vFjsSKIylmfCjhyWbfivufG2ZeeozycMij43W4g=\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0,\n      \"finishMessage\": \"Model generated function call(s).\"\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 46,\n    \"candidatesTokenCount\": 16,\n    \"totalTokenCount\": 126,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 46\n      }\n    ],\n    \"thoughtsTokenCount\": 64,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"KE7GapPzPJ-ikdUP4J3umA4\"\n}\n"
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"functionCall\": {\n              \"name\": \"content_returning\",\n              \"args\": {\n                \"query\": \"test data\"\n              }\n            },\n            \"thoughtSignature\": \"CpoCAWkUfRMcy6GOjPJeTEsk95wMEACbPlerP7w/1WsqbKaVVEWHyra+l4STFRcShCtRYHZb+FNcvF1OdLO/Gn4nA3BRrFGJtXVprRpFFrVsRoMmXKCOwVwWfe7+O1+gGqvM1Ue+mf4PEVze5ihfqgDHndW6zhYoIDGpjeTXhYxS+o7xlQJoOluSe4/RnXFq3Akui2EZQxSGXXVmey9e8G94DNFpKRatxYhsyac+CYVXBfXITVVblRDTR3MS7rBVKHTmyMV3WSemvL83o3yfyXQvNP8rz0GUQBt5p1RcyIvRevMq+efbU9DlAv7XqbpSIA5bho7JulLmW+e0UV4ZlyU8bnBEMTyuXfCoHF4cQcIVo0Y5TBHRP63IvmsP\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0,\n      \"finishMessage\": \"Model generated function call(s).\"\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 46,\n    \"candidatesTokenCount\": 16,\n    \"totalTokenCount\": 119,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 46\n      }\n    ],\n    \"thoughtsTokenCount\": 57,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"Cv3LapHnN7zuxs0PloHY0Q0\"\n}\n"
   },
   {
     "method": "post",
     "uri": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Process this query: test data\"}]},{\"role\":\"model\",\"parts\":[{\"functionCall\":{\"name\":\"content_returning\",\"args\":{\"query\":\"test data\"}},\"thoughtSignature\":\"CroCAWkUfRPrG7Bq2lx89f4uyo3qmNmzSJlQXHmtmhtI1mbk1O4W6PFNJvdARZvIjG6Q/iZTN9kyzWUHmGQNxIZFXtWvhaJL5qpmVaFlFYlQqjUWEhzQD4Iwcc1RlrNpQOubHEZbVhExA5AJV8Wtx3vou5v0eSPjXTC8tA0Mtc4dmkD2I0Ivk3BMOvaPGY3LhFSQQsp73U1/SVDvY8ARhtLmWMko8hSXKec+QhKkjMmz5dsauuFu0C/v0lGJ2pspyyqacoOU5r1zKyrqR8x6f1PGKGMumr4iOUkBas0q3I9DREHKEePEZHhZ8yl3WOH8NsP58fHCuI5QvzwlDQ4JQeAcTDJWV3HNkL1cKvB+QsKuigeymGQSdlxIQaxu7xk4vFjsSKIylmfCjhyWbfivufG2ZeeozycMij43W4g=\"}]},{\"role\":\"user\",\"parts\":[{\"functionResponse\":{\"name\":\"content_returning\",\"response\":{\"name\":\"content_returning\",\"content\":[{\"text\":\"Processed: test data\"}]}}}]}],\"generationConfig\":{},\"tools\":[{\"functionDeclarations\":[{\"name\":\"content_returning\",\"description\":\"Returns a processed string result\",\"parametersJsonSchema\":{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"Query to process\"}},\"required\":[\"query\"],\"additionalProperties\":false,\"strict\":true}}]}]}",
+    "request_body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Process this query: test data\"}]},{\"role\":\"model\",\"parts\":[{\"functionCall\":{\"name\":\"content_returning\",\"args\":{\"query\":\"test data\"}},\"thoughtSignature\":\"CpoCAWkUfRMcy6GOjPJeTEsk95wMEACbPlerP7w/1WsqbKaVVEWHyra+l4STFRcShCtRYHZb+FNcvF1OdLO/Gn4nA3BRrFGJtXVprRpFFrVsRoMmXKCOwVwWfe7+O1+gGqvM1Ue+mf4PEVze5ihfqgDHndW6zhYoIDGpjeTXhYxS+o7xlQJoOluSe4/RnXFq3Akui2EZQxSGXXVmey9e8G94DNFpKRatxYhsyac+CYVXBfXITVVblRDTR3MS7rBVKHTmyMV3WSemvL83o3yfyXQvNP8rz0GUQBt5p1RcyIvRevMq+efbU9DlAv7XqbpSIA5bho7JulLmW+e0UV4ZlyU8bnBEMTyuXfCoHF4cQcIVo0Y5TBHRP63IvmsP\"}]},{\"role\":\"user\",\"parts\":[{\"functionResponse\":{\"name\":\"content_returning\",\"response\":{\"name\":\"content_returning\",\"content\":[{\"text\":\"Processed: test data\"}]}}}]}],\"generationConfig\":{},\"tools\":[{\"functionDeclarations\":[{\"name\":\"content_returning\",\"description\":\"Returns a processed string result\",\"parametersJsonSchema\":{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"description\":\"Query to process\"}},\"required\":[\"query\"],\"additionalProperties\":false,\"strict\":true}}]}]}",
     "status": 200,
     "response_headers": {
       "X-Gemini-Service-Tier": "standard",
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 13:50:34 GMT",
+      "Date": "Sun, 11 Oct 2026 21:18:04 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=491",
+      "Server-Timing": "gfet4t7; dur=378",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"The processed query is \\\"Processed: test data\\\".\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 92,\n    \"candidatesTokenCount\": 10,\n    \"totalTokenCount\": 102,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 92\n      }\n    ],\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"KU7Gar-BMMz8nsEP9ZaYiAo\"\n}\n"
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"The query \\\"test data\\\" has been processed.\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 92,\n    \"candidatesTokenCount\": 10,\n    \"totalTokenCount\": 102,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 92\n      }\n    ],\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"C_3LaurON5CExN8P5ouIsQg\"\n}\n"
   }
 ]

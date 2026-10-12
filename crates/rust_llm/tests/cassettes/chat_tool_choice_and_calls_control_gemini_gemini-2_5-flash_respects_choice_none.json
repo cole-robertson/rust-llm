@@ -8,15 +8,15 @@
       "X-Gemini-Service-Tier": "standard",
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 13:57:15 GMT",
+      "Date": "Sun, 11 Oct 2026 21:19:21 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=3224",
+      "Server-Timing": "gfet4t7; dur=4077",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"The current weather in Berlin is **partly cloudy** with a temperature of **16°C** (feels like 15°C).\\n\\nHere are some more details:\\n*   **Conditions:** Partly cloudy\\n*   **Humidity:** 72%\\n*   **Wind:** 8 km/h from the West\\n*   **Pressure:** 1018 hPa\\n\\nEnjoy your day in Berlin!\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 103,\n    \"candidatesTokenCount\": 89,\n    \"totalTokenCount\": 639,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 103\n      }\n    ],\n    \"thoughtsTokenCount\": 447,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"uE_Gao7yFsbW7M8P9faryQ4\"\n}\n"
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"The current weather in Berlin, Germany (at 52.5200, 13.4050) is:\\n\\n*   **Temperature:** 16°C (61°F)\\n*   **Conditions:** Partly cloudy\\n*   **Feels like:** 15°C (59°F)\\n*   **Humidity:** 70%\\n*   **Wind:** 10 km/h (6 mph) from the West\\n\\n(Data accurate as of my last update, please check a live weather source for the most up-to-the-minute information.)\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 103,\n    \"candidatesTokenCount\": 129,\n    \"totalTokenCount\": 932,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 103\n      }\n    ],\n    \"thoughtsTokenCount\": 700,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"Vf3LaqiYLpCExN8P7IuIsQg\"\n}\n"
   }
 ]

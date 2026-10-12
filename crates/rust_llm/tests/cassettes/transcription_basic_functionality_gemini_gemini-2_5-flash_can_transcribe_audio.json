@@ -8,15 +8,15 @@
       "X-Gemini-Service-Tier": "standard",
       "Content-Type": "application/json; charset=UTF-8",
       "Vary": "Origin",
-      "Date": "Wed, 07 Oct 2026 12:59:09 GMT",
+      "Date": "Sun, 11 Oct 2026 21:06:20 GMT",
       "Server": "scaffolding on HTTPServer2",
       "X-Xss-Protection": "0",
       "X-Frame-Options": "SAMEORIGIN",
       "X-Content-Type-Options": "nosniff",
-      "Server-Timing": "gfet4t7; dur=1752",
+      "Server-Timing": "gfet4t7; dur=1483",
       "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
       "Transfer-Encoding": "chunked"
     },
-    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"Ruby is a programming language designed for developer happiness.\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 133,\n    \"candidatesTokenCount\": 10,\n    \"totalTokenCount\": 167,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 14\n      },\n      {\n        \"modality\": \"AUDIO\",\n        \"tokenCount\": 119\n      }\n    ],\n    \"thoughtsTokenCount\": 24,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"G0LGauPYLqvgnsEPo7O7gQo\"\n}\n"
+    "response_body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"Ruby is a programming language designed for developer happiness.\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 133,\n    \"candidatesTokenCount\": 10,\n    \"totalTokenCount\": 164,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 14\n      },\n      {\n        \"modality\": \"AUDIO\",\n        \"tokenCount\": 119\n      }\n    ],\n    \"thoughtsTokenCount\": 21,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-2.5-flash\",\n  \"responseId\": \"SvrLavbMOd_CvdIPo729wQI\"\n}\n"
   }
 ]
