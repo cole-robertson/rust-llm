@@ -1706,10 +1706,33 @@ impl Chat {
     }
 
     /// `Chat#discard_missing_uploads`: whether the error named uploads the provider deleted
-    /// (which the attachments now forget).
+    /// (which the attachments now forget). Each message lists its attachments' cached
+    /// replacements next to the originals, since a converted attachment's upload sits on its
+    /// replacement (2.1.1).
     async fn discard_missing_uploads(&self, error: &Error) -> bool {
+        let upload_messages: Vec<Message> = {
+            let replacements = self
+                .callbacks
+                .attachment_replacements
+                .lock()
+                .map(|r| r.clone())
+                .unwrap_or_default();
+            self.messages
+                .iter()
+                .map(|m| {
+                    let mut attachments = m.attachments.clone();
+                    attachments.extend(m.attachments.iter().filter_map(|a| {
+                        replacements
+                            .iter()
+                            .find(|(original, _)| original.same_attachment(a))
+                            .map(|(_, replacement)| replacement.clone())
+                    }));
+                    m.clone().with_attachments(attachments)
+                })
+                .collect()
+        };
         !crate::files::discard_missing_uploads(
-            &self.messages,
+            &upload_messages,
             error,
             self.provider,
             &self.config,

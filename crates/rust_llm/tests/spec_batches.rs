@@ -616,7 +616,7 @@ async fn does_not_retry_permission_errors() {
 #[tokio::test]
 async fn preserves_scalar_and_one_element_array_embedding_shapes_after_reloading_a_job() {
     let server = MockServer::start().await;
-    let body = json!({ "model": "mistral-embed", "data": [{ "embedding": [0.1, 0.2] }], "usage": { "prompt_tokens": 3 } });
+    let body = json!({ "model": "mistral-embed", "data": [{ "index": 0, "embedding": [0.1, 0.2] }], "usage": { "prompt_tokens": 3 } });
     let job = json!({ "id": "job_123", "status": "SUCCESS", "total_requests": 2, "outputs": [
         { "custom_id": "0", "response": { "body": body } },
         { "custom_id": "1:array", "response": { "body": body } }
@@ -653,6 +653,80 @@ async fn keeps_a_failed_embedding_request_in_its_original_slot() {
 
     assert!(results.iter().all(Option::is_none));
     assert_eq!(batch.statuses(), &[None, None, Some(BatchStatus::Failed)]);
+}
+
+/// `parse_batch_result` on one Mistral output line for request `0:array`, through a reloaded job:
+/// that request's result and status.
+async fn parse_mistral_embedding_rows(
+    rows: Value,
+) -> (Option<rust_llm::BatchResult>, Option<BatchStatus>) {
+    let server = MockServer::start().await;
+    let job = json!({ "id": "job_123", "status": "SUCCESS", "total_requests": 1, "outputs": [
+        { "custom_id": "0:array", "response": { "body": { "model": "mistral-embed", "data": rows } } }
+    ] });
+    get(&server, "/v1/batch/jobs/job_123", job).await;
+    let mut batch = Batch::find_with_config(config(&server), "job_123", Some("mistral"))
+        .await
+        .unwrap();
+    let results = batch.results().await.unwrap();
+    (
+        results.first().cloned().flatten(),
+        batch.statuses().first().cloned().flatten(),
+    )
+}
+
+// spec: providers/mistral/chat_completions/batches_spec.rb:165 #parse_batch_result > restores embedding rows to the order their indexes name
+#[tokio::test]
+async fn restores_embedding_rows_to_the_order_their_indexes_name() {
+    let rows = json!([{ "index": 2, "embedding": [0.3] }, { "index": 0, "embedding": [0.1] },
+                      { "index": 1, "embedding": [0.2] }]);
+
+    let (result, status) = parse_mistral_embedding_rows(rows).await;
+
+    let embedding = result.as_ref().and_then(|r| r.as_embedding()).unwrap();
+    assert_eq!(
+        embedding.vectors,
+        Vectors::Batch(vec![vec![0.1], vec![0.2], vec![0.3]])
+    );
+    assert_eq!(status, Some(BatchStatus::Succeeded));
+}
+
+// spec: providers/mistral/chat_completions/batches_spec.rb:178 #parse_batch_result > fails only the embedding result with invalid positions #{positions.inspect}
+#[tokio::test]
+async fn fails_only_the_embedding_result_with_invalid_positions() {
+    let cases = [
+        json!([0, 0]),
+        json!([0, 2]),
+        json!([-1, 0]),
+        json!([null, 0]),
+        json!(["0", 1]),
+        json!([0.0, 1]),
+    ];
+    for positions in cases {
+        let rows: Vec<Value> = positions
+            .as_array()
+            .unwrap()
+            .iter()
+            .enumerate()
+            .map(|(order, position)| json!({ "index": position, "embedding": [order as f64] }))
+            .collect();
+
+        let (result, status) = parse_mistral_embedding_rows(json!(rows)).await;
+
+        assert!(result.is_none(), "{positions}");
+        assert_eq!(status, Some(BatchStatus::Failed), "{positions}");
+    }
+}
+
+// spec: providers/mistral/chat_completions/batches_spec.rb:187 #parse_batch_result > fails only the embedding result with a missing position
+#[tokio::test]
+async fn fails_only_the_embedding_result_with_a_missing_position() {
+    let rows = json!([{ "embedding": [0.1] }, { "embedding": [0.2] }]);
+
+    let (result, status) = parse_mistral_embedding_rows(rows).await;
+
+    assert!(result.is_none());
+    assert_eq!(status, Some(BatchStatus::Failed));
 }
 
 // spec: providers/mistral/chat_completions/batches_spec.rb:215 submits, reloads, and cancels an embedding batch

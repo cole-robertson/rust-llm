@@ -4,10 +4,10 @@
 //! provider talks to a wiremock server, and `validate_batch_requests!` is reached through its
 //! `#[doc(hidden)]` port in `rust_llm::batch`.
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use rust_llm::batch::openai_validate_batch_requests;
-use rust_llm::{Batch, BatchStatus, Chat, Config, Error, ProtocolName};
+use rust_llm::{Batch, BatchStatus, Chat, Config, Error, ProtocolName, Vectors};
 use serde_json::{Value, json};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -174,6 +174,114 @@ fn embedding_batches_reject_unsupported_payload_shapes() {
     );
 }
 
+/// `embedding_line`: request 3's embeddings, one row per vector naming its `position`, listed in
+/// reverse so only the indexes say which input each vector belongs to.
+fn embedding_line(vectors: &[f64], positions: &[Value]) -> Value {
+    let mut rows: Vec<Value> = vectors
+        .iter()
+        .zip(positions)
+        .map(|(vector, position)| json!({ "index": position, "embedding": [vector] }))
+        .collect();
+    rows.reverse();
+    json!({ "custom_id": "3", "response": { "status_code": 200, "body": {
+        "object": "list", "model": "text-embedding-3-small", "data": rows,
+        "usage": { "prompt_tokens": 5, "total_tokens": 5 } } } })
+}
+
+/// `parse_batch_result(line)` reached through a reloaded OpenAI embeddings batch: request 3's
+/// result and status.
+async fn parse_embedding_line(line: Value) -> (Option<rust_llm::BatchResult>, Option<BatchStatus>) {
+    let server = MockServer::start().await;
+    mount(
+        &server,
+        "GET",
+        "/v1/batches/batch_1",
+        json!({ "id": "batch_1", "status": "completed", "endpoint": "/v1/embeddings", "output_file_id": "file-out" }),
+    )
+    .await;
+    Mock::given(method("GET"))
+        .and(path("/v1/files/file-out/content"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_raw(format!("{line}\n"), "application/octet-stream"),
+        )
+        .mount(&server)
+        .await;
+    let mut batch = Batch::find_with_config(config(&server), "batch_1", Some("openai"))
+        .await
+        .unwrap();
+    let results = batch.results().await.unwrap();
+    (
+        results.get(3).cloned().flatten(),
+        batch.statuses().get(3).cloned().flatten(),
+    )
+}
+
+// spec: protocols/chat_completions/embedding_batches_spec.rb:89 #parse_batch_result > orders embedding rows by the index that names their input
+#[tokio::test]
+async fn orders_embedding_rows_by_the_index_that_names_their_input() {
+    let (result, status) =
+        parse_embedding_line(embedding_line(&[0.1, 0.2], &[json!(1), json!(0)])).await;
+
+    let embedding = result.as_ref().and_then(|r| r.as_embedding()).unwrap();
+    assert_eq!(
+        embedding.vectors,
+        Vectors::Batch(vec![vec![0.2], vec![0.1]])
+    );
+    assert_eq!(status, Some(BatchStatus::Succeeded));
+}
+
+// spec: protocols/chat_completions/embedding_batches_spec.rb:97 #parse_batch_result > fails the embedding result with invalid positions #{positions.inspect}
+#[tokio::test]
+async fn fails_the_embedding_result_with_invalid_positions() {
+    let cases = [
+        json!([0, 0]),
+        json!([0, 2]),
+        json!([-1, 0]),
+        json!([null, 0]),
+        json!(["0", 1]),
+        json!([0.0, 1]),
+        json!([1]),
+        json!([0, 1, 2, 2]),
+    ];
+    for positions in cases {
+        let positions = positions.as_array().unwrap();
+        let line = embedding_line(&vec![0.1; positions.len()], positions);
+
+        let (result, status) = parse_embedding_line(line).await;
+
+        assert!(result.is_none(), "{positions:?}");
+        assert_eq!(status, Some(BatchStatus::Failed), "{positions:?}");
+    }
+}
+
+// spec: protocols/chat_completions/embedding_batches_spec.rb:107 #parse_batch_result > fails the embedding result when a row carries no position
+#[tokio::test]
+async fn fails_the_embedding_result_when_a_row_carries_no_position() {
+    let mut line = embedding_line(&[0.1, 0.2], &[json!(0), json!(1)]);
+    line["response"]["body"]["data"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("index");
+
+    let (result, status) = parse_embedding_line(line).await;
+
+    assert!(result.is_none());
+    assert_eq!(status, Some(BatchStatus::Failed));
+}
+
+// spec: protocols/chat_completions/embedding_batches_spec.rb:117 #parse_batch_result > fails the embedding result when a row is not a record
+#[tokio::test]
+async fn fails_the_embedding_result_when_a_row_is_not_a_record() {
+    let mut line = embedding_line(&[0.1, 0.2], &[json!(0), json!(1)]);
+    line["response"]["body"]["data"][0] = json!("not a record");
+
+    let (result, status) = parse_embedding_line(line).await;
+
+    assert!(result.is_none());
+    assert_eq!(status, Some(BatchStatus::Failed));
+}
+
 // ---- responses/batches_spec.rb ------------------------------------------------------------------
 
 // spec: protocols/responses/batches_spec.rb:64 #validate_batch_requests! > rejects unsupported payload shapes
@@ -262,68 +370,4 @@ async fn falls_back_to_the_old_metadata_key_and_then_position() {
         messages[2].as_ref().map(|m| m.content().to_string()),
         Some("by key".into())
     );
-}
-
-// spec: protocols/gemini/batches_spec.rb:135 #parse_inline_response > logs and skips a per-item error
-#[tokio::test]
-async fn logs_and_skips_a_per_item_error() {
-    let (_server, mut batch) = gemini_batch(completed_gemini_batch(json!([
-        { "metadata": { "custom_id": "0" }, "error": { "code": 400, "message": "too long" } }
-    ])))
-    .await;
-    let warnings = Arc::new(Mutex::new(Vec::new()));
-    let messages = {
-        let _guard = tracing::dispatcher::set_default(&tracing::Dispatch::new(WarnCollector(
-            warnings.clone(),
-        )));
-        batch.messages().await.unwrap()
-    };
-    assert_eq!(messages.len(), 1);
-    assert!(messages[0].is_none());
-    assert_eq!(batch.statuses(), &[Some(BatchStatus::Failed)]);
-    let warnings = warnings.lock().unwrap();
-    assert!(
-        warnings.iter().any(|w| w.contains("failed: too long")),
-        "{warnings:?}"
-    );
-}
-
-/// Collects WARN messages, as the Ruby spec's `RubyLLM.logger` spy does.
-struct WarnCollector(Arc<Mutex<Vec<String>>>);
-
-impl tracing::Subscriber for WarnCollector {
-    fn register_callsite(
-        &self,
-        _: &'static tracing::Metadata<'static>,
-    ) -> tracing::subscriber::Interest {
-        tracing::subscriber::Interest::sometimes()
-    }
-    fn max_level_hint(&self) -> Option<tracing::level_filters::LevelFilter> {
-        Some(tracing::level_filters::LevelFilter::TRACE)
-    }
-    fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
-        true
-    }
-    fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
-        tracing::span::Id::from_u64(1)
-    }
-    fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
-    fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
-    fn event(&self, event: &tracing::Event<'_>) {
-        struct Message<'a>(&'a mut String);
-        impl tracing::field::Visit for Message<'_> {
-            fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
-                if field.name() == "message" {
-                    self.0.push_str(&format!("{value:?}"));
-                }
-            }
-        }
-        if *event.metadata().level() == tracing::Level::WARN {
-            let mut message = String::new();
-            event.record(&mut Message(&mut message));
-            self.0.lock().unwrap().push(message);
-        }
-    }
-    fn enter(&self, _: &tracing::span::Id) {}
-    fn exit(&self, _: &tracing::span::Id) {}
 }

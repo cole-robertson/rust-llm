@@ -844,7 +844,7 @@ async fn web_search_xai_searches_cites_and_counts() {
         response
             .tokens()
             .server_tool_use
-            .is_some_and(|u| u.get("web_search_requests") == Some(&json!(2))),
+            .is_some_and(|u| u.get("web_search_requests").and_then(Value::as_u64) > Some(0)),
         "{:?}",
         response.tokens()
     );

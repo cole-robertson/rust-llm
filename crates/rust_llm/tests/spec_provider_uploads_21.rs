@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use rust_llm::files::{ProviderFileStore, is_confirmed_upload};
-use rust_llm::{Attachment, Chat, Config, Error, Message, Provider, UploadedFile};
+use rust_llm::{Attachment, Chat, Config, Error, Message, Provider, Role, UploadedFile};
 use serde_json::{Value, json};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, Request, ResponseTemplate};
@@ -21,6 +21,8 @@ const MB: usize = 1024 * 1024;
 #[derive(Default)]
 struct Store {
     files: Mutex<HashMap<(String, String), UploadedFile>>,
+    /// Every `forget` call, as `(id, provider, account)` (the spec's `have_received(:forget)`).
+    forgets: Mutex<Vec<(String, String, String)>>,
 }
 
 #[async_trait::async_trait]
@@ -39,6 +41,10 @@ impl ProviderFileStore for Store {
             .insert((provider.into(), account.into()), upload.clone());
     }
     async fn forget(&self, id: &str, provider: &str, account: &str) {
+        self.forgets
+            .lock()
+            .unwrap()
+            .push((id.into(), provider.into(), account.into()));
         let mut files = self.files.lock().unwrap();
         let key = (provider.to_string(), account.to_string());
         if files.get(&key).is_some_and(|f| f.id == id) {
@@ -401,6 +407,305 @@ async fn does_not_retry_a_file_the_application_uploaded_itself() {
         .unwrap_err();
     assert!(err.to_string().contains("file_app"), "{err}");
     assert_eq!(count(&server, "POST", "/v1/messages").await, 1);
+}
+
+// ---- converted attachments ----------------------------------------------------------------------
+
+/// `converted_chat`: a Word document the chat converts to `notes`, recording each conversion.
+fn converted_chat(config: &Arc<Config>, store: &Arc<Store>) -> (Chat, Attachment, Converted) {
+    let document = Attachment::from_bytes(b"Office document".to_vec(), "report.docx", None);
+    let replacement = notes(store);
+    let converted: Converted = Arc::new(Mutex::new(Vec::new()));
+    let seen = converted.clone();
+    let chat = chat(config).convert_unsupported_attachments(move |a| {
+        seen.lock().unwrap().push(a.clone());
+        Ok(Some(replacement.clone()))
+    });
+    (chat, document, converted)
+}
+
+type Converted = Arc<Mutex<Vec<Attachment>>>;
+
+/// Answers `/v1/files` uploads with `ids` in order (the last repeats).
+async fn uploads_return(server: &MockServer, ids: &[&str]) {
+    let bodies: Vec<Value> = ids.iter().map(|id| file_body(id)).collect();
+    let next = Arc::new(Mutex::new(0usize));
+    Mock::given(method("POST"))
+        .and(path("/v1/files"))
+        .respond_with(move |_: &Request| {
+            let mut n = next.lock().unwrap();
+            let body = bodies[(*n).min(bodies.len() - 1)].clone();
+            *n += 1;
+            json_response(body, 200)
+        })
+        .mount(server)
+        .await;
+}
+
+async fn stream_ask(
+    chat: &mut Chat,
+    text: &str,
+    with: Vec<Attachment>,
+) -> (Result<Message, Error>, String) {
+    let chunks = Arc::new(Mutex::new(String::new()));
+    let sink = chunks.clone();
+    chat.ask_later_with(text, with).unwrap();
+    let result = chat
+        .complete_stream(move |c| {
+            if let Some(t) = &c.content {
+                sink.lock().unwrap().push_str(t);
+            }
+        })
+        .await;
+    let streamed = chunks.lock().unwrap().clone();
+    (result, streamed)
+}
+
+// spec: chat_provider_uploads_spec.rb:193 converted attachments > reuses the conversion when an upload disappears after a successful turn
+#[tokio::test]
+async fn converted_reuses_the_conversion_when_an_upload_disappears_after_a_turn() {
+    let server = MockServer::start().await;
+    let (config, store, account) = anthropic_with_stored_file(&server).await;
+    let (mut chat, document, converted) = converted_chat(&config, &store);
+    upload_returns(&server, "file_new").await;
+    messages(
+        &server,
+        vec![
+            json_response(reply(), 200),
+            missing("file_old", 404),
+            json_response(reply(), 200),
+        ],
+    )
+    .await;
+
+    let first = chat
+        .ask_with("Read this report", vec![document.clone()])
+        .await
+        .unwrap();
+    assert_eq!(first.content.as_deref(), Some("Noted."));
+    let second = chat.ask("Continue").await.unwrap();
+    assert_eq!(second.content.as_deref(), Some("Noted."));
+
+    assert_eq!(count(&server, "POST", "/v1/files").await, 1);
+    assert_eq!(sent_file(&server, "file_old").await, 2);
+    assert_eq!(sent_file(&server, "file_new").await, 1);
+    assert_eq!(*converted.lock().unwrap(), vec![document.clone()]);
+    assert_eq!(chat.messages()[0].attachments, vec![document]);
+    assert_eq!(store.ids(), vec!["file_new"]);
+    assert!(!is_confirmed_upload("anthropic", &account, "file_old"));
+}
+
+// spec: chat_provider_uploads_spec.rb:210 converted attachments > reuploads before any streamed content reaches the caller
+#[tokio::test]
+async fn converted_reuploads_before_any_streamed_content() {
+    let server = MockServer::start().await;
+    let (config, store, _) = anthropic_with_stored_file(&server).await;
+    let (mut chat, document, converted) = converted_chat(&config, &store);
+    upload_returns(&server, "file_new").await;
+    messages(
+        &server,
+        vec![missing("file_old", 400), streamed(&["Noted."], None)],
+    )
+    .await;
+
+    let (response, chunks) =
+        stream_ask(&mut chat, "Read this report", vec![document.clone()]).await;
+
+    assert_eq!(response.unwrap().content.as_deref(), Some("Noted."));
+    assert_eq!(chunks, "Noted.");
+    assert_eq!(count(&server, "POST", "/v1/files").await, 1);
+    assert_eq!(*converted.lock().unwrap(), vec![document.clone()]);
+    assert_eq!(chat.messages()[0].attachments, vec![document]);
+}
+
+// spec: chat_provider_uploads_spec.rb:225 converted attachments > reuploads after a 404 that names no file
+#[tokio::test]
+async fn converted_reuploads_after_a_404_that_names_no_file() {
+    let server = MockServer::start().await;
+    let (config, store, _) = anthropic_with_stored_file(&server).await;
+    let (mut chat, document, converted) = converted_chat(&config, &store);
+    upload_returns(&server, "file_new").await;
+    messages(
+        &server,
+        vec![
+            json_response(
+                json!({ "error": { "type": "not_found_error", "message": "Not found" } }),
+                404,
+            ),
+            json_response(reply(), 200),
+        ],
+    )
+    .await;
+
+    let response = chat
+        .ask_with("Read this report", vec![document.clone()])
+        .await
+        .unwrap();
+    assert_eq!(response.content.as_deref(), Some("Noted."));
+    assert_eq!(sent_file(&server, "file_new").await, 1);
+    assert_eq!(*converted.lock().unwrap(), vec![document]);
+}
+
+// spec: chat_provider_uploads_spec.rb:238 converted attachments > retries a missing converted upload only once
+#[tokio::test]
+async fn converted_retries_a_missing_upload_only_once() {
+    let server = MockServer::start().await;
+    let (config, store, _) = anthropic_with_stored_file(&server).await;
+    let (mut chat, document, converted) = converted_chat(&config, &store);
+    upload_returns(&server, "file_new").await;
+    messages(
+        &server,
+        vec![missing("file_old", 404), missing("file_new", 404)],
+    )
+    .await;
+
+    let err = chat
+        .ask_with("Read this report", vec![document.clone()])
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("file_new"), "{err}");
+    assert_eq!(count(&server, "POST", "/v1/files").await, 1);
+    assert_eq!(count(&server, "POST", "/v1/messages").await, 2);
+    assert_eq!(*converted.lock().unwrap(), vec![document]);
+}
+
+// spec: chat_provider_uploads_spec.rb:249 converted attachments > never retries a converted upload once streaming started
+#[tokio::test]
+async fn converted_never_retries_once_streaming_started() {
+    let server = MockServer::start().await;
+    let (config, store, _) = anthropic_with_stored_file(&server).await;
+    let (mut chat, document, _) = converted_chat(&config, &store);
+    Mock::given(method("POST"))
+        .and(path("/v1/files"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&server)
+        .await;
+    messages(
+        &server,
+        vec![streamed(
+            &["Partial"],
+            Some(json!({ "type": "not_found_error", "message": "File not found: file_old" })),
+        )],
+    )
+    .await;
+
+    let (result, chunks) = stream_ask(&mut chat, "Read this report", vec![document]).await;
+
+    let err = result.unwrap_err();
+    assert!(err.to_string().contains("file_old"), "{err}");
+    assert_eq!(chunks, "Partial");
+    assert_eq!(count(&server, "POST", "/v1/files").await, 0);
+    assert_eq!(count(&server, "POST", "/v1/messages").await, 1);
+    assert_eq!(store.ids(), vec!["file_old"]);
+}
+
+// spec: chat_provider_uploads_spec.rb:265 converted attachments > can replace a missing upload again on a later turn
+#[tokio::test]
+async fn converted_replaces_a_missing_upload_again_on_a_later_turn() {
+    let server = MockServer::start().await;
+    let (config, store, _) = anthropic_with_stored_file(&server).await;
+    let (mut chat, document, converted) = converted_chat(&config, &store);
+    uploads_return(&server, &["file_new", "file_next"]).await;
+    messages(
+        &server,
+        vec![
+            missing("file_old", 404),
+            json_response(reply(), 200),
+            missing("file_new", 404),
+            json_response(reply(), 200),
+        ],
+    )
+    .await;
+
+    let first = chat
+        .ask_with("Read this report", vec![document.clone()])
+        .await
+        .unwrap();
+    assert_eq!(first.content.as_deref(), Some("Noted."));
+    let second = chat.ask("Continue").await.unwrap();
+    assert_eq!(second.content.as_deref(), Some("Noted."));
+    assert_eq!(count(&server, "POST", "/v1/files").await, 2);
+    assert_eq!(*converted.lock().unwrap(), vec![document]);
+    assert_eq!(store.ids(), vec!["file_next"]);
+}
+
+// spec: chat_provider_uploads_spec.rb:279 converted attachments > preserves an unrelated upload on an original attachment
+#[tokio::test]
+async fn converted_preserves_an_unrelated_upload_on_an_original() {
+    let server = MockServer::start().await;
+    let (config, store, _) = anthropic_with_stored_file(&server).await;
+    let (mut chat, document, converted) = converted_chat(&config, &store);
+    let mut bytes = b"Other notes long enough to upload.".to_vec();
+    bytes.resize(25 * MB, b' ');
+    let original = Attachment::from_bytes(bytes, "other.txt", None);
+    uploads_return(&server, &["file_other", "file_new"]).await;
+    messages(
+        &server,
+        vec![missing("file_old", 404), json_response(reply(), 200)],
+    )
+    .await;
+
+    let response = chat
+        .ask_with(
+            "Read these reports",
+            vec![original.clone(), document.clone()],
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.content.as_deref(), Some("Noted."));
+    assert_eq!(count(&server, "POST", "/v1/files").await, 2);
+    assert_eq!(sent_file(&server, "file_other").await, 2);
+    assert_eq!(original.provider_upload_ids(), vec!["file_other"]);
+    assert_eq!(
+        chat.messages()[0].attachments,
+        vec![original, document.clone()]
+    );
+    assert_eq!(*converted.lock().unwrap(), vec![document]);
+}
+
+// spec: chat_provider_uploads_spec.rb:294 converted attachments > forgets a shared replacement only once across transcript messages
+#[tokio::test]
+async fn converted_forgets_a_shared_replacement_only_once() {
+    let server = MockServer::start().await;
+    let (config, store, account) = anthropic_with_stored_file(&server).await;
+    let (mut chat, document, converted) = converted_chat(&config, &store);
+    let other = Attachment::from_bytes(b"Other Office document".to_vec(), "other.docx", None);
+    upload_returns(&server, "file_new").await;
+    messages(
+        &server,
+        vec![
+            json_response(reply(), 200),
+            missing("file_old", 404),
+            json_response(reply(), 200),
+        ],
+    )
+    .await;
+
+    let first = chat
+        .ask_with("Read this report", vec![document.clone()])
+        .await
+        .unwrap();
+    assert_eq!(first.content.as_deref(), Some("Noted."));
+    let second = chat
+        .ask_with("Read another report", vec![other.clone()])
+        .await
+        .unwrap();
+    assert_eq!(second.content.as_deref(), Some("Noted."));
+
+    let forgets = store.forgets.lock().unwrap().clone();
+    let old = ("file_old".to_string(), "anthropic".to_string(), account);
+    assert_eq!(forgets.iter().filter(|f| **f == old).count(), 1);
+    assert_eq!(
+        *converted.lock().unwrap(),
+        vec![document.clone(), other.clone()]
+    );
+    let user_attachments: Vec<Vec<Attachment>> = chat
+        .messages()
+        .iter()
+        .filter(|m| m.role == Role::User)
+        .map(|m| m.attachments.clone())
+        .collect();
+    assert_eq!(user_attachments, vec![vec![document], vec![other]]);
 }
 
 // spec: chat_provider_uploads_spec.rb:314 compaction > uploads a file the provider deleted again and compacts once more
