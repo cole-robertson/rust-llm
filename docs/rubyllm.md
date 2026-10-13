@@ -11,8 +11,8 @@ mostly spelling: how a Ruby idiom turns into Rust.
   and every request RustLLM sends must be JSON-equal to the one RubyLLM recorded.
   `bin/convert-cassettes` turns upstream cassettes into fixtures.
 - **Spec parity:** [`PARITY.md`](PARITY.md) classifies all 4,684 examples in RubyLLM 2.1.1's spec
-  suite: 2,988 ported as Rust tests that cite them (`// spec: file:line`), 176 replayed from their
-  own cassettes, 1,520 not applicable (each with its reason), and 0 missing. `bin/parity`
+  suite: 2,991 ported as Rust tests that cite them (`// spec: file:line`), 176 replayed from their
+  own cassettes, 1,517 not applicable (each with its reason), and 0 missing. `bin/parity`
   regenerates it.
 - **Live:** `examples/readme.rs` runs RubyLLM's README against a real provider, and
   `examples/judge.rs` runs a Jev judgment.

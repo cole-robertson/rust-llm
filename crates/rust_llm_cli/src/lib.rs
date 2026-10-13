@@ -229,6 +229,51 @@ impl Generator {
         }
     }
 
+    /// Removes `content` (whole lines, compared trimmed) where it appears as one block; nothing
+    /// happens when it is absent. For text an earlier release of a generator injected.
+    pub fn remove(&mut self, rel: &str, content: &str) {
+        let Some(existing) = self.read(rel) else {
+            return;
+        };
+        let target: Vec<&str> = content
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .collect();
+        let lines: Vec<&str> = existing.lines().collect();
+        let Some(start) = (0..lines.len()).find(|&i| {
+            let mut j = i;
+            target.iter().all(|t| {
+                while j < lines.len() && lines[j].trim().is_empty() {
+                    j += 1;
+                }
+                let hit = j < lines.len() && lines[j].trim() == *t;
+                j += 1;
+                hit
+            })
+        }) else {
+            return;
+        };
+        let mut end = start;
+        for t in &target {
+            while lines[end].trim().is_empty() {
+                end += 1;
+            }
+            debug_assert_eq!(lines[end].trim(), *t);
+            end += 1;
+        }
+        let mut kept: Vec<&str> = lines[..start].to_vec();
+        kept.extend_from_slice(&lines[end..]);
+        let mut updated = kept.join("\n");
+        if existing.ends_with('\n') {
+            updated.push('\n');
+        }
+        match fs::write(self.path(rel), updated) {
+            Ok(()) => self.record("remove", rel),
+            Err(e) => self.fail(format!("{rel}: {e}")),
+        }
+    }
+
     /// Adds `name` in sorted position to a one-line `import { a, c } from "module"`, like the
     /// kit's `scaffold:pages` does for the sidebar.
     pub fn named_import(&mut self, rel: &str, module: &str, name: &str) {
