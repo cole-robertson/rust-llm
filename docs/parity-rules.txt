@@ -1434,7 +1434,7 @@ active_record/chat_methods_spec.rb:615	PORTED	crates/rust_llm_loco/tests/acts_as
 active_record/chat_methods_spec.rb:664	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::records_a_denial_and_rejects_an_unknown_tool_call
 active_record/chat_methods_spec.rb:673	N/A	Ruby-only: approve accepts a ToolCall value (type coercion)
 active_record/chat_methods_spec.rb:683	PORTED	crates/rust_llm_loco/tests/acts_as_parity.rs::records_a_denial_and_rejects_an_unknown_tool_call
-active_record/chat_methods_spec.rb:691	N/A	Ruby-only: blank placeholder assistant row (Rust writes rows after each step)
+active_record/chat_methods_spec.rb:691	N/A	Ruby-only: blank placeholder assistant row reuse across rounds (complete writes rows after each step; complete_stream creates its placeholder per step and deletes it when the step fails, see stream_chat_record.rs)
 active_record/chat_methods_spec.rb:702	N/A	Ruby-only: blank placeholder assistant row
 active_record/chat_methods_spec.rb:714	N/A	Ruby-only: blank placeholder assistant row
 active_record/chat_methods_spec.rb:725	N/A	Ruby-only: private persist_message_completion(nil)
@@ -1928,8 +1928,6 @@ chat_functions_spec.rb:312	MISSING	with_temperature takes f64; no way to clear i
 chat_functions_spec.rb:326	PORTED	tests/cassette_replay.rs (chat completions providers replay recorded temperature bodies)
 chat_functions_spec.rb:344	MISSING	no test: temperature sent even when registry marks the model as rejecting it
 chat_functions_spec.rb:355	MISSING	no test: temperature sent to search models
-chat_functions_spec.rb:366	N/A	Ruby-only: reads @protocol (with_protocol is tested through fallback protocol restore)
-chat_functions_spec.rb:372	N/A	Ruby-only: reads @protocol
 chat_functions_spec.rb:390	N/A	Ruby-only: messages= coercion of hashes
 chat_functions_spec.rb:408	N/A	Ruby-only: messages= coercion of a single payload
 chat_functions_spec.rb:418	PORTED	tests/spec_chat_options.rs::set_messages_replaces_the_transcript
@@ -1939,7 +1937,6 @@ chat_headers_spec.rb:8	N/A	Ruby-only: reads chat.headers (sending is PORTED at :
 chat_headers_spec.rb:13	N/A	Ruby-only: returns self
 chat_headers_spec.rb:18	MISSING	with_headers has no clear (nil)
 chat_headers_spec.rb:26	N/A	Rust type system: headers argument is required
-chat_headers_spec.rb:48	N/A	Ruby-only: reads instance variables
 chat_model_aliases_spec.rb:22	N/A	provider not ported: bedrock
 chat_model_aliases_spec.rb:28	N/A	provider not ported: bedrock
 chat_model_aliases_spec.rb:35	N/A	provider not ported: vertexai

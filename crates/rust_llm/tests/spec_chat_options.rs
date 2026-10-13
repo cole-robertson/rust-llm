@@ -382,6 +382,45 @@ async fn max_output_tokens_maps_to_each_providers_key() {
     }
 }
 
+// spec: chat_functions_spec.rb:366 protocol override > sets @protocol from RubyLLM.chat(protocol:)
+// spec: chat_functions_spec.rb:372 protocol override > sets @protocol from with_model(id, protocol:)
+// `RubyLLM.chat(protocol:)` and `with_model(id, protocol:)` are both `with_protocol` here; the
+// `protocol()` reader is `@protocol`.
+#[tokio::test]
+async fn with_protocol_sets_the_protocol() {
+    let server = serve(vec![]).await;
+    assert_eq!(openai(&server).protocol(), None);
+    let chat = openai(&server).with_protocol(rust_llm::ProtocolName::ChatCompletions);
+    assert_eq!(
+        chat.protocol(),
+        Some(rust_llm::ProtocolName::ChatCompletions)
+    );
+    let chat = openai(&server)
+        .with_model("gpt-4.1-nano", Some("openai"))
+        .unwrap()
+        .with_protocol(rust_llm::ProtocolName::ChatCompletions);
+    assert_eq!(
+        chat.protocol(),
+        Some(rust_llm::ProtocolName::ChatCompletions)
+    );
+}
+
+// spec: chat_headers_spec.rb:48 #with_headers > allows chaining with other methods
+#[tokio::test]
+async fn with_headers_chains_with_other_settings() {
+    let server = serve(vec![]).await;
+    let chat = openai(&server)
+        .with_temperature(0.5)
+        .with_headers([("X-Test".to_string(), "value".to_string())])
+        .with_provider_options(json!({ "max_tokens": 100 }));
+    assert_eq!(
+        chat.headers(),
+        [("X-Test".to_string(), "value".to_string())]
+    );
+    assert_eq!(chat.provider_options(), &json!({ "max_tokens": 100 }));
+    assert_eq!(chat.temperature(), Some(0.5));
+}
+
 // spec: chat_functions_spec.rb:380 resets @protocol to nil when with_model is called without a protocol
 #[tokio::test]
 async fn with_model_drops_an_explicit_protocol() {

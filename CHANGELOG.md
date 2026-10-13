@@ -5,8 +5,8 @@ RustLLM's version follows the RubyLLM release it ports: 2.0.x ports RubyLLM 2.0 
 
 ## [Unreleased]
 
-Ports RubyLLM 2.1.1. `docs/PARITY.md` classifies all 4,684 examples in its spec suite: 2,988 ported
-as Rust tests, 176 replayed from their own recorded cassettes, 1,520 not applicable (each with a
+Ports RubyLLM 2.1.1. `docs/PARITY.md` classifies all 4,684 examples in its spec suite: 2,991 ported
+as Rust tests, 176 replayed from their own recorded cassettes, 1,517 not applicable (each with a
 reason), 0 missing. Existing apps: run `rust-llm generate upgrade` and `cargo loco db migrate`.
 
 ### Added (RubyLLM 2.1)
@@ -61,6 +61,9 @@ reason), 0 missing. Existing apps: run `rust-llm generate upgrade` and `cargo lo
   the wrong inputs.
 - Converted attachments are uploaded again after a provider deletes them, as plain ones are.
 - A persisted chat keeps its reply when a usage row cannot be linked to the message, and logs it.
+- `rust-llm generate chat_ui` run over a 2.0 chat UI removes the 2.0 `/chats` routes and sidebar
+  link instead of defining them twice, which left the app unable to compile. See "Upgrading a 2.0
+  chat UI" in the generators guide.
 - Evaluation datasets read YAML with `serde_norway` instead of the deprecated `serde_yaml`, whose
   `unsafe-libyaml` is unmaintained (RUSTSEC-2024-0449).
 

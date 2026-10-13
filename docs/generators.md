@@ -78,6 +78,18 @@ and its accounts. Adds:
 
 To give the chat tools, add them in the worker, where the comment marks the spot.
 
+### Upgrading a 2.0 chat UI
+
+The 2.0 chat UI was not scoped to accounts. Run `rust-llm generate upgrade`, then
+`rust-llm generate chat_ui --force`: it removes the 2.0 `/chats` routes and sidebar link,
+replaces the generated pages and controllers (`--force` overwrites files you changed, so commit
+first), and adds `chats.account_id`. Chats created under 2.0 have no account, so the new pages do
+not list them until you assign one, for example:
+
+```sh
+sqlite3 db.sqlite "UPDATE chats SET account_id = 1 WHERE account_id IS NULL"
+```
+
 ## public_chat
 
 ```sh
