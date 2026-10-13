@@ -1512,8 +1512,6 @@ generators/tool_generator_spec.rb:36	PORTED	crates/rust_llm_cli/tests/generators
 generators/tool_generator_spec.rb:69	PORTED	crates/rust_llm_cli/tests/generators.rs::tool_names_follow_tool_name_rules
 generators/tool_generator_spec.rb:80	N/A	Ruby-only: tailwind ERB partials
 generators/tool_generator_spec.rb:91	N/A	Ruby-only: message model mappings not mirrored by the Rust CLI
-generators/upgrade_generator_spec.rb:20	PORTED	crates/rust_llm_cli/tests/spec_generators.rs::upgrade_adds_what_2_1_needs_to_a_2_0_schema
-generators/upgrade_generator_spec.rb:103	PORTED	crates/rust_llm_cli/tests/spec_generators.rs::upgrade_leaves_an_up_to_date_schema_alone
 # ---- agents ----
 agent_delegation_spec.rb	N/A	Ruby-only: Agent delegates to Chat (Rust Agent::chat returns the Chat)
 agent_instructions_spec.rb	N/A	Ruby-only: class inheritance of instruction declarations and prompts
@@ -2143,3 +2141,4 @@ mcp/listener_spec.rb:130	N/A	Rails-only: callbacks wrapped in Rails.application.
 # ---- lane EO: evaluations (wave 2) ----
 evaluation/assertions_spec.rb:31	N/A	Ruby-only: assertions come from the optional minitest gem (LoadError when absent); the port's Assertions are built into rust_llm, so there is no optional dependency to be missing
 evaluation/assertions_spec.rb:38	N/A	Ruby-only: respond_to?/method_missing delegation of assert_* to Minitest::Assertions; Rust assertions are statically typed methods on evaluation::Assertions, so an unknown assertion is a compile error, not a runtime respond_to? answer
+generators/upgrade_generator_spec.rb	N/A	no earlier RustLLM schema: RustLLM starts at 2.1.1, and `rust-llm generate install` creates the 2.1.1 tables; `rust-llm generate upgrade` has nothing to do until the next release

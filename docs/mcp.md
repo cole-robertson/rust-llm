@@ -321,7 +321,7 @@ rust_llm::configure(|c| c.mcp_credential_store = Some(std::sync::Arc::new(store)
 ```
 
 Implement `rust_llm::mcp::CredentialStore` (`read`, `write`, `delete`) to keep them elsewhere.
-Existing apps add the table with `rust-llm generate upgrade` (see [Generators](generators.md)).
+`rust-llm generate install` creates the table.
 
 ## Differences from RubyLLM
 

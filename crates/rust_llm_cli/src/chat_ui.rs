@@ -159,13 +159,6 @@ const NAV_ITEM: &[&str] = &[
     "},",
 ];
 
-/// What `rust-llm generate chat_ui` 2.0 injected: unscoped `/chats` paths and routes, and a
-/// sidebar link without an account. Running this release's generator over that app removes them
-/// before adding the account-scoped ones, which use the same names.
-const V2_0_PATHS: &str = include_str!("../templates/chat_ui/v2_0_paths.rs.txt");
-const V2_0_ROUTES: &str = include_str!("../templates/chat_ui/v2_0_routes.rs.txt");
-const V2_0_NAV_ITEM: &str = include_str!("../templates/chat_ui/v2_0_nav.tsx.txt");
-
 /// What the kit provides that the account-scoped chat UI builds on.
 const KIT_FILES: &[(&str, &str)] = &[
     ("src/route_table.rs", "the route table"),
@@ -191,14 +184,6 @@ pub fn generate(g: &mut Generator) -> Result<(), String> {
             missing.join("\n")
         ));
     }
-    // The route entries read the same in both releases; only the 2.0 paths tell them apart.
-    if g.read("src/route_table.rs")
-        .is_some_and(|t| t.contains("pub const CHATS: &str = \"/chats\";"))
-    {
-        g.remove("src/route_table.rs", V2_0_PATHS);
-        g.remove("src/route_table.rs", V2_0_ROUTES);
-    }
-    g.remove("frontend/components/app-sidebar.tsx", V2_0_NAV_ITEM);
     install::migration_template(g, MIGRATION_SUFFIX, MIGRATION);
     g.inject("src/models/chats.rs", CHAT_MODEL_ACCOUNTS, Anchor::End);
     let pkg = package_name(g)?;

@@ -34,7 +34,7 @@ pub fn generate(g: &mut Generator, rust_llm_path: Option<&str>) -> Result<(), St
 fn add_dependencies(g: &mut Generator, rust_llm_path: Option<&str>) -> Result<(), String> {
     let spec = |krate: &str| -> Result<String, String> {
         let Some(root) = rust_llm_path else {
-            return Ok("\"2.0.0\"".to_string());
+            return Ok("\"2.1.1\"".to_string());
         };
         let dir = Path::new(root).join("crates").join(krate);
         let dir = dir

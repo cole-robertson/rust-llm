@@ -50,9 +50,9 @@ fn install_adds_dependencies_to_the_app_and_migration_crates() {
     let dir = installed();
     let cargo = read(dir.path(), "Cargo.toml");
     let deps = cargo.split("[dev-dependencies]").next().unwrap();
-    assert!(deps.contains("rust_llm = \"2.0.0\"\n"), "{cargo}");
-    assert!(deps.contains("rust_llm_loco = \"2.0.0\"\n"), "{cargo}");
-    assert!(read(dir.path(), "migration/Cargo.toml").contains("loco-rs = { workspace = true }\nrust_llm_loco = \"2.0.0\"\n\n[dependencies.sea-orm-migration]"));
+    assert!(deps.contains("rust_llm = \"2.1.1\"\n"), "{cargo}");
+    assert!(deps.contains("rust_llm_loco = \"2.1.1\"\n"), "{cargo}");
+    assert!(read(dir.path(), "migration/Cargo.toml").contains("loco-rs = { workspace = true }\nrust_llm_loco = \"2.1.1\"\n\n[dependencies.sea-orm-migration]"));
 }
 
 #[test]
@@ -528,61 +528,6 @@ fn chat_ui_twice_changes_nothing() {
     assert_eq!(walk(dir.path()), before);
 }
 
-/// What `rust-llm generate chat_ui` 2.0.0 injected into the kit, verbatim.
-const V2_0_PATHS: &str = include_str!("../templates/chat_ui/v2_0_paths.rs.txt");
-const V2_0_ROUTES: &str = include_str!("../templates/chat_ui/v2_0_routes.rs.txt");
-const V2_0_NAV_ITEM: &str = include_str!("../templates/chat_ui/v2_0_nav.tsx.txt");
-
-// Found by upgrading a real 2.0 app: the account-scoped chat UI reuses the 2.0 constant names
-// (`CHATS`, `MODELS`, ...), so injecting next to the 2.0 ones defined each twice and the app no
-// longer compiled.
-#[test]
-fn chat_ui_over_a_2_0_chat_ui_replaces_its_unscoped_routes_and_sidebar_link() {
-    let dir = installed();
-    let root = dir.path();
-    let add_before = |rel: &str, marker: &str, text: &str| {
-        let source = read(root, rel);
-        let at = source.find(marker).unwrap();
-        let line_start = source[..at].rfind('\n').map_or(0, |i| i + 1);
-        let updated = format!("{}{text}\n{}", &source[..line_start], &source[line_start..]);
-        fs::write(root.join(rel), updated).unwrap();
-    };
-    add_before("src/route_table.rs", "// scaffold:paths", V2_0_PATHS);
-    add_before("src/route_table.rs", "// scaffold:routes", V2_0_ROUTES);
-    add_before(
-        "frontend/components/app-sidebar.tsx",
-        "// scaffold:nav\n",
-        V2_0_NAV_ITEM,
-    );
-
-    let mut g = Generator::new(root, false);
-    chat_ui::generate(&mut g).unwrap();
-    assert!(g.failures.is_empty(), "{:?}", g.failures);
-
-    let routes = read(root, "src/route_table.rs");
-    assert_eq!(count(&routes, "pub const CHATS: &str ="), 1, "{routes}");
-    assert_eq!(count(&routes, "pub const MODELS: &str ="), 1, "{routes}");
-    assert!(routes.contains("pub const CHATS: &str = \"/{account_slug}/chats\";"));
-    assert!(!routes.contains("\"/chats\""));
-    assert!(!routes.contains("pub fn chat_path(id: i32)"));
-    assert_eq!(count(&routes, "\"chats.index\""), 1);
-    assert_eq!(count(&routes, "\"models.show\""), 1);
-    let sidebar = read(root, "frontend/components/app-sidebar.tsx");
-    assert!(!sidebar.contains("chats.index().url"), "{sidebar}");
-    assert!(sidebar.contains("href: chats.index(account.slug).url,"));
-
-    // Once upgraded, running it again changes nothing.
-    let before = walk(root);
-    let mut again = Generator::new(root, false);
-    chat_ui::generate(&mut again).unwrap();
-    assert!(
-        actions(&again).iter().all(|(a, _)| *a == "identical"),
-        "{:?}",
-        again.actions
-    );
-    assert_eq!(walk(root), before);
-}
-
 #[test]
 fn tool_components_import_the_chat_ui_modules_that_exist() {
     let dir = installed();
@@ -667,42 +612,16 @@ fn provider_writes_a_module_and_test_and_registers_the_module() {
 }
 
 #[test]
-fn upgrade_writes_one_migration_and_registers_it() {
+fn upgrade_has_nothing_to_do_in_the_first_release() {
     let dir = installed();
-    let mut g = Generator::new(dir.path(), false);
-    upgrade::generate(&mut g).unwrap();
-    assert!(g.failures.is_empty(), "{:?}", g.failures);
-    let lib = read(dir.path(), "migration/src/lib.rs");
-    let module = lib
-        .lines()
-        .find_map(|l| {
-            l.strip_prefix("mod ")?
-                .strip_suffix("_upgrade_rust_llm_to_2_1;")
-        })
-        .map(|stem| format!("{stem}_upgrade_rust_llm_to_2_1"))
-        .expect("upgrade migration declared");
-    assert!(lib.contains(&format!(
-        "            Box::new({module}::Migration),\n            // inject-above"
-    )));
-    assert!(
-        lib.find(&format!("Box::new({module}")) > lib.find("_create_rust_llm_records::Migration"),
-        "runs after the install migration"
-    );
-    assert_eq!(
-        read(dir.path(), &format!("migration/src/{module}.rs")),
-        include_str!("../templates/upgrade/migration.rs")
-    );
-
-    // A second run reuses the file instead of adding another migration.
     let before = walk(dir.path());
     let mut g = Generator::new(dir.path(), false);
     upgrade::generate(&mut g).unwrap();
-    assert!(
-        actions(&g).iter().all(|(a, _)| *a == "identical"),
-        "{:?}",
-        g.actions
-    );
+    assert!(g.failures.is_empty(), "{:?}", g.failures);
+    assert!(g.actions.is_empty(), "{:?}", g.actions);
+    assert!(g.notes.iter().any(|n| n.contains("Nothing to upgrade")));
     assert_eq!(walk(dir.path()), before);
+    assert!(upgrade::generate_with(&mut g, &["chat:Thread"]).is_err());
 }
 
 #[test]

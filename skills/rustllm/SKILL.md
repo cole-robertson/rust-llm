@@ -3,7 +3,7 @@ name: rustllm
 description: Build and maintain Rust or Loco applications with the RustLLM AI framework (the rust_llm, rust_llm_loco, and rust_llm_cli crates). Use for chats, agents, tools, structured output, media generation, transcription, OCR, moderation, embeddings, reranking, batches, MCP, judgments, Loco persistence, and the rust-llm generators; not for contributing to the framework itself.
 license: MIT
 metadata:
-  api_version: "2.0"
+  api_version: "2.1"
 ---
 
 # Build with RustLLM
