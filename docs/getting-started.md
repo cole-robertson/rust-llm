@@ -9,7 +9,7 @@ next to each Rust sample for readers coming from Ruby.
 
 ```toml
 [dependencies]
-rust_llm = "2.0"
+rust_llm = "2.1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 

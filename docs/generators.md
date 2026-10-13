@@ -42,7 +42,7 @@ cargo fmt --all && cargo loco db migrate
 Adds:
 
 - `rust_llm` and `rust_llm_loco` to `Cargo.toml`, and `rust_llm_loco` to `migration/Cargo.toml`,
-  at version `2.0.0` from crates.io. Pass `--path` to a checkout to depend on a local copy instead.
+  at version `2.1.1` from crates.io. Pass `--path` to a checkout to depend on a local copy instead.
 - `migration/src/m<timestamp>_create_rust_llm_records.rs`, registered in the migrator. It runs
   `rust_llm_loco::migrations()` (see [Persistence with Loco](persistence-loco.md)).
 - `src/models/chats.rs` and `src/models/messages.rs`, re-exporting the `rust_llm_loco` entities
@@ -77,18 +77,6 @@ and its accounts. Adds:
 - Request tests (`tests/requests/chats.rs`) against a local stand-in for Anthropic's streaming API.
 
 To give the chat tools, add them in the worker, where the comment marks the spot.
-
-### Upgrading a 2.0 chat UI
-
-The 2.0 chat UI was not scoped to accounts. Run `rust-llm generate upgrade`, then
-`rust-llm generate chat_ui --force`: it removes the 2.0 `/chats` routes and sidebar link,
-replaces the generated pages and controllers (`--force` overwrites files you changed, so commit
-first), and adds `chats.account_id`. Chats created under 2.0 have no account, so the new pages do
-not list them until you assign one, for example:
-
-```sh
-sqlite3 db.sqlite "UPDATE chats SET account_id = 1 WHERE account_id IS NULL"
-```
 
 ## public_chat
 
@@ -148,10 +136,9 @@ the provider to `MODELS_DEV_PROVIDER_MAP`; core files that are not there are lef
 
 ## upgrade
 
-Writes `migration/src/m<timestamp>_upgrade_rust_llm_to_2_1.rs` (RubyLLM's
-`upgrade_ruby_llm_to_2_1.rb.tt`) and registers it: it adds `rust_llm_mcp_credentials` and
-`rust_llm_tool_calls.pending_input` when they are missing, so it is safe on an up-to-date schema.
-Then run `cargo loco db migrate`.
+RubyLLM's `ruby_llm:upgrade` moves an app's schema from the previous release to the current one.
+RustLLM starts at 2.1.1, so in this release `rust-llm generate upgrade` has nothing to do: `install`
+already creates the 2.1.1 tables. The next release that changes the schema ships its upgrade here.
 
 ## Not Generated
 

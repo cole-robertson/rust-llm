@@ -284,8 +284,7 @@ impl MigrationTrait for CreateRustLlmAttachments {
     }
 }
 
-/// The `ruby_llm_mcp_credentials` table of `create_ruby_llm_records_migration.rb.tt` (and of the
-/// 2.1 upgrade): MCP OAuth credentials, keyed by owner and server, with a polymorphic owner.
+/// The `ruby_llm_mcp_credentials` table of `create_ruby_llm_records_migration.rb.tt`: MCP OAuth credentials, keyed by owner and server, with a polymorphic owner.
 /// `data` holds the encrypted JSON (see `McpCredentialStore`).
 #[derive(DeriveMigrationName)]
 pub struct CreateRustLlmMcpCredentials;
@@ -397,8 +396,7 @@ impl MigrationTrait for CreateRustLlmBatches {
     }
 }
 
-/// The `ruby_llm_provider_files` table of `create_ruby_llm_records_migration.rb.tt` (and of the
-/// 2.1 upgrade): the provider file each stored attachment was uploaded to, one row per blob key
+/// The `ruby_llm_provider_files` table of `create_ruby_llm_records_migration.rb.tt`: the provider file each stored attachment was uploaded to, one row per blob key
 /// and provider account (`RubyLLM::ActiveRecord::ProviderFile`, see `rust_llm_loco::ProviderFile`).
 /// Rows name the attachment by its `rust_llm_attachments.blob_key`, never handed out twice.
 #[derive(DeriveMigrationName)]
@@ -449,7 +447,7 @@ impl MigrationTrait for CreateRustLlmProviderFiles {
 
 /// The `ruby_llm_usages` table of `create_ruby_llm_records_migration.rb.tt`: one row per billed
 /// attempt, attached to a chat and message when a chat record made it, and to its owner. Part of
-/// [`CreateRustLlmRecords`]; the 2.1 upgrade rebuilds it from here on SQLite.
+/// [`CreateRustLlmRecords`].
 #[derive(DeriveMigrationName)]
 pub struct CreateRustLlmUsages;
 

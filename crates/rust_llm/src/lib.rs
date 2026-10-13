@@ -147,4 +147,4 @@ pub async fn count_tokens(text: &str, model: Option<&str>, provider: Option<&str
 }
 
 /// `RubyLLM::VERSION` of the port's source.
-pub const VERSION: &str = "2.0.0";
+pub const VERSION: &str = "2.1.1";

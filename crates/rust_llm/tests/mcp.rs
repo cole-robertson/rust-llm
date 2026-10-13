@@ -785,7 +785,7 @@ async fn a_modern_server_is_discovered_and_gets_meta_with_every_request() {
     // RubyLLM sends { name: "ruby_llm", version: RubyLLM::VERSION }; the port names itself.
     assert_eq!(
         meta["io.modelcontextprotocol/clientInfo"],
-        json!({ "name": "rust_llm", "version": "2.0.0" })
+        json!({ "name": "rust_llm", "version": rust_llm::VERSION })
     );
     assert_eq!(
         meta["io.modelcontextprotocol/clientCapabilities"],

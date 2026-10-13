@@ -23,7 +23,7 @@ know RustLLM. Same method names, same behavior, Rust types.
 
 ```toml
 [dependencies]
-rust_llm = "2.0"
+rust_llm = "2.1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 

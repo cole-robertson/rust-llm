@@ -24,14 +24,14 @@ doc = false
 
 [dependencies]
 # `tool::underscore` keeps generated tool file names equal to the runtime `Tool::name()`.
-rust_llm = { path = "../rust_llm", version = "2.0.0" }
+rust_llm = { path = "../rust_llm", version = "2.1.1" }
 chrono.workspace = true
 
 [dev-dependencies]
 tempfile = "3"
 # tests/spec_generators.rs compiles the install/upgrade migration and model templates and runs
 # them against SQLite; syn checks that core wiring the provider generator rewrites still parses.
-rust_llm_loco = { path = "../rust_llm_loco", version = "2.0.0" }
+rust_llm_loco = { path = "../rust_llm_loco", version = "2.1.1" }
 async-trait.workspace = true
 sea-orm.workspace = true
 sea-orm-migration.workspace = true

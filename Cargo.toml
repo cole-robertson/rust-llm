@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/rust_llm", "crates/rust_llm_loco", "crates/rust_llm_cli", "docs/check"]
 
 [workspace.package]
-version = "2.0.0"
+version = "2.1.1"
 edition = "2024"
 license = "MIT"
 rust-version = "1.88"
