@@ -20,6 +20,7 @@ fn limits() -> Limits {
     Limits {
         ip_messages: 20,
         session_messages: 10,
+        global_messages: 200,
         window: Duration::from_secs(600),
         max_input_chars: 4_000,
         max_output_tokens: 1_024,
@@ -254,9 +255,13 @@ async fn one_conversation_is_rate_limited() {
     .await;
 }
 
-#[tokio::test]
-#[serial]
-async fn one_ip_is_rate_limited_across_conversations() {
+/// [`with_public_chat`] with `limits` behind a proxy whose `X-Forwarded-For` is trusted, so
+/// [`say_as`] picks the client address.
+async fn with_public_chat_behind_proxy<F, Fut>(limits: Limits, f: F)
+where
+    F: FnOnce(TestServer, AppContext) -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
     use loco_rs::controller::middleware::remote_ip::{ClientIpSource, RemoteIpMiddleware};
     anthropic_stub::use_stub().await;
     public_chat::reset();
@@ -267,9 +272,18 @@ async fn one_ip_is_rate_limited_across_conversations() {
         });
     };
     with_app_config(trust_the_proxy, |server, ctx| async move {
-        let mut limits = limits();
-        limits.ip_messages = 3;
         ctx.shared_store.insert(limits);
+        f(server, ctx).await;
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn one_ip_is_rate_limited_across_conversations() {
+    let mut limits = limits();
+    limits.ip_messages = 3;
+    with_public_chat_behind_proxy(limits, |server, _ctx| async move {
         // A new browser (no cookie) for each message: only the IP links them.
         for n in 0..3 {
             let res = say_as(&server, "203.0.113.7", &format!("hi {n}")).await;
@@ -281,6 +295,60 @@ async fn one_ip_is_rate_limited_across_conversations() {
         // Another address is not affected.
         let res = say_as(&server, "203.0.113.8", "hello").await;
         assert_eq!(res.status_code(), 200);
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn one_ipv6_network_is_rate_limited_across_its_addresses() {
+    let mut limits = limits();
+    limits.ip_messages = 2;
+    with_public_chat_behind_proxy(limits, |server, _ctx| async move {
+        assert_eq!(say_as(&server, "2001:db8:1:2::1", "one").await.status_code(), 200);
+        assert_eq!(say_as(&server, "2001:db8:1:2::2", "two").await.status_code(), 200);
+        // Rotating to another address in the same /64 does not reset the limit.
+        let res = say_as(&server, "2001:db8:1:2:ffff::3", "three").await;
+        assert_eq!(res.status_code(), 429);
+        assert_eq!(res.json::<Value>()["error"], SLOW_DOWN);
+        // Another /64 is not affected.
+        assert_eq!(say_as(&server, "2001:db8:1:3::1", "hello").await.status_code(), 200);
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn all_guests_together_are_rate_limited() {
+    let mut limits = limits();
+    limits.global_messages = 3;
+    with_public_chat_behind_proxy(limits, |server, _ctx| async move {
+        for n in 1..=3 {
+            let res = say_as(&server, &format!("203.0.113.{n}"), "hi").await;
+            assert_eq!(res.status_code(), 200, "{}", res.text());
+        }
+        let res = say_as(&server, "198.51.100.9", "a new address").await;
+        assert_eq!(res.status_code(), 429);
+        assert_eq!(res.json::<Value>()["error"], SLOW_DOWN);
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn a_refused_message_keeps_no_conversation() {
+    let mut limits = limits();
+    limits.ip_messages = 1;
+    with_public_chat_behind_proxy(limits, |server, _ctx| async move {
+        assert_eq!(say_as(&server, "203.0.113.7", "hi").await.status_code(), 200);
+        assert_eq!(public_chat::conversations(), 1);
+        // Rate-limited browsers without a cookie must not fill the table (and so evict guests).
+        for _ in 0..5 {
+            let res = say_as(&server, "203.0.113.7", "again").await;
+            assert_eq!(res.status_code(), 429);
+            assert!(res.maybe_cookie(COOKIE).is_none(), "no conversation to name");
+        }
+        assert_eq!(public_chat::conversations(), 1);
     })
     .await;
 }

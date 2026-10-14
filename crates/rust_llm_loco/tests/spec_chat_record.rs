@@ -182,6 +182,53 @@ async fn polls_the_row_at_most_once_per_interval() {
     assert!(record.is_cancelled(&db).await.unwrap(), "left on the row");
 }
 
+/// A `complete` the caller drops mid-request (a client disconnect) stops polling the row, so a
+/// cancellation written afterwards is left for the next run instead of being consumed by a
+/// poller nobody is listening to.
+#[tokio::test]
+async fn a_dropped_completion_stops_polling_for_cancellation() {
+    let db = db().await;
+    let server = MockServer::start().await;
+    Mock::given(matchers::any())
+        .respond_with(ResponseTemplate::new(500).set_delay(Duration::from_secs(30)))
+        .mount(&server)
+        .await;
+    let record = ChatRecord::create(&db, MODEL, None).await.unwrap();
+    let mut chat = record.to_llm_with(&db, config_for(&server)).await.unwrap();
+    record.ask_later(&db, &mut chat, "Hello").await.unwrap();
+
+    for streaming in [false, true] {
+        let dropped = async {
+            if streaming {
+                let _ = record.complete_stream(&db, &mut chat, |_| {}).await;
+            } else {
+                let _ = record.complete(&db, &mut chat).await;
+            }
+        };
+        assert!(
+            tokio::time::timeout(Duration::from_millis(300), dropped)
+                .await
+                .is_err(),
+            "still waiting on the model when dropped"
+        );
+        record.cancel(&db).await.unwrap();
+        tokio::time::sleep(rust_llm_loco::CANCELLATION_POLL_INTERVAL * 2).await;
+        assert!(
+            record.is_cancelled(&db).await.unwrap(),
+            "the request stays on the row for the next run (streaming: {streaming})"
+        );
+        chats::Entity::update_many()
+            .col_expr(
+                chats::Column::Cancelled,
+                sea_orm::sea_query::Expr::value(false),
+            )
+            .filter(chats::Column::Id.eq(record.id()))
+            .exec(&db)
+            .await
+            .unwrap();
+    }
+}
+
 // ---- chat_methods_spec: model assignment and context -----------------------------------------
 
 // spec: active_record/chat_methods_spec.rb:135 model assignment falls back to the configured default model
@@ -1223,6 +1270,33 @@ async fn re_collecting_never_appends_an_answer_twice() {
         .filter(|m| m.role == "assistant")
         .count();
     assert_eq!(assistants, 1);
+}
+
+// A record's chat writes its own usage rows (`usage_recorder = persist_usage_entry`), so a
+// collected answer is one row linked to its chat, never a second ledger row with no chat.
+#[tokio::test]
+async fn collecting_with_a_usage_ledger_writes_one_row_per_answer() {
+    let db = db().await;
+    let server = anthropic_batch("msgbatch_ledger", &[(0, "4")]).await;
+    let mut c = (*store_config(&server, &db)).clone();
+    c.usage_ledger = Some(rust_llm_loco::UsageLedger::shared(db.clone()));
+    let config = Arc::new(c);
+    let (record, chat) = staged(&db, &config, "What is 2 + 2?").await;
+    let batch = rust_llm_loco::batch::submit(&db, vec![(record.clone(), chat)])
+        .await
+        .unwrap();
+
+    let mut polled = rust_llm::Batch::find_with_config(config, batch.id(), None)
+        .await
+        .unwrap();
+    polled.refresh().await.unwrap();
+    rust_llm_loco::batch::collect(&db, &mut polled)
+        .await
+        .unwrap();
+
+    let rows = rust_llm_usages::Entity::find().all(&db).await.unwrap();
+    assert_eq!(rows.len(), 1, "{rows:?}");
+    assert_eq!(rows[0].chat_id, Some(i64::from(record.id())));
 }
 
 // spec: active_record/acts_as_batch_spec.rb:100 keeps answers aligned when a chat was deleted before collection

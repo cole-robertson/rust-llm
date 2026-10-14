@@ -101,7 +101,7 @@ async fn complete_walks_the_agentic_loop_state_machine() {
     assert!(!chat.is_complete(), "tools owe results");
     chat.run_tools().await.unwrap();
     assert!(!chat.is_complete(), "model owes a response again");
-    chat.add_completion(answer_message("hello"), false);
+    chat.add_completion(answer_message("hello"), false).await;
     assert!(chat.is_complete(), "answered, no tools");
 }
 
@@ -343,7 +343,7 @@ async fn step_returns_none_once_complete() {
     let server = serve(vec![]).await;
     let mut chat = chat(&server).with_tool(Echo);
     chat.ask_later("Echo \"hello\" back to me.").unwrap();
-    chat.add_completion(answer_message("hello"), false);
+    chat.add_completion(answer_message("hello"), false).await;
     assert!(chat.step().await.unwrap().is_none());
 }
 
@@ -425,7 +425,7 @@ async fn complete_is_a_no_op_on_a_complete_chat() {
     let server = serve(vec![]).await;
     let mut chat = chat(&server).with_tool(Echo);
     chat.ask_later("Echo \"hello\" back to me.").unwrap();
-    chat.add_completion(answer_message("hello"), false);
+    chat.add_completion(answer_message("hello"), false).await;
     assert_eq!(chat.complete().await.unwrap().content(), "hello");
     assert_eq!(requests(&server).await, 0);
 }
@@ -442,7 +442,7 @@ async fn add_completion_appends_and_runs_message_callbacks() {
         .before_message(move || before.lock().unwrap().push("before".into()))
         .after_message(move |m| after.lock().unwrap().push(m.content().to_string()));
     chat.ask_later("Echo \"hello\" back to me.").unwrap();
-    chat.add_completion(answer_message("hello"), false);
+    chat.add_completion(answer_message("hello"), false).await;
     assert_eq!(chat.messages().last().unwrap().content(), "hello");
     assert_eq!(*received.lock().unwrap(), ["before", "hello"]);
 }
@@ -455,6 +455,7 @@ async fn add_completion_keeps_raw_json_and_parsed_reads_it() {
         .with_schema(json!({ "type": "object", "properties": { "answer": { "type": "string" } } }));
     let message = chat
         .add_completion(Message::assistant(r#"{"answer":"hello"}"#), false)
+        .await
         .clone();
     assert_eq!(message.content(), r#"{"answer":"hello"}"#);
     assert_eq!(

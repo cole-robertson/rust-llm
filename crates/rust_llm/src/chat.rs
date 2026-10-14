@@ -925,7 +925,7 @@ impl Chat {
 
     /// `add_completion(response, record_usage:)`: append an answer produced outside `complete`
     /// (e.g. by a batch), recording its usage and running the message callbacks.
-    pub fn add_completion(&mut self, mut message: Message, record_usage: bool) -> &Message {
+    pub async fn add_completion(&mut self, mut message: Message, record_usage: bool) -> &Message {
         if message.usage_entries.is_empty() {
             let entry = UsageEntry {
                 id: UsageEntry::next_id(),
@@ -941,10 +941,10 @@ impl Chat {
                 cost: message.cost(None),
             };
             message.usage_entries = vec![entry.clone()];
-            self.record_usage_now(entry);
+            self.record_usage_entry(entry).await;
         } else if record_usage {
             for entry in message.usage_entries.clone() {
-                self.record_usage_now(entry);
+                self.record_usage_entry(entry).await;
             }
         }
         for cb in &mut self.callbacks.before_message {
@@ -1239,10 +1239,15 @@ impl Chat {
         self.usage_entries.push(entry);
     }
 
-    /// `record_usage` for the synchronous `add_completion` path: no async recorder can run here.
-    fn record_usage_now(&mut self, entry: UsageEntry) {
+    /// `record_usage_entry` for `add_completion`: `@usage_recorder ? @usage_recorder.call(entry) :
+    /// Accounting::Usage.record(entry)`, then `usage.rust_llm`.
+    async fn record_usage_entry(&mut self, entry: UsageEntry) {
         if let Some(r) = &mut self.usage_recorder {
             r(&entry);
+        } else if let Some(r) = self.async_usage_recorder.clone() {
+            r(entry.clone()).await;
+        } else {
+            crate::accounting::record(&self.config, &entry).await;
         }
         crate::instrumentation::usage(&self.config, &entry);
         self.usage_entries.push(entry);
@@ -1620,6 +1625,7 @@ impl Chat {
         mut on_chunk: Option<&mut (dyn FnMut(&Message) + Send)>,
         chunks_yielded: &mut bool,
     ) -> Result<Message> {
+        let usage_start = self.usage_entries.len();
         self.load_mcp_tools().await?;
         self.load_attachments(&mut []).await?;
         let mut messages = self.request_messages().await?;
@@ -1632,7 +1638,6 @@ impl Chat {
         // `Anthropic#complete`: a turn a server tool paused with `pause_turn` goes back verbatim to
         // continue, up to MAX_PAUSE_TURN_CONTINUATIONS requests, and the segments merge into one message.
         let mut segments = Vec::new();
-        let mut call_entries = Vec::new();
         let mut billed_model = None;
         let mut reuploaded = false;
         let mut continuation = 0;
@@ -1640,7 +1645,7 @@ impl Chat {
             let chunk_sink = on_chunk
                 .as_mut()
                 .map(|f| &mut **f as &mut (dyn FnMut(&Message) + Send));
-            let (segment, entries, billed, protocol) = match self
+            let (segment, billed, protocol) = match self
                 .request_once(&messages, chunk_sink, chunks_yielded)
                 .await
             {
@@ -1659,7 +1664,6 @@ impl Chat {
                 }
             };
             continuation += 1;
-            call_entries.extend(entries);
             billed_model = Some(billed);
             let paused = protocol == ProtocolName::Anthropic
                 && segment.finish_reason == Some(FinishReason::PauseTurn);
@@ -1672,8 +1676,9 @@ impl Chat {
             }
         }
         let mut message = protocols::anthropic::merge_turn_segments(segments);
-        // `link_completion_usage`: every attempt of this call is linked to the message it produced.
-        message.usage_entries = call_entries;
+        // `link_completion_usage(result, usage_start)`: every attempt since the turn began, failed
+        // ones before a re-upload included, is linked to the message it produced.
+        message.usage_entries = self.usage_entries[usage_start..].to_vec();
         message.model_info = billed_model;
         if !streaming {
             for cb in &mut self.callbacks.before_message {
@@ -1750,7 +1755,7 @@ impl Chat {
         messages: &[Message],
         on_chunk: Option<&mut (dyn FnMut(&Message) + Send)>,
         chunks_yielded: &mut bool,
-    ) -> Result<(Message, Vec<UsageEntry>, Model, ProtocolName)> {
+    ) -> Result<(Message, Model, ProtocolName)> {
         let streaming = on_chunk.is_some();
         let (payload, protocol) = self.render_with(messages, streaming)?;
         let mut endpoint = protocols::endpoint(protocol, self.provider, &self.model, streaming);
@@ -1886,7 +1891,7 @@ impl Chat {
         call_entries.push(entry);
         message.usage_entries = call_entries.clone();
         message.model_info = Some(billed_model.clone());
-        Ok((message, call_entries, billed_model, protocol))
+        Ok((message, billed_model, protocol))
     }
 
     /// `count_tokens(message)`: input tokens for the next request as configured (instructions,
@@ -1980,10 +1985,10 @@ impl Chat {
                 None,
             ));
         }
+        let usage_start = self.usage_entries.len();
         let mut reuploaded = false;
         loop {
-            let mut entries = Vec::new();
-            match self.compact_request(protocol, &mut entries).await {
+            match self.compact_request(protocol).await {
                 // `replacing_missing_uploads`: a file the provider deleted is uploaded again and
                 // the compaction runs once more.
                 Err(e) => {
@@ -1995,9 +2000,9 @@ impl Chat {
                 }
                 Ok(mut message) => {
                     let entry = self.entry(UsageStatus::Succeeded, message.tokens.clone(), None);
-                    self.record_usage(entry.clone()).await;
-                    entries.push(entry);
-                    message.usage_entries = entries;
+                    self.record_usage(entry).await;
+                    // `link_completion_usage(result, usage_start)`.
+                    message.usage_entries = self.usage_entries[usage_start..].to_vec();
                     // `record_generated_message`: a cancel during the request keeps the billed
                     // usage but adds no message.
                     self.raise_if_cancelled()?;
@@ -2015,12 +2020,8 @@ impl Chat {
     }
 
     /// One `responses/compact` request: prepares the history, sends it, and records the usage of
-    /// each failed attempt in `entries`.
-    async fn compact_request(
-        &mut self,
-        protocol: ProtocolName,
-        entries: &mut Vec<UsageEntry>,
-    ) -> Result<Message> {
+    /// each failed attempt.
+    async fn compact_request(&mut self, protocol: ProtocolName) -> Result<Message> {
         let mut messages = self.preprocessed_messages()?;
         crate::files::preprocess_messages(
             &mut messages,
@@ -2065,9 +2066,8 @@ impl Chat {
             Err(e) => Err(e.claim(protocol, self.provider.slug(), &self.model.id, &payload)),
         };
         for tokens in retried {
-            let entry = self.entry(UsageStatus::Failed, tokens, None);
-            self.record_usage(entry.clone()).await;
-            entries.push(entry);
+            self.record_usage(self.entry(UsageStatus::Failed, tokens, None))
+                .await;
         }
         match result {
             Ok(m) => Ok(m),
@@ -2348,7 +2348,12 @@ impl Chat {
                 event.set("result_content", || r.content.clone().into());
                 event.set("result_class", || "ToolResult".into());
             }
-            event.finish(result.as_ref().err());
+            // `invoke_tool` rescues a pause inside the block and returns PAUSED: not a failure.
+            let failure = result
+                .as_ref()
+                .err()
+                .filter(|e| !matches!(e, Error::McpInputRequired(_) | Error::McpTask(_)));
+            event.finish(failure);
             result
         }
     }

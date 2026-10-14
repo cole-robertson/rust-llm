@@ -218,6 +218,75 @@ async fn lets_one_process_refresh_a_grant_while_the_others_wait_for_its_token() 
     let _ = std::fs::remove_file(file);
 }
 
+/// SQLite has one write lock, and `synchronize` holds it while the block runs. A token endpoint
+/// that never answers must not hold it for the whole `request_timeout` (300 s by default): the
+/// refresh gives up after [`McpCredentialStore::SYNCHRONIZE_TIMEOUT`], keeps the old token, and
+/// the app's other writes go through again.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_hung_token_endpoint_does_not_hold_the_write_lock() {
+    use rust_llm::mcp::OAuth;
+
+    let (first, second, file) = shared_db("hung").await;
+    let auth = wiremock::MockServer::start().await;
+    wiremock::Mock::given(wiremock::matchers::method("POST"))
+        .and(wiremock::matchers::path("/token"))
+        .respond_with(
+            wiremock::ResponseTemplate::new(200)
+                .set_body_json(json!({ "access_token": "access-2", "expires_in": 3600 }))
+                .set_delay(std::time::Duration::from_secs(60)),
+        )
+        .mount(&auth)
+        .await;
+    let owner = McpCredentialStore::owner_key(rust_llm_loco::CHAT_TYPE, 1);
+    let server_url = "http://127.0.0.1:1/mcp";
+    let key = format!("{owner}@{server_url}");
+    let store = Arc::new(McpCredentialStore::new(first, KEY));
+    store
+        .write(
+            &key,
+            json!({
+                "access_token": "access-1", "refresh_token": "refresh-1", "expires_at": 0,
+                "client_id": "client", "issuer": auth.uri(),
+                "server": { "issuer": auth.uri(), "token_endpoint": format!("{}/token", auth.uri()) }
+            }),
+            Some(&owner),
+        )
+        .await
+        .unwrap();
+    let mut config = (*rust_llm::config()).clone();
+    config.mcp_credential_store = Some(store.clone());
+    let oauth = OAuth::new(
+        server_url,
+        Some(owner.clone()),
+        None,
+        None,
+        None,
+        Arc::new(config),
+    )
+    .unwrap();
+
+    let started = std::time::Instant::now();
+    let token = tokio::time::timeout(
+        McpCredentialStore::SYNCHRONIZE_TIMEOUT + std::time::Duration::from_secs(5),
+        oauth.access_token(),
+    )
+    .await
+    .expect("the refresh gives up instead of holding the lock");
+    assert_eq!(
+        token.unwrap(),
+        Some("access-1".to_string()),
+        "the old token is kept"
+    );
+    assert!(started.elapsed() >= McpCredentialStore::SYNCHRONIZE_TIMEOUT);
+
+    let other = McpCredentialStore::new(second, KEY);
+    other
+        .write("another-key", json!({ "access_token": "x" }), None)
+        .await
+        .expect("the write lock was released");
+    let _ = std::fs::remove_file(file);
+}
+
 /// A P-256 key, as `OpenSSL::PKey::EC.generate('prime256v1').private_to_pem`, and the base64url
 /// X coordinate of its public point.
 const EC_KEY: &str = "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgT3wOt+pNOqFCTSW4\nobzAWeGUx5YMPT9yXPhJOQX9Ix6hRANCAASualQCGPmiMrhMn86Cx4y1PDHdT6UX\npxher9ER5Vv5x9fQa4XsUpssH9POeC+VdMQnrevJRZ1ti8potRDWZBqf\n-----END PRIVATE KEY-----";

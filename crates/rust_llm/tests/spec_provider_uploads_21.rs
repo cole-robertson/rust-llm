@@ -10,7 +10,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use rust_llm::files::{ProviderFileStore, is_confirmed_upload};
-use rust_llm::{Attachment, Chat, Config, Error, Message, Provider, Role, UploadedFile};
+use rust_llm::{
+    Attachment, Chat, Config, Error, Message, Provider, Role, UploadedFile, UsageStatus,
+};
 use serde_json::{Value, json};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, Request, ResponseTemplate};
@@ -252,6 +254,34 @@ async fn uploads_a_deleted_file_again_and_retries_once() {
     assert_eq!(sent_file(&server, "file_new").await, 1);
     assert_eq!(store.ids(), vec!["file_new"]);
     assert!(!is_confirmed_upload("anthropic", &account, "file_old"));
+}
+
+// `link_completion_usage(result, usage_start)`: the answer carries every attempt since the turn
+// began, the failed request over the deleted file included.
+#[tokio::test]
+async fn links_the_failed_attempt_and_the_retry_to_the_answer() {
+    let server = MockServer::start().await;
+    let (config, store, _) = anthropic_with_stored_file(&server).await;
+    upload_returns(&server, "file_new").await;
+    messages(
+        &server,
+        vec![missing("file_old", 404), json_response(reply(), 200)],
+    )
+    .await;
+
+    let mut chat = chat(&config);
+    let response = chat
+        .ask_with("Summarize these notes", vec![notes(&store)])
+        .await
+        .unwrap();
+
+    let statuses: Vec<UsageStatus> = response.usage_entries.iter().map(|e| e.status).collect();
+    assert_eq!(statuses, [UsageStatus::Failed, UsageStatus::Succeeded]);
+    assert_eq!(response.usage_entries, chat.usage_entries());
+    assert_eq!(
+        chat.messages().last().unwrap().usage_entries,
+        response.usage_entries
+    );
 }
 
 // spec: chat_provider_uploads_spec.rb:108 retries a streamed request that failed before streaming anything
@@ -755,8 +785,12 @@ async fn compaction_uploads_a_deleted_file_again_and_compacts_once_more() {
     m.attachments.push(report);
     chat.add_message(m);
 
-    chat.compact().await.unwrap();
+    let compacted = chat.compact().await.unwrap();
 
+    // `link_completion_usage(result, usage_start)`: the failed compaction is linked too.
+    let statuses: Vec<UsageStatus> = compacted.usage_entries.iter().map(|e| e.status).collect();
+    assert_eq!(statuses, [UsageStatus::Failed, UsageStatus::Succeeded]);
+    assert_eq!(compacted.usage_entries, chat.usage_entries());
     let compacts: Vec<String> = server
         .received_requests()
         .await

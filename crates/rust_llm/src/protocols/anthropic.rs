@@ -791,8 +791,7 @@ pub fn parse_completion_body(data: &Value, raw: RawResponse) -> Result<Message> 
     .or_else(|| int(usage.get("reasoning_tokens")));
     m.tokens.server_tool_use = usage
         .get("server_tool_use")
-        .and_then(Value::as_object)
-        .cloned();
+        .and_then(crate::tokens::Tokens::positive_counts);
     m.finish_reason = normalize_finish_reason(
         data.get("stop_reason").and_then(Value::as_str),
         FINISH_REASONS,
@@ -947,8 +946,7 @@ pub fn build_chunk(state: &mut StreamBlocks, data: &Value) -> Message {
     chunk.tokens.server_tool_use = data
         .pointer("/message/usage/server_tool_use")
         .or_else(|| data.pointer("/usage/server_tool_use"))
-        .and_then(Value::as_object)
-        .cloned();
+        .and_then(crate::tokens::Tokens::positive_counts);
     chunk.finish_reason = normalize_finish_reason(
         data.pointer("/delta/stop_reason").and_then(Value::as_str),
         FINISH_REASONS,

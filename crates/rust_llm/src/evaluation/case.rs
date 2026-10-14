@@ -16,7 +16,8 @@ pub struct Case {
 }
 
 impl Case {
-    /// `Case.new(name:, inputs:)`. Inputs must be JSON (finite numbers only).
+    /// `Case.new(name:, inputs:)`. Inputs must be JSON (finite numbers only): a non-finite float
+    /// such as `f64::NAN` becomes `null` on its way to a [`Value`], as `serde_json` converts it.
     pub fn new(name: impl Into<String>, inputs: impl Into<Value>) -> Result<Case> {
         let name = name.into();
         if name.is_empty() {

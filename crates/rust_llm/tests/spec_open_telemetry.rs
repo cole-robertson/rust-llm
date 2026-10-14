@@ -1540,4 +1540,68 @@ mod traced {
             assert!(!Context::current().span().span_context().is_valid());
         }
     }
+
+    /// A tool that pauses the way an MCP tool does when its server asks the user for input.
+    struct Pausing;
+
+    #[async_trait]
+    impl Tool for Pausing {
+        fn name(&self) -> String {
+            "pausing".into()
+        }
+        fn description(&self) -> String {
+            "Asks the user first".into()
+        }
+        async fn execute(
+            &self,
+            _: Map<String, Value>,
+            _: &ToolCall,
+        ) -> Result<ToolResult, ToolError> {
+            let input = rust_llm::mcp::InputState {
+                requests: vec![rust_llm::InputRequest::new(
+                    "confirm",
+                    json!({ "message": "Deploy to production?" }),
+                )],
+                request_state: None,
+                task: None,
+            };
+            Err(Box::new(rust_llm::Error::McpInputRequired(Box::new(
+                rust_llm::mcp::InputRequiredError {
+                    message: "Deploy to production?".into(),
+                    input,
+                },
+            ))))
+        }
+    }
+
+    // `invoke_tool` rescues `MCP::InputRequiredError` inside the `tool_call.ruby_llm` block and
+    // returns PAUSED, so a paused call is not a failed span.
+    #[tokio::test]
+    async fn does_not_record_a_paused_mcp_tool_call_as_an_error() {
+        let otel = traced().await;
+        let server = MockServer::start().await;
+        let mut chat = stub_chat(config(&server)).with_tool(Pausing);
+        chat.add_message(Message::user("Deploy"));
+        let mut call = Message::assistant("");
+        call.tool_calls = Some(
+            [(
+                "call_1".to_string(),
+                ToolCall::new("call_1", "pausing", Map::new()),
+            )]
+            .into_iter()
+            .collect(),
+        );
+        chat.add_message(call);
+
+        chat.run_tools().await.unwrap();
+
+        assert_eq!(chat.pending_inputs().len(), 1);
+        let spans = otel.spans();
+        let tool = spans
+            .iter()
+            .find(|s| s.name == "execute_tool pausing")
+            .unwrap();
+        assert!(!is_error(tool), "{:?}", tool.status);
+        assert_eq!(string(tool, "error.type"), None);
+    }
 }

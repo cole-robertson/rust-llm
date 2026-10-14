@@ -88,10 +88,13 @@ cargo loco task routes:generate
 A chat page at `/chat` that anyone can use without signing in, for a demo or a landing page. A
 guest's conversation lives in server memory under an unguessable cookie (no rows), and replies
 stream back on the request as Server-Sent Events. Limits come from `PUBLIC_CHAT_*` environment
-variables: messages per IP and per conversation in a window (20 and 10 per 10 minutes), input
-length (4,000 characters), output tokens per reply (1,024), and turns per conversation (20). The
-model is `PUBLIC_CHAT_MODEL`, or RustLLM's `default_model`. RubyLLM has no equivalent. Each reply is
-billed to the app's provider key, so keep the limits tight on a public deployment.
+variables: messages per IP, per conversation, and from all guests together in a window (20, 10, and
+200 per 10 minutes; `PUBLIC_CHAT_GLOBAL_MESSAGES` caps the total), input length (4,000 characters),
+output tokens per reply (1,024), and turns per conversation (20). An IPv6 client is limited by its
+/64. Behind a proxy, enable the `remote_ip` middleware: without a client address every guest shares
+one IP limit, and the app logs a warning saying so. The model is `PUBLIC_CHAT_MODEL`, or RustLLM's
+`default_model`. RubyLLM has no equivalent. Each reply is billed to the app's provider key, so keep
+the limits tight on a public deployment.
 
 ## tool
 

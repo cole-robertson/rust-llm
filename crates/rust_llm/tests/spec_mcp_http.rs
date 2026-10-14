@@ -1327,3 +1327,69 @@ async fn stops_listening_instead_of_asking_again() {
     );
     mcp.close().await;
 }
+
+// ---- response size limits ---------------------------------------------------------------------
+
+/// Text that makes a JSON-RPC answer about `bytes` long.
+fn padding(bytes: usize) -> String {
+    "x".repeat(bytes)
+}
+
+// A hostile server cannot make the client hold an answer of any size in memory.
+#[tokio::test]
+async fn refuses_a_json_answer_past_the_message_limit() {
+    let server = modern_server().await;
+    stub_with(&server, "tools/call", |request| {
+        ResponseTemplate::new(200).set_body_raw(
+            rpc(
+                request,
+                json!({ "result": { "content": [], "padding": padding(5 * 1024 * 1024) } }),
+            ),
+            "application/json",
+        )
+    })
+    .await;
+
+    let message = mcp_error(slow_call(&client(&server)).await);
+    assert!(message.contains("bytes"), "{message}");
+}
+
+// Nor an event of any size on an event stream.
+#[tokio::test]
+async fn refuses_an_event_past_the_message_limit() {
+    let server = modern_server().await;
+    stub_with(&server, "tools/call", |request| {
+        events(format!(
+            "data: {}\n\n",
+            rpc(
+                request,
+                json!({ "result": { "content": [], "padding": padding(5 * 1024 * 1024) } }),
+            )
+        ))
+    })
+    .await;
+
+    let message = mcp_error(slow_call(&client(&server)).await);
+    assert!(message.contains("bytes"), "{message}");
+}
+
+// The limit is per message: a stream of many small events before the answer reads through.
+#[tokio::test]
+async fn reads_a_long_stream_of_small_events_before_the_answer() {
+    let server = modern_server().await;
+    stub_with(&server, "tools/call", |request| {
+        let mut body = progress_event().repeat(60_000);
+        body.push_str(&format!("data: {}\n\n", answer(request)));
+        events(body)
+    })
+    .await;
+
+    assert_eq!(
+        slow_call(&client(&server)).await.unwrap(),
+        json!({ "content": [] })
+    );
+}
+
+fn progress_event() -> String {
+    format!("data: {}\n\n", progress())
+}

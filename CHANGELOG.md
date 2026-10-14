@@ -3,7 +3,7 @@
 RustLLM's version follows the RubyLLM release it ports: 2.1.1 ports RubyLLM 2.1.1 (upstream
 `crmne/ruby_llm` at tag `v2.1.1`). Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [2.1.1] - unreleased
+## [2.1.1] - 2026-10-13
 
 First release: `rust_llm`, `rust_llm_loco`, and `rust_llm_cli`, a full port of RubyLLM 2.1.1.
 `docs/PARITY.md` classifies all 4,684 examples in RubyLLM's spec suite: 2,991 ported as Rust tests,

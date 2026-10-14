@@ -752,6 +752,31 @@ fn message_delta_usage_carries_thinking_tokens() {
     assert_eq!(chunk.tokens.thinking, Some(7));
 }
 
+// `Tokens.new(server_tool_use:)` keeps only positive counts: a response that ran no server tool
+// reports none, buffered or streamed.
+#[test]
+fn server_tool_use_without_any_runs_is_none() {
+    let zeroes = json!({ "web_search_requests": 0, "web_fetch_requests": 0 });
+    let mut data = body(json!([{ "type": "text", "text": "Hi" }]));
+    data["usage"] = json!({ "input_tokens": 3, "output_tokens": 1, "server_tool_use": zeroes });
+    assert_eq!(parse(data).tokens.server_tool_use, None);
+
+    let chunk = anthropic::build_chunk(
+        &mut StreamBlocks::default(),
+        &json!({ "type": "message_delta", "delta": { "stop_reason": "end_turn" },
+                 "usage": { "output_tokens": 1, "server_tool_use": zeroes } }),
+    );
+    assert_eq!(chunk.tokens.server_tool_use, None);
+
+    let ran = json!({ "web_search_requests": 2, "web_fetch_requests": 0 });
+    let mut data = body(json!([{ "type": "text", "text": "Hi" }]));
+    data["usage"] = json!({ "server_tool_use": ran });
+    assert_eq!(
+        parse(data).tokens.server_tool_use,
+        json!({ "web_search_requests": 2 }).as_object().cloned()
+    );
+}
+
 // spec: protocols/anthropic/streaming_spec.rb:72 sends Accept-Encoding: identity on streaming requests
 #[tokio::test]
 async fn streaming_requests_ask_for_identity_encoding() {
