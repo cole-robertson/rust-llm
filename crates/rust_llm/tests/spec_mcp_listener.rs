@@ -200,3 +200,14 @@ async fn stops_when_the_server_does_not_know_the_method() {
     tokio::time::sleep(Duration::from_millis(100)).await;
     assert_eq!(client.attempts().len(), 1);
 }
+
+// Found in the pre-release review: dropping a listener without `stop` left its subscription (and
+// its stream or stdio process) running detached.
+#[tokio::test]
+async fn dropping_a_listener_cancels_its_subscription() {
+    let client = Scripted::new(acknowledging());
+    let listener = listener(&client, Duration::from_secs(2), quiet());
+    listener.start(tools()).await.unwrap();
+    drop(listener);
+    eventually(|| client.cancelled() == [1]).await;
+}

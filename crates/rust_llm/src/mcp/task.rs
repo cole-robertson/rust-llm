@@ -135,9 +135,10 @@ impl Task {
     }
 
     /// `poll_interval`: how long the server asks you to wait before checking on the task again.
+    /// A negative, non-finite, or overflowing hint is ignored rather than trusted.
     pub fn poll_interval(&self) -> Option<Duration> {
         let ms = self.data.get("pollIntervalMs").and_then(Value::as_f64)?;
-        Some(Duration::from_secs_f64(ms / 1000.0))
+        Duration::try_from_secs_f64(ms / 1000.0).ok()
     }
 
     /// `expires_at`: when the server may forget the task, or `None` when it keeps it for good.
@@ -145,7 +146,12 @@ impl Task {
         let ttl = self.data.get("ttlMs").and_then(Value::as_f64)?;
         let created = self.data.get("createdAt").and_then(Value::as_str)?;
         let created = DateTime::parse_from_rfc3339(created).ok()?;
-        Some(created.with_timezone(&Utc) + chrono::Duration::milliseconds(ttl as i64))
+        if !ttl.is_finite() || ttl < 0.0 {
+            return None;
+        }
+        // `as` saturates a huge ttl at i64::MAX; out-of-range sums are `None`, not a panic.
+        let ttl = chrono::Duration::try_milliseconds(ttl as i64)?;
+        created.with_timezone(&Utc).checked_add_signed(ttl)
     }
 
     /// `done?`: the task completed, failed, or was cancelled.
@@ -261,5 +267,42 @@ impl Task {
                 self.id
             ))
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    // Found in the pre-release review: a server's bad hint panicked in Duration::from_secs_f64.
+    #[test]
+    fn ignores_a_poll_interval_that_is_negative_or_too_large() {
+        for ms in [json!(-1), json!(1e300)] {
+            let task = Task::new(None, json!({ "taskId": "t", "pollIntervalMs": ms }));
+            assert_eq!(task.poll_interval(), None, "{ms}");
+        }
+        let task = Task::new(None, json!({ "taskId": "t", "pollIntervalMs": 250 }));
+        assert_eq!(task.poll_interval(), Some(Duration::from_millis(250)));
+    }
+
+    // Found in the pre-release review: a huge ttl overflowed `DateTime + TimeDelta`.
+    #[test]
+    fn has_no_expiry_for_a_ttl_out_of_range() {
+        for ttl in [json!(1e300), json!(-5)] {
+            let task = Task::new(
+                None,
+                json!({ "taskId": "t", "ttlMs": ttl, "createdAt": "2026-10-13T12:00:00Z" }),
+            );
+            assert_eq!(task.expires_at(), None, "{ttl}");
+        }
+        let task = Task::new(
+            None,
+            json!({ "taskId": "t", "ttlMs": 60000, "createdAt": "2026-10-13T12:00:00Z" }),
+        );
+        assert_eq!(
+            task.expires_at().map(|t| t.to_rfc3339()),
+            Some("2026-10-13T12:01:00+00:00".to_string())
+        );
     }
 }
