@@ -9,7 +9,7 @@ name: Release
 #      maintainer's machine with a normal token.
 #   2. On each crate's crates.io Settings -> Trusted Publishing, add: owner cole-robertson,
 #      repository rust-llm, workflow release.yml, environment blank.
-# After that, pushing a tag `v2.0.1` publishes 2.0.1. `gh workflow run release.yml` checks the
+# After that, pushing a tag `v2.1.2` publishes 2.1.2. `gh workflow run release.yml` checks the
 # token exchange without publishing anything.
 
 on:

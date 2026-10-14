@@ -48,6 +48,13 @@ impl EventStreamParser {
         self.reconnection_time
     }
 
+    /// The bytes held for the event in progress: its unfinished line and the data lines read so
+    /// far. A stream that never ends a line or an event grows this without bound, so readers of
+    /// untrusted streams compare it to a limit after every `feed` (see [`StreamState::read`]).
+    pub(crate) fn pending_bytes(&self) -> usize {
+        self.buffer.len() - self.position + self.data.len()
+    }
+
     /// `#feed(chunk) { |type, data, id| }`: hands each event the piece completes to `on_event`.
     /// When `on_event` fails, the lines already read stay read: the next `feed` continues after
     /// them.
@@ -197,6 +204,13 @@ fn decode(bytes: &[u8]) -> String {
 /// body is kept while waiting for it to parse.
 pub(crate) const MAX_JSON_BODY_BYTES: usize = 1024 * 1024;
 
+/// The most one server-sent event of a provider's stream may hold, unfinished or dispatched. Not
+/// in RubyLLM, which buffers without limit. The WebSocket transport's `MAX_FRAME_BYTES`: large
+/// enough for a base64 image streamed inside a single event, small enough that a server that
+/// never ends a line or an event cannot exhaust memory. The limit is per event, so a long stream
+/// of events is never cut short.
+pub(crate) const MAX_EVENT_BYTES: usize = 16 * 1024 * 1024;
+
 /// `Protocol::Streaming::StreamState`: one attempt's parser, plus the bare JSON body a provider
 /// may answer a streaming request with instead of events. Each attempt starts a fresh one.
 pub(crate) struct StreamState {
@@ -229,7 +243,16 @@ impl StreamState {
             self.json_body = Some(trim(chunk).starts_with(b"{"));
         }
         if self.json_body != Some(true) {
-            self.parser.feed_with(chunk, on_event)?;
+            let mut on_event = on_event;
+            self.parser.feed_with(chunk, |event| {
+                if event.data.len() > MAX_EVENT_BYTES {
+                    return Err(event_too_large(MAX_EVENT_BYTES));
+                }
+                on_event(event)
+            })?;
+            if self.parser.pending_bytes() > MAX_EVENT_BYTES {
+                return Err(event_too_large(MAX_EVENT_BYTES));
+            }
             return Ok(None);
         }
         // `handle_json_body`: refuse the read before retaining it, in bytes.
@@ -242,6 +265,10 @@ impl StreamState {
         self.buffer.extend_from_slice(chunk);
         Ok(error_body(&self.buffer))
     }
+}
+
+fn event_too_large(limit: usize) -> Error {
+    Error::Api(format!("Streaming event exceeds {limit} bytes"), None)
 }
 
 /// `handle_failed_response`: appends a read of a failed response's body to `buffer`, unless it
@@ -318,6 +345,59 @@ mod tests {
             "{error}"
         );
         assert_eq!(state.buffer, br#"{"detail":""#);
+    }
+
+    // A hostile server cannot grow one line without end: no newline ever arrives.
+    #[test]
+    fn rejects_a_line_that_never_ends_past_the_event_limit() {
+        let mut state = StreamState::new(MAX_JSON_BODY_BYTES);
+        assert_eq!(feed_all(&mut state, b"data: ").unwrap(), None);
+        let piece = vec![b'x'; 1024 * 1024];
+        let mut outcome = Ok(None);
+        for _ in 0..17 {
+            outcome = feed_all(&mut state, &piece);
+            if outcome.is_err() {
+                break;
+            }
+        }
+        let error = outcome.unwrap_err();
+        assert!(matches!(error, Error::Api(..)), "{error:?}");
+        assert!(error.to_string().contains("event exceeds"), "{error}");
+    }
+
+    // Nor one event: many short `data:` lines and never the blank line that ends it.
+    #[test]
+    fn rejects_an_event_that_never_ends_past_the_event_limit() {
+        let mut state = StreamState::new(MAX_JSON_BODY_BYTES);
+        let line = format!("data: {}\n", "x".repeat(1024));
+        let piece = line.repeat(1024);
+        let mut outcome = Ok(None);
+        for _ in 0..17 {
+            outcome = feed_all(&mut state, piece.as_bytes());
+            if outcome.is_err() {
+                break;
+            }
+        }
+        let error = outcome.unwrap_err();
+        assert!(error.to_string().contains("event exceeds"), "{error}");
+    }
+
+    // The limit is per event, not per stream: a long stream of small events reads through.
+    #[test]
+    fn reads_a_long_stream_of_small_events() {
+        let mut state = StreamState::new(MAX_JSON_BODY_BYTES);
+        let event = format!("data: {}\n\n", "x".repeat(1024));
+        let piece = event.repeat(1024);
+        let mut count = 0;
+        for _ in 0..20 {
+            state
+                .read(piece.as_bytes(), |_| {
+                    count += 1;
+                    Ok(())
+                })
+                .unwrap();
+        }
+        assert_eq!(count, 20 * 1024);
     }
 
     // spec: protocol/streaming_spec.rb:262 stops retaining a failed response body past the limit, leaving its status to raise

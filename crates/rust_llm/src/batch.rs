@@ -742,7 +742,7 @@ impl Batch {
                 failure
             });
             if let Some(result) = result {
-                slots[index] = Some(self.deliver(index, result)?);
+                slots[index] = Some(self.deliver(index, result).await?);
             }
         }
         if self.completed {
@@ -768,7 +768,7 @@ impl Batch {
 
     /// Collecting early keeps reading fresh, so a result already delivered comes back on every
     /// later poll: hand each one over once.
-    fn deliver(&mut self, index: usize, result: BatchResult) -> Result<BatchResult> {
+    async fn deliver(&mut self, index: usize, result: BatchResult) -> Result<BatchResult> {
         match result {
             BatchResult::Embedding(mut embedding) => {
                 let model = self
@@ -786,7 +786,12 @@ impl Batch {
                         model,
                     )?;
                     if instrument {
-                        crate::instrumentation::usage(self.http.connection.config(), &entry);
+                        // `Accounting::Usage.report`: the ledger, then `usage.rust_llm`.
+                        crate::accounting::report(
+                            self.http.connection.config(),
+                            std::slice::from_ref(&entry),
+                        )
+                        .await;
                     }
                     embedding.usage_entries = vec![entry];
                 }
@@ -821,7 +826,7 @@ impl Batch {
                 if !delivered {
                     self.delivered.insert(index);
                     if let Some(chat) = self.chats.as_mut().and_then(|c| c.get_mut(index)) {
-                        chat.add_completion(message.clone(), true);
+                        chat.add_completion(message.clone(), true).await;
                     }
                 }
                 Ok(BatchResult::Message(message))

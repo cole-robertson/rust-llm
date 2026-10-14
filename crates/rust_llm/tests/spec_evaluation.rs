@@ -975,3 +975,30 @@ async fn rejects_invalid_configuration_before_publishing_progress_or_yielding_tr
     assert!(events.lock().unwrap().is_empty());
     assert_eq!(performed.load(Ordering::SeqCst), 0);
 }
+
+// An evaluation whose name cannot name its workflow reports why, instead of skipping `perform`.
+#[tokio::test]
+async fn records_an_error_when_the_evaluation_name_cannot_name_its_workflow() {
+    let performed = Arc::new(AtomicUsize::new(0));
+    let mut e = upcase_evaluation(Evaluation::named(""));
+    let seen = performed.clone();
+    e.perform(move |_| {
+        let seen = seen.clone();
+        async move {
+            seen.fetch_add(1, Ordering::SeqCst);
+            Ok(Outcome::Value("HELLO".into()))
+        }
+    });
+    let report = e
+        .run_with(RunOptions::default().dataset(greeting()))
+        .await
+        .unwrap();
+    let first = report.first().unwrap();
+    assert_eq!(first.status(), Status::Error);
+    assert!(
+        first.error().unwrap().message.contains("cannot be empty"),
+        "{:?}",
+        first.error()
+    );
+    assert_eq!(performed.load(Ordering::SeqCst), 0);
+}

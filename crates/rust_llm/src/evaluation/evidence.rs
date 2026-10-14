@@ -3,7 +3,7 @@
 //!
 //! Ruby inspects the returned object's class. Here `perform` returns an [`Outcome`], one variant
 //! per kind of value Ruby recognizes; anything else goes through an adapter
-//! ([`super::EvaluationDef::adapt`]) to JSON, as Ruby's `adapt` does.
+//! ([`super::Evaluation::adapt`]) to JSON, as Ruby's `adapt` does.
 
 use std::any::Any;
 use std::sync::Arc;

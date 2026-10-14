@@ -33,6 +33,11 @@ const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
 const RECONNECTS: usize = 3;
 const RECONNECT_DELAY: Duration = Duration::from_secs(1);
 const CHECK_INTERVAL: Duration = Duration::from_millis(100);
+/// The most one message may hold: a JSON body, or one event of an event stream (its unfinished
+/// line and data included). Not in RubyLLM, which reads without limit; a server that never ends
+/// its body, a line, or an event would otherwise exhaust memory. A stream that stays open is not
+/// limited, only each message on it.
+const MAX_MESSAGE_BYTES: usize = 4 * 1024 * 1024;
 
 /// Headers sent with every request, resolved per request for its HTTP verb (`headers: ->(verb)
 /// { ... }`).
@@ -134,7 +139,8 @@ impl Http {
     pub fn new(url: &str, headers: HeaderSource, timeout: Duration) -> Result<Http> {
         if !Http::is_secure(url) {
             return Err(Error::Argument(format!(
-                "MCP servers must use HTTPS without credentials in the URL: {url}"
+                "MCP servers must use HTTPS without credentials in the URL: {}",
+                without_credentials(url)
             )));
         }
         let url = reqwest::Url::parse(url).map_err(|e| Error::Argument(e.to_string()))?;
@@ -443,7 +449,7 @@ impl Http {
                 Err(_) if stream.is_events() => break,
                 Err(e) => return Err(request_error(e)),
             };
-            stream.feed(&chunk, on_notification);
+            stream.feed(&chunk, on_notification)?;
             for request in std::mem::take(&mut stream.asked) {
                 self.answer(request, version).await;
             }
@@ -579,6 +585,24 @@ impl Http {
     }
 }
 
+fn too_large() -> Error {
+    McpError::new(format!(
+        "MCP server sent a message over {MAX_MESSAGE_BYTES} bytes"
+    ))
+    .into()
+}
+
+/// `url` without its username and password, for messages; unparseable URLs carry none to strip
+/// but may still hold them, so they are left out entirely.
+fn without_credentials(url: &str) -> String {
+    let Ok(mut url) = reqwest::Url::parse(url) else {
+        return "(unparseable URL)".to_string();
+    };
+    let _ = url.set_username("");
+    let _ = url.set_password(None);
+    url.to_string()
+}
+
 fn request_error(e: reqwest::Error) -> Error {
     if e.is_timeout() {
         Error::Timeout(e.to_string())
@@ -659,30 +683,42 @@ impl Stream {
         }
     }
 
-    fn feed(&mut self, chunk: &[u8], on_notification: &mut OnNotification<'_>) {
-        if self.events == Some(false) {
+    /// Fails once a message outgrows `MAX_MESSAGE_BYTES`.
+    fn feed(&mut self, chunk: &[u8], on_notification: &mut OnNotification<'_>) -> Result<()> {
+        if self.events != Some(true) {
+            if self.body.len() + chunk.len() > MAX_MESSAGE_BYTES {
+                return Err(too_large());
+            }
             self.body.push_str(&String::from_utf8_lossy(chunk));
-            return;
+        }
+        if self.events == Some(false) {
+            return Ok(());
         }
         let chunk = if self.events.is_none() {
-            self.body.push_str(&String::from_utf8_lossy(chunk));
             let trimmed = self.body.trim_start();
             if trimmed.is_empty() {
-                return;
+                return Ok(());
             }
             self.events = Some(!(trimmed.starts_with('{') || trimmed.starts_with('[')));
             if self.events == Some(false) {
-                return;
+                return Ok(());
             }
             std::mem::take(&mut self.body).into_bytes()
         } else {
             chunk.to_vec()
         };
         for event in self.parser.feed(&chunk) {
+            if event.data.len() > MAX_MESSAGE_BYTES {
+                return Err(too_large());
+            }
             if !event.data.is_empty() {
                 self.receive(&event.data, on_notification);
             }
         }
+        if self.parser.pending_bytes() > MAX_MESSAGE_BYTES {
+            return Err(too_large());
+        }
+        Ok(())
     }
 
     /// The body has ended: a bare JSON body is read now.
@@ -868,6 +904,21 @@ mod tests {
     }
 
     #[test]
+    fn leaves_the_password_out_of_the_error_for_a_url_with_credentials() {
+        let error = Http::new(
+            "https://ada:hunter2@mcp.example.com/mcp",
+            Arc::new(|_| Vec::new()),
+            Duration::from_secs(1),
+        )
+        .err()
+        .unwrap()
+        .to_string();
+        assert!(!error.contains("hunter2"), "{error}");
+        assert!(!error.contains("ada"), "{error}");
+        assert!(error.contains("https://mcp.example.com/mcp"), "{error}");
+    }
+
+    #[test]
     fn encodes_header_values_that_are_not_plain_ascii() {
         assert_eq!(header_value("search").as_deref(), Some("search"));
         let encoded = |v: &str| {
@@ -896,7 +947,7 @@ mod tests {
             serde_json::json!({ "jsonrpc": "2.0", "method": "notifications/tools/list_changed" })
         );
         for _ in 0..100 {
-            stream.feed(event.as_bytes(), &mut |_| {});
+            stream.feed(event.as_bytes(), &mut |_| {}).unwrap();
         }
         assert!(stream.replies.is_empty());
         assert!(stream.body.is_empty());

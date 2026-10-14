@@ -273,7 +273,9 @@ impl OAuthSettings {
         self.owner_with(move || Some(owner.clone()))
     }
 
-    /// `owner: :user`: evaluated when the MCP needs its credentials.
+    /// `owner: :user`: evaluated when the MCP needs its credentials. One `Mcp` serves one owner:
+    /// it keeps the OAuth state of the first owner it resolves, so build one `Mcp` per owner, as
+    /// RubyLLM builds one MCP instance per user.
     pub fn owner_with(
         mut self,
         owner: impl Fn() -> Option<String> + Send + Sync + 'static,
@@ -1613,10 +1615,7 @@ impl OAuth {
             .await
             .map_err(|e| Error::ConnectionFailed(e.to_string()))?;
         let status = response.status().as_u16();
-        let body = response
-            .text()
-            .await
-            .map_err(|e| Error::ConnectionFailed(e.to_string()))?;
+        let body = read_body(response).await?;
         if status >= 400 {
             let host = Url::parse(url)
                 .ok()
@@ -1643,8 +1642,10 @@ impl OAuth {
             .and_then(|v| v.to_str().ok())
             .map(str::to_string);
         self.proofs.remember(url, nonce.as_deref());
-        let Ok(body) = response.text().await else {
-            return Err(self.refusal(url, Some(status), ""));
+        let body = match read_body(response).await {
+            Ok(body) => body,
+            Err(Error::ConnectionFailed(_)) => return Err(self.refusal(url, Some(status), "")),
+            Err(e) => return Err(e),
         };
         if status >= 400 {
             return Err(self.refusal(url, Some(status), &body));
@@ -1725,6 +1726,28 @@ fn client_assertion(key: &Key, client_id: &str, server: &Value) -> Result<String
     let mut header = Map::new();
     header.insert("typ".into(), "client-authentication+jwt".into());
     key.jwt(&claims, algorithm, header)
+}
+
+/// The most an OAuth response body may hold. Metadata and token responses are small JSON
+/// objects; RubyLLM reads them without limit, which lets a hostile server exhaust memory.
+const MAX_RESPONSE_BYTES: usize = 1024 * 1024;
+
+/// A response body as text, refused once it outgrows `MAX_RESPONSE_BYTES`. A body cut short is a
+/// connection failure.
+async fn read_body(response: reqwest::Response) -> Result<String> {
+    use futures::StreamExt;
+    let mut body = Vec::new();
+    let mut chunks = response.bytes_stream();
+    while let Some(chunk) = chunks.next().await {
+        let chunk = chunk.map_err(|e| Error::ConnectionFailed(e.to_string()))?;
+        if body.len() + chunk.len() > MAX_RESPONSE_BYTES {
+            return Err(error(format!(
+                "The authorization server sent a response over {MAX_RESPONSE_BYTES} bytes"
+            )));
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(String::from_utf8_lossy(&body).into_owned())
 }
 
 fn parse(body: &str) -> Result<Value> {

@@ -2,7 +2,7 @@
 
 Install RustLLM, configure a provider, and try chats, streaming, files, structured output, tools,
 agents, images, embeddings, audio, and cost tracking. Each section shows one feature and links to its
-guide. The API follows [RubyLLM](https://github.com/crmne/ruby_llm) 2.0, so the Ruby original sits
+guide. The API follows [RubyLLM](https://github.com/crmne/ruby_llm) 2.1, so the Ruby original sits
 next to each Rust sample for readers coming from Ruby.
 
 ## Installation

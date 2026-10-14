@@ -820,16 +820,23 @@ impl RunContext<'_> {
     ) {
         let name = self.evaluation.name.as_deref().unwrap_or("Evaluation");
         let metadata = json!({ "case": case.name(), "repetition": repetition });
-        let Ok(workflow) = crate::workflow::Workflow::new(
+        let workflow = match crate::workflow::Workflow::new(
             name,
             Some(self.id),
             Some(metadata),
             self.config.clone(),
-        ) else {
-            return;
+        ) {
+            Ok(workflow) => workflow,
+            Err(e) => {
+                steps.error = Some(TrialError::from_error(&e));
+                return;
+            }
         };
-        let _ = workflow
+        // A reborrow, so `steps` is free again to record the workflow's own failure.
+        let performing = &mut *steps;
+        let outcome = workflow
             .run(|wf| async move {
+                let steps = performing;
                 wf.step("perform", None, async {
                     self.perform(instance, steps).await;
                     Ok(())
@@ -849,6 +856,9 @@ impl RunContext<'_> {
                 Ok(())
             })
             .await;
+        if let Err(e) = outcome {
+            steps.error.get_or_insert(TrialError::from_error(&e));
+        }
     }
 
     /// `perform`: setup, the application, its evidence, then assertions.

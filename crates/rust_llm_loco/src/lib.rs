@@ -88,6 +88,15 @@ use entities::{
 pub const CHAT_TYPE: &str = "Chat";
 pub const MESSAGE_TYPE: &str = "Message";
 
+/// A spawned task aborted when this is dropped.
+struct AbortOnDrop(tokio::task::JoinHandle<()>);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
 /// `ChatMethods::CANCELLATION_POLL_INTERVAL`: how often a running `complete` reads the
 /// `chats.cancelled` column another process may have set.
 pub const CANCELLATION_POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -685,7 +694,7 @@ impl ChatRecord {
         let pending: Arc<Mutex<Vec<UsageEntry>>> = Arc::default();
         let sink = pending.clone();
         chat.set_usage_recorder(Box::new(move |e| sink.lock().unwrap().push(e.clone())));
-        chat.add_completion(message, false);
+        chat.add_completion(message, false).await;
         self.persist_unsaved(db, chat, Usages::Pending(&pending))
             .await?;
         let orphans = std::mem::take(&mut *pending.lock().unwrap()); // poisoned lock only
@@ -852,7 +861,7 @@ impl ChatRecord {
         }
         let poller = self.watch_cancellation(db, chat.cancel_handle());
         let outcome = self.run_loop(db, chat, &pending_usages).await;
-        poller.abort();
+        drop(poller);
         chat.clear_async_usage_recorder();
         // Attempts that produced no message stay in the ledger unlinked, as RubyLLM keeps them.
         if let Err(e) = outcome {
@@ -902,7 +911,7 @@ impl ChatRecord {
         let outcome = self
             .run_stream_loop(db, chat, &pending_usages, &mut on_event)
             .await;
-        poller.abort();
+        drop(poller);
         chat.clear_async_usage_recorder();
         if let Err(e) = outcome {
             if let Error::Llm(llm) = &e {
@@ -1477,15 +1486,17 @@ impl ChatRecord {
         consume_cancellation(db, self.record.id).await
     }
 
-    /// Polls the row while `complete` runs and cancels the chat when a request appears.
+    /// Polls the row while `complete` runs and cancels the chat when a request appears. The
+    /// poller stops when the returned guard drops, including when the caller's future is dropped
+    /// mid-request, so it never consumes a cancellation meant for a later run.
     fn watch_cancellation(
         &self,
         db: &DatabaseConnection,
         handle: rust_llm::CancelHandle,
-    ) -> tokio::task::JoinHandle<()> {
+    ) -> AbortOnDrop {
         let db = db.clone();
         let id = self.record.id;
-        tokio::spawn(async move {
+        AbortOnDrop(tokio::spawn(async move {
             loop {
                 tokio::time::sleep(CANCELLATION_POLL_INTERVAL).await;
                 match consume_cancellation(&db, id).await {
@@ -1500,7 +1511,7 @@ impl ChatRecord {
                     }
                 }
             }
-        })
+        }))
     }
 
     // ---- approvals and input requests ------------------------------------------------------

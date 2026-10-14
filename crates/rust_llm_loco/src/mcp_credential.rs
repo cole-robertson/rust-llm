@@ -21,6 +21,7 @@
 //!
 //! `synchronize(key)` touches the row in a transaction, which locks it on every database (SQLite
 //! takes its write lock), so one process refreshes a grant while the others wait for its token.
+//! The block is given at most [`McpCredentialStore::SYNCHRONIZE_TIMEOUT`] to hold it.
 //! The store's own reads and writes inside the block run in that transaction, as Active Record's
 //! do on the transaction's connection.
 
@@ -83,6 +84,10 @@ fn failure(message: impl std::fmt::Display) -> rust_llm::Error {
 }
 
 impl McpCredentialStore {
+    /// The longest `synchronize` holds its transaction (and so, on SQLite, the database's one
+    /// write lock) while its block calls the authorization server.
+    pub const SYNCHRONIZE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
     /// A store in `db`, encrypting with the 32-byte `key` (`active_record_encryption.primary_key`).
     pub fn new(db: DatabaseConnection, key: [u8; 32]) -> McpCredentialStore {
         McpCredentialStore {
@@ -213,6 +218,11 @@ impl CredentialStore for McpCredentialStore {
 
     /// `synchronize(key)`: `transaction { where(key:).touch_all; yield }`. Updating the row locks
     /// it on every database; SQLite ignores `FOR UPDATE`. The block's error rolls it back.
+    ///
+    /// On SQLite that lock is the whole database's write lock, and the block calls the
+    /// authorization server, so the block is cut off (and rolled back, failing like a refused
+    /// refresh) after [`McpCredentialStore::SYNCHRONIZE_TIMEOUT`] rather than the configuration's
+    /// `request_timeout`, keeping every other write in the app waiting at most that long.
     async fn synchronize<'a>(
         &'a self,
         key: &'a str,
@@ -233,7 +243,17 @@ impl CredentialStore for McpCredentialStore {
             .await
             .map_err(failure)?;
         let transaction = Arc::new(transaction);
-        let result = TRANSACTION.scope(transaction.clone(), block).await;
+        let result = tokio::time::timeout(
+            Self::SYNCHRONIZE_TIMEOUT,
+            TRANSACTION.scope(transaction.clone(), block),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            Err(failure(format!(
+                "gave up on {key} after {:?} so as not to hold the write lock",
+                Self::SYNCHRONIZE_TIMEOUT
+            )))
+        });
         let transaction = Arc::into_inner(transaction)
             .ok_or_else(|| failure("the transaction outlived its block"))?;
         match result {

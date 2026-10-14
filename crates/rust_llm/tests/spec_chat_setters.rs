@@ -241,8 +241,8 @@ async fn consults_an_external_cancellation_checker() {
 }
 
 // spec: chat_options_spec.rb:265 leaves the ledger alone
-#[test]
-fn add_completion_leaves_the_ledger_alone_when_usage_is_already_recorded() {
+#[tokio::test]
+async fn add_completion_leaves_the_ledger_alone_when_usage_is_already_recorded() {
     let mut chat = chat(MODEL, "anthropic");
     let mut response = Message::assistant("from a batch");
     response.tokens.input = Some(5);
@@ -258,7 +258,7 @@ fn add_completion_leaves_the_ledger_alone_when_usage_is_already_recorded() {
         cost: Default::default(),
     }];
 
-    chat.add_completion(response, false);
+    chat.add_completion(response, false).await;
 
     assert!(chat.usage_entries().is_empty());
 }

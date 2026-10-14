@@ -680,6 +680,117 @@ async fn hydrates_embeddings_into_their_staged_requests_and_leaves_failed_slots_
     );
 }
 
+/// `Accounting::Usage.ledger`: the entries it was handed, in order.
+#[derive(Default)]
+struct Ledger(std::sync::Mutex<Vec<rust_llm::UsageEntry>>);
+
+#[async_trait::async_trait]
+impl rust_llm::accounting::UsageLedger for Ledger {
+    async fn record(&self, entry: &rust_llm::UsageEntry) {
+        self.0.lock().unwrap().push(entry.clone());
+    }
+}
+
+/// `config` with `ledger` as its usage ledger.
+fn with_ledger(config: &Arc<Config>, ledger: &Arc<Ledger>) -> Arc<Config> {
+    let mut c = (**config).clone();
+    c.usage_ledger = Some(ledger.clone());
+    Arc::new(c)
+}
+
+// Ruby's `add_completion(record_usage: true)` hands a plain chat's batch entries to
+// `Accounting::Usage.record` (`record_usage_entry`), so the ledger gets one row per answer.
+#[tokio::test]
+async fn writes_each_collected_chat_answer_to_the_usage_ledger_once() {
+    let jsonl = anthropic_success("0", json!([{ "type": "text", "text": "Hello" }]), 3, 2);
+    let (_server, config) = ended_anthropic_batch(jsonl).await;
+    let ledger = Arc::new(Ledger::default());
+    let config = with_ledger(&config, &ledger);
+    let chat = staged(&config, "claude-haiku-4-5", None, "Hi");
+
+    let mut batch = Batch::find_with_config(config, "msgbatch_test", Some("anthropic"))
+        .await
+        .unwrap()
+        .with_chats(vec![chat]);
+    let message = batch.messages().await.unwrap().remove(0).unwrap();
+    batch.messages().await.unwrap();
+
+    let recorded = ledger.0.lock().unwrap().clone();
+    assert_eq!(recorded, message.usage_entries);
+    assert_eq!(recorded.len(), 1);
+    assert_eq!(
+        (recorded[0].tokens.input, recorded[0].tokens.output),
+        (Some(3), Some(2))
+    );
+}
+
+/// An OpenAI embedding batch that has completed with one embedding of `prompt_tokens: 3`.
+async fn completed_embedding_batch(server: &MockServer) {
+    let batch_json = json!({ "id": "batch_test", "status": "completed", "endpoint": "/v1/embeddings",
+        "output_file_id": "file-out", "error_file_id": "", "request_counts": { "total": 1, "completed": 1, "failed": 0 } });
+    Mock::given(method("POST"))
+        .and(path("/v1/files"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "id": "file-in" })))
+        .mount(server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/v1/batches"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(batch_json.clone()))
+        .mount(server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v1/batches/batch_test"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(batch_json))
+        .mount(server)
+        .await;
+    let ok = json!({ "custom_id": "0", "response": { "status_code": 200, "body": {
+        "object": "list", "model": "text-embedding-3-small",
+        "data": [{ "object": "embedding", "index": 0, "embedding": [0.1, 0.2] }], "usage": { "prompt_tokens": 3 } } } });
+    Mock::given(method("GET"))
+        .and(path("/v1/files/file-out/content"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_raw(format!("{ok}\n"), "application/octet-stream"),
+        )
+        .mount(server)
+        .await;
+}
+
+// Ruby's `attach_batch_usage` reports an embedding's entry through `Accounting::Usage.report`
+// (ledger and `usage.ruby_llm`), once per request.
+#[tokio::test]
+async fn writes_each_collected_embedding_to_the_usage_ledger_once() {
+    let server = MockServer::start().await;
+    completed_embedding_batch(&server).await;
+    let ledger = Arc::new(Ledger::default());
+    let mut config = Config::default();
+    config.set("openai_api_key", "test-key");
+    config.set("openai_api_base", format!("{}/v1", server.uri()));
+    config.usage_ledger = Some(ledger.clone());
+    let config = Arc::new(config);
+    let request = embed_later(
+        "Embed me",
+        EmbedOptions {
+            model: Some("text-embedding-3-small"),
+            config: Some(config.clone()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    let mut batch = rust_llm::batch(vec![request]).await.unwrap();
+    let results = batch.results().await.unwrap();
+    batch.results().await.unwrap();
+
+    let embedding = results[0].as_ref().and_then(|r| r.as_embedding()).unwrap();
+    let recorded = ledger.0.lock().unwrap().clone();
+    assert_eq!(recorded, embedding.usage_entries);
+    assert_eq!(recorded.len(), 1);
+    assert_eq!(
+        recorded[0].operation,
+        rust_llm::message::Operation::Embedding
+    );
+}
+
 // ---- Provider#batch_cost ------------------------------------------------------------------------
 
 fn priced(batch: Option<PricingTier>) -> Model {

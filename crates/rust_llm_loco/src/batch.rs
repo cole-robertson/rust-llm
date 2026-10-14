@@ -193,10 +193,14 @@ pub async fn to_llm(
         .with_batch_protocol(row.batch_protocol.as_deref());
     let mut chats = Vec::new();
     for record in records(db, row).await? {
-        chats.push(match record {
+        let mut chat = match record {
             Some(record) => record.to_llm_with(db, config.clone()).await?,
             None => placeholder_chat(config.clone(), &row.provider)?,
-        });
+        };
+        // `usage_recorder = persist_usage_entry`: a record writes its own rows ([`collect`] does,
+        // from the answers' entries), so a delivered answer never reaches the ledger as well.
+        chat.set_usage_recorder(Box::new(|_| {}));
+        chats.push(chat);
     }
     Ok(batch.with_chats(chats))
 }

@@ -2364,3 +2364,54 @@ fn refuses_grants_it_does_not_know() {
         "{error:?}"
     );
 }
+
+// ---- response size limits ---------------------------------------------------------------------
+
+/// A JSON object with `fields`, padded past the 1 MiB OAuth response limit.
+fn oversized(mut fields: Value) -> Value {
+    fields["padding"] = json!("x".repeat(2 * 1024 * 1024));
+    fields
+}
+
+// A hostile metadata server cannot make the client hold a response of any size in memory.
+#[tokio::test]
+async fn refuses_metadata_past_the_response_limit() {
+    let w = world().await;
+    let metadata =
+        oversized(json!({ "resource": w.server_url(), "authorization_servers": [w.issuer()] }));
+    w.stub(
+        &w.mcp,
+        "GET",
+        "/.well-known/oauth-protected-resource/mcp",
+        ResponseTemplate::new(200).set_body_json(metadata),
+    )
+    .await;
+
+    let error = w
+        .linear("ada")
+        .authorization_url(REDIRECT_URI)
+        .await
+        .err()
+        .unwrap();
+    assert!(mcp_error(error).contains("bytes"));
+}
+
+// Nor a token endpoint.
+#[tokio::test]
+async fn refuses_a_token_response_past_the_response_limit() {
+    let w = world().await;
+    w.stub(
+        &w.auth,
+        "POST",
+        "/token",
+        ResponseTemplate::new(200).set_body_json(oversized(
+            json!({ "access_token": "access-1", "expires_in": 3600 }),
+        )),
+    )
+    .await;
+    let linear = w.linear("ada");
+    let url = linear.authorization_url(REDIRECT_URI).await.unwrap();
+
+    let error = linear.authorize(w.callback(&url, &[])).await.unwrap_err();
+    assert!(mcp_error(error).contains("bytes"));
+}

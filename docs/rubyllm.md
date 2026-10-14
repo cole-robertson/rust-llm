@@ -76,7 +76,7 @@ mostly spelling: how a Ruby idiom turns into Rust.
 | `chat.messages` | `chat.messages()` |
 | `chat.messages = list` | `chat.set_messages(list)` |
 | `chat.add_message(msg)` | `chat.add_message(Message::user(..))` |
-| `chat.add_completion(response)` | `chat.add_completion(message, record_usage)` |
+| `chat.add_completion(response)` | `chat.add_completion(message, record_usage).await` |
 | `chat.render` | `chat.render()?` |
 | `chat.cache_until_here` | `chat.cache_until_here()?` |
 | `chat.with_instructions(text)` | `.with_instructions(text)` |
@@ -330,3 +330,7 @@ async fn main() -> rust_llm::Result<()> {
   takes an async closure.
 - MCP OAuth refuses P-521 DPoP keys (`ring` cannot sign with them); generated keys are P-256, as in
   RubyLLM.
+- Evaluation datasets are read as YAML 1.2 (`serde_norway`), while Ruby's Psych reads YAML 1.1:
+  unquoted `yes`, `no`, `on`, and `off` stay strings here but are booleans in Ruby, and aliases
+  (`*name`) are accepted here where Ruby's `safe_load_file` rejects them. Quote such values, or
+  write `true`/`false`, so a dataset reads the same in both.

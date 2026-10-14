@@ -9,8 +9,10 @@
 //!   `{type: "error", message}`). Nothing is broadcast, so one guest's reply can only ever reach
 //!   the request that asked for it.
 //! - **Limits** ([`Limits`], from `PUBLIC_CHAT_*` environment variables): messages per client IP
-//!   and per conversation within a window, input length, output tokens per reply, and turns per
-//!   conversation. Over a limit the answer is a 413 or 429 with a message the page shows.
+//!   (an IPv6 client by its /64), per conversation, and in all, within a window; input length,
+//!   output tokens per reply, and turns per conversation. Over a limit the answer is a 413 or 429
+//!   with a message the page shows. Without a known client address (the `remote_ip` middleware
+//!   off and no socket address) every guest shares one IP bucket; a warning says so once.
 //!
 //! Each reply calls the model with the app's provider key. Keep the limits tight on a public
 //! deployment.
@@ -58,6 +60,8 @@ pub struct Limits {
     pub ip_messages: u32,
     /// Messages one conversation may send per `window` (`PUBLIC_CHAT_SESSION_MESSAGES`, 10).
     pub session_messages: u32,
+    /// Messages all guests together may send per `window` (`PUBLIC_CHAT_GLOBAL_MESSAGES`, 200).
+    pub global_messages: u32,
     /// The rate-limit window (`PUBLIC_CHAT_WINDOW_SECS`, 600).
     pub window: Duration,
     /// The longest message, in characters (`PUBLIC_CHAT_MAX_INPUT_CHARS`, 4,000).
@@ -87,6 +91,7 @@ impl Limits {
         Self {
             ip_messages: var("PUBLIC_CHAT_IP_MESSAGES", 20),
             session_messages: var("PUBLIC_CHAT_SESSION_MESSAGES", 10),
+            global_messages: var("PUBLIC_CHAT_GLOBAL_MESSAGES", 200),
             window: Duration::from_secs(var("PUBLIC_CHAT_WINDOW_SECS", 600)),
             max_input_chars: var("PUBLIC_CHAT_MAX_INPUT_CHARS", 4_000),
             max_output_tokens: var("PUBLIC_CHAT_MAX_OUTPUT_TOKENS", 1_024),
@@ -145,7 +150,9 @@ struct Conversation {
 #[derive(Default)]
 struct Guests {
     conversations: HashMap<String, Conversation>,
+    /// Keyed by [`client_key`].
     ips: HashMap<IpAddr, Option<Bucket>>,
+    global: Option<Bucket>,
 }
 
 /// In memory, like the kit's live hub: one process, gone on restart.
@@ -158,6 +165,23 @@ fn guests() -> std::sync::MutexGuard<'static, Guests> {
 /// Forget every conversation and rate bucket (tests start from nothing).
 pub fn reset() {
     *guests() = Guests::default();
+}
+
+/// How many conversations are kept (tests).
+pub fn conversations() -> usize {
+    guests().conversations.len()
+}
+
+/// The address a client's IP bucket is keyed by: an IPv4 address as is, an IPv6 address by its
+/// /64, which one subscriber usually holds whole.
+fn client_key(ip: IpAddr) -> IpAddr {
+    match ip.to_canonical() {
+        IpAddr::V6(v6) => {
+            let s = v6.segments();
+            IpAddr::from([s[0], s[1], s[2], s[3], 0, 0, 0, 0])
+        }
+        v4 => v4,
+    }
 }
 
 impl Guests {
@@ -190,11 +214,16 @@ impl<S: Send + Sync> FromRequestParts<S> for ClientIp {
 
     async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, Self::Rejection> {
         // Without a known client address every guest shares one bucket.
-        Ok(Self(
-            crate::auth::client_ip(parts)
-                .await
-                .unwrap_or(IpAddr::from([0, 0, 0, 0])),
-        ))
+        static WARNED: std::sync::Once = std::sync::Once::new();
+        Ok(Self(crate::auth::client_ip(parts).await.unwrap_or_else(|| {
+            WARNED.call_once(|| {
+                tracing::warn!(
+                    "public chat: no client IP, so every guest shares one rate limit; \
+                     enable server.middlewares.remote_ip behind a proxy"
+                );
+            });
+            IpAddr::from([0, 0, 0, 0])
+        })))
     }
 }
 
@@ -295,12 +324,38 @@ async fn create(
     let history = {
         let mut guests = guests();
         guests.sweep(now, limits.window);
-        let ip_ok = Bucket::take(
-            guests.ips.entry(ip).or_default(),
+        let (busy, turns, mut rate) = guests
+            .conversations
+            .get(&id)
+            .map_or((false, 0, None), |c| (c.busy, c.turns, c.rate));
+        if busy {
+            return Ok(refuse(
+                StatusCode::CONFLICT,
+                "Wait for the reply to finish before sending another message.",
+            ));
+        }
+        if turns >= limits.max_turns {
+            return Ok(refuse(
+                StatusCode::TOO_MANY_REQUESTS,
+                &format!(
+                    "This conversation has reached its {} messages. Start a new one to keep going.",
+                    limits.max_turns
+                ),
+            ));
+        }
+        // The IP first, so a client over its own limit cannot drain the global one.
+        let allowed = Bucket::take(
+            guests.ips.entry(client_key(ip)).or_default(),
             limits.ip_messages,
             limits.window,
             now,
-        );
+        ) && Bucket::take(&mut rate, limits.session_messages, limits.window, now)
+            && Bucket::take(&mut guests.global, limits.global_messages, limits.window, now);
+        if !allowed {
+            tracing::warn!(%ip, "public chat rate limited");
+            return Ok(refuse(StatusCode::TOO_MANY_REQUESTS, SLOW_DOWN));
+        }
+        // Every check passed: only now is a new conversation kept.
         let conversation = guests
             .conversations
             .entry(id.clone())
@@ -311,31 +366,7 @@ async fn create(
                 rate: None,
                 seen: now,
             });
-        if conversation.busy {
-            return Ok(refuse(
-                StatusCode::CONFLICT,
-                "Wait for the reply to finish before sending another message.",
-            ));
-        }
-        if conversation.turns >= limits.max_turns {
-            return Ok(refuse(
-                StatusCode::TOO_MANY_REQUESTS,
-                &format!(
-                    "This conversation has reached its {} messages. Start a new one to keep going.",
-                    limits.max_turns
-                ),
-            ));
-        }
-        let session_ok = Bucket::take(
-            &mut conversation.rate,
-            limits.session_messages,
-            limits.window,
-            now,
-        );
-        if !ip_ok || !session_ok {
-            tracing::warn!(%ip, "public chat rate limited");
-            return Ok(refuse(StatusCode::TOO_MANY_REQUESTS, SLOW_DOWN));
-        }
+        conversation.rate = rate;
         conversation.busy = true;
         conversation.seen = now;
         conversation.messages.clone()
