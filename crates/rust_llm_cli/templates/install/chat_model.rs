@@ -5,12 +5,10 @@
 pub use rust_llm_loco::entities::chats::{ActiveModel, Column, Entity, Model};
 pub use rust_llm_loco::ChatRecord;
 
-use rust_llm_loco::entities::{messages, rust_llm_models, rust_llm_tool_calls, rust_llm_usages};
-use rust_llm_loco::{CHAT_TYPE, MESSAGE_TYPE};
+use rust_llm_loco::entities::{messages, rust_llm_models};
 use sea_orm::sea_query::{Expr, ExprTrait};
 use sea_orm::{
     ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
-    TransactionTrait,
 };
 use serde_json::{json, Value};
 
@@ -84,33 +82,18 @@ pub async fn find_props(db: &DatabaseConnection, id: i32) -> Result<Option<Value
 }
 
 /// `chat.destroy!` with `acts_as_chat`'s `dependent: :destroy`: the chat's messages, their tool
-/// calls, and its usage rows go with it.
+/// calls and attachments, and its usage rows go with it ([`ChatRecord::destroy`]).
 ///
 /// # Errors
 /// Database errors; nothing is deleted unless everything is.
 pub async fn destroy(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
-    let txn = db.begin().await?;
-    let message_ids: Vec<i64> = messages::Entity::find()
-        .filter(messages::Column::ChatId.eq(id))
-        .all(&txn)
-        .await?
-        .iter()
-        .map(|m| i64::from(m.id))
-        .collect();
-    rust_llm_tool_calls::Entity::delete_many()
-        .filter(rust_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
-        .filter(rust_llm_tool_calls::Column::MessageId.is_in(message_ids))
-        .exec(&txn)
-        .await?;
-    rust_llm_usages::Entity::delete_many()
-        .filter(rust_llm_usages::Column::ChatType.eq(CHAT_TYPE))
-        .filter(rust_llm_usages::Column::ChatId.eq(i64::from(id)))
-        .exec(&txn)
-        .await?;
-    messages::Entity::delete_many()
-        .filter(messages::Column::ChatId.eq(id))
-        .exec(&txn)
-        .await?;
-    Entity::delete_by_id(id).exec(&txn).await?;
-    txn.commit().await
+    let record = match ChatRecord::find(db, id).await {
+        Ok(record) => record,
+        Err(rust_llm_loco::Error::NotFound(_)) => return Ok(()),
+        Err(e) => return Err(DbErr::Custom(e.to_string())),
+    };
+    record.destroy(db).await.map_err(|e| match e {
+        rust_llm_loco::Error::Db(e) => e,
+        other => DbErr::Custom(other.to_string()),
+    })
 }

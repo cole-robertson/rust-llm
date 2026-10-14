@@ -716,13 +716,16 @@ impl ChatRecord {
     /// `chat.destroy!`: deletes the chat with its messages, and the internal rows that belong to
     /// them (`dependent: :destroy` on messages, tool calls, usages, and attachments).
     pub async fn destroy(self, db: &DatabaseConnection) -> Result<()> {
-        let ids: Vec<i64> = self
-            .messages(db)
+        // The ids are read inside the write transaction, so a message a worker commits meanwhile
+        // goes with its tool calls and attachments instead of leaving them behind.
+        let txn = begin_write(db).await?;
+        let ids: Vec<i64> = messages::Entity::find()
+            .filter(messages::Column::ChatId.eq(self.record.id))
+            .all(&txn)
             .await?
             .iter()
-            .map(|m| m.id as i64)
+            .map(|m| i64::from(m.id))
             .collect();
-        let txn = begin_write(db).await?;
         rust_llm_tool_calls::Entity::delete_many()
             .filter(rust_llm_tool_calls::Column::MessageType.eq(MESSAGE_TYPE))
             .filter(rust_llm_tool_calls::Column::MessageId.is_in(ids.clone()))

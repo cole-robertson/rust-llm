@@ -111,6 +111,27 @@ pub struct Listener {
     control: tokio::sync::Mutex<Option<Running>>,
 }
 
+/// Dropping a listener stops its subscription, as `stop` does, instead of leaving the task (and
+/// its HTTP stream or stdio process) running detached.
+impl Drop for Listener {
+    fn drop(&mut self) {
+        if let Some(running) = self.control.get_mut().take() {
+            // `halt` lets the subscription notice the flag and close its stream before it would
+            // abort the task; without a runtime to finish on, abort it straight away.
+            match tokio::runtime::Handle::try_current() {
+                Ok(handle) => {
+                    handle.spawn(halt(Some(running)));
+                }
+                Err(_) => {
+                    running.shared.stopping.store(true, Ordering::SeqCst);
+                    running.shared.stopped.notify_waiters();
+                    running.task.abort();
+                }
+            }
+        }
+    }
+}
+
 impl Listener {
     pub fn new(
         client: Arc<dyn Subscribe>,
